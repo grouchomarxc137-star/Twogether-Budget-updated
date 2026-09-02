@@ -1,5 +1,5 @@
 const STATE_KEY = 'TOGETHER_BUDGET_STATE_V1';
-const MAX_AUDIT = 500;
+const MAX_AUDIT = 2;
 const ACTORS = ['Principessa', 'Principe'];
 const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other'];
 
@@ -26,7 +26,7 @@ function readState_() {
       version: 2,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
-      audit: Array.isArray(parsed.audit) ? parsed.audit : [],
+      audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
     };
   } catch (err) {
@@ -39,7 +39,6 @@ function migrateTrip_(trip) {
     return sanitizeTripRecord_(trip);
   }
 
-  // Migration from the original single-entry trip format.
   const who = cleanActor_(trip && (trip.updatedBy || trip.createdBy));
   const actor = who === 'Unknown' ? 'Principessa' : who;
   const submission = sanitizeSubmission_({
@@ -75,7 +74,7 @@ function migrateTrip_(trip) {
 function saveState_(state) {
   state.version = 2;
   state.updatedAt = new Date().toISOString();
-  if (state.audit.length > MAX_AUDIT) state.audit = state.audit.slice(-MAX_AUDIT);
+  state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   PropertiesService.getScriptProperties().setProperty(STATE_KEY, JSON.stringify(state));
 }
 
@@ -149,7 +148,6 @@ function doPost(e) {
       return output_({ok:true, tripId:trip.id});
     }
 
-    // Backwards-compatible support for the previous frontend.
     if (action === 'upsertTrip') {
       const old = payload.trip || {};
       const submission = sanitizeSubmission_({
@@ -269,6 +267,7 @@ function addAudit_(state, actor, action, ref) {
     id: Utilities.getUuid(), actor: actor, action: action,
     ref: String(ref || ''), at: new Date().toISOString()
   });
+  state.audit = state.audit.slice(-MAX_AUDIT);
 }
 
 function resetDatabaseForOwnerOnly() {
