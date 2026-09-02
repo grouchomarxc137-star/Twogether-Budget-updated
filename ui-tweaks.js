@@ -7,18 +7,15 @@
 
   function setLoggedIn(name){
     if(!badge) return;
-    badge.textContent = `Logged in as ${name}`;
+    badge.textContent = name;
     badge.classList.remove('hidden');
-    badge.setAttribute('aria-label', `Logged in as ${name}. Click to switch user.`);
+    badge.removeAttribute('aria-label');
+    badge.style.cursor = 'default';
+    badge.style.pointerEvents = 'none';
   }
 
   document.querySelectorAll('.identity-choice[data-actor]').forEach(button => {
     button.addEventListener('click', () => setLoggedIn(button.dataset.actor));
-  });
-
-  badge?.addEventListener('click', () => {
-    document.getElementById('identityModal')?.classList.add('show');
-    document.getElementById('identityModal')?.setAttribute('aria-hidden','false');
   });
 
   function isInBudgetYear(dateText){
