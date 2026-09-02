@@ -23,17 +23,10 @@
     <button class="tab" data-sheet="compare" type="button">Compare Options</button>
   </div>
 
-  <div class="formula-wrap">
-    <input id="nameBox" class="namebox" value="F5" aria-label="Selected cell">
-    <span class="fx">fx</span>
-    <input id="formulaBar" class="formula" placeholder="Enter a value or formula, e.g. =SUM(F5:L5)">
-    <span id="status" class="status">Ready</span>
-  </div>
-
   <main class="main">
     <section id="trip" class="sheet active">
       <div class="titlebar">Visits & Trip Costs</div>
-      <div class="subtitle">Every Trip Log column is editable. Start/End keep calendar pickers, Location keeps its dropdown, and totals have editable default formulas.</div>
+      <div class="subtitle">Enter your trip details below. Start/End have calendar pickers, Location has a dropdown, and totals calculate automatically in the background.</div>
       <div class="table-wrap">
         <table id="tripTable">
           <thead>
@@ -70,6 +63,7 @@
         <div class="kpi green"><div class="kpi-label">Average Trips / Month</div><div class="kpi-value" id="kpiTrips">0.0</div></div>
       </div>
       <div class="titlebar">Monthly Overview</div>
+      <div class="subtitle">This page updates immediately from the trips you enter on Trip Log. The Start date determines which month a trip belongs to.</div>
       <div class="table-wrap">
         <table class="overview-table">
           <thead><tr>
@@ -83,7 +77,7 @@
 
     <section id="compare" class="sheet">
       <div class="titlebar greenhead">Compare Your Options</div>
-      <div class="subtitle">Yellow cells are editable. Try a plain number or a formula beginning with =.</div>
+      <div class="subtitle">Yellow cells are your scenario inputs. Everything else updates automatically from your Trip Log and these values.</div>
 
       <div class="compare-grid">
         <div class="block">
@@ -122,10 +116,10 @@
       <div class="howto">
         <h3>How to use this workbook</h3>
         <ol>
-          <li>Enter each visit in <b>Trip Log</b>.</li>
-          <li><b>Monthly Overview</b> updates automatically from the Start date.</li>
-          <li>Edit the yellow cells here to test renting and car scenarios.</li>
-          <li>Click any editable money cell and use the formula bar if you want Excel-like formulas.</li>
+          <li>Enter every visit in <b>Trip Log</b>, including a Start date.</li>
+          <li><b>Trip Total</b> and <b>Per Person</b> calculate automatically. You may type a number in either field if you want to override the automatic result for that trip.</li>
+          <li><b>Monthly Overview</b> and <b>Compare Options</b> recalculate immediately whenever you change a trip.</li>
+          <li>Edit the yellow scenario cells here to compare renting and car costs.</li>
         </ol>
       </div>
     </section>
