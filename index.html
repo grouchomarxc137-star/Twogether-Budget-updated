@@ -10,8 +10,8 @@
 <body>
 <div class="app" id="app">
   <header class="topbar">
-    <div class="brand-wrap"><div class="brand-mark" id="brandMark" title="Switch user">♡</div><div><div class="brand">Together</div><div class="brand-sub">shared trip budget</div></div></div>
-    <div class="top-actions"><button id="loggedUserBadge" class="who-badge hidden" type="button" title="Switch user"></button></div>
+    <div class="brand-wrap"><div class="brand-mark" id="brandMark">♡</div><div><div class="brand">Together</div><div class="brand-sub">shared trip budget</div></div></div>
+    <div class="top-actions"><span id="loggedUserBadge" class="who-badge hidden" aria-live="polite"></span></div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -29,7 +29,6 @@
           <span class="eyebrow">SHARED BETWEEN YOU TWO</span>
           <h1>Log a trip without turning it into homework.</h1>
           <p>One question at a time. You only enter what <em>you</em> remember and what <em>you</em> paid. If your versions differ, Together highlights exactly where.</p>
-          <div class="live-pill"><span class="live-dot"></span> Shared quietly in the background</div>
         </div>
         <div class="wizard-card" id="wizardCard">
           <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="wizardStep">Question 1</div><div class="wizard-progress"><span id="wizardProgress"></span></div></div><button class="text-btn" id="restartWizard" type="button">Start over</button></div>
@@ -77,6 +76,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <footer class="footer">Shared data is stored in Google Apps Script. Syncing happens silently in the background.</footer>
 </div>
-<script src="config.js"></script><script src="app-v3.js" defer></script><script src="ui-tweaks.js" defer></script>
+<script src="config.js"></script><script src="app-v3.js" defer></script><script src="ui-tweaks-v3.js?v=2" defer></script>
 </body>
 </html>
