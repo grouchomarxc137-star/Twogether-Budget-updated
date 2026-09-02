@@ -1,0 +1,42 @@
+/* Reversible typography experiment: Crimson Pro across the entire Twogether site. */
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap');
+
+html,
+body,
+button,
+input,
+select,
+textarea,
+table,
+th,
+td,
+.brand,
+.brand-sub,
+.tab,
+.hero-copy h1,
+.page-heading h1,
+.question-stage h2,
+.section-heading h2,
+.panel-head h2,
+.table-title h2,
+.trip-story-card h3,
+.trip-card-bottom strong,
+.kpi strong,
+.review-total strong,
+.compare-head,
+.rows,
+.identity-card,
+.trip-modal-card,
+.toast {
+  font-family: 'Crimson Pro', Georgia, serif !important;
+}
+
+/* Keep small interface labels readable with the serif. */
+.eyebrow,
+.panel-kicker,
+.brand-sub,
+.wizard-step,
+th,
+.trip-country {
+  letter-spacing: .07em;
+}
