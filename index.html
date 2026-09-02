@@ -3,54 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Together Budget Workbook</title>
+<title>Together Budget</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app" id="app">
-  <div class="topbar">
-    <div class="brand">Together Budget Workbook</div>
-    <div class="small">You + Principe</div>
+  <header class="topbar">
+    <div>
+      <div class="brand">Together Budget</div>
+      <div class="small">Trips, monthly costs and future options</div>
+    </div>
     <div class="spacer"></div>
     <button class="btn" id="loadDemo" type="button">Example</button>
-    <button class="btn" id="clearAll" type="button">Clear</button>
+    <button class="btn" id="clearAll" type="button">Clear all</button>
     <button class="btn primary" id="downloadJson" type="button">Export data</button>
-  </div>
+  </header>
 
-  <div class="tabs" role="tablist">
-    <button class="tab active" data-sheet="trip" type="button">Trip Log</button>
+  <nav class="tabs" role="tablist" aria-label="Budget pages">
+    <button class="tab active" data-sheet="log" type="button">Log Trip</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly Overview</button>
     <button class="tab" data-sheet="compare" type="button">Compare Options</button>
-  </div>
+    <button class="tab" data-sheet="details" type="button">Trip Details</button>
+  </nav>
 
   <main class="main">
-    <section id="trip" class="sheet active">
-      <div class="titlebar">Visits & Trip Costs</div>
-      <div class="subtitle">Enter your trip details below. Start/End have calendar pickers, Location has a dropdown, and totals calculate automatically in the background.</div>
-      <div class="table-wrap">
-        <table id="tripTable">
-          <thead>
-            <tr>
-              <th style="min-width:70px">Trip #</th>
-              <th style="min-width:135px">Start</th>
-              <th style="min-width:135px">End</th>
-              <th style="min-width:140px">Location</th>
-              <th style="min-width:170px">City / Area</th>
-              <th style="min-width:130px">Accommodation €</th>
-              <th style="min-width:120px">Groceries €</th>
-              <th style="min-width:120px">Eating Out €</th>
-              <th style="min-width:135px">Flights / Train €</th>
-              <th style="min-width:110px">Fuel €</th>
-              <th style="min-width:140px">Tolls / Parking €</th>
-              <th style="min-width:110px">Other €</th>
-              <th style="min-width:125px">Trip Total €</th>
-              <th style="min-width:125px">Per Person €</th>
-              <th style="min-width:120px">You Paid €</th>
-              <th style="min-width:135px">Principe Paid €</th>
-            </tr>
-          </thead>
-          <tbody id="tripBody"></tbody>
-        </table>
+    <section id="log" class="sheet active">
+      <div class="log-shell">
+        <div class="log-intro">
+          <span class="eyebrow">QUICK TRIP LOG</span>
+          <h1>Log a trip, one question at a time.</h1>
+          <p>Answer the question, continue, and the next one appears. At the end you can review everything before saving it.</p>
+        </div>
+
+        <div class="wizard-card" id="wizardCard">
+          <div class="wizard-top">
+            <div>
+              <div class="wizard-step" id="wizardStep">Question 1</div>
+              <div class="wizard-progress"><span id="wizardProgress"></span></div>
+            </div>
+            <button class="text-btn" id="restartWizard" type="button">Start over</button>
+          </div>
+          <div id="wizardBody" class="wizard-body"></div>
+        </div>
+
+        <div class="recent-card">
+          <div class="recent-head">
+            <div>
+              <h2>Recent trips</h2>
+              <p>Your latest saved trips appear here.</p>
+            </div>
+            <button class="btn" id="openDetails" type="button">View all details</button>
+          </div>
+          <div id="recentTrips" class="recent-list"></div>
+        </div>
       </div>
     </section>
 
@@ -63,11 +68,11 @@
         <div class="kpi green"><div class="kpi-label">Average Trips / Month</div><div class="kpi-value" id="kpiTrips">0.0</div></div>
       </div>
       <div class="titlebar">Monthly Overview</div>
-      <div class="subtitle">This page updates immediately from the trips you enter on Trip Log. The Start date determines which month a trip belongs to.</div>
+      <div class="subtitle">Updates automatically whenever a trip is saved or edited.</div>
       <div class="table-wrap">
         <table class="overview-table">
           <thead><tr>
-            <th style="min-width:110px">Month</th><th>Trips</th><th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th>
+            <th>Month</th><th>Trips</th><th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th>
             <th>Flights / Train €</th><th>Fuel €</th><th>Tolls / Parking €</th><th>Other €</th><th>Total €</th><th>Per Person €</th>
           </tr></thead>
           <tbody id="monthlyBody"></tbody>
@@ -77,8 +82,7 @@
 
     <section id="compare" class="sheet">
       <div class="titlebar greenhead">Compare Your Options</div>
-      <div class="subtitle">Yellow cells are your scenario inputs. Everything else updates automatically from your Trip Log and these values.</div>
-
+      <div class="subtitle">Yellow cells are editable. Everything else recalculates automatically.</div>
       <div class="compare-grid">
         <div class="block">
           <div class="block-head"><span>Current situation</span><span>Monthly €</span></div>
@@ -89,17 +93,14 @@
             <div class="r"><div>Trips per month (average)</div><div class="val" id="tripAvg">0.0</div></div>
           </div>
         </div>
-
         <div class="block">
           <div class="block-head"><span>Renting a place</span><span>Monthly €</span></div>
           <div class="rows" id="rentRows"></div>
         </div>
-
         <div class="block">
           <div class="block-head"><span>Car budget</span><span>Monthly €</span></div>
           <div class="rows" id="carRows"></div>
         </div>
-
         <div class="block">
           <div class="block-head"><span>Decision Snapshot</span><span>Monthly €</span></div>
           <div class="rows">
@@ -112,22 +113,29 @@
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="howto">
-        <h3>How to use this workbook</h3>
-        <ol>
-          <li>Enter every visit in <b>Trip Log</b>, including a Start date.</li>
-          <li><b>Trip Total</b> and <b>Per Person</b> calculate automatically. You may type a number in either field if you want to override the automatic result for that trip.</li>
-          <li><b>Monthly Overview</b> and <b>Compare Options</b> recalculate immediately whenever you change a trip.</li>
-          <li>Edit the yellow scenario cells here to compare renting and car costs.</li>
-        </ol>
+    <section id="details" class="sheet">
+      <div class="titlebar">Trip Details & History</div>
+      <div class="subtitle">This is the full editable record. Changes here immediately update every other page.</div>
+      <div class="table-wrap">
+        <table id="tripTable">
+          <thead>
+            <tr>
+              <th>Trip #</th><th>Start</th><th>End</th><th>Location</th><th>Other Location</th><th>City / Area</th>
+              <th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th><th>Flights / Train €</th><th>Fuel €</th>
+              <th>Tolls / Parking €</th><th>Other €</th><th>Trip Total €</th><th>Per Person €</th><th>You Paid €</th><th>Principe Paid €</th>
+            </tr>
+          </thead>
+          <tbody id="tripBody"></tbody>
+        </table>
       </div>
     </section>
   </main>
 
-  <div class="footer">Your data is saved automatically in this browser. Use “Export data” for a backup copy as JSON.</div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer class="footer">Your data is saved automatically in this browser. Use “Export data” for a backup copy.</footer>
 </div>
-
 <script src="app.js" defer></script>
 </body>
 </html>
