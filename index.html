@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Together Budget Workbook</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand">Together Budget Workbook</div>
+    <div class="small">You + Principe</div>
+    <div class="spacer"></div>
+    <button class="btn" id="loadDemo" type="button">Example</button>
+    <button class="btn" id="clearAll" type="button">Clear</button>
+    <button class="btn primary" id="downloadJson" type="button">Export data</button>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-sheet="trip" type="button">Trip Log</button>
+    <button class="tab" data-sheet="monthly" type="button">Monthly Overview</button>
+    <button class="tab" data-sheet="compare" type="button">Compare Options</button>
+  </div>
+
+  <div class="formula-wrap">
+    <input id="nameBox" class="namebox" value="F5" aria-label="Selected cell">
+    <span class="fx">fx</span>
+    <input id="formulaBar" class="formula" placeholder="Enter a value or formula, e.g. =SUM(F5:L5)">
+    <span id="status" class="status">Ready</span>
+  </div>
+
+  <main class="main">
+    <section id="trip" class="sheet active">
+      <div class="titlebar">Visits & Trip Costs</div>
+      <div class="subtitle">Every Trip Log column is editable. Start/End keep calendar pickers, Location keeps its dropdown, and totals have editable default formulas.</div>
+      <div class="table-wrap">
+        <table id="tripTable">
+          <thead>
+            <tr>
+              <th style="min-width:70px">Trip #</th>
+              <th style="min-width:135px">Start</th>
+              <th style="min-width:135px">End</th>
+              <th style="min-width:140px">Location</th>
+              <th style="min-width:170px">City / Area</th>
+              <th style="min-width:130px">Accommodation €</th>
+              <th style="min-width:120px">Groceries €</th>
+              <th style="min-width:120px">Eating Out €</th>
+              <th style="min-width:135px">Flights / Train €</th>
+              <th style="min-width:110px">Fuel €</th>
+              <th style="min-width:140px">Tolls / Parking €</th>
+              <th style="min-width:110px">Other €</th>
+              <th style="min-width:125px">Trip Total €</th>
+              <th style="min-width:125px">Per Person €</th>
+              <th style="min-width:120px">You Paid €</th>
+              <th style="min-width:135px">Principe Paid €</th>
+            </tr>
+          </thead>
+          <tbody id="tripBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="monthly" class="sheet">
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">12-Month Total</div><div class="kpi-value" id="kpiTotal">€0.00</div></div>
+        <div class="kpi"><div class="kpi-label">Average / Month</div><div class="kpi-value" id="kpiMonth">€0.00</div></div>
+        <div class="kpi"><div class="kpi-label">Per Person / Month</div><div class="kpi-value" id="kpiPerson">€0.00</div></div>
+        <div class="kpi"><div class="kpi-label">Average / Trip</div><div class="kpi-value" id="kpiTrip">€0.00</div></div>
+        <div class="kpi green"><div class="kpi-label">Average Trips / Month</div><div class="kpi-value" id="kpiTrips">0.0</div></div>
+      </div>
+      <div class="titlebar">Monthly Overview</div>
+      <div class="table-wrap">
+        <table class="overview-table">
+          <thead><tr>
+            <th style="min-width:110px">Month</th><th>Trips</th><th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th>
+            <th>Flights / Train €</th><th>Fuel €</th><th>Tolls / Parking €</th><th>Other €</th><th>Total €</th><th>Per Person €</th>
+          </tr></thead>
+          <tbody id="monthlyBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="compare" class="sheet">
+      <div class="titlebar greenhead">Compare Your Options</div>
+      <div class="subtitle">Yellow cells are editable. Try a plain number or a formula beginning with =.</div>
+
+      <div class="compare-grid">
+        <div class="block">
+          <div class="block-head"><span>Current situation</span><span>Monthly €</span></div>
+          <div class="rows">
+            <div class="r"><div>Average visits cost now</div><div class="val" id="currentAvg">€0.00</div></div>
+            <div class="r"><div>Your share now</div><div class="val" id="yourShare">€0.00</div></div>
+            <div class="r"><div>Principe share now</div><div class="val" id="hisShare">€0.00</div></div>
+            <div class="r"><div>Trips per month (average)</div><div class="val" id="tripAvg">0.0</div></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-head"><span>Renting a place</span><span>Monthly €</span></div>
+          <div class="rows" id="rentRows"></div>
+        </div>
+
+        <div class="block">
+          <div class="block-head"><span>Car budget</span><span>Monthly €</span></div>
+          <div class="rows" id="carRows"></div>
+        </div>
+
+        <div class="block">
+          <div class="block-head"><span>Decision Snapshot</span><span>Monthly €</span></div>
+          <div class="rows">
+            <div class="r"><div>Current visit lifestyle</div><div class="val" id="snapCurrent">€0.00</div></div>
+            <div class="r"><div>Rental lifestyle</div><div class="val" id="snapRent">€0.00</div></div>
+            <div class="r"><div>Rental + car</div><div class="val" id="snapBoth">€0.00</div></div>
+            <div class="r"><div>Difference: rental vs current</div><div class="val" id="snapDiffRent">€0.00</div></div>
+            <div class="r"><div>Difference: rental + car vs current</div><div class="val" id="snapDiffBoth">€0.00</div></div>
+            <div class="r"><div>Per person: rental + car</div><div class="val" id="snapPerson">€0.00</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="howto">
+        <h3>How to use this workbook</h3>
+        <ol>
+          <li>Enter each visit in <b>Trip Log</b>.</li>
+          <li><b>Monthly Overview</b> updates automatically from the Start date.</li>
+          <li>Edit the yellow cells here to test renting and car scenarios.</li>
+          <li>Click any editable money cell and use the formula bar if you want Excel-like formulas.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer">Your data is saved automatically in this browser. Use “Export data” for a backup copy as JSON.</div>
+</div>
+
+<script src="app.js" defer></script>
+</body>
+</html>
