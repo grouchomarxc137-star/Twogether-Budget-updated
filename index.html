@@ -3,41 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f4ef">
 <title>Together Budget</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app" id="app">
   <header class="topbar">
-    <div>
-      <div class="brand">Together Budget</div>
-      <div class="small">Trips, monthly costs and future options</div>
+    <div class="brand-wrap">
+      <div class="brand-mark">♡</div>
+      <div><div class="brand">Together</div><div class="brand-sub">shared trip budget</div></div>
     </div>
-    <div class="spacer"></div>
-    <button class="btn" id="loadDemo" type="button">Example</button>
-    <button class="btn" id="clearAll" type="button">Clear all</button>
-    <button class="btn primary" id="downloadJson" type="button">Export data</button>
+    <div class="top-actions">
+      <span class="connection" id="connectionStatus" data-tone="neutral">Connecting…</span>
+      <span class="who-badge hidden" id="whoBadge"></span>
+      <button class="soft-btn" id="syncNow" type="button">Sync</button>
+      <button class="soft-btn" id="switchUser" type="button">Switch user</button>
+      <button class="soft-btn" id="downloadJson" type="button">Backup</button>
+      <button class="soft-btn" id="loadDemo" type="button">Example</button>
+      <button class="soft-btn danger-soft" id="clearAll" type="button">Clear</button>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Budget pages">
-    <button class="tab active" data-sheet="log" type="button">Log Trip</button>
-    <button class="tab" data-sheet="monthly" type="button">Monthly Overview</button>
-    <button class="tab" data-sheet="compare" type="button">Compare Options</button>
-    <button class="tab" data-sheet="details" type="button">Trip Details</button>
+    <button class="tab active" data-sheet="log" type="button">Log trip</button>
+    <button class="tab" data-sheet="monthly" type="button">Monthly</button>
+    <button class="tab" data-sheet="compare" type="button">Compare</button>
+    <button class="tab" data-sheet="details" type="button">Trip details</button>
   </nav>
 
   <main class="main">
     <section id="log" class="sheet active">
-      <div class="log-shell">
-        <div class="log-intro">
-          <span class="eyebrow">QUICK TRIP LOG</span>
-          <h1>Log a trip, one question at a time.</h1>
-          <p>Answer the question, continue, and the next one appears. At the end you can review everything before saving it.</p>
+      <div id="setupNotice" class="setup-notice hidden">
+        <strong>Shared backend not connected yet.</strong>
+        <span>The wizard works, but Save Trip will stay disabled until the Apps Script Web App URL is added to <code>config.js</code>.</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">SHARED BETWEEN YOU TWO</span>
+          <h1>Log the trip while it’s still fresh.</h1>
+          <p>One question at a time. No spreadsheet feeling, no formulas, and both of you see the same data once Apps Script is connected.</p>
+          <div class="live-pill"><span class="live-dot"></span> Live sync every few seconds</div>
         </div>
 
         <div class="wizard-card" id="wizardCard">
           <div class="wizard-top">
-            <div>
+            <div class="progress-side">
               <div class="wizard-step" id="wizardStep">Question 1</div>
               <div class="wizard-progress"><span id="wizardProgress"></span></div>
             </div>
@@ -45,97 +57,105 @@
           </div>
           <div id="wizardBody" class="wizard-body"></div>
         </div>
+      </div>
 
-        <div class="recent-card">
-          <div class="recent-head">
-            <div>
-              <h2>Recent trips</h2>
-              <p>Your latest saved trips appear here.</p>
-            </div>
-            <button class="btn" id="openDetails" type="button">View all details</button>
+      <div class="lower-grid">
+        <section class="panel recent-card">
+          <div class="panel-head">
+            <div><span class="panel-kicker">RECENT</span><h2>Latest trips</h2></div>
+            <button class="soft-btn" id="openDetails" type="button">View all</button>
           </div>
           <div id="recentTrips" class="recent-list"></div>
-        </div>
+        </section>
+
+        <section class="panel activity-card">
+          <div class="panel-head"><div><span class="panel-kicker">ACTIVITY</span><h2>Who changed what</h2></div></div>
+          <div id="activityList" class="activity-list"></div>
+        </section>
       </div>
     </section>
 
     <section id="monthly" class="sheet">
+      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>This recalculates from the shared trips automatically.</p></div>
       <div class="kpis">
-        <div class="kpi"><div class="kpi-label">12-Month Total</div><div class="kpi-value" id="kpiTotal">€0.00</div></div>
-        <div class="kpi"><div class="kpi-label">Average / Month</div><div class="kpi-value" id="kpiMonth">€0.00</div></div>
-        <div class="kpi"><div class="kpi-label">Per Person / Month</div><div class="kpi-value" id="kpiPerson">€0.00</div></div>
-        <div class="kpi"><div class="kpi-label">Average / Trip</div><div class="kpi-value" id="kpiTrip">€0.00</div></div>
-        <div class="kpi green"><div class="kpi-label">Average Trips / Month</div><div class="kpi-value" id="kpiTrips">0.0</div></div>
+        <div class="kpi"><span>12-month total</span><strong id="kpiTotal">€0.00</strong></div>
+        <div class="kpi"><span>Average / month</span><strong id="kpiMonth">€0.00</strong></div>
+        <div class="kpi"><span>Per person / month</span><strong id="kpiPerson">€0.00</strong></div>
+        <div class="kpi"><span>Average / trip</span><strong id="kpiTrip">€0.00</strong></div>
+        <div class="kpi accent-kpi"><span>Trips / active month</span><strong id="kpiTrips">0.0</strong></div>
       </div>
-      <div class="titlebar">Monthly Overview</div>
-      <div class="subtitle">Updates automatically whenever a trip is saved or edited.</div>
-      <div class="table-wrap">
-        <table class="overview-table">
-          <thead><tr>
-            <th>Month</th><th>Trips</th><th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th>
-            <th>Flights / Train €</th><th>Fuel €</th><th>Tolls / Parking €</th><th>Other €</th><th>Total €</th><th>Per Person €</th>
-          </tr></thead>
-          <tbody id="monthlyBody"></tbody>
-        </table>
+      <div class="table-card">
+        <div class="table-title"><h2>Monthly breakdown</h2><span>Based on trip start date</span></div>
+        <div class="table-wrap">
+          <table class="overview-table">
+            <thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead>
+            <tbody id="monthlyBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
     <section id="compare" class="sheet">
-      <div class="titlebar greenhead">Compare Your Options</div>
-      <div class="subtitle">Yellow cells are editable. Everything else recalculates automatically.</div>
+      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>The yellow values are shared too, so both of you are looking at the same scenario.</p></div>
       <div class="compare-grid">
-        <div class="block">
-          <div class="block-head"><span>Current situation</span><span>Monthly €</span></div>
+        <div class="compare-card">
+          <div class="compare-head"><span>Current situation</span><small>Monthly</small></div>
           <div class="rows">
-            <div class="r"><div>Average visits cost now</div><div class="val" id="currentAvg">€0.00</div></div>
-            <div class="r"><div>Your share now</div><div class="val" id="yourShare">€0.00</div></div>
-            <div class="r"><div>Principe share now</div><div class="val" id="hisShare">€0.00</div></div>
-            <div class="r"><div>Trips per month (average)</div><div class="val" id="tripAvg">0.0</div></div>
+            <div class="r"><span>Average visits cost now</span><strong id="currentAvg">€0.00</strong></div>
+            <div class="r"><span>Principessa share now</span><strong id="yourShare">€0.00</strong></div>
+            <div class="r"><span>Principe share now</span><strong id="hisShare">€0.00</strong></div>
+            <div class="r"><span>Trips per active month</span><strong id="tripAvg">0.0</strong></div>
           </div>
         </div>
-        <div class="block">
-          <div class="block-head"><span>Renting a place</span><span>Monthly €</span></div>
-          <div class="rows" id="rentRows"></div>
-        </div>
-        <div class="block">
-          <div class="block-head"><span>Car budget</span><span>Monthly €</span></div>
-          <div class="rows" id="carRows"></div>
-        </div>
-        <div class="block">
-          <div class="block-head"><span>Decision Snapshot</span><span>Monthly €</span></div>
+        <div class="compare-card"><div class="compare-head"><span>Renting a place</span><small>Monthly</small></div><div class="rows" id="rentRows"></div></div>
+        <div class="compare-card"><div class="compare-head"><span>Car budget</span><small>Monthly</small></div><div class="rows" id="carRows"></div></div>
+        <div class="compare-card highlight-card">
+          <div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div>
           <div class="rows">
-            <div class="r"><div>Current visit lifestyle</div><div class="val" id="snapCurrent">€0.00</div></div>
-            <div class="r"><div>Rental lifestyle</div><div class="val" id="snapRent">€0.00</div></div>
-            <div class="r"><div>Rental + car</div><div class="val" id="snapBoth">€0.00</div></div>
-            <div class="r"><div>Difference: rental vs current</div><div class="val" id="snapDiffRent">€0.00</div></div>
-            <div class="r"><div>Difference: rental + car vs current</div><div class="val" id="snapDiffBoth">€0.00</div></div>
-            <div class="r"><div>Per person: rental + car</div><div class="val" id="snapPerson">€0.00</div></div>
+            <div class="r"><span>Current visit lifestyle</span><strong id="snapCurrent">€0.00</strong></div>
+            <div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div>
+            <div class="r"><span>Rental + car</span><strong id="snapBoth">€0.00</strong></div>
+            <div class="r"><span>Difference: rental vs current</span><strong id="snapDiffRent">€0.00</strong></div>
+            <div class="r"><span>Difference: rental + car</span><strong id="snapDiffBoth">€0.00</strong></div>
+            <div class="r total-row"><span>Per person: rental + car</span><strong id="snapPerson">€0.00</strong></div>
           </div>
         </div>
       </div>
     </section>
 
     <section id="details" class="sheet">
-      <div class="titlebar">Trip Details & History</div>
-      <div class="subtitle">This is the full editable record. Changes here immediately update every other page.</div>
-      <div class="table-wrap">
-        <table id="tripTable">
-          <thead>
-            <tr>
-              <th>Trip #</th><th>Start</th><th>End</th><th>Location</th><th>Other Location</th><th>City / Area</th>
-              <th>Accommodation €</th><th>Groceries €</th><th>Eating Out €</th><th>Flights / Train €</th><th>Fuel €</th>
-              <th>Tolls / Parking €</th><th>Other €</th><th>Trip Total €</th><th>Per Person €</th><th>You Paid €</th><th>Principe Paid €</th>
-            </tr>
-          </thead>
-          <tbody id="tripBody"></tbody>
-        </table>
+      <div class="page-heading"><span class="eyebrow">DATABASE VIEW</span><h1>Trip details</h1><p>Edit a value here and the shared backend, monthly overview and comparison page update too.</p></div>
+      <div class="table-card">
+        <div class="table-title"><h2>All trips</h2><span>Last column shows who last changed the trip</span></div>
+        <div class="table-wrap">
+          <table id="tripTable" class="details-table">
+            <thead><tr><th>#</th><th>Start</th><th>End</th><th>Location</th><th>Other location</th><th>City / Area</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th><th>Principessa paid</th><th>Principe paid</th><th>Last changed by</th></tr></thead>
+            <tbody id="tripBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
 
+  <div class="identity-modal" id="identityModal" aria-hidden="true">
+    <div class="identity-backdrop"></div>
+    <div class="identity-card" role="dialog" aria-modal="true" aria-labelledby="identityTitle">
+      <div class="identity-heart">♡</div>
+      <span class="eyebrow">WELCOME BACK</span>
+      <h2 id="identityTitle">Who is logging in?</h2>
+      <p>This name is attached to every shared change you make.</p>
+      <div class="identity-grid">
+        <button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log changes as Principessa</small></button>
+        <button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log changes as Principe</small></button>
+      </div>
+    </div>
+  </div>
+
+  <iframe name="backendFrame" title="backend" class="backend-frame"></iframe>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <footer class="footer">Your data is saved automatically in this browser. Use “Export data” for a backup copy.</footer>
+  <footer class="footer">Shared state lives in Google Apps Script once connected. The browser does not store your trip database locally.</footer>
 </div>
+<script src="config.js"></script>
 <script src="app.js" defer></script>
 </body>
 </html>
