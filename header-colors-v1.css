@@ -1,0 +1,29 @@
+/* Experimental header colors. Safe to remove independently if the palette isn't liked. */
+
+/* Monthly overview column headers */
+.overview-table thead th:nth-child(1){background:#d9c8a8;color:#4f4536}
+.overview-table thead th:nth-child(2){background:#c7d4b8;color:#3f4a35}
+.overview-table thead th:nth-child(3){background:#d8c1a7;color:#4d4033}
+.overview-table thead th:nth-child(4){background:#c9d7c4;color:#3d4b3a}
+.overview-table thead th:nth-child(5){background:#e2c1a4;color:#5b3f2d}
+.overview-table thead th:nth-child(6){background:#c7ccd9;color:#3d4250}
+.overview-table thead th:nth-child(7){background:#d7c0a6;color:#4d3f31}
+.overview-table thead th:nth-child(8){background:#c8d3cb;color:#39483f}
+.overview-table thead th:nth-child(9){background:#dbc7b7;color:#4c4039}
+.overview-table thead th:nth-child(10){background:#d0c2a8;color:#4f4433}
+.overview-table thead th:nth-child(11){background:#c4d0bc;color:#3d4938}
+
+/* Compare page: current situation intentionally distinct from the rest */
+.compare-grid .compare-card:nth-child(1) .compare-head{
+  background:#c9d7c4;
+  color:#314032;
+}
+.compare-grid .compare-card:nth-child(2) .compare-head{
+  background:#ead8c6;
+}
+.compare-grid .compare-card:nth-child(3) .compare-head{
+  background:#e6d5c4;
+}
+.compare-grid .compare-card:nth-child(4) .compare-head{
+  background:#d7c5b5;
+}
