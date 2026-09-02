@@ -1,0 +1,53 @@
+/* Reversible typography experiment: Gambarino across the entire Twogether site. */
+@import url('https://api.fontshare.com/v2/css?f[]=gambarino@400&display=swap');
+
+html,
+body,
+button,
+input,
+select,
+textarea,
+table,
+th,
+td,
+.brand,
+.brand-sub,
+.tab,
+.hero-copy h1,
+.page-heading h1,
+.question-stage h2,
+.section-heading h2,
+.panel-head h2,
+.table-title h2,
+.trip-story-card h3,
+.trip-card-bottom strong,
+.kpi strong,
+.review-total strong,
+.compare-head,
+.rows,
+.identity-card,
+.trip-modal-card,
+.toast {
+  font-family: 'Gambarino', Georgia, serif !important;
+}
+
+/* Gambarino is a display serif, so keep small labels a touch tighter and calmer. */
+.eyebrow,
+.panel-kicker,
+.brand-sub,
+.wizard-step,
+th,
+.trip-country {
+  letter-spacing: .06em;
+}
+
+button,
+input,
+select,
+textarea,
+th,
+td,
+.rows,
+.compare-head {
+  font-weight: 400 !important;
+}
