@@ -1,29 +1,32 @@
-/* Experimental header colors. Safe to remove independently if the palette isn't liked. */
+/* Soft experimental header palette. Safe to remove independently. */
 
-/* Monthly overview column headers */
-.overview-table thead th:nth-child(1){background:#d9c8a8;color:#4f4536}
-.overview-table thead th:nth-child(2){background:#c7d4b8;color:#3f4a35}
-.overview-table thead th:nth-child(3){background:#d8c1a7;color:#4d4033}
-.overview-table thead th:nth-child(4){background:#c9d7c4;color:#3d4b3a}
-.overview-table thead th:nth-child(5){background:#e2c1a4;color:#5b3f2d}
-.overview-table thead th:nth-child(6){background:#c7ccd9;color:#3d4250}
-.overview-table thead th:nth-child(7){background:#d7c0a6;color:#4d3f31}
-.overview-table thead th:nth-child(8){background:#c8d3cb;color:#39483f}
-.overview-table thead th:nth-child(9){background:#dbc7b7;color:#4c4039}
-.overview-table thead th:nth-child(10){background:#d0c2a8;color:#4f4433}
-.overview-table thead th:nth-child(11){background:#c4d0bc;color:#3d4938}
+/* Monthly overview — very light tinted neutrals */
+.overview-table thead th:nth-child(1){background:#f3ede5;color:#514a43}
+.overview-table thead th:nth-child(2){background:#edf1e9;color:#465044}
+.overview-table thead th:nth-child(3){background:#f5eee7;color:#524940}
+.overview-table thead th:nth-child(4){background:#eef2ed;color:#455047}
+.overview-table thead th:nth-child(5){background:#f6ece5;color:#594a42}
+.overview-table thead th:nth-child(6){background:#eef0f4;color:#48505a}
+.overview-table thead th:nth-child(7){background:#f3ede6;color:#514941}
+.overview-table thead th:nth-child(8){background:#edf1ee;color:#445048}
+.overview-table thead th:nth-child(9){background:#f4edeb;color:#524947}
+.overview-table thead th:nth-child(10){background:#f1ede6;color:#514a40}
+.overview-table thead th:nth-child(11){background:#eef2ea;color:#465044}
 
-/* Compare page: current situation intentionally distinct from the rest */
+/* Compare page — Current situation stays distinct, but everything remains soft */
 .compare-grid .compare-card:nth-child(1) .compare-head{
-  background:#c9d7c4;
-  color:#314032;
+  background:#e9efe7;
+  color:#3f4b3f;
 }
 .compare-grid .compare-card:nth-child(2) .compare-head{
-  background:#ead8c6;
+  background:#f5eee8;
+  color:#514940;
 }
 .compare-grid .compare-card:nth-child(3) .compare-head{
-  background:#e6d5c4;
+  background:#f3ece6;
+  color:#514940;
 }
 .compare-grid .compare-card:nth-child(4) .compare-head{
-  background:#d7c5b5;
+  background:#eeeae7;
+  color:#4d4946;
 }
