@@ -31,12 +31,28 @@ td,
   font-family: 'Crimson Pro', Georgia, serif !important;
 }
 
-/* Keep small interface labels readable with the serif. */
+/* Half-pixel size bump for the current Crimson Pro test. */
+body { font-size: 16.5px; }
+.brand { font-size: 24.5px; }
+.brand-sub { font-size: 11.5px; }
+.hero-copy h1 { font-size: calc(clamp(44px, 5vw, 74px) + .5px); }
+.page-heading h1 { font-size: calc(clamp(40px, 5vw, 62px) + .5px); }
+.question-stage h2 { font-size: calc(clamp(30px, 3vw, 44px) + .5px); }
+.section-heading h2 { font-size: 32.5px; }
+.panel-head h2,
+.table-title h2 { font-size: 24.5px; }
+.trip-story-card h3 { font-size: 25.5px; }
+.trip-card-bottom strong { font-size: 24.5px; }
+.kpi strong { font-size: 25.5px; }
+.review-total strong { font-size: 31.5px; }
+
+/* Small interface text gets the same subtle bump where the base stylesheet fixes a px size. */
 .eyebrow,
-.panel-kicker,
+.panel-kicker { font-size: 11.5px; }
 .brand-sub,
 .wizard-step,
 th,
-.trip-country {
-  letter-spacing: .07em;
-}
+.trip-country { letter-spacing: .07em; }
+.wizard-step { font-size: 12.5px; }
+th { font-size: 11.5px; }
+.trip-country { font-size: 11.5px; }
