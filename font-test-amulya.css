@@ -1,0 +1,42 @@
+/* Reversible typography experiment: Amulya across the entire Twogether site. */
+@import url('https://api.fontshare.com/v2/css?f[]=amulya@400,500,600,700&display=swap');
+
+html,
+body,
+button,
+input,
+select,
+textarea,
+table,
+th,
+td,
+.brand,
+.brand-sub,
+.tab,
+.hero-copy h1,
+.page-heading h1,
+.question-stage h2,
+.section-heading h2,
+.panel-head h2,
+.table-title h2,
+.trip-story-card h3,
+.trip-card-bottom strong,
+.kpi strong,
+.review-total strong,
+.compare-head,
+.rows,
+.identity-card,
+.trip-modal-card,
+.toast {
+  font-family: 'Amulya', Inter, ui-sans-serif, system-ui, sans-serif !important;
+}
+
+/* Keep small labels refined with Amulya's cleaner sans-serif shapes. */
+.eyebrow,
+.panel-kicker,
+.brand-sub,
+.wizard-step,
+th,
+.trip-country {
+  letter-spacing: .08em;
+}
