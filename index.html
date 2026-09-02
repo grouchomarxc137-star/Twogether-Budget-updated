@@ -10,152 +10,79 @@
 <body>
 <div class="app" id="app">
   <header class="topbar">
-    <div class="brand-wrap">
-      <div class="brand-mark">♡</div>
-      <div><div class="brand">Together</div><div class="brand-sub">shared trip budget</div></div>
-    </div>
+    <div class="brand-wrap"><div class="brand-mark">♡</div><div><div class="brand">Together</div><div class="brand-sub">shared trip budget</div></div></div>
     <div class="top-actions">
       <span class="connection" id="connectionStatus" data-tone="neutral">Connecting…</span>
       <span class="who-badge hidden" id="whoBadge"></span>
       <button class="soft-btn" id="syncNow" type="button">Sync</button>
       <button class="soft-btn" id="switchUser" type="button">Switch user</button>
       <button class="soft-btn" id="downloadJson" type="button">Backup</button>
-      <button class="soft-btn" id="loadDemo" type="button">Example</button>
-      <button class="soft-btn danger-soft" id="clearAll" type="button">Clear</button>
     </div>
   </header>
 
-  <nav class="tabs" role="tablist" aria-label="Budget pages">
+  <nav class="tabs" role="tablist">
     <button class="tab active" data-sheet="log" type="button">Log trip</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
-    <button class="tab" data-sheet="details" type="button">Trip details</button>
   </nav>
 
   <main class="main">
     <section id="log" class="sheet active">
-      <div id="setupNotice" class="setup-notice hidden">
-        <strong>Shared backend not connected yet.</strong>
-        <span>The wizard works, but Save Trip will stay disabled until the Apps Script Web App URL is added to <code>config.js</code>.</span>
-      </div>
+      <div id="backendUpgrade" class="setup-notice hidden"><strong>Backend update needed.</strong><span>The website is ready, but Apps Script must be redeployed with the latest <code>backend/Code.gs</code> before dual-entry matching works.</span></div>
 
       <div class="hero-grid">
         <div class="hero-copy">
           <span class="eyebrow">SHARED BETWEEN YOU TWO</span>
-          <h1>Log the trip while it’s still fresh.</h1>
-          <p>One question at a time. No spreadsheet feeling, no formulas, and both of you see the same data once Apps Script is connected.</p>
-          <div class="live-pill"><span class="live-dot"></span> Live sync every few seconds</div>
+          <h1>Log a trip without turning it into homework.</h1>
+          <p>One question at a time. You only enter what <em>you</em> remember and what <em>you</em> paid. If your versions differ, Together highlights exactly where.</p>
+          <div class="live-pill"><span class="live-dot"></span> Shared sync + mismatch checks</div>
         </div>
-
         <div class="wizard-card" id="wizardCard">
-          <div class="wizard-top">
-            <div class="progress-side">
-              <div class="wizard-step" id="wizardStep">Question 1</div>
-              <div class="wizard-progress"><span id="wizardProgress"></span></div>
-            </div>
-            <button class="text-btn" id="restartWizard" type="button">Start over</button>
-          </div>
+          <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="wizardStep">Question 1</div><div class="wizard-progress"><span id="wizardProgress"></span></div></div><button class="text-btn" id="restartWizard" type="button">Start over</button></div>
           <div id="wizardBody" class="wizard-body"></div>
         </div>
       </div>
 
-      <div class="lower-grid">
-        <section class="panel recent-card">
-          <div class="panel-head">
-            <div><span class="panel-kicker">RECENT</span><h2>Latest trips</h2></div>
-            <button class="soft-btn" id="openDetails" type="button">View all</button>
-          </div>
-          <div id="recentTrips" class="recent-list"></div>
-        </section>
+      <section class="trip-gallery-section">
+        <div class="section-heading"><div><span class="panel-kicker">YOUR TRIPS</span><h2>Trip stories</h2><p>Tap any trip to open its full breakdown, spending chart and comparison between your two versions.</p></div></div>
+        <div id="tripGallery" class="trip-gallery"></div>
+      </section>
 
-        <section class="panel activity-card">
-          <div class="panel-head"><div><span class="panel-kicker">ACTIVITY</span><h2>Who changed what</h2></div></div>
-          <div id="activityList" class="activity-list"></div>
-        </section>
+      <div class="lower-grid single-activity">
+        <section class="panel activity-card"><div class="panel-head"><div><span class="panel-kicker">ACTIVITY</span><h2>Who changed what</h2></div></div><div id="activityList" class="activity-list"></div></section>
       </div>
     </section>
 
     <section id="monthly" class="sheet">
-      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>This recalculates from the shared trips automatically.</p></div>
+      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>Trips with uncertain amounts are included as estimates and clearly marked.</p></div>
       <div class="kpis">
         <div class="kpi"><span>12-month total</span><strong id="kpiTotal">€0.00</strong></div>
         <div class="kpi"><span>Average / month</span><strong id="kpiMonth">€0.00</strong></div>
         <div class="kpi"><span>Per person / month</span><strong id="kpiPerson">€0.00</strong></div>
         <div class="kpi"><span>Average / trip</span><strong id="kpiTrip">€0.00</strong></div>
-        <div class="kpi accent-kpi"><span>Trips / active month</span><strong id="kpiTrips">0.0</strong></div>
+        <div class="kpi accent-kpi"><span>Trips with estimates</span><strong id="kpiTrips">0</strong></div>
       </div>
-      <div class="table-card">
-        <div class="table-title"><h2>Monthly breakdown</h2><span>Based on trip start date</span></div>
-        <div class="table-wrap">
-          <table class="overview-table">
-            <thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead>
-            <tbody id="monthlyBody"></tbody>
-          </table>
-        </div>
-      </div>
+      <div class="table-card"><div class="table-title"><h2>Monthly breakdown</h2><span>~ means at least one amount is estimated</span></div><div class="table-wrap"><table class="overview-table"><thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div>
     </section>
 
     <section id="compare" class="sheet">
-      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>The yellow values are shared too, so both of you are looking at the same scenario.</p></div>
+      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>Scenario values are shared, so you both see the same plan.</p></div>
       <div class="compare-grid">
-        <div class="compare-card">
-          <div class="compare-head"><span>Current situation</span><small>Monthly</small></div>
-          <div class="rows">
-            <div class="r"><span>Average visits cost now</span><strong id="currentAvg">€0.00</strong></div>
-            <div class="r"><span>Principessa share now</span><strong id="yourShare">€0.00</strong></div>
-            <div class="r"><span>Principe share now</span><strong id="hisShare">€0.00</strong></div>
-            <div class="r"><span>Trips per active month</span><strong id="tripAvg">0.0</strong></div>
-          </div>
-        </div>
+        <div class="compare-card"><div class="compare-head"><span>Current situation</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Average visits cost now</span><strong id="currentAvg">€0.00</strong></div><div class="r"><span>Principessa share now</span><strong id="yourShare">€0.00</strong></div><div class="r"><span>Principe share now</span><strong id="hisShare">€0.00</strong></div><div class="r"><span>Trips logged</span><strong id="tripAvg">0</strong></div></div></div>
         <div class="compare-card"><div class="compare-head"><span>Renting a place</span><small>Monthly</small></div><div class="rows" id="rentRows"></div></div>
         <div class="compare-card"><div class="compare-head"><span>Car budget</span><small>Monthly</small></div><div class="rows" id="carRows"></div></div>
-        <div class="compare-card highlight-card">
-          <div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div>
-          <div class="rows">
-            <div class="r"><span>Current visit lifestyle</span><strong id="snapCurrent">€0.00</strong></div>
-            <div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div>
-            <div class="r"><span>Rental + car</span><strong id="snapBoth">€0.00</strong></div>
-            <div class="r"><span>Difference: rental vs current</span><strong id="snapDiffRent">€0.00</strong></div>
-            <div class="r"><span>Difference: rental + car</span><strong id="snapDiffBoth">€0.00</strong></div>
-            <div class="r total-row"><span>Per person: rental + car</span><strong id="snapPerson">€0.00</strong></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="details" class="sheet">
-      <div class="page-heading"><span class="eyebrow">DATABASE VIEW</span><h1>Trip details</h1><p>Edit a value here and the shared backend, monthly overview and comparison page update too.</p></div>
-      <div class="table-card">
-        <div class="table-title"><h2>All trips</h2><span>Last column shows who last changed the trip</span></div>
-        <div class="table-wrap">
-          <table id="tripTable" class="details-table">
-            <thead><tr><th>#</th><th>Start</th><th>End</th><th>Location</th><th>Other location</th><th>City / Area</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th><th>Principessa paid</th><th>Principe paid</th><th>Last changed by</th></tr></thead>
-            <tbody id="tripBody"></tbody>
-          </table>
-        </div>
+        <div class="compare-card highlight-card"><div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Current visit lifestyle</span><strong id="snapCurrent">€0.00</strong></div><div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div><div class="r"><span>Rental + car</span><strong id="snapBoth">€0.00</strong></div><div class="r"><span>Difference: rental vs current</span><strong id="snapDiffRent">€0.00</strong></div><div class="r"><span>Difference: rental + car</span><strong id="snapDiffBoth">€0.00</strong></div><div class="r total-row"><span>Per person: rental + car</span><strong id="snapPerson">€0.00</strong></div></div></div>
       </div>
     </section>
   </main>
 
-  <div class="identity-modal" id="identityModal" aria-hidden="true">
-    <div class="identity-backdrop"></div>
-    <div class="identity-card" role="dialog" aria-modal="true" aria-labelledby="identityTitle">
-      <div class="identity-heart">♡</div>
-      <span class="eyebrow">WELCOME BACK</span>
-      <h2 id="identityTitle">Who is logging in?</h2>
-      <p>This name is attached to every shared change you make.</p>
-      <div class="identity-grid">
-        <button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log changes as Principessa</small></button>
-        <button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log changes as Principe</small></button>
-      </div>
-    </div>
-  </div>
+  <div class="identity-modal" id="identityModal" aria-hidden="true"><div class="identity-backdrop"></div><div class="identity-card" role="dialog" aria-modal="true"><div class="identity-heart">♡</div><span class="eyebrow">WELCOME BACK</span><h2>Who is logging in?</h2><p>Your name is attached to every shared change.</p><div class="identity-grid"><button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log as Principessa</small></button><button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log as Principe</small></button></div></div></div>
 
+  <div class="trip-modal" id="tripModal" aria-hidden="true"><div class="trip-modal-backdrop" data-close-trip></div><div class="trip-modal-card"><button class="trip-close" type="button" data-close-trip>×</button><div id="tripModalBody"></div></div></div>
   <iframe name="backendFrame" title="backend" class="backend-frame"></iframe>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <footer class="footer">Shared state lives in Google Apps Script once connected. The browser does not store your trip database locally.</footer>
+  <footer class="footer">Shared data is stored in Google Apps Script. The browser is only a live view.</footer>
 </div>
-<script src="config.js"></script>
-<script src="app.js" defer></script>
+<script src="config.js"></script><script src="app.js" defer></script>
 </body>
 </html>
