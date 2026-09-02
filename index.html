@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#f7f4ef">
 <title>Together Budget</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="theme.css?v=1">
 </head>
 <body>
 <div class="app" id="app">
@@ -26,8 +27,8 @@
 
       <div class="hero-grid">
         <div class="hero-copy">
-          <span class="eyebrow">SHARED BETWEEN YOU TWO</span>
-          <h1>Log a trip without turning it into homework.</h1>
+          <span class="eyebrow">SHARED BETWEEN PRINCIPE AND PRINCIPESSA</span>
+          <h1>Log your most recent trip</h1>
           <p>One question at a time. You only enter what <em>you</em> remember and what <em>you</em> paid. If your versions differ, Together highlights exactly where.</p>
         </div>
         <div class="wizard-card" id="wizardCard">
@@ -74,8 +75,7 @@
   <div class="trip-modal" id="tripModal" aria-hidden="true"><div class="trip-modal-backdrop" data-close-trip></div><div class="trip-modal-card"><button class="trip-close" type="button" data-close-trip>×</button><div id="tripModalBody"></div></div></div>
   <iframe name="backendFrame" title="backend" class="backend-frame"></iframe>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <footer class="footer">Shared data is stored in Google Apps Script. Syncing happens silently in the background.</footer>
 </div>
-<script src="config.js"></script><script src="app-v3.js" defer></script><script src="ui-tweaks-v3.js?v=2" defer></script>
+<script src="config.js"></script><script src="app-v3.js" defer></script><script src="ui-tweaks-v3.js?v=2" defer></script><script src="identity-copy.js?v=1" defer></script>
 </body>
 </html>
