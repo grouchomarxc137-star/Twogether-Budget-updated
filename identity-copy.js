@@ -4,6 +4,11 @@
   const badge = document.getElementById('loggedUserBadge');
   const wizardBody = document.getElementById('wizardBody');
 
+  function desiredHelp(name){
+    const other = name === 'Principessa' ? 'Principe' : 'Principessa';
+    return `Start a new trip, or add your version to one ${other} already logged.`;
+  }
+
   function applyIdentity(name){
     if(name !== 'Principessa' && name !== 'Principe') return;
     document.body.dataset.actor = name;
@@ -20,8 +25,8 @@
     if(!heading) return;
     const p = heading.parentElement?.querySelector('p');
     if(!p) return;
-    const other = name === 'Principessa' ? 'Principe' : 'Principessa';
-    p.textContent = `Start a new trip, or add your version to one ${other} already logged.`;
+    const nextText = desiredHelp(name);
+    if(p.textContent !== nextText) p.textContent = nextText;
   }
 
   document.querySelectorAll('.identity-choice[data-actor]').forEach(button => {
