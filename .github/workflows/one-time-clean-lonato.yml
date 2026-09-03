@@ -1,0 +1,42 @@
+name: Clean Lonato trips
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-clean-lonato.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove Lonato and Loanto trips
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://script.google.com/macros/s/AKfycbxwx7oh24EkBDCyWAshJZnVWgI9F0kpg3wjjfwKhdMuoWE1ifgwJ5hPRqD_9iULKcJjlg/exec'
+          before="$(curl -fsSL "$URL?action=state")"
+          echo "$before" > /tmp/state-before.json
+
+          mapfile -t ids < <(jq -r '.state.trips[]? | select((((.submissions.Principessa.city // .submissions.Principe.city // "") | ascii_downcase) | test("lonato|loanto"))) | .id' /tmp/state-before.json)
+          echo "Found ${#ids[@]} Lonato/Loanto trip(s)."
+
+          for id in "${ids[@]}"; do
+            payload="$(jq -nc --arg id "$id" '{id:$id}')"
+            result="$(curl -fsSL -X POST \
+              --data-urlencode 'action=deleteTrip' \
+              --data-urlencode 'actor=Principessa' \
+              --data-urlencode "payload=$payload" \
+              "$URL")"
+            echo "Delete $id => $result"
+          done
+
+          sleep 1
+          after="$(curl -fsSL "$URL?action=state")"
+          echo "$after" > /tmp/state-after.json
+          remaining_bad="$(jq '[.state.trips[]? | select((((.submissions.Principessa.city // .submissions.Principe.city // "") | ascii_downcase) | test("lonato|loanto")))] | length' /tmp/state-after.json)"
+          echo 'Remaining trip cities:'
+          jq -r '.state.trips[]? | (.submissions.Principessa.city // .submissions.Principe.city // "(no city)")' /tmp/state-after.json
+          test "$remaining_bad" -eq 0
