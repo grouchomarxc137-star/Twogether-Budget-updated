@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="compare-shadow-experiment.css?v=1">
 <link rel="stylesheet" href="font-test-crimson-pro.css?v=3">
 <link rel="stylesheet" href="activity-limit.css?v=1">
+<link rel="stylesheet" href="features-v4.css?v=1">
 </head>
 <body>
 <div class="app" id="app">
@@ -28,7 +29,7 @@
 
   <main class="main">
     <section id="log" class="sheet active">
-      <div id="backendUpgrade" class="setup-notice hidden"><strong>Backend update needed.</strong><span>The website is ready, but Apps Script must be redeployed with the latest <code>backend/Code.gs</code> before dual-entry matching works.</span></div>
+      <div id="backendUpgrade" class="setup-notice hidden"><strong>Backend update needed.</strong><span>Redeploy the latest <code>backend/Code.gs</code> to enable editing/confirmation and trip budgets.</span></div>
 
       <div class="hero-grid">
         <div class="hero-copy">
@@ -43,7 +44,7 @@
       </div>
 
       <section class="trip-gallery-section">
-        <div class="section-heading"><div><span class="panel-kicker">YOUR TRIPS</span><h2>Trip stories</h2><p>Tap any trip to open its full breakdown, spending chart and comparison between your two versions.</p></div></div>
+        <div class="section-heading"><div><span class="panel-kicker">YOUR TRIPS</span><h2>Trip stories</h2><p>Tap any trip to compare your versions, edit calculations before confirmation, and check the actual spend against your planned budget.</p></div></div>
         <div id="tripGallery" class="trip-gallery"></div>
       </section>
 
@@ -53,7 +54,7 @@
     </section>
 
     <section id="monthly" class="sheet">
-      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>Trips with uncertain amounts are included as estimates and clearly marked.</p></div>
+      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>January through December 2026. Trips that are not fully confirmed yet remain marked as estimates.</p></div>
       <div class="kpis">
         <div class="kpi"><span>12-month total</span><strong id="kpiTotal">€0.00</strong></div>
         <div class="kpi"><span>Average / month</span><strong id="kpiMonth">€0.00</strong></div>
@@ -61,26 +62,26 @@
         <div class="kpi"><span>Average / trip</span><strong id="kpiTrip">€0.00</strong></div>
         <div class="kpi accent-kpi"><span>Trips / year</span><strong id="kpiTrips">0</strong></div>
       </div>
-      <div class="table-card"><div class="table-title"><h2>Monthly breakdown</h2><span>~ means at least one amount is estimated</span></div><div class="table-wrap"><table class="overview-table"><thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div>
+      <div class="table-card"><div class="table-title"><h2>Monthly breakdown</h2><span>~ means at least one amount is estimated or still awaiting confirmation</span></div><div class="table-wrap"><table class="overview-table"><thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div>
     </section>
 
     <section id="compare" class="sheet">
-      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>Scenario values are shared, so you both see the same plan.</p></div>
+      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>Current situation uses what Principessa and Principe actually logged as paid. Rental and car scenario values are shared.</p></div>
       <div class="compare-grid">
-        <div class="compare-card"><div class="compare-head"><span>Current situation</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Average visits cost now</span><strong id="currentAvg">€0.00</strong></div><div class="r"><span>Principessa share now</span><strong id="yourShare">€0.00</strong></div><div class="r"><span>Principe share now</span><strong id="hisShare">€0.00</strong></div><div class="r"><span>Trips logged</span><strong id="tripAvg">0</strong></div></div></div>
+        <div class="compare-card"><div class="compare-head"><span>Current situation</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Actual paid / month</span><strong id="currentAvg">€0.00</strong></div><div class="r"><span>Principessa actual / month</span><strong id="yourShare">€0.00</strong></div><div class="r"><span>Principe actual / month</span><strong id="hisShare">€0.00</strong></div><div class="r"><span>Trips logged</span><strong id="tripAvg">0</strong></div></div></div>
         <div class="compare-card"><div class="compare-head"><span>Renting a place</span><small>Monthly</small></div><div class="rows" id="rentRows"></div></div>
         <div class="compare-card"><div class="compare-head"><span>Car budget</span><small>Monthly</small></div><div class="rows" id="carRows"></div></div>
-        <div class="compare-card highlight-card"><div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Current visit lifestyle</span><strong id="snapCurrent">€0.00</strong></div><div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div><div class="r"><span>Rental + car</span><strong id="snapBoth">€0.00</strong></div><div class="r"><span>Difference: rental vs current</span><strong id="snapDiffRent">€0.00</strong></div><div class="r"><span>Difference: rental + car</span><strong id="snapDiffBoth">€0.00</strong></div><div class="r total-row"><span>Per person: rental + car</span><strong id="snapPerson">€0.00</strong></div></div></div>
+        <div class="compare-card highlight-card"><div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Current lifestyle</span><strong id="snapCurrent">€0.00</strong></div><div class="r"><span>Current + car</span><strong id="snapCurrentCar">€0.00</strong></div><div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div><div class="r"><span>Rental + car</span><strong id="snapRentCar">€0.00</strong></div><div class="r"><span>Current + rental</span><strong id="snapCurrentRent">€0.00</strong></div><div class="r total-row"><span>Current + rental + car</span><strong id="snapAll">€0.00</strong></div></div></div>
       </div>
     </section>
   </main>
 
-  <div class="identity-modal" id="identityModal" aria-hidden="true"><div class="identity-backdrop"></div><div class="identity-card" role="dialog" aria-modal="true"><div class="identity-heart">♡</div><span class="eyebrow">WELCOME BACK</span><h2>Who is logging in?</h2><p>Your name is attached to every shared change.</p><div class="identity-grid"><button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log as Principessa</small></button><button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log as Principe</small></button></div></div></div>
+  <div class="identity-modal" id="identityModal" aria-hidden="true"><div class="identity-backdrop"></div><div class="identity-card" role="dialog" aria-modal="true"><div class="identity-heart">♡</div><span class="eyebrow">WELCOME BACK</span><h2>Who is logging in?</h2><p>Your choice is remembered on this device, so refreshing will not log you out.</p><div class="identity-grid"><button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log as Principessa</small></button><button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log as Principe</small></button></div></div></div>
 
   <div class="trip-modal" id="tripModal" aria-hidden="true"><div class="trip-modal-backdrop" data-close-trip></div><div class="trip-modal-card"><button class="trip-close" type="button" data-close-trip>×</button><div id="tripModalBody"></div></div></div>
   <iframe name="backendFrame" title="backend" class="backend-frame"></iframe>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </div>
-<script src="config.js"></script><script src="app-v3.js?v=4" defer></script><script src="identity-ui-v2.js?v=1" defer></script><script src="monthly-2026.js?v=1" defer></script>
+<script src="config.js"></script><script src="app-v4.js?v=1" defer></script>
 </body>
 </html>
