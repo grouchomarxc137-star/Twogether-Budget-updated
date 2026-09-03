@@ -36,7 +36,6 @@
     {group:'subscriptions',name:'Oranje Pakketje',amount:4},
     {group:'subscriptions',name:'Odido',amount:30},
     {group:'groceries',name:'Groceries',amount:255},
-    {group:'extra',name:'Extra',amount:250},
     {group:'investments',name:'Investments',amount:550},
     {group:'savings',name:'Save up',amount:500}
   ];
@@ -144,6 +143,20 @@
   function ownMonths(){ return financeState.finances?.[actor()] || []; }
   function recordFor(month){ return ownMonths().find(x=>x.month===month) || null; }
   function hasValue(v){ return v !== '' && v != null; }
+  function normalizeFinanceRecord(rec){
+    const copy=JSON.parse(JSON.stringify(rec||{}));
+    copy.expenses=Array.isArray(copy.expenses)?copy.expenses.map(x=>({...x,group:normalizeGroup(x.group)})):[];
+    const legacyBudget = !hasValue(copy.extraBudget) || n(copy.extraBudget)<=0 || n(copy.extraBudget)===255;
+    if(legacyBudget){
+      const legacyExtraIndex=copy.expenses.findIndex(x=>normalizeGroup(x.group)==='extra' && String(x.name||'').trim().toLowerCase()==='extra' && n(x.amount)===250);
+      if(legacyExtraIndex>=0){
+        copy.expenses.splice(legacyExtraIndex,1);
+        copy.extraBudget=250;
+      }
+    }
+    if(!hasValue(copy.extraBudget)||n(copy.extraBudget)<=0) copy.extraBudget=250;
+    return copy;
+  }
 
   function calc(rec){
     const incomes=Array.isArray(rec?.incomes)?rec.incomes:[];
@@ -153,8 +166,8 @@
     const savings=expenses.filter(x=>normalizeGroup(x.group)==='savings').reduce((s,x)=>s+n(x.amount),0);
     const investmentContribution=expenses.filter(x=>normalizeGroup(x.group)==='investments').reduce((s,x)=>s+n(x.amount),0);
     const extraSpent=expenses.filter(x=>normalizeGroup(x.group)==='extra').reduce((s,x)=>s+n(x.amount),0);
-    const rawExtraBudget=hasValue(rec?.extraBudget)?n(rec.extraBudget):255;
-    const extraBudget=rawExtraBudget>0?rawExtraBudget:255;
+    const rawExtraBudget=hasValue(rec?.extraBudget)?n(rec.extraBudget):250;
+    const extraBudget=rawExtraBudget>0?rawExtraBudget:250;
     const extraDelta=extraBudget-extraSpent;
     const leftover=income-outflow;
     const investmentTotal=hasValue(rec?.investmentTotal)?n(rec.investmentTotal):null;
@@ -203,8 +216,8 @@
         financeState={
           version:Number(res.state?.version||0),
           finances:{
-            Principessa:Array.isArray(res.state?.finances?.Principessa)?res.state.finances.Principessa:[],
-            Principe:Array.isArray(res.state?.finances?.Principe)?res.state.finances.Principe:[]
+            Principessa:(Array.isArray(res.state?.finances?.Principessa)?res.state.finances.Principessa:[]).map(normalizeFinanceRecord),
+            Principe:(Array.isArray(res.state?.finances?.Principe)?res.state.finances.Principe:[]).map(normalizeFinanceRecord)
           },
           financeProfiles:{
             Principessa:normalizeProfile(res.state?.financeProfiles?.Principessa),
@@ -337,11 +350,10 @@
     $('[data-fin-mini-delete]')?.addEventListener('click',()=>{const next=profile();next.receivables.splice(index,1);saveProfile(next,'Money owed removed');});
   }
 
-  function freshRecord(month){ return {month,incomes:[],expenses:[],extraBudget:255,investmentTotal:'',sisterInvestments:'',finalized:false,finalizedAt:''}; }
+  function freshRecord(month){ return {month,incomes:[],expenses:[],extraBudget:250,investmentTotal:'',sisterInvestments:'',finalized:false,finalizedAt:''}; }
   function cloneRecord(rec){
-    const copy=JSON.parse(JSON.stringify(rec));
-    copy.expenses=(copy.expenses||[]).map(x=>({...x,group:normalizeGroup(x.group)}));
-    if(!hasValue(copy.extraBudget)||n(copy.extraBudget)<=0)copy.extraBudget=255;
+    const copy=normalizeFinanceRecord(rec);
+    if(!hasValue(copy.extraBudget)||n(copy.extraBudget)<=0)copy.extraBudget=250;
     copy.finalized=copy.finalized===true; if(!copy.finalizedAt)copy.finalizedAt='';
     if(copy.investmentTotal==null)copy.investmentTotal=''; if(copy.sisterInvestments==null)copy.sisterInvestments='';
     return copy;
@@ -367,16 +379,20 @@
     const previous=latestPriorMonth(month),d=freshRecord(month);
     d.incomes=RECURRING_INCOMES.map(x=>({name:x.name,amount:recurringValue(previous,'income',x.name,x.amount)}));
     d.expenses=RECURRING_EXPENSES.map(x=>({group:x.group,name:x.name,amount:recurringValue(previous,'expense',x.name,x.amount)}));
-    if(previous&&hasValue(previous.extraBudget)&&n(previous.extraBudget)>0) d.extraBudget=n(previous.extraBudget);
+    if(previous&&hasValue(previous.extraBudget)&&n(previous.extraBudget)>0) d.extraBudget=n(previous.extraBudget); else d.extraBudget=250;
     return d;
   }
   function buildRecurringQueue(d){
     return [
       ...(d.incomes||[]).map((_,index)=>({kind:'income',index})),
-      ...(d.expenses||[]).map((_,index)=>({kind:'expense',index}))
+      ...(d.expenses||[]).map((_,index)=>({kind:'expense',index})),
+      {kind:'extraBudget'}
     ];
   }
-  function recurringSource(item,d){ return item?.kind==='income'?d.incomes?.[item.index]:d.expenses?.[item.index]; }
+  function recurringSource(item,d){
+    if(item?.kind==='extraBudget') return {name:'Extra budget',amount:d.extraBudget,group:'extra'};
+    return item?.kind==='income'?d.incomes?.[item.index]:d.expenses?.[item.index];
+  }
   function startRecurringMonth(month){
     const d=seededRecord(month||selectedMonth);
     flow={data:d,stage:'recurringCheck',temp:{},recurringQueue:buildRecurringQueue(d),recurringIndex:0};
@@ -402,7 +418,7 @@
     if(!actor()){ setProgress('PERSONAL FINANCES',8); body.innerHTML=wizardHtml('Choose your profile first','Your monthly finances are kept separately for Principessa and Principe.',''); return; }
     if(!flow){
       setProgress('MONTHLY FINANCES',8);
-      body.innerHTML=wizardHtml(`Track ${actor()}’s month`,'One question at a time, just like trip logging.',`<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Start a monthly check-in</strong><small>Income, colored expenses, €255 Extra budget, savings and investments.</small></div><span>→</span></button></div>`);
+      body.innerHTML=wizardHtml(`Track ${actor()}’s month`,'One question at a time, just like trip logging.',`<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Start a monthly check-in</strong><small>Income, colored expenses, €250 Extra budget, savings and investments.</small></div><span>→</span></button></div>`);
       $('[data-fin-start]')?.addEventListener('click',()=>startMonth(selectedMonth,false)); return;
     }
     const d=flow.data,t=flow.temp||{};
@@ -415,13 +431,14 @@
 
     if(flow.stage==='recurringCheck'){
       const queue=flow.recurringQueue||buildRecurringQueue(d),idx=Number(flow.recurringIndex||0);
-      if(idx>=queue.length){flow.stage='extraBudget';renderWizard();return;}
+      if(idx>=queue.length){flow.stage='investmentTotal';renderWizard();return;}
       const item=queue[idx],source=recurringSource(item,d);
       if(!source){flow.recurringIndex=idx+1;renderWizard();return;}
-      const meta=item.kind==='income'?{label:'Income',tone:'other'}:{label:CATEGORY_LABELS[groupTone(source.group)]||groupLabel(source.group),tone:groupTone(source.group)};
+      const meta=item.kind==='income'?{label:'Income',tone:'other'}:item.kind==='extraBudget'?{label:'Monthly limit',tone:'budgets'}:{label:CATEGORY_LABELS[groupTone(source.group)]||groupLabel(source.group),tone:groupTone(source.group)};
       const pct=12+Math.round(((idx+1)/Math.max(1,queue.length))*48);
       setProgress(`CHECKING ${idx+1} OF ${queue.length}`,pct);
-      body.innerHTML=wizardHtml(`${source.name} · ${money(source.amount)}?`,`Recurring ${item.kind==='income'?'income':meta.label.toLowerCase()}. Confirm it if it is still correct, or edit only the amount.`,`<div class="finance-reference finance-tone-${meta.tone}"><span>${esc(meta.label)}</span><strong>${esc(source.name)}</strong><small>Usual amount · ${money(source.amount)}</small></div><div class="finance-actions"><button class="btn ghost" type="button" data-fin-recurring-edit>Edit</button><button class="btn primary big" type="button" data-fin-recurring-confirm>Confirm</button></div>`);
+      const help=item.kind==='extraBudget'?'This is your monthly spending ceiling for Extra purchases. It is not counted as money spent.':`Recurring ${item.kind==='income'?'income':meta.label.toLowerCase()}. Confirm it if it is still correct, or edit only the amount.`;
+      body.innerHTML=wizardHtml(`${source.name} · ${money(source.amount)}?`,help,`<div class="finance-reference finance-tone-${meta.tone}"><span>${esc(meta.label)}</span><strong>${esc(source.name)}</strong><small>${item.kind==='extraBudget'?'Monthly spending limit':'Usual amount'} · ${money(source.amount)}</small></div><div class="finance-actions"><button class="btn ghost" type="button" data-fin-recurring-edit>Edit</button><button class="btn primary big" type="button" data-fin-recurring-confirm>Confirm</button></div>`);
       $('[data-fin-recurring-confirm]')?.addEventListener('click',()=>{flow.recurringIndex=idx+1;renderWizard();});
       $('[data-fin-recurring-edit]')?.addEventListener('click',()=>{flow.temp={recurringItem:item};flow.stage='recurringEdit';renderWizard();});
       return;
@@ -433,7 +450,7 @@
       setProgress(`EDITING ${idx+1} OF ${(flow.recurringQueue||[]).length}`,20+Math.round(((idx+1)/Math.max(1,(flow.recurringQueue||[]).length))*40));
       body.innerHTML=wizardHtml(`Update ${source.name}`,'Change only this month’s amount. The value you save becomes next month’s suggestion.',`<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount??''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
       bindBack(()=>{flow.stage='recurringCheck';renderWizard();});
-      $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount','warn');source.amount=n(v);flow.temp={};flow.recurringIndex=idx+1;flow.stage='recurringCheck';renderWizard();});
+      $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount','warn');if(item.kind==='extraBudget')d.extraBudget=n(v);else source.amount=n(v);flow.temp={};flow.recurringIndex=idx+1;flow.stage='recurringCheck';renderWizard();});
       return;
     }
 
@@ -497,7 +514,7 @@
 
     if(flow.stage==='expenseAmount'){
       const meta=groupMeta(t.group); setProgress('EXPENSES',56);
-      body.innerHTML=wizardHtml(`How much was ${t.name}?`,meta.key==='extra'?`This counts toward your ${money(hasValue(d.extraBudget)?d.extraBudget:255)} monthly Extra budget.`:'Enter the amount for this month.',`<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+      body.innerHTML=wizardHtml(`How much was ${t.name}?`,meta.key==='extra'?`This counts toward your ${money(hasValue(d.extraBudget)?d.extraBudget:250)} monthly Extra budget.`:'Enter the amount for this month.',`<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
       bindBack(()=>{if(meta.optionalName)flow.stage='expenseOptionalName';else if(meta.defaultName)flow.stage='expenseGroup';else flow.stage='expenseName';renderWizard();});
       $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount','warn');d.expenses.push({group:t.group,name:t.name,amount:n(v)});flow.temp={};flow.stage='expenseMore';renderWizard();}); return;
     }
@@ -510,7 +527,7 @@
 
     if(flow.stage==='extraBudget'){
       setProgress('EXTRA BUDGET',70);
-      body.innerHTML=wizardHtml('What is your Extra budget this month?','Default is €255. You can change it for a specific month. Twogether will warn you if your Extra spending goes above it.',`<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(hasValue(d.extraBudget)?d.extraBudget:255))}" placeholder="255.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+      body.innerHTML=wizardHtml('What is your Extra spending limit this month?','Default is €250. You can change it for a specific month. This is a limit, not an expense. Twogether will warn you when your actual Extra purchases go above it.',`<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(hasValue(d.extraBudget)?d.extraBudget:250))}" placeholder="250.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
       bindBack(()=>{flow.stage='expenseGroup';renderWizard();});
       $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid Extra budget','warn');d.extraBudget=n(v);flow.stage='investmentTotal';renderWizard();}); return;
     }
