@@ -368,11 +368,12 @@
     const core=['accom','travel'];
 
     if(f.stage==='choose'){
-      const unlogged=MONEY_FIELDS.filter(key=>!partialHasValue(f,key));
+      const partialOrder=['accom','travel','groceries','eat','fuel','tolls','other'];
+      const unlogged=partialOrder.filter(key=>!partialHasValue(f,key));
       let selectable=f.expanded?unlogged:core.filter(key=>unlogged.includes(key));
       if(!selectable.length&&!f.expanded){f.expanded=true;selectable=unlogged;}
       const choices=selectable.map(key=>`<button class="trip-pick" type="button" data-v5-partial-key="${key}"><span class="pick-icon">${icons[key]||'＋'}</span><div><strong>${esc(MONEY_LABELS[key])}</strong><small>Add ${esc(MONEY_LABELS[key].toLowerCase())}</small></div></button>`).join('');
-      const savedKeys=MONEY_FIELDS.filter(key=>partialHasValue(f,key));
+      const savedKeys=partialOrder.filter(key=>partialHasValue(f,key));
       const savedChoices=savedKeys.map(key=>`<button class="trip-pick" type="button" data-v5-partial-saved="${key}"><span class="pick-icon">↻</span><div><strong>${esc(MONEY_LABELS[key])}</strong><small>Saved total ${money(f.draft[key])} · add another or edit</small></div></button>`).join('');
       const intro=!f.expanded?'Start with accommodation and/or Flights / Train. After your first entry, you can add the other categories.':'Choose one of the remaining categories. Saved categories can still be updated below.';
       const content=`${saved?`<div class="v5-reference"><span>Saved so far</span><strong>${esc(saved)}</strong></div>`:''}${choices?`<div class="v5-choice-stack">${choices}</div>`:'<div class="budget-empty">All categories already have a saved amount.</div>'}${savedChoices?`<div class="v5-step" style="margin:18px 0 8px">ALREADY LOGGED · EDIT OR ADD</div><div class="v5-choice-stack">${savedChoices}</div>`:''}${saved?'<div class="v5-actions"><button class="btn ghost" type="button" data-v5-partial-cancel>Cancel</button><button class="btn primary big" type="button" data-v5-partial-save>Save for later</button></div>':''}`;
@@ -441,8 +442,14 @@
     MONEY_FIELDS.forEach(key=>{partial[key]=f.draft[key]??'';});
     try{
       await post('savePlanPartial',{planId:f.planId,partial});
+      const plan=planById(f.planId); const a=actor();
+      if(plan&&a){
+        plan.partials={...(plan.partials||{})};
+        plan.partials[a]=JSON.parse(JSON.stringify(partial));
+        renderBudgetPlans();
+      }
       closeOverlay(); toast('Saved. You can keep adding expenses later.');
-      setTimeout(refreshState,450);
+      setTimeout(refreshState,1600);
     }catch(err){toast(err.message||'Could not save partial expenses','warn');if(btn)btn.disabled=false;}
   }
 
