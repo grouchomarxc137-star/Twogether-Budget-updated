@@ -3,164 +3,753 @@
 
   const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
   const API_URL = String(CONFIG.appsScriptUrl || '').trim();
-  const SYNC_MS = 3000;
-  const DEFAULT_COMPARE = {rent:600,utilities:120,condo:0,stilltravel:180,food:250,carpay:250,insurance:90,tax:45,carfuel:120,maintenance:50};
+  const SYNC_MS = 3500;
+  const ACTOR_KEY = 'twogether_actor_v1';
+  const ACTORS = ['Principessa','Principe'];
+
+  const DEFAULT_COMPARE = {
+    rent:600, utilities:120, condo:0, stilltravel:180, food:250,
+    carpay:250, insurance:90, tax:45, carfuel:120, maintenance:50
+  };
   const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other'];
-  const MONEY_LABELS = {accom:'Accommodation',groceries:'Groceries',eat:'Eating out',travel:'Flights / Train',fuel:'Fuel',tolls:'Tolls / Parking',other:'Other'};
+  const MONEY_LABELS = {
+    accom:'Accommodation', groceries:'Groceries', eat:'Eating out',
+    travel:'Flights / Train', fuel:'Fuel', tolls:'Tolls / Parking', other:'Other'
+  };
   const MONTHS = [
-    ['2026-09','Sep 2026'],['2026-10','Oct 2026'],['2026-11','Nov 2026'],['2026-12','Dec 2026'],
-    ['2027-01','Jan 2027'],['2027-02','Feb 2027'],['2027-03','Mar 2027'],['2027-04','Apr 2027'],
-    ['2027-05','May 2027'],['2027-06','Jun 2027'],['2027-07','Jul 2027'],['2027-08','Aug 2027']
+    ['2026-01','Jan 2026'],['2026-02','Feb 2026'],['2026-03','Mar 2026'],['2026-04','Apr 2026'],
+    ['2026-05','May 2026'],['2026-06','Jun 2026'],['2026-07','Jul 2026'],['2026-08','Aug 2026'],
+    ['2026-09','Sep 2026'],['2026-10','Oct 2026'],['2026-11','Nov 2026'],['2026-12','Dec 2026']
   ];
-  const RENT_DEFS = [['Rent','rent'],['Utilities + Wi-Fi','utilities'],['Condo fees','condo'],['Still-needed travel','stilltravel'],['Groceries / eating out','food']];
-  const CAR_DEFS = [['Car payment / saving','carpay'],['Insurance','insurance'],['Road tax','tax'],['Fuel','carfuel'],['Maintenance reserve','maintenance']];
+  const RENT_DEFS = [
+    ['Rent','rent'],['Utilities + Wi-Fi','utilities'],['Condo fees','condo'],
+    ['Still-needed travel','stilltravel'],['Groceries / eating out','food']
+  ];
+  const CAR_DEFS = [
+    ['Car payment / saving','carpay'],['Insurance','insurance'],['Road tax','tax'],
+    ['Fuel','carfuel'],['Maintenance reserve','maintenance']
+  ];
 
   let actor = '';
-  let state = {version:1,trips:[],compare:{...DEFAULT_COMPARE},audit:[],updatedAt:''};
-  let wizard = freshDraft();
-  let wizardStep = 0;
-  let wizardTripId = '';
+  let state = normalizeState({});
+  let backendV3 = false;
   let syncBusy = false;
   let syncTimer = null;
-  let backendV2 = false;
+  let lastServerStamp = '';
+  let openTripId = '';
+  let wizard = freshWizard();
 
-  const $ = (s,r=document)=>r.querySelector(s);
-  const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
-  const esc = v=>String(v??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-  const n = v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0};
-  const money = v=>'€'+n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-  const fmtDate = v=>{if(!v)return '—';const [y,m,d]=String(v).split('-');return y&&m&&d?`${d}/${m}/${y}`:v};
-  const otherActor = ()=>actor==='Principessa'?'Principe':'Principessa';
+  const $ = (s,r=document) => r.querySelector(s);
+  const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+  const esc = v => String(v ?? '').replace(/[&<>'"]/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+  }[ch]));
+  const n = v => {
+    const x = Number(String(v ?? '').replace(',','.'));
+    return Number.isFinite(x) ? x : 0;
+  };
+  const money = v => '€' + n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtDate = v => {
+    if(!v) return '—';
+    const [y,m,d] = String(v).split('-');
+    return y && m && d ? `${d}/${m}/${y}` : String(v);
+  };
+  const otherActor = () => actor === 'Principessa' ? 'Principe' : 'Principessa';
 
-  function freshDraft(){return {location:'',otherLocation:'',city:'',start:'',end:'',accom:'',groceries:'',eat:'',travel:'',fuel:'',tolls:'',other:'',otherNote:'',paid:'',uncertain:{}}}
-  function toast(msg,tone='ok'){const el=$('#toast');el.textContent=msg;el.className='toast show '+tone;clearTimeout(el._t);el._t=setTimeout(()=>el.className='toast',2600)}
-  function setConnection(text,tone='neutral'){const el=$('#connectionStatus');if(el){el.textContent=text;el.dataset.tone=tone}}
-  function locationLabel(s){return s?.location==='Other'?(s.otherLocation||'Other'):(s?.location||'—')}
-  function tripTotalSubmission(s){return MONEY_FIELDS.reduce((sum,k)=>sum+n(s?.[k]),0)}
-  function hasUncertain(s){return MONEY_FIELDS.some(k=>s?.uncertain?.[k]===true)}
+  function freshDraft(){
+    return {
+      location:'',otherLocation:'',city:'',start:'',end:'',budget:'',
+      accom:'',groceries:'',eat:'',travel:'',fuel:'',tolls:'',other:'',otherNote:'',
+      paid:'',uncertain:{}
+    };
+  }
 
-  function normalizeState(s){return {version:Number(s?.version||1),trips:Array.isArray(s?.trips)?s.trips:[],compare:{...DEFAULT_COMPARE,...(s?.compare||{})},audit:Array.isArray(s?.audit)?s.audit:[],updatedAt:s?.updatedAt||''}}
-  function getSubs(t){return {Principessa:t?.submissions?.Principessa||null,Principe:t?.submissions?.Principe||null}}
+  function freshWizard(){
+    return {mode:null,tripId:'',draft:freshDraft(),index:0};
+  }
+
+  function normalizeState(s){
+    return {
+      version:Number(s?.version || 1),
+      trips:Array.isArray(s?.trips) ? s.trips.map(t => ({
+        ...t,
+        submissions:{Principessa:t?.submissions?.Principessa || null,Principe:t?.submissions?.Principe || null},
+        confirmed:{Principessa:!!t?.confirmed?.Principessa,Principe:!!t?.confirmed?.Principe},
+        budget:t?.budget ?? ''
+      })) : [],
+      compare:{...DEFAULT_COMPARE,...(s?.compare || {})},
+      audit:Array.isArray(s?.audit) ? s.audit.slice(-2) : [],
+      updatedAt:s?.updatedAt || ''
+    };
+  }
+
+  function toast(msg,tone='ok'){
+    const el = $('#toast');
+    if(!el) return;
+    el.textContent = msg;
+    el.className = 'toast show ' + tone;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className='toast', 2600);
+  }
+
+  function locationLabel(s){
+    return s?.location === 'Other' ? (s.otherLocation || 'Other') : (s?.location || '—');
+  }
+
+  function tripMeta(t){
+    if(!t) return {};
+    const preferred = t?.submissions?.[t.createdBy];
+    return preferred || t?.submissions?.Principessa || t?.submissions?.Principe || {};
+  }
+
+  function isLocked(t){
+    return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe);
+  }
+
+  function tripTotalSubmission(s){
+    return MONEY_FIELDS.reduce((sum,k)=>sum+n(s?.[k]),0);
+  }
 
   function differences(t){
-    const {Principessa:a,Principe:b}=getSubs(t); if(!a||!b)return [];
-    const out=[];
-    const textFields=[['location','Location'],['otherLocation','Other location'],['city','City / Area'],['start','Start date'],['end','End date']];
-    textFields.forEach(([k,label])=>{if(String(a[k]||'').trim().toLowerCase()!==String(b[k]||'').trim().toLowerCase())out.push({key:k,label,a:a[k]||'—',b:b[k]||'—',type:'text'})});
-    MONEY_FIELDS.forEach(k=>{if(Math.abs(n(a[k])-n(b[k]))>.01)out.push({key:k,label:MONEY_LABELS[k],a:money(a[k]),b:money(b[k]),type:'money'})});
+    const a = t?.submissions?.Principessa;
+    const b = t?.submissions?.Principe;
+    if(!a || !b) return [];
+    const out = [];
+
+    MONEY_FIELDS.forEach(k => {
+      const amountDiff = Math.abs(n(a[k])-n(b[k])) > .01;
+      const certaintyDiff = !!a?.uncertain?.[k] !== !!b?.uncertain?.[k];
+      if(amountDiff){
+        out.push({key:k,label:MONEY_LABELS[k],a:money(a[k]),b:money(b[k]),type:'money'});
+      } else if(certaintyDiff){
+        out.push({
+          key:k+'Certainty',label:MONEY_LABELS[k]+' certainty',
+          a:a?.uncertain?.[k] ? 'Estimated' : 'Exact',
+          b:b?.uncertain?.[k] ? 'Estimated' : 'Exact',type:'text'
+        });
+      }
+    });
+
+    if(String(a.otherNote||'').trim().toLowerCase() !== String(b.otherNote||'').trim().toLowerCase()){
+      out.push({key:'otherNote',label:'Other expense note',a:a.otherNote||'—',b:b.otherNote||'—',type:'text'});
+    }
     return out;
   }
 
   function effectiveTrip(t){
-    const {Principessa:a,Principe:b}=getSubs(t);
-    const source=a||b||{};
-    const out={id:t.id,location:source.location||'',otherLocation:source.otherLocation||'',city:source.city||'',start:source.start||'',end:source.end||'',uncertain:{},provisional:!(a&&b),mismatch:false};
-    if(a&&b){
-      const latest=(String(a.submittedAt||'')>=String(b.submittedAt||''))?a:b;
-      ['location','otherLocation','city','start','end'].forEach(k=>out[k]=latest[k]||a[k]||b[k]||'');
-    }
-    MONEY_FIELDS.forEach(k=>{
-      if(a&&b){
-        out[k]=(n(a[k])+n(b[k]))/2;
-        out.uncertain[k]=!!(a.uncertain?.[k]||b.uncertain?.[k]||Math.abs(n(a[k])-n(b[k]))>.01);
-      }else{
-        out[k]=n(source[k]);out.uncertain[k]=!!source.uncertain?.[k];
+    const a = t?.submissions?.Principessa;
+    const b = t?.submissions?.Principe;
+    const meta = tripMeta(t);
+    const out = {
+      id:t?.id || '',
+      location:meta.location||'',otherLocation:meta.otherLocation||'',city:meta.city||'',
+      start:meta.start||'',end:meta.end||'',budget:n(t?.budget),
+      uncertain:{},provisional:!(a&&b),mismatch:false,locked:isLocked(t)
+    };
+
+    MONEY_FIELDS.forEach(k => {
+      if(a && b){
+        const same = Math.abs(n(a[k])-n(b[k])) <= .01;
+        out[k] = same ? n(a[k]) : (n(a[k])+n(b[k]))/2;
+        out.uncertain[k] = !!(a?.uncertain?.[k] || b?.uncertain?.[k] || !same);
+      } else {
+        const s = a || b || {};
+        out[k] = n(s[k]);
+        out.uncertain[k] = !!s?.uncertain?.[k];
       }
     });
-    out.mismatch=differences(t).length>0;
-    out.estimated=Object.values(out.uncertain).some(Boolean)||out.mismatch;
-    out.total=MONEY_FIELDS.reduce((s,k)=>s+n(out[k]),0);
-    out.paidPrincipessa=n(a?.paid);out.paidPrincipe=n(b?.paid);
+
+    out.mismatch = !!(a && b && differences(t).length);
+    out.total = MONEY_FIELDS.reduce((sum,k)=>sum+n(out[k]),0);
+    out.paidPrincipessa = n(a?.paid);
+    out.paidPrincipe = n(b?.paid);
+    out.estimated = out.provisional || out.mismatch || !out.locked || Object.values(out.uncertain).some(Boolean);
     return out;
   }
 
-  function jsonp(params={}){return new Promise((resolve,reject)=>{if(!API_URL)return reject(new Error('Backend URL missing'));const cb='__tb_'+Date.now()+'_'+Math.random().toString(36).slice(2);const script=document.createElement('script');const timer=setTimeout(()=>done(new Error('Sync timed out')),12000);function done(err,data){clearTimeout(timer);delete window[cb];script.remove();err?reject(err):resolve(data)}window[cb]=data=>done(null,data);const q=new URLSearchParams({...params,callback:cb,_:Date.now().toString()});script.src=API_URL+(API_URL.includes('?')?'&':'?')+q;script.onerror=()=>done(new Error('Could not reach Apps Script'));document.head.appendChild(script)})}
+  function budgetInfo(t){
+    const e = effectiveTrip(t);
+    if(!e.budget) return {has:false,label:'No planned budget',delta:0,tone:'neutral'};
+    const delta = e.budget - e.total;
+    if(Math.abs(delta) < .01) return {has:true,label:'Exactly on budget',delta:0,tone:'ok'};
+    if(delta > 0) return {has:true,label:`${money(delta)} under budget`,delta,tone:'ok'};
+    return {has:true,label:`${money(Math.abs(delta))} over budget`,delta,tone:'warn'};
+  }
 
-  function postAction(action,payload){return new Promise((resolve,reject)=>{if(!API_URL)return reject(new Error('Backend not configured'));const form=document.createElement('form');form.method='POST';form.action=API_URL;form.target='backendFrame';form.style.display='none';const fields={action,actor,payload:JSON.stringify(payload||{})};Object.entries(fields).forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)});document.body.appendChild(form);form.submit();form.remove();setTimeout(async()=>{await syncNow(true);resolve()},900)})}
+  function jsonp(params={}){
+    return new Promise((resolve,reject)=>{
+      if(!API_URL) return reject(new Error('Backend URL missing'));
+      const cb = '__twogether_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      const timer = setTimeout(()=>done(new Error('Sync timed out')),12000);
 
-  async function syncNow(showErrors=false){if(!API_URL||syncBusy)return;syncBusy=true;setConnection('Syncing…','sync');try{const res=await jsonp({action:'state'});if(!res?.ok)throw new Error(res?.error||'Sync failed');state=normalizeState(res.state);backendV2=state.version>=2;$('#backendUpgrade')?.classList.toggle('hidden',backendV2);renderAll();setConnection(backendV2?'Live · synced':'Backend update needed',backendV2?'ok':'warn')}catch(e){setConnection('Offline','warn');if(showErrors)toast(e.message||'Could not sync','warn')}finally{syncBusy=false}}
+      function done(err,data){
+        clearTimeout(timer);
+        try{ delete window[cb]; }catch{}
+        script.remove();
+        err ? reject(err) : resolve(data);
+      }
 
-  function showIdentity(){$('#identityModal').classList.add('show');$('#identityModal').setAttribute('aria-hidden','false')}
-  function chooseIdentity(name){actor=name;$('#identityModal').classList.remove('show');$('#identityModal').setAttribute('aria-hidden','true');$('#whoBadge').textContent=name;$('#whoBadge').classList.remove('hidden');wizard=freshDraft();wizardStep=0;wizardTripId='';renderWizard();syncNow(true);if(syncTimer)clearInterval(syncTimer);syncTimer=setInterval(()=>syncNow(false),SYNC_MS)}
+      window[cb] = data => done(null,data);
+      const q = new URLSearchParams({...params,callback:cb,_:Date.now().toString()});
+      script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + q.toString();
+      script.onerror = () => done(new Error('Could not reach Apps Script'));
+      document.head.appendChild(script);
+    });
+  }
 
-  function openSheet(id){$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.sheet===id));$$('.sheet').forEach(x=>x.classList.toggle('active',x.id===id))}
+  function postAction(action,payload){
+    return new Promise((resolve,reject)=>{
+      if(!API_URL) return reject(new Error('Backend not configured'));
+      const frame = document.querySelector('iframe[name="backendFrame"]');
+      if(!frame) return reject(new Error('Backend frame missing'));
 
-  function pendingForActor(){return state.trips.filter(t=>!t?.submissions?.[actor]&&t?.submissions?.[otherActor()])}
-  function startForTrip(id){wizard=freshDraft();wizardStep=0;wizardTripId=id||'';openSheet('log');renderWizard();window.scrollTo({top:0,behavior:'smooth'})}
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = API_URL;
+      form.target = 'backendFrame';
+      form.style.display = 'none';
+      const fields = {action,actor,payload:JSON.stringify(payload||{})};
+      Object.entries(fields).forEach(([k,v])=>{
+        const input = document.createElement('input');
+        input.type='hidden';input.name=k;input.value=v;
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
 
-  function steps(){
-    const cityExample=wizard.location==='Italy'?'Lonato del Garda':wizard.location==='Portugal'?'Lisbon':wizard.location==='Netherlands'?'Tilburg':'your city or area';
-    return [
-      {key:'tripChoice',title:'Which trip are you logging?',help:'Start a new trip, or add your version to one the other person already logged.',type:'tripChoice'},
-      {key:'location',title:'Where was this trip?',help:'Choose the main country.',type:'choice',options:['Italy','Netherlands','Portugal','Other']},
-      {key:'otherLocation',title:'What country or place was it?',type:'text',placeholder:'e.g. Tunisia',when:d=>d.location==='Other'},
-      {key:'city',title:'Which city or area?',help:`For example: ${cityExample}.`,type:'text',placeholder:`e.g. ${cityExample}`},
-      {key:'start',title:'When did the trip start?',type:'date'},
-      {key:'end',title:'When did it end?',type:'date'},
-      {key:'accom',title:'How much was accommodation?',type:'money',help:'If you only know roughly, mark it as uncertain and give your best estimate.'},
+      setTimeout(async()=>{
+        try{ await syncNow(true); resolve(); }
+        catch(err){ reject(err); }
+      },900);
+    });
+  }
+
+  async function syncNow(showErrors=false){
+    if(!API_URL || syncBusy) return;
+    syncBusy = true;
+    try{
+      const res = await jsonp({action:'state'});
+      if(!res?.ok) throw new Error(res?.error || 'Sync failed');
+      const next = normalizeState(res.state);
+      const stamp = next.updatedAt || JSON.stringify({trips:next.trips,compare:next.compare,audit:next.audit});
+      backendV3 = next.version >= 3;
+      const notice = $('#backendUpgrade');
+      if(notice){
+        notice.classList.toggle('hidden',backendV3);
+        if(!backendV3){
+          notice.innerHTML = '<strong>Backend update needed.</strong><span>Redeploy the latest <code>backend/Code.gs</code> to enable editing/confirmation and trip budgets.</span>';
+        }
+      }
+
+      if(stamp !== lastServerStamp){
+        state = next;
+        lastServerStamp = stamp;
+        renderDataViews();
+        if(actor && wizard.mode === null) renderWizard();
+        if(openTripId && $('#tripModal')?.classList.contains('show')) renderTripModal(openTripId);
+      }
+    }catch(err){
+      if(showErrors) toast(err.message || 'Could not sync','warn');
+    }finally{
+      syncBusy = false;
+    }
+  }
+
+  function showIdentity(){
+    const modal = $('#identityModal');
+    modal?.classList.add('show');
+    modal?.setAttribute('aria-hidden','false');
+  }
+
+  function chooseIdentity(name,{persist=true}={}){
+    if(!ACTORS.includes(name)) return;
+    actor = name;
+    if(persist){
+      try{ localStorage.setItem(ACTOR_KEY,name); }catch{}
+    }
+    document.body.dataset.actor = name;
+    const badge = $('#loggedUserBadge');
+    if(badge){
+      badge.textContent = name;
+      badge.classList.remove('hidden');
+      badge.style.pointerEvents = 'none';
+      badge.style.cursor = 'default';
+    }
+    $('#identityModal')?.classList.remove('show');
+    $('#identityModal')?.setAttribute('aria-hidden','true');
+    wizard = freshWizard();
+    renderWizard();
+    syncNow(true);
+    if(syncTimer) clearInterval(syncTimer);
+    syncTimer = setInterval(()=>syncNow(false),SYNC_MS);
+  }
+
+  function openSheet(id){
+    $$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.sheet===id));
+    $$('.sheet').forEach(x=>x.classList.toggle('active',x.id===id));
+  }
+
+  function pendingForActor(){
+    return state.trips.filter(t => !isLocked(t) && !t?.submissions?.[actor] && t?.submissions?.[otherActor()]);
+  }
+
+  function editableForActor(){
+    return state.trips.filter(t => !isLocked(t) && !!t?.submissions?.[actor]);
+  }
+
+  function beginNew(){
+    wizard = {mode:'new',tripId:'',draft:freshDraft(),index:0};
+    renderWizard();
+  }
+
+  function beginJoin(id){
+    const t = state.trips.find(x=>x.id===id);
+    if(!t || isLocked(t)) return;
+    const meta = tripMeta(t);
+    wizard = {
+      mode:'join',tripId:id,index:0,
+      draft:{...freshDraft(),...meta,budget:t.budget ?? '',uncertain:{}}
+    };
+    renderWizard();
+  }
+
+  function beginEdit(id){
+    const t = state.trips.find(x=>x.id===id);
+    const own = t?.submissions?.[actor];
+    if(!t || !own || isLocked(t)) return;
+    const meta = tripMeta(t);
+    wizard = {
+      mode:'edit',tripId:id,index:0,
+      draft:{...freshDraft(),...meta,...own,budget:t.budget ?? '',uncertain:{...(own.uncertain||{})}}
+    };
+    closeTripModal();
+    openSheet('log');
+    renderWizard();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function flowSteps(){
+    if(wizard.mode === null){
+      return [{key:'tripChoice',title:'Which trip are you logging?',type:'tripChoice'}];
+    }
+
+    const moneySteps = [
+      {key:'accom',title:'How much was accommodation?',type:'money'},
       {key:'groceries',title:'How much on groceries?',type:'money'},
       {key:'eat',title:'How much on eating out?',type:'money'},
       {key:'travel',title:'How much on flights or trains?',type:'money'},
       {key:'fuel',title:'How much on fuel?',type:'money'},
       {key:'tolls',title:'How much on tolls or parking?',type:'money'},
-      {key:'other',title:'Any other expenses?',type:'money',help:'Use 0 if none. You can mark this as uncertain too.'},
-      {key:'otherNote',title:'What were the other expenses?',type:'text',placeholder:'e.g. museum tickets',optional:true,when:d=>n(d.other)>0},
-      {key:'paid',title:`How much did ${actor||'you'} pay?`,help:`Only your own payment is recorded while you are logged in as ${actor||'this user'}.`,type:'money',optional:true,noUncertain:true},
-      {key:'review',title:'Ready to save your version?',type:'review'}
+      {key:'other',title:'Any other expenses?',type:'moneyOrNone'},
+      {key:'otherNote',title:'What were the other expenses?',type:'text',optional:true,when:d=>n(d.other)>0},
+      {key:'paid',title:`How much did ${actor} actually pay?`,type:'money',optional:true,noUncertain:true},
+      {key:'review',title:wizard.mode==='edit' ? 'Save your corrected version?' : 'Ready to save your version?',type:'review'}
     ];
+
+    if(wizard.mode === 'join' || wizard.mode === 'edit') return moneySteps.filter(s=>!s.when || s.when(wizard.draft));
+
+    const locationExample = wizard.draft.location === 'Italy' ? 'Lonato del Garda' :
+      wizard.draft.location === 'Portugal' ? 'Lisbon' :
+      wizard.draft.location === 'Netherlands' ? 'Tilburg' : 'your city or area';
+
+    return [
+      {key:'location',title:'Where was this trip?',help:'Choose the main country.',type:'choice',options:['Italy','Netherlands','Portugal','Other']},
+      {key:'otherLocation',title:'What country or place was it?',type:'text',placeholder:'e.g. Tunisia',when:d=>d.location==='Other'},
+      {key:'city',title:'Which city or area?',help:`For example: ${locationExample}.`,type:'text',placeholder:`e.g. ${locationExample}`},
+      {key:'start',title:'When did the trip start?',type:'date'},
+      {key:'end',title:'When did it end?',type:'date'},
+      {key:'budget',title:'What is your ideal total budget for this trip?',help:'This is your shared target before the trip. You can skip it if you do not want to set one.',type:'budget',optional:true},
+      ...moneySteps
+    ].filter(s=>!s.when || s.when(wizard.draft));
   }
-  function visibleSteps(){return steps().filter(s=>!s.when||s.when(wizard))}
-  function currentStep(){const v=visibleSteps();return v[Math.min(wizardStep,v.length-1)]}
+
+  function currentStep(){
+    const steps = flowSteps();
+    if(wizard.index >= steps.length) wizard.index = Math.max(0,steps.length-1);
+    return steps[wizard.index];
+  }
+
+  function contextBanner(){
+    if(wizard.mode !== 'join' && wizard.mode !== 'edit') return '';
+    const t = state.trips.find(x=>x.id===wizard.tripId);
+    const m = tripMeta(t);
+    const verb = wizard.mode === 'edit' ? 'Editing your calculations for' : 'Adding your calculations to';
+    return `<div class="existing-trip-context"><strong>${verb} ${esc(m.city || locationLabel(m))}</strong><span>${esc(locationLabel(m))} · ${fmtDate(m.start)}–${fmtDate(m.end)}</span></div>`;
+  }
 
   function renderWizard(){
-    const body=$('#wizardBody');if(!body||!actor)return;
-    const vis=visibleSteps();if(wizardStep>=vis.length)wizardStep=vis.length-1;const s=currentStep(),idx=vis.indexOf(s);
-    $('#wizardStep').textContent=s.type==='review'?'Review':`Question ${idx+1} of ${vis.length-1}`;$('#wizardProgress').style.width=`${Math.max(8,((idx+1)/vis.length)*100)}%`;
-    let control='';
-    if(s.type==='tripChoice'){
-      const pending=pendingForActor();
-      control=`<div class="trip-choice-stack"><button class="trip-pick new-trip-pick" data-trip-pick="new" type="button"><span class="pick-icon">＋</span><div><strong>Start a new trip</strong><small>Neither of you has logged this trip yet</small></div></button>${pending.map(t=>{const e=effectiveTrip(t),other=t.submissions[otherActor()];return `<button class="trip-pick" data-trip-pick="${esc(t.id)}" type="button"><span class="pick-icon">↔</span><div><strong>${esc(locationLabel(other))}${other.city?` · ${esc(other.city)}`:''}</strong><small>${fmtDate(other.start)} → ${fmtDate(other.end)} · ${otherActor()} already logged this</small></div></button>`}).join('')}</div>`;
-    }else if(s.type==='choice')control=`<div class="choice-grid">${s.options.map(o=>`<button class="choice" data-choice="${esc(o)}" type="button">${esc(o)}</button>`).join('')}</div>`;
-    else if(s.type==='date')control=`<div class="field-wrap"><input class="big-input" id="wizardInput" type="date" value="${esc(wizard[s.key])}"></div>`;
-    else if(s.type==='text')control=`<div class="field-wrap"><input class="big-input" id="wizardInput" type="text" placeholder="${esc(s.placeholder||'')}" value="${esc(wizard[s.key])}"></div>`;
-    else if(s.type==='money'){
-      const uncertain=!!wizard.uncertain[s.key];
-      control=`<div class="money-mode ${uncertain?'uncertain-mode':''}"><div class="money-input-wrap"><span>€</span><input class="big-input money-field" id="wizardInput" inputmode="decimal" placeholder="${uncertain?'best estimate':'0.00'}" value="${esc(wizard[s.key])}"></div>${s.noUncertain?'':`<div class="certainty-row"><button type="button" class="certainty ${!uncertain?'active':''}" data-certainty="exact">Exact</button><button type="button" class="certainty ${uncertain?'active':''}" data-certainty="uncertain">Not sure · estimate</button></div>${uncertain?'<div class="estimate-note">~ This amount will count in totals as an estimate, not as an exact value.</div>':''}`}</div>`;
-    }else if(s.type==='review')control=reviewMarkup();
-    body.innerHTML=`<div class="question-stage"><div class="question-icon">${stepIcon(s)}</div><h2>${esc(s.title)}</h2>${s.help?`<p>${esc(s.help)}</p>`:''}${control}<div class="wizard-actions"><button class="btn ghost" id="wizardBack" type="button" ${wizardStep===0?'disabled':''}>Back</button>${s.type==='review'?`<button class="btn primary big" id="saveTrip" type="button" ${backendV2?'':'disabled'}>Save my version</button>`:(['choice','tripChoice'].includes(s.type)?'':`<button class="btn primary big" id="wizardNext" type="button">Continue</button>`)}</div>${s.type==='review'&&!backendV2?'<div class="inline-warning">The Apps Script backend needs the new version before this can be saved.</div>':''}</div>`;
+    const body = $('#wizardBody');
+    if(!body || !actor) return;
+    const steps = flowSteps();
+    const s = currentStep();
+    const stepEl = $('#wizardStep');
+    const progress = $('#wizardProgress');
 
-    $('#wizardBack')?.addEventListener('click',()=>{wizardStep=Math.max(0,wizardStep-1);renderWizard()});
-    $$('.trip-pick',body).forEach(btn=>btn.addEventListener('click',()=>{wizardTripId=btn.dataset.tripPick==='new'?'':btn.dataset.tripPick;wizardStep++;renderWizard()}));
-    $$('.choice',body).forEach(btn=>btn.addEventListener('click',()=>{wizard[s.key]=btn.dataset.choice;wizardStep++;setTimeout(renderWizard,100)}));
-    $$('.certainty',body).forEach(btn=>btn.addEventListener('click',()=>{wizard.uncertain[s.key]=btn.dataset.certainty==='uncertain';renderWizard()}));
-    const input=$('#wizardInput');if(input){input.focus();input.addEventListener('input',()=>{if(input.value.trim()==='-'&&!s.noUncertain){wizard.uncertain[s.key]=true;input.value='';toast('Marked uncertain — now enter your best estimate.','warn')}});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();advanceInput(s,input)}});if(s.type==='date')input.addEventListener('change',()=>{if(input.value){wizard[s.key]=input.value;wizardStep++;renderWizard()}})}
-    $('#wizardNext')?.addEventListener('click',()=>advanceInput(s,input));$('#saveTrip')?.addEventListener('click',saveWizard);
+    if(s.type === 'review'){
+      if(stepEl) stepEl.textContent = 'Review';
+    }else{
+      const questionCount = steps.filter(x=>x.type!=='review').length;
+      const questionNumber = steps.slice(0,wizard.index+1).filter(x=>x.type!=='review').length;
+      if(stepEl) stepEl.textContent = `Question ${Math.max(1,questionNumber)} of ${Math.max(1,questionCount)}`;
+    }
+    if(progress) progress.style.width = `${Math.max(8,((wizard.index+1)/Math.max(1,steps.length))*100)}%`;
+
+    let control = '';
+    if(s.type === 'tripChoice'){
+      const pending = pendingForActor();
+      const editable = editableForActor().filter(t => t.submissions?.Principessa && t.submissions?.Principe && differences(t).length);
+      control = `<div class="trip-choice-stack">
+        <button class="trip-pick new-trip-pick" data-trip-pick="new" type="button"><span class="pick-icon">＋</span><div><strong>Start a new trip</strong><small>Log location, dates, planned budget and your expenses.</small></div></button>
+        ${pending.map(t=>{
+          const m=tripMeta(t);
+          return `<button class="trip-pick" data-trip-pick="${esc(t.id)}" type="button"><span class="pick-icon">↔</span><div><strong>Add your version · ${esc(m.city||locationLabel(m))}</strong><small>${fmtDate(m.start)}–${fmtDate(m.end)} · only expense questions</small></div></button>`;
+        }).join('')}
+        ${editable.map(t=>{
+          const m=tripMeta(t);
+          return `<button class="trip-pick" data-edit-pick="${esc(t.id)}" type="button"><span class="pick-icon">✎</span><div><strong>Fix your version · ${esc(m.city||locationLabel(m))}</strong><small>Your two calculations currently differ.</small></div></button>`;
+        }).join('')}
+      </div>`;
+    } else if(s.type === 'choice'){
+      control = `<div class="choice-grid">${s.options.map(o=>`<button class="choice" type="button" data-choice="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+    } else if(s.type === 'text' || s.type === 'date'){
+      control = `<div class="field-wrap"><input id="wizardInput" class="big-input" type="${s.type==='date'?'date':'text'}" value="${esc(wizard.draft[s.key]||'')}" placeholder="${esc(s.placeholder||'')}"></div>`;
+    } else if(s.type === 'money' || s.type === 'moneyOrNone' || s.type === 'budget'){
+      const value = wizard.draft[s.key] ?? '';
+      const isUncertain = !!wizard.draft.uncertain?.[s.key];
+      control = `<div class="${isUncertain?'uncertain-mode':''}">
+        <div class="money-input-wrap"><span>€</span><input id="wizardInput" class="big-input money-field" inputmode="decimal" value="${esc(value)}" placeholder="0.00"></div>
+        ${(!s.noUncertain && MONEY_FIELDS.includes(s.key)) ? `<div class="certainty-row"><button class="certainty ${!isUncertain?'active':''}" type="button" data-certainty="exact">Exact</button><button class="certainty ${isUncertain?'active':''}" type="button" data-certainty="estimate">Not sure · estimate</button></div>` : ''}
+        ${isUncertain ? '<div class="estimate-note">This amount will count in totals but stay marked as an estimate.</div>' : ''}
+        ${s.type==='moneyOrNone' ? '<button class="btn ghost full" type="button" data-none> No other expenses </button>' : ''}
+        ${s.type==='budget' ? '<button class="btn ghost full" type="button" data-skip-budget>Skip budget</button>' : ''}
+      </div>`;
+    } else if(s.type === 'review'){
+      control = reviewHtml();
+    }
+
+    const help = s.type==='tripChoice'
+      ? `Start a new trip, or add your version to one ${otherActor()} already logged.`
+      : (s.help || (wizard.mode==='join' ? 'The trip details are already shared. Only enter your expense calculations.' : wizard.mode==='edit' ? 'Correct only the calculations that need changing.' : ''));
+
+    body.innerHTML = `<div class="question-stage">${contextBanner()}<h2>${esc(s.title)}</h2>${help?`<p>${esc(help)}</p>`:''}${control}${wizardActions(s)}</div>`;
+    bindWizard(s);
   }
 
-  function advanceInput(s,input){const v=String(input?.value||'').trim();if(!s.optional&&!v)return toast('Please answer this question first.','warn');if(s.type==='money'&&v&&!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount or use “Not sure · estimate”.','warn');wizard[s.key]=v;wizardStep++;renderWizard()}
-  function stepIcon(s){return ({tripChoice:'↔',location:'✦',otherLocation:'⌖',city:'⌖',start:'◷',end:'◷',accom:'⌂',groceries:'▣',eat:'◇',travel:'✈',fuel:'◉',tolls:'P',other:'＋',otherNote:'✎',paid:'♡',review:'✓'})[s.key]||'•'}
+  function wizardActions(s){
+    if(s.type === 'tripChoice' || s.type === 'choice' || s.type === 'review') return '';
+    const back = `<button class="btn ghost" type="button" data-wizard-back>Back</button>`;
+    const optional = s.optional;
+    return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${optional?'Continue':'Next'}</button></div>`;
+  }
 
-  function reviewMarkup(){const total=tripTotalSubmission(wizard),est=hasUncertain(wizard);return `<div class="review-card"><div class="review-total ${est?'estimate-total':''}"><span>${est?'Estimated trip total':'Trip total'}</span><strong>${est?'~ ':''}${money(total)}</strong><small>${money(total/2)} each</small></div><div class="review-grid"><div><span>Location</span><strong>${esc(locationLabel(wizard))}</strong></div><div><span>City</span><strong>${esc(wizard.city||'—')}</strong></div><div><span>Dates</span><strong>${fmtDate(wizard.start)} → ${fmtDate(wizard.end)}</strong></div><div><span>${esc(actor)} paid</span><strong>${money(wizard.paid)}</strong></div>${MONEY_FIELDS.map(k=>`<div class="${wizard.uncertain[k]?'uncertain-review':''}"><span>${MONEY_LABELS[k]}</span><strong>${wizard.uncertain[k]?'~ ':''}${money(wizard[k])}</strong></div>`).join('')}</div></div>`}
+  function reviewHtml(){
+    const d = wizard.draft;
+    const total = MONEY_FIELDS.reduce((sum,k)=>sum+n(d[k]),0);
+    const estimate = MONEY_FIELDS.some(k=>d?.uncertain?.[k]);
+    const submitLabel = wizard.mode==='edit' ? 'Update my version' : 'Save my version';
+    return `<div class="review-card">
+      <div class="review-total ${estimate?'estimate-total':''}"><span>Your trip calculation</span><strong>${estimate?'~ ':''}${money(total)}</strong><small>${d.budget ? `Planned budget ${money(d.budget)}` : 'No planned budget'}</small></div>
+      <div class="review-grid">
+        <div><span>Trip</span><strong>${esc(d.city||locationLabel(d))}</strong></div>
+        <div><span>Dates</span><strong>${fmtDate(d.start)}–${fmtDate(d.end)}</strong></div>
+        ${MONEY_FIELDS.map(k=>`<div class="${d?.uncertain?.[k]?'uncertain-review':''}"><span>${esc(MONEY_LABELS[k])}</span><strong>${d?.uncertain?.[k]?'~ ':''}${money(d[k])}</strong></div>`).join('')}
+        <div><span>${esc(actor)} paid</span><strong>${money(d.paid)}</strong></div>
+      </div>
+    </div><div class="wizard-actions"><button class="btn ghost" type="button" data-wizard-back>Back</button><button class="btn primary big" type="button" data-save-version>${esc(submitLabel)}</button></div>`;
+  }
 
-  async function saveWizard(){if(!backendV2)return toast('Redeploy the new Apps Script backend first.','warn');const btn=$('#saveTrip');if(btn){btn.disabled=true;btn.textContent='Saving…'};try{await postAction('saveSubmission',{tripId:wizardTripId,submission:wizard});toast('Your version was saved ♡');wizard=freshDraft();wizardTripId='';wizardStep=0;renderWizard()}catch(e){toast('Could not save the trip.','warn');if(btn){btn.disabled=false;btn.textContent='Save my version'}}}
+  function bindWizard(s){
+    $$('[data-trip-pick]').forEach(btn=>btn.addEventListener('click',()=>{
+      const id=btn.dataset.tripPick;
+      id==='new' ? beginNew() : beginJoin(id);
+    }));
+    $$('[data-edit-pick]').forEach(btn=>btn.addEventListener('click',()=>beginEdit(btn.dataset.editPick)));
+    $$('[data-choice]').forEach(btn=>btn.addEventListener('click',()=>{
+      wizard.draft[s.key]=btn.dataset.choice;
+      wizard.index++;
+      renderWizard();
+    }));
 
-  function renderTripGallery(){const root=$('#tripGallery');if(!root)return;const trips=[...state.trips].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));if(!trips.length){root.innerHTML='<div class="empty-state gallery-empty"><div>♡</div><strong>No trips yet</strong><span>Your first saved trip will become a card here.</span></div>';return}root.innerHTML=trips.map(t=>{const e=effectiveTrip(t),diff=differences(t),subs=getSubs(t),waiting=!subs.Principessa?'Waiting for Principessa':!subs.Principe?'Waiting for Principe':'',status=diff.length?`${diff.length} difference${diff.length===1?'':'s'}`:waiting||'Matched',cls=diff.length?'status-warn':waiting?'status-wait':'status-ok';return `<button class="trip-story-card" data-open-trip="${esc(t.id)}" type="button"><div class="trip-card-top"><span class="trip-country">${esc(locationLabel(e))}</span><span class="trip-status ${cls}">${status}</span></div><h3>${esc(e.city||locationLabel(e))}</h3><p>${fmtDate(e.start)} → ${fmtDate(e.end)}</p><div class="trip-card-bottom"><strong>${e.estimated?'~ ':''}${money(e.total)}</strong><span>${e.estimated?'estimated total':'total'}</span></div>${!subs[actor]?'<div class="your-version-needed">Add your version →</div>':''}</button>`}).join('');$$('[data-open-trip]',root).forEach(b=>b.addEventListener('click',()=>openTripModal(b.dataset.openTrip)))}
+    const input = $('#wizardInput');
+    if(input){
+      input.addEventListener('input',()=>{
+        let v=input.value;
+        if(MONEY_FIELDS.includes(s.key) || s.key==='paid' || s.key==='budget'){
+          if(v === '-'){
+            if(MONEY_FIELDS.includes(s.key)) wizard.draft.uncertain[s.key]=true;
+            v='';input.value='';
+          }
+        }
+        wizard.draft[s.key]=v;
+      });
+      input.addEventListener('keydown',e=>{
+        if(e.key==='Enter' && s.type!=='date'){
+          e.preventDefault();
+          $('[data-wizard-next]')?.click();
+        }
+      });
+      setTimeout(()=>input.focus(),0);
+    }
 
-  function openTripModal(id){const t=state.trips.find(x=>x.id===id);if(!t)return;const e=effectiveTrip(t),diff=differences(t),subs=getSubs(t),total=Math.max(e.total,0.01),segments=MONEY_FIELDS.map(k=>({k,label:MONEY_LABELS[k],v:n(e[k]),pct:n(e[k])/total*100})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);let deg=0;const colors=['#8d6e63','#c8909c','#7f927a','#c09a5b','#7f91a8','#a98572','#b7a390'];const stops=segments.map((x,i)=>{const start=deg;deg+=x.pct*3.6;return `${colors[i%colors.length]} ${start}deg ${deg}deg`}).join(',');const mismatchHtml=diff.length?`<div class="mismatch-box"><div class="mismatch-title">⚠ Your versions don’t fully match</div><p>Talk through these before treating the trip as final.</p>${diff.map(d=>`<div class="mismatch-row"><strong>${esc(d.label)}</strong><span><b>Principessa:</b> ${esc(d.a)}</span><span><b>Principe:</b> ${esc(d.b)}</span></div>`).join('')}</div>`:'<div class="match-box">✓ Both versions match on the shared trip details.</div>';
-    $('#tripModalBody').innerHTML=`<div class="trip-detail-hero"><span class="eyebrow">TRIP STORY</span><h2>${esc(e.city||locationLabel(e))}</h2><p>${esc(locationLabel(e))} · ${fmtDate(e.start)} → ${fmtDate(e.end)}</p><div class="detail-total"><strong>${e.estimated?'~ ':''}${money(e.total)}</strong><span>${e.estimated?'Estimated total':'Total spent'}</span></div></div><div class="trip-analysis-grid"><div class="spend-chart-card"><h3>Where the money went</h3>${segments.length?`<div class="donut" style="background:conic-gradient(${stops})"><div><strong>${money(e.total)}</strong><span>total</span></div></div><div class="legend">${segments.map((x,i)=>`<div><i style="background:${colors[i%colors.length]}"></i><span>${esc(x.label)}</span><strong>${e.uncertain[x.k]?'~ ':''}${money(x.v)}</strong><small>${x.pct.toFixed(0)}%</small></div>`).join('')}</div>`:'<div class="empty-state">No spending entered yet.</div>'}</div><div class="trip-meta-card"><h3>At a glance</h3><div class="meta-stat"><span>Biggest category</span><strong>${segments[0]?esc(segments[0].label):'—'}</strong></div><div class="meta-stat"><span>Principessa paid</span><strong>${money(e.paidPrincipessa)}</strong></div><div class="meta-stat"><span>Principe paid</span><strong>${money(e.paidPrincipe)}</strong></div><div class="meta-stat"><span>Data quality</span><strong>${e.estimated?'Estimate / needs review':'Exact & matched'}</strong></div>${!subs[actor]?`<button class="btn primary full" id="addMyVersion">Add my version</button>`:''}</div></div>${mismatchHtml}<div class="submission-grid">${['Principessa','Principe'].map(name=>{const s=subs[name];return `<div class="submission-card"><span>${name}</span>${s?`<strong>${money(tripTotalSubmission(s))}</strong><small>${hasUncertain(s)?'Contains estimates':'Marked exact'} · paid ${money(s.paid)}</small>`:'<strong>Not logged yet</strong><small>Waiting for their version</small>'}</div>`}).join('')}</div>`;
-    $('#tripModal').classList.add('show');$('#tripModal').setAttribute('aria-hidden','false');$('#addMyVersion')?.addEventListener('click',()=>{closeTripModal();startForTrip(id)})}
-  function closeTripModal(){$('#tripModal').classList.remove('show');$('#tripModal').setAttribute('aria-hidden','true')}
+    $$('[data-certainty]').forEach(btn=>btn.addEventListener('click',()=>{
+      wizard.draft.uncertain[s.key] = btn.dataset.certainty==='estimate';
+      renderWizard();
+    }));
+    $('[data-none]')?.addEventListener('click',()=>{
+      wizard.draft.other='0';wizard.draft.uncertain.other=false;wizard.index++;renderWizard();
+    });
+    $('[data-skip-budget]')?.addEventListener('click',()=>{
+      wizard.draft.budget='';wizard.index++;renderWizard();
+    });
+    $('[data-wizard-back]')?.addEventListener('click',()=>{
+      if(wizard.index>0){ wizard.index--; renderWizard(); }
+      else { wizard=freshWizard(); renderWizard(); }
+    });
+    $('[data-wizard-next]')?.addEventListener('click',()=>{
+      const value = String(wizard.draft[s.key] ?? '').trim();
+      if(!s.optional && !value){ toast('Add an answer first','warn'); return; }
+      if((MONEY_FIELDS.includes(s.key) || s.key==='paid' || s.key==='budget') && value && !Number.isFinite(Number(value.replace(',','.')))){
+        toast('Enter a valid amount','warn');return;
+      }
+      wizard.index++;
+      renderWizard();
+    });
+    $('[data-save-version]')?.addEventListener('click',saveWizardVersion);
+  }
 
-  function monthlyStats(){return MONTHS.map(([key,label])=>{const trips=state.trips.map(t=>effectiveTrip(t)).filter(e=>e.start?.slice(0,7)===key);const s={trips:trips.length,accom:0,groceries:0,eat:0,travel:0,fuel:0,tolls:0,other:0,total:0,estimated:false};trips.forEach(e=>{MONEY_FIELDS.forEach(k=>s[k]+=n(e[k]));s.total+=e.total;s.estimated=s.estimated||e.estimated});return {key,label,...s}})}
-  function renderMonthly(){const body=$('#monthlyBody');if(!body)return;const stats=monthlyStats();body.innerHTML=stats.map(s=>`<tr><td>${s.label}</td><td>${s.trips}</td>${MONEY_FIELDS.map(k=>`<td>${money(s[k])}</td>`).join('')}<td>${s.estimated?'~ ':''}${money(s.total)}</td><td>${s.estimated?'~ ':''}${money(s.total/2)}</td></tr>`).join('');const total=stats.reduce((a,m)=>a+m.total,0),trips=state.trips.length,active=stats.filter(m=>m.trips).length||1,estimatedTrips=state.trips.map(effectiveTrip).filter(e=>e.estimated).length;$('#kpiTotal').textContent=money(total);$('#kpiMonth').textContent=money(total/active);$('#kpiPerson').textContent=money(total/active/2);$('#kpiTrip').textContent=money(trips?total/trips:0);$('#kpiTrips').textContent=String(estimatedTrips)}
+  async function saveWizardVersion(){
+    const btn = $('[data-save-version]');
+    if(btn) btn.disabled=true;
+    const payload = {
+      tripId:wizard.mode==='new' ? '' : wizard.tripId,
+      submission:{...wizard.draft,uncertain:{...wizard.draft.uncertain}},
+      budget:wizard.mode==='new' ? wizard.draft.budget : undefined
+    };
+    try{
+      await postAction('saveSubmission',payload);
+      toast(wizard.mode==='edit' ? 'Your version was updated' : 'Your version was saved');
+      wizard=freshWizard();
+      renderWizard();
+    }catch(err){
+      toast(err.message || 'Could not save','warn');
+      if(btn) btn.disabled=false;
+    }
+  }
 
-  function renderCompare(){const stats=monthlyStats(),total=stats.reduce((a,m)=>a+m.total,0),active=stats.filter(m=>m.trips).length||1,avg=total/active;$('#currentAvg').textContent=money(avg);$('#yourShare').textContent=money(avg/2);$('#hisShare').textContent=money(avg/2);$('#tripAvg').textContent=String(state.trips.length);const rent=RENT_DEFS.reduce((a,x)=>a+n(state.compare[x[1]]),0),car=CAR_DEFS.reduce((a,x)=>a+n(state.compare[x[1]]),0);$('#snapCurrent').textContent=money(avg);$('#snapRent').textContent=money(rent);$('#snapBoth').textContent=money(rent+car);$('#snapDiffRent').textContent=money(rent-avg);$('#snapDiffBoth').textContent=money(rent+car-avg);$('#snapPerson').textContent=money((rent+car)/2)}
-  function renderCompareInputs(){const make=(id,defs)=>{const root=$(id);if(!root)return;root.innerHTML=defs.map(([label,key])=>`<div class="r"><span>${esc(label)}</span><div class="editable"><input data-cmp="${key}" inputmode="decimal" value="${esc(state.compare[key])}"></div></div>`).join('')+`<div class="r total-row"><span>Total</span><strong id="${id==='#rentRows'?'rentTotal':'carTotal'}">€0.00</strong></div>`;$$('[data-cmp]',root).forEach(inp=>inp.addEventListener('change',async()=>{const key=inp.dataset.cmp,val=n(inp.value);state.compare[key]=val;renderCompare();await postAction('updateCompare',{key,value:val})}))};make('#rentRows',RENT_DEFS);make('#carRows',CAR_DEFS);const rent=RENT_DEFS.reduce((a,x)=>a+n(state.compare[x[1]]),0),car=CAR_DEFS.reduce((a,x)=>a+n(state.compare[x[1]]),0);$('#rentTotal').textContent=money(rent);$('#carTotal').textContent=money(car)}
+  function renderTripGallery(){
+    const root = $('#tripGallery');
+    if(!root) return;
+    if(!state.trips.length){
+      root.innerHTML='<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>';
+      return;
+    }
 
-  function renderActivity(){const root=$('#activityList');if(!root)return;const arr=[...state.audit].sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,12);if(!arr.length){root.innerHTML='<div class="activity-empty">No shared activity yet.</div>';return}const labels={addSubmission:'logged their version of a trip',updateSubmission:'updated their trip version',createTrip:'created a trip',updateTrip:'updated a trip',deleteTrip:'deleted a trip',updateCompare:'changed a comparison value'};root.innerHTML=arr.map(a=>`<div class="activity-item"><span class="avatar-mini">${a.actor==='Principe'?'P':'P'}</span><div><strong>${esc(a.actor||'Someone')}</strong> ${esc(labels[a.action]||a.action)}<small>${new Date(a.at).toLocaleString()}</small></div></div>`).join('')}
-  function renderAll(){renderTripGallery();renderMonthly();renderCompareInputs();renderCompare();renderActivity();renderWizard()}
+    const sorted=[...state.trips].sort((a,b)=>String(tripMeta(b).start||b.updatedAt||'').localeCompare(String(tripMeta(a).start||a.updatedAt||'')));
+    root.innerHTML=sorted.map(t=>{
+      const e=effectiveTrip(t),m=tripMeta(t),d= differences(t),budget=budgetInfo(t);
+      let status='';let statusClass='status-wait';
+      if(isLocked(t)){status='Confirmed';statusClass='status-ok';}
+      else if(t.submissions.Principessa && t.submissions.Principe && d.length){status='Needs discussion';statusClass='status-warn';}
+      else if(t.submissions.Principessa && t.submissions.Principe){status='Awaiting confirmation';statusClass='status-wait';}
+      else {status=`Waiting for ${t.submissions.Principessa?'Principe':'Principessa'}`;}
+      return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
+        <div class="trip-card-top"><span class="trip-country">${esc(locationLabel(m))}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
+        <h3>${esc(m.city||locationLabel(m))}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
+        <div class="trip-card-bottom"><strong>${e.estimated?'~ ':''}${money(e.total)}</strong><span>${budget.has?esc(budget.label):'No budget set'}</span></div>
+        ${!t.submissions?.[actor] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
+      </button>`;
+    }).join('');
+    $$('[data-open-trip]',root).forEach(btn=>btn.addEventListener('click',()=>openTripModal(btn.dataset.openTrip)));
+  }
 
-  $$('.tab').forEach(b=>b.addEventListener('click',()=>openSheet(b.dataset.sheet)));$$('.identity-choice').forEach(b=>b.addEventListener('click',()=>chooseIdentity(b.dataset.actor)));$('#switchUser').addEventListener('click',showIdentity);$('#syncNow').addEventListener('click',()=>syncNow(true));$('#restartWizard').addEventListener('click',()=>{wizard=freshDraft();wizardStep=0;wizardTripId='';renderWizard()});$$('[data-close-trip]').forEach(x=>x.addEventListener('click',closeTripModal));document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTripModal()});$('#downloadJson').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='together-budget-backup.json';a.click();URL.revokeObjectURL(a.href)});
+  function openTripModal(id){
+    openTripId=id;
+    renderTripModal(id);
+    $('#tripModal')?.classList.add('show');
+    $('#tripModal')?.setAttribute('aria-hidden','false');
+  }
 
-  renderCompareInputs();renderMonthly();renderCompare();renderTripGallery();renderActivity();showIdentity();
+  function closeTripModal(){
+    openTripId='';
+    $('#tripModal')?.classList.remove('show');
+    $('#tripModal')?.setAttribute('aria-hidden','true');
+  }
+
+  function renderTripModal(id){
+    const root=$('#tripModalBody');
+    const t=state.trips.find(x=>x.id===id);
+    if(!root || !t) return;
+    const e=effectiveTrip(t),m=tripMeta(t),diff=differences(t),budget=budgetInfo(t);
+    const both=!!(t.submissions.Principessa && t.submissions.Principe);
+    const locked=isLocked(t);
+    const own=!!t.submissions?.[actor];
+    const canConfirm=backendV3 && both && !diff.length && !locked && !t.confirmed?.[actor];
+
+    let statusHtml='';
+    if(locked){
+      statusHtml='<div class="match-box ok"><strong>Confirmed by both of you.</strong><span>This trip is now locked and treated as final.</span></div>';
+    }else if(!both){
+      statusHtml=`<div class="match-box"><strong>Waiting for ${t.submissions.Principessa?'Principe':'Principessa'}.</strong><span>Matching can be checked after both versions are logged.</span></div>`;
+    }else if(diff.length){
+      statusHtml=`<div class="match-box warn"><strong>Your calculations differ.</strong><span>Discuss the highlighted amounts, then each person can edit their own version until they match.</span></div>`;
+    }else{
+      const p=t.confirmed?.Principessa?'✓':'○',q=t.confirmed?.Principe?'✓':'○';
+      statusHtml=`<div class="match-box ok"><strong>Your calculations match.</strong><span>${p} Principessa confirmed · ${q} Principe confirmed. Both confirmations lock the trip.</span></div>`;
+    }
+
+    root.innerHTML=`
+      <div class="trip-modal-heading"><span class="eyebrow">${esc(locationLabel(m))}</span><h2>${esc(m.city||locationLabel(m))}</h2><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p></div>
+      <div class="trip-modal-total"><span>Current trip total</span><strong>${e.estimated?'~ ':''}${money(e.total)}</strong></div>
+      ${statusHtml}
+      <div class="budget-check ${budget.tone}"><div><span>Planned budget</span><strong>${e.budget?money(e.budget):'Not set'}</strong></div><div><span>Actual / current total</span><strong>${money(e.total)}</strong></div><div class="budget-result"><span>Budget check</span><strong>${esc(budget.label)}</strong></div></div>
+      ${diff.length ? `<div class="difference-list"><h3>What differs</h3>${diff.map(x=>`<div class="difference-row"><strong>${esc(x.label)}</strong><span>Principessa: ${esc(x.a)}</span><span>Principe: ${esc(x.b)}</span></div>`).join('')}</div>` : ''}
+      <div class="submission-grid">${submissionCard('Principessa',t.submissions.Principessa)}${submissionCard('Principe',t.submissions.Principe)}</div>
+      <div class="trip-modal-actions">
+        ${!locked && own ? '<button class="btn" type="button" data-edit-own>Edit my calculations</button>' : ''}
+        ${!locked && !own && t.submissions?.[otherActor()] ? '<button class="btn" type="button" data-add-own>Add my version</button>' : ''}
+        ${canConfirm ? '<button class="btn primary" type="button" data-confirm-own>Confirm my version</button>' : ''}
+        ${!backendV3 && both && !diff.length ? '<span class="backend-inline-note">Backend v3 is needed before confirmation can be saved.</span>' : ''}
+      </div>`;
+
+    $('[data-edit-own]',root)?.addEventListener('click',()=>beginEdit(id));
+    $('[data-add-own]',root)?.addEventListener('click',()=>{closeTripModal();openSheet('log');beginJoin(id);window.scrollTo({top:0,behavior:'smooth'});});
+    $('[data-confirm-own]',root)?.addEventListener('click',async()=>{
+      try{ await postAction('confirmTrip',{id}); toast('Your confirmation was saved'); await syncNow(true); }
+      catch(err){ toast(err.message || 'Could not confirm','warn'); }
+    });
+  }
+
+  function submissionCard(name,s){
+    if(!s) return `<div class="submission-card missing"><span>${esc(name)}</span><strong>Not logged yet</strong></div>`;
+    return `<div class="submission-card"><span>${esc(name)}</span><strong>${money(tripTotalSubmission(s))}</strong><small>Paid: ${money(s.paid)}</small><div class="submission-mini">${MONEY_FIELDS.map(k=>`<div><span>${esc(MONEY_LABELS[k])}</span><b>${s?.uncertain?.[k]?'~ ':''}${money(s[k])}</b></div>`).join('')}</div></div>`;
+  }
+
+  function renderMonthly(){
+    const body=$('#monthlyBody');
+    if(!body) return;
+    const trips=state.trips.map(effectiveTrip);
+    const stats=MONTHS.map(([key,label])=>{
+      const monthTrips=trips.filter(t=>String(t.start||'').slice(0,7)===key);
+      const s={key,label,trips:monthTrips.length,accom:0,groceries:0,eat:0,travel:0,fuel:0,tolls:0,other:0,total:0,estimated:false};
+      monthTrips.forEach(t=>{
+        MONEY_FIELDS.forEach(k=>s[k]+=n(t[k]));
+        s.total+=t.total;s.estimated=s.estimated||t.estimated;
+      });
+      return s;
+    });
+
+    body.innerHTML=stats.map(s=>`<tr><td>${s.label}</td><td>${s.trips}</td>${MONEY_FIELDS.map(k=>`<td>${money(s[k])}</td>`).join('')}<td>${s.estimated?'~ ':''}${money(s.total)}</td><td>${s.estimated?'~ ':''}${money(s.total/2)}</td></tr>`).join('');
+    const total=stats.reduce((sum,m)=>sum+m.total,0);
+    const tripCount=stats.reduce((sum,m)=>sum+m.trips,0);
+    const activeMonths=stats.filter(m=>m.trips>0).length||1;
+    $('#kpiTotal').textContent=money(total);
+    $('#kpiMonth').textContent=money(total/activeMonths);
+    $('#kpiPerson').textContent=money(total/activeMonths/2);
+    $('#kpiTrip').textContent=money(tripCount?total/tripCount:0);
+    $('#kpiTrips').textContent=String(tripCount);
+  }
+
+  function actualCurrentSituation(){
+    const trips=state.trips.filter(t=>{
+      const start=tripMeta(t).start||'';
+      return start>='2026-01-01' && start<='2026-12-31';
+    });
+    const months=new Set(trips.map(t=>String(tripMeta(t).start||'').slice(0,7)).filter(Boolean));
+    const divisor=months.size||1;
+    const p=trips.reduce((sum,t)=>sum+n(t?.submissions?.Principessa?.paid),0)/divisor;
+    const q=trips.reduce((sum,t)=>sum+n(t?.submissions?.Principe?.paid),0)/divisor;
+    return {principessa:p,principe:q,total:p+q,trips:trips.length};
+  }
+
+  function renderCompare(){
+    const rentRoot=$('#rentRows'),carRoot=$('#carRows');
+    if(rentRoot) rentRoot.innerHTML=compareRowsHtml(RENT_DEFS);
+    if(carRoot) carRoot.innerHTML=compareRowsHtml(CAR_DEFS);
+    $$('[data-compare-key]').forEach(input=>input.addEventListener('change',async()=>{
+      const key=input.dataset.compareKey;
+      const value=n(input.value);
+      state.compare[key]=value;
+      renderCompareNumbers();
+      try{ await postAction('updateCompare',{key,value}); }
+      catch(err){ toast('Could not save comparison','warn'); }
+    }));
+    renderCompareNumbers();
+  }
+
+  function compareRowsHtml(defs){
+    return defs.map(([label,key])=>`<div class="r"><span>${esc(label)}</span><strong class="editable"><input type="number" min="0" step="1" data-compare-key="${esc(key)}" value="${esc(state.compare[key])}"></strong></div>`).join('');
+  }
+
+  function renderCompareNumbers(){
+    const current=actualCurrentSituation();
+    const rent=RENT_DEFS.reduce((sum,[,k])=>sum+n(state.compare[k]),0);
+    const car=CAR_DEFS.reduce((sum,[,k])=>sum+n(state.compare[k]),0);
+    if($('#currentAvg')) $('#currentAvg').textContent=money(current.total);
+    if($('#yourShare')) $('#yourShare').textContent=money(current.principessa);
+    if($('#hisShare')) $('#hisShare').textContent=money(current.principe);
+    if($('#tripAvg')) $('#tripAvg').textContent=String(current.trips);
+
+    const values={
+      snapCurrent:current.total,
+      snapCurrentCar:current.total+car,
+      snapRent:rent,
+      snapRentCar:rent+car,
+      snapCurrentRent:current.total+rent,
+      snapAll:current.total+rent+car
+    };
+    Object.entries(values).forEach(([id,val])=>{const el=$('#'+id);if(el)el.textContent=money(val);});
+  }
+
+  function renderActivity(){
+    const root=$('#activityList');
+    if(!root) return;
+    const items=[...(state.audit||[])].slice(-2).reverse();
+    if(!items.length){root.innerHTML='<div class="activity-empty">No recent changes yet.</div>';return;}
+    root.innerHTML=items.map(a=>{
+      const t=state.trips.find(x=>x.id===a.ref);
+      const place=t ? (tripMeta(t).city||locationLabel(tripMeta(t))) : '';
+      const labels={
+        addSubmission:'added a trip version',updateSubmission:'edited a trip version',confirmTrip:'confirmed a trip',
+        updateTripBudget:'updated a trip budget',updateCompare:'updated the comparison',deleteTrip:'deleted a trip'
+      };
+      const action=labels[a.action]||String(a.action||'made a change');
+      return `<div class="activity-item"><span class="avatar-mini">${esc(String(a.actor||'?').slice(0,1))}</span><div><strong>${esc(a.actor||'Unknown')}</strong> ${esc(action)}${place?` · ${esc(place)}`:''}<small>${formatTime(a.at)}</small></div></div>`;
+    }).join('');
+  }
+
+  function formatTime(value){
+    if(!value) return '';
+    const d=new Date(value);
+    if(Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined,{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  }
+
+  function renderDataViews(){
+    renderTripGallery();
+    renderMonthly();
+    renderCompare();
+    renderActivity();
+  }
+
+  function bindStatic(){
+    $$('.tab').forEach(tab=>tab.addEventListener('click',()=>openSheet(tab.dataset.sheet)));
+    $$('.identity-choice[data-actor]').forEach(btn=>btn.addEventListener('click',()=>chooseIdentity(btn.dataset.actor)));
+    $('#restartWizard')?.addEventListener('click',()=>{wizard=freshWizard();renderWizard();});
+    $$('[data-close-trip]').forEach(el=>el.addEventListener('click',closeTripModal));
+    const brand=$('#brandMark');
+    if(brand){brand.removeAttribute('title');brand.style.cursor='default';}
+  }
+
+  function init(){
+    bindStatic();
+    renderDataViews();
+    let saved='';
+    try{saved=localStorage.getItem(ACTOR_KEY)||'';}catch{}
+    if(ACTORS.includes(saved)) chooseIdentity(saved,{persist:false});
+    else showIdentity();
+  }
+
+  document.addEventListener('DOMContentLoaded',init);
 })();
