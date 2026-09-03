@@ -45,3 +45,5 @@ s = p.read_text()
 s = s.replace('live.css?v=2', 'live.css?v=3').replace('live.css?v=1', 'live.css?v=3')
 s = s.replace('workflow.js?v=2', 'workflow.js?v=3').replace('workflow.js?v=1', 'workflow.js?v=3')
 p.write_text(s)
+
+# One-shot patch marker: 2026-09-03
