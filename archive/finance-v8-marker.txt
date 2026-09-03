@@ -1,0 +1,1 @@
+Finance trial v8 snapshot marker. The actual rollback point is the Git branch rollback-finances-v8, created before the finance v9 redesign on 2026-09-03.
