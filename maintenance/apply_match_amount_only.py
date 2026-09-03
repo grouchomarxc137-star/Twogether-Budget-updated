@@ -17,3 +17,5 @@ s, count = re.subn(r'workflow\.js\?v=\d+', 'workflow.js?v=3', s, count=1)
 if count != 1:
     raise SystemExit('workflow.js script tag not found; refusing to patch')
 p.write_text(s, encoding='utf-8')
+
+# trigger: 2026-09-03T14:13+02:00
