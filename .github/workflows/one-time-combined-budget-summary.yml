@@ -1,0 +1,26 @@
+name: Apply guarded combined-budget summary
+
+on:
+  push:
+    paths:
+      - 'maintenance/apply_combined_budget_summary.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply combined-budget summary
+        run: python maintenance/apply_combined_budget_summary.py
+      - name: Validate JavaScript syntax
+        run: node --check workflow.js
+      - name: Commit validated patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workflow.js index.html
+          git diff --cached --quiet || git commit -m "Show combined planned budget on active trips"
+          git push
