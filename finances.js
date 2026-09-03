@@ -14,13 +14,34 @@
     {key:'medical',label:'Medical',example:'e.g. Zorgverzekering',tone:'medical',named:true},
     {key:'subscriptions',label:'Subscriptions',example:'e.g. Spotify',tone:'subscriptions',named:true},
     {key:'rent',label:'Rent',defaultName:'Rent',tone:'budgets'},
-    {key:'transport',label:'Transport',example:'e.g. NS',tone:'budgets',named:true},
     {key:'groceries',label:'Groceries',defaultName:'Groceries',tone:'budgets'},
     {key:'extra',label:'Extra',defaultName:'Extra',tone:'budgets',optionalName:true},
     {key:'savings',label:'Save up',defaultName:'Save up',tone:'wealth'},
     {key:'investments',label:'Investments',defaultName:'Investments',tone:'wealth'},
     {key:'other',label:'Other',example:'e.g. Gift',tone:'other',named:true}
   ];
+  const RECURRING_INCOMES = [
+    {name:'Neways',amount:2051},
+    {name:'Belastingdienst',amount:129}
+  ];
+  const RECURRING_EXPENSES = [
+    {group:'medical',name:'Zorgverzekering',amount:158},
+    {group:'medical',name:'Liability Insurance',amount:4},
+    {group:'rent',name:'Rent',amount:50},
+    {group:'subscriptions',name:'Chatgpt Plus',amount:23},
+    {group:'subscriptions',name:'Sportcity',amount:28},
+    {group:'subscriptions',name:'Spotify',amount:8.5},
+    {group:'subscriptions',name:'iCloud',amount:3},
+    {group:'subscriptions',name:'NS',amount:100},
+    {group:'subscriptions',name:'Oranje Pakketje',amount:4},
+    {group:'subscriptions',name:'Odido',amount:30},
+    {group:'groceries',name:'Groceries',amount:255},
+    {group:'extra',name:'Extra',amount:250},
+    {group:'investments',name:'Investments',amount:550},
+    {group:'savings',name:'Save up',amount:500}
+  ];
+  const CATEGORY_ORDER=['medical','subscriptions','budgets','wealth','other'];
+  const CATEGORY_LABELS={medical:'Medical',subscriptions:'Subscriptions',budgets:'Budgets',wealth:'Savings / Investments',other:'Other'};
 
   let financeState = {
     version:0,
@@ -53,6 +74,7 @@
     const g = String(value || 'other');
     if(g === 'health') return 'medical';
     if(g === 'living') return 'rent';
+    if(g === 'transport') return 'subscriptions';
     return GROUPS.some(x=>x.key===g) ? g : 'other';
   }
   function groupMeta(value){
@@ -254,7 +276,7 @@
   function renderDetail(rec){
     const root=$('#financeDetail'); if(!root) return;
     const c=calc(rec),gl=investmentGL(rec);
-    const expenses=(rec.expenses||[]).map(x=>`<div class="finance-breakdown-row finance-tone-${groupTone(x.group)}"><span><b>${esc(groupLabel(x.group))}</b>${x.name&&x.name!==groupLabel(x.group)?` · ${esc(x.name)}`:''}</span><strong>${money(x.amount)}</strong></div>`).join('');
+    const expenses=groupedExpenseHtml(rec.expenses||[],false);
     const incomes=(rec.incomes||[]).map(x=>`<div class="finance-breakdown-row"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></div>`).join('');
     const extraStatus=c.extraOver>0?`<div class="finance-alert bad">⚠ You spent ${money(c.extraOver)} more than your Extra budget.</div>`:`<div class="finance-alert good">Extra budget: ${money(c.extraBudget)} · ${money(Math.max(0,c.extraDelta))} left</div>`;
     const investmentBlock=c.investmentTotal!=null?`<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value<0?'finance-negative':'finance-positive'}"><span>G/L p/m${gl?` vs ${monthLabel(gl.previousMonth)}`:''}</span><strong>${gl?signedMoney(gl.value):'—'}</strong></div></div>`:'';
@@ -321,13 +343,56 @@
     if(copy.investmentTotal==null)copy.investmentTotal=''; if(copy.sisterInvestments==null)copy.sisterInvestments='';
     return copy;
   }
-  function startMonth(month='2026-09',skipMonth=false){ flow={data:freshRecord(month||selectedMonth),stage:skipMonth?'incomeSource':'month',temp:{}}; renderWizard(); }
+  function startMonth(month='2026-09',skipMonth=false){ const target=month||selectedMonth; if(skipMonth){startRecurringMonth(target);return;} flow={data:freshRecord(target),stage:'month',temp:{}}; renderWizard(); }
   function startEdit(rec){ flow={data:cloneRecord(rec),stage:'review',temp:{}}; renderWizard(); }
   function resetWizard(){ flow=null; renderWizard(); }
   function setProgress(label,pct){ const step=$('#financeWizardStep'),bar=$('#financeWizardProgress'); if(step)step.textContent=label; if(bar)bar.style.width=Math.max(8,Math.min(100,pct))+'%'; }
   function wizardHtml(title,help,body){ return `<div class="finance-question"><h2>${esc(title)}</h2>${help?`<p>${esc(help)}</p>`:''}${body}</div>`; }
   function bindBack(next){ $('[data-fin-back]')?.addEventListener('click',next); }
   function listHtml(items,labelFn){ return items?.length?`<div class="finance-list">${items.map(x=>`<div class="finance-list-row"><span>${esc(labelFn(x))}</span><strong>${money(x.amount)}</strong></div>`).join('')}</div>`:''; }
+
+  function latestPriorMonth(month){
+    return [...ownMonths()].filter(x=>String(x.month)<String(month)).sort((a,b)=>String(b.month).localeCompare(String(a.month)))[0]||null;
+  }
+  function recurringValue(previous,kind,name,fallback){
+    if(!previous) return fallback;
+    const list=kind==='income'?(previous.incomes||[]):(previous.expenses||[]);
+    const match=list.find(x=>String(x.name||'').trim().toLowerCase()===String(name).trim().toLowerCase());
+    return match&&hasValue(match.amount)?n(match.amount):fallback;
+  }
+  function seededRecord(month){
+    const previous=latestPriorMonth(month),d=freshRecord(month);
+    d.incomes=RECURRING_INCOMES.map(x=>({name:x.name,amount:recurringValue(previous,'income',x.name,x.amount)}));
+    d.expenses=RECURRING_EXPENSES.map(x=>({group:x.group,name:x.name,amount:recurringValue(previous,'expense',x.name,x.amount)}));
+    if(previous&&hasValue(previous.extraBudget)) d.extraBudget=n(previous.extraBudget);
+    return d;
+  }
+  function buildRecurringQueue(d){
+    return [
+      ...(d.incomes||[]).map((_,index)=>({kind:'income',index})),
+      ...(d.expenses||[]).map((_,index)=>({kind:'expense',index}))
+    ];
+  }
+  function recurringSource(item,d){ return item?.kind==='income'?d.incomes?.[item.index]:d.expenses?.[item.index]; }
+  function startRecurringMonth(month){
+    const d=seededRecord(month||selectedMonth);
+    flow={data:d,stage:'recurringCheck',temp:{},recurringQueue:buildRecurringQueue(d),recurringIndex:0};
+    renderWizard();
+  }
+  function groupedExpenseHtml(items,removable=false){
+    const rows=(items||[]).map((x,index)=>({...x,index,group:normalizeGroup(x.group),tone:groupTone(x.group)}));
+    const grouped={};
+    rows.forEach(x=>(grouped[x.tone]||(grouped[x.tone]=[])).push(x));
+    return CATEGORY_ORDER.filter(tone=>grouped[tone]?.length).map(tone=>{
+      const group=grouped[tone],total=group.reduce((sum,x)=>sum+n(x.amount),0);
+      const itemRows=group.map(x=>{
+        const label=x.group==='extra'&&x.name&&x.name!=='Extra'?`Extra · ${esc(x.name)}`:esc(x.name||groupLabel(x.group));
+        const remove=removable?` <button class="text-btn" data-fin-remove-expense="${x.index}">×</button>`:'';
+        return `<div class="finance-category-item"><span>${label}</span><strong>${money(x.amount)}${remove}</strong></div>`;
+      }).join('');
+      return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(CATEGORY_LABELS[tone]||tone)}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
+    }).join('');
+  }
 
   function renderWizard(){
     const body=$('#financeWizardBody'); if(!body) return;
@@ -342,7 +407,31 @@
     if(flow.stage==='month'){
       setProgress('QUESTION 1',10);
       body.innerHTML=wizardHtml('Which month are you logging?','Choose the month these numbers belong to.',`<select class="finance-select" id="finMonthSelect">${MONTHS.map(([k,l])=>`<option value="${k}" ${k===d.month?'selected':''}>${l}</option>`).join('')}</select><div class="finance-actions"><button class="btn ghost" data-fin-back>Cancel</button><button class="btn primary big" data-fin-next>Next</button></div>`);
-      bindBack(resetWizard); $('[data-fin-next]')?.addEventListener('click',()=>{d.month=$('#finMonthSelect')?.value||d.month;flow.stage='incomeSource';renderWizard();}); return;
+      bindBack(resetWizard); $('[data-fin-next]')?.addEventListener('click',()=>{const chosen=$('#finMonthSelect')?.value||d.month;startRecurringMonth(chosen);}); return;
+    }
+
+    if(flow.stage==='recurringCheck'){
+      const queue=flow.recurringQueue||buildRecurringQueue(d),idx=Number(flow.recurringIndex||0);
+      if(idx>=queue.length){flow.stage='extraBudget';renderWizard();return;}
+      const item=queue[idx],source=recurringSource(item,d);
+      if(!source){flow.recurringIndex=idx+1;renderWizard();return;}
+      const meta=item.kind==='income'?{label:'Income',tone:'other'}:{label:CATEGORY_LABELS[groupTone(source.group)]||groupLabel(source.group),tone:groupTone(source.group)};
+      const pct=12+Math.round(((idx+1)/Math.max(1,queue.length))*48);
+      setProgress(`CHECKING ${idx+1} OF ${queue.length}`,pct);
+      body.innerHTML=wizardHtml(`${source.name} · ${money(source.amount)}?`,`Recurring ${item.kind==='income'?'income':meta.label.toLowerCase()}. Confirm it if it is still correct, or edit only the amount.`,`<div class="finance-reference finance-tone-${meta.tone}"><span>${esc(meta.label)}</span><strong>${esc(source.name)}</strong><small>Usual amount · ${money(source.amount)}</small></div><div class="finance-actions"><button class="btn ghost" type="button" data-fin-recurring-edit>Edit</button><button class="btn primary big" type="button" data-fin-recurring-confirm>Confirm</button></div>`);
+      $('[data-fin-recurring-confirm]')?.addEventListener('click',()=>{flow.recurringIndex=idx+1;renderWizard();});
+      $('[data-fin-recurring-edit]')?.addEventListener('click',()=>{flow.temp={recurringItem:item};flow.stage='recurringEdit';renderWizard();});
+      return;
+    }
+
+    if(flow.stage==='recurringEdit'){
+      const item=t.recurringItem,source=recurringSource(item,d),idx=Number(flow.recurringIndex||0);
+      if(!item||!source){flow.stage='recurringCheck';renderWizard();return;}
+      setProgress(`EDITING ${idx+1} OF ${(flow.recurringQueue||[]).length}`,20+Math.round(((idx+1)/Math.max(1,(flow.recurringQueue||[]).length))*40));
+      body.innerHTML=wizardHtml(`Update ${source.name}`,'Change only this month’s amount. The value you save becomes next month’s suggestion.',`<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount??''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
+      bindBack(()=>{flow.stage='recurringCheck';renderWizard();});
+      $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount','warn');source.amount=n(v);flow.temp={};flow.recurringIndex=idx+1;flow.stage='recurringCheck';renderWizard();});
+      return;
     }
 
     if(flow.stage==='incomeSource'){
@@ -435,7 +524,7 @@
     const body=$('#financeWizardBody'); if(!body||!flow) return;
     const d=flow.data,c=calc(d),gl=investmentGL(d); setProgress('REVIEW',100);
     const incomeRows=d.incomes.map((x,i)=>`<div class="finance-list-row"><span>${esc(x.name)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('')||'<div class="finance-empty">No income added.</div>';
-    const expenseRows=d.expenses.map((x,i)=>`<div class="finance-list-row finance-tone-${groupTone(x.group)}"><span><b>${esc(groupLabel(x.group))}</b>${x.name&&x.name!==groupLabel(x.group)?` · ${esc(x.name)}`:''}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-remove-expense="${i}">×</button></strong></div>`).join('')||'<div class="finance-empty">No expenses added.</div>';
+    const expenseRows=groupedExpenseHtml(d.expenses,true)||'<div class="finance-empty">No expenses added.</div>';
     const extraLine=c.extraOver>0?`<div class="finance-alert bad">⚠ Extra budget exceeded by ${money(c.extraOver)} · spent ${money(c.extraSpent)} of ${money(c.extraBudget)}</div>`:`<div class="finance-alert good">Extra: ${money(c.extraSpent)} spent of ${money(c.extraBudget)} · ${money(Math.max(0,c.extraDelta))} left</div>`;
     const investmentLines=c.investmentTotal==null?'<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>':`<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value<0?'finance-negative':'finance-positive'}"><span>G/L p/m${gl?` vs ${monthLabel(gl.previousMonth)}`:''}</span><strong>${gl?signedMoney(gl.value):'—'}</strong></div>`;
     body.innerHTML=wizardHtml(`Ready to save ${monthLabel(d.month)}?`,'Review your personal monthly picture before saving.',`<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button></div><div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div><div class="finance-breakdown-row"><span>Extra budget</span><strong>${money(c.extraBudget)} <button class="text-btn" data-fin-edit-extra>Edit</button></strong></div></div><div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div><div class="finance-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><button class="btn primary big" data-fin-save>Save month</button></div>`);
