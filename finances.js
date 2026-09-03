@@ -153,7 +153,8 @@
     const savings=expenses.filter(x=>normalizeGroup(x.group)==='savings').reduce((s,x)=>s+n(x.amount),0);
     const investmentContribution=expenses.filter(x=>normalizeGroup(x.group)==='investments').reduce((s,x)=>s+n(x.amount),0);
     const extraSpent=expenses.filter(x=>normalizeGroup(x.group)==='extra').reduce((s,x)=>s+n(x.amount),0);
-    const extraBudget=hasValue(rec?.extraBudget)?n(rec.extraBudget):255;
+    const rawExtraBudget=hasValue(rec?.extraBudget)?n(rec.extraBudget):255;
+    const extraBudget=rawExtraBudget>0?rawExtraBudget:255;
     const extraDelta=extraBudget-extraSpent;
     const leftover=income-outflow;
     const investmentTotal=hasValue(rec?.investmentTotal)?n(rec.investmentTotal):null;
@@ -226,7 +227,7 @@
     const summaryRoot=$('#financeSummary');
     if(summaryRoot){
       summaryRoot.innerHTML=`
-        <div class="finance-kpi"><span>${latest?monthLabel(latest.month):'Latest month'}</span><strong>${latest?'Saved':'Not logged'}</strong></div>
+        <div class="finance-kpi"><span>${latest?monthLabel(latest.month):'Latest month'}</span><strong>${latest?(latest.finalized?'Final':'Draft'):'Not logged'}</strong></div>
         <div class="finance-kpi"><span>Total income</span><strong>${money(summary.income)}</strong></div>
         <div class="finance-kpi"><span>Total outflow</span><strong>${money(summary.outflow)}</strong></div>
         <div class="finance-kpi ${summary.leftover<0?'bad':summary.income?'good':''}"><span>${summary.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(summary.leftover))}</strong></div>
@@ -240,7 +241,7 @@
       const rec=recordFor(key),c=calc(rec||{}),gl=rec?investmentGL(rec):null;
       const extraWarn=rec&&c.extraOver>0?`<em class="finance-warning">⚠ Extra ${money(c.extraOver)} over</em>`:'';
       const glText=gl?`<em class="finance-month-gl ${gl.value<0?'down':'up'}">${gl.value<0?'▼':'▲'} ${money(Math.abs(gl.value))}</em>`:'';
-      return `<button class="finance-month ${rec?'saved':''} ${key==='2026-09'?'current':''}" type="button" data-fin-month="${key}"><span>${esc(label)}</span><strong>${rec?money(c.leftover):'Not logged'}</strong><small>${rec?`${money(c.income)} in · ${money(c.outflow)} out`:'Tap to start'}</small>${extraWarn}${glText}</button>`;
+      return `<button class="finance-month ${rec?'saved':''} ${key==='2026-09'?'current':''}" type="button" data-fin-month="${key}"><span>${esc(label)}</span><strong>${rec?money(c.leftover):'Not logged'}</strong><small>${rec?`${rec.finalized?'Final':'Draft'} · ${money(c.income)} in · ${money(c.outflow)} out`:'Tap to start'}</small>${extraWarn}${glText}</button>`;
     }).join('');
     $$('[data-fin-month]',root).forEach(btn=>btn.addEventListener('click',()=>{
       selectedMonth=btn.dataset.finMonth;
@@ -280,8 +281,9 @@
     const incomes=(rec.incomes||[]).map(x=>`<div class="finance-breakdown-row"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></div>`).join('');
     const extraStatus=c.extraOver>0?`<div class="finance-alert bad">⚠ You spent ${money(c.extraOver)} more than your Extra budget.</div>`:`<div class="finance-alert good">Extra budget: ${money(c.extraBudget)} · ${money(Math.max(0,c.extraDelta))} left</div>`;
     const investmentBlock=c.investmentTotal!=null?`<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value<0?'finance-negative':'finance-positive'}"><span>G/L p/m${gl?` vs ${monthLabel(gl.previousMonth)}`:''}</span><strong>${gl?signedMoney(gl.value):'—'}</strong></div></div>`:'';
-    root.innerHTML=`<div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h3>${esc(monthLabel(rec.month))}</h3></div><button class="btn ghost" type="button" data-fin-edit>Edit month</button></div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${incomes?`<div class="finance-review-section"><h3>Income</h3>${incomes}</div>`:''}${expenses?`<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>`:''}<div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div></div>${investmentBlock}`;
+    root.innerHTML=`<div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h3>${esc(monthLabel(rec.month))}</h3></div>${rec.finalized?'<span class="finance-final-badge">Final · locked</span>':'<div class="finance-detail-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'}</div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${incomes?`<div class="finance-review-section"><h3>Income</h3>${incomes}</div>`:''}${expenses?`<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>`:''}<div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div></div>${investmentBlock}`;
     $('[data-fin-edit]',root)?.addEventListener('click',()=>startEdit(rec));
+    $('[data-fin-finalize-existing]',root)?.addEventListener('click',()=>confirmExistingMonth(rec));
   }
 
   function ensureMiniModal(){
@@ -335,16 +337,17 @@
     $('[data-fin-mini-delete]')?.addEventListener('click',()=>{const next=profile();next.receivables.splice(index,1);saveProfile(next,'Money owed removed');});
   }
 
-  function freshRecord(month){ return {month,incomes:[],expenses:[],extraBudget:255,investmentTotal:'',sisterInvestments:''}; }
+  function freshRecord(month){ return {month,incomes:[],expenses:[],extraBudget:255,investmentTotal:'',sisterInvestments:'',finalized:false,finalizedAt:''}; }
   function cloneRecord(rec){
     const copy=JSON.parse(JSON.stringify(rec));
     copy.expenses=(copy.expenses||[]).map(x=>({...x,group:normalizeGroup(x.group)}));
-    if(!hasValue(copy.extraBudget))copy.extraBudget=255;
+    if(!hasValue(copy.extraBudget)||n(copy.extraBudget)<=0)copy.extraBudget=255;
+    copy.finalized=copy.finalized===true; if(!copy.finalizedAt)copy.finalizedAt='';
     if(copy.investmentTotal==null)copy.investmentTotal=''; if(copy.sisterInvestments==null)copy.sisterInvestments='';
     return copy;
   }
   function startMonth(month='2026-09',skipMonth=false){ const target=month||selectedMonth; if(skipMonth){startRecurringMonth(target);return;} flow={data:freshRecord(target),stage:'month',temp:{}}; renderWizard(); }
-  function startEdit(rec){ flow={data:cloneRecord(rec),stage:'review',temp:{}}; renderWizard(); }
+  function startEdit(rec){ if(rec?.finalized===true)return toast('This month is final and locked','warn'); flow={data:cloneRecord(rec),stage:'review',temp:{}}; renderWizard(); }
   function resetWizard(){ flow=null; renderWizard(); }
   function setProgress(label,pct){ const step=$('#financeWizardStep'),bar=$('#financeWizardProgress'); if(step)step.textContent=label; if(bar)bar.style.width=Math.max(8,Math.min(100,pct))+'%'; }
   function wizardHtml(title,help,body){ return `<div class="finance-question"><h2>${esc(title)}</h2>${help?`<p>${esc(help)}</p>`:''}${body}</div>`; }
@@ -364,7 +367,7 @@
     const previous=latestPriorMonth(month),d=freshRecord(month);
     d.incomes=RECURRING_INCOMES.map(x=>({name:x.name,amount:recurringValue(previous,'income',x.name,x.amount)}));
     d.expenses=RECURRING_EXPENSES.map(x=>({group:x.group,name:x.name,amount:recurringValue(previous,'expense',x.name,x.amount)}));
-    if(previous&&hasValue(previous.extraBudget)) d.extraBudget=n(previous.extraBudget);
+    if(previous&&hasValue(previous.extraBudget)&&n(previous.extraBudget)>0) d.extraBudget=n(previous.extraBudget);
     return d;
   }
   function buildRecurringQueue(d){
@@ -527,7 +530,7 @@
     const expenseRows=groupedExpenseHtml(d.expenses,true)||'<div class="finance-empty">No expenses added.</div>';
     const extraLine=c.extraOver>0?`<div class="finance-alert bad">⚠ Extra budget exceeded by ${money(c.extraOver)} · spent ${money(c.extraSpent)} of ${money(c.extraBudget)}</div>`:`<div class="finance-alert good">Extra: ${money(c.extraSpent)} spent of ${money(c.extraBudget)} · ${money(Math.max(0,c.extraDelta))} left</div>`;
     const investmentLines=c.investmentTotal==null?'<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>':`<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value<0?'finance-negative':'finance-positive'}"><span>G/L p/m${gl?` vs ${monthLabel(gl.previousMonth)}`:''}</span><strong>${gl?signedMoney(gl.value):'—'}</strong></div>`;
-    body.innerHTML=wizardHtml(`Ready to save ${monthLabel(d.month)}?`,'Review your personal monthly picture before saving.',`<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button></div><div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div><div class="finance-breakdown-row"><span>Extra budget</span><strong>${money(c.extraBudget)} <button class="text-btn" data-fin-edit-extra>Edit</button></strong></div></div><div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div><div class="finance-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><button class="btn primary big" data-fin-save>Save month</button></div>`);
+    body.innerHTML=wizardHtml(`Ready to save ${monthLabel(d.month)}?`,'Review your personal monthly picture before saving.',`<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button></div><div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div><div class="finance-breakdown-row"><span>Extra budget</span><strong>${money(c.extraBudget)} <button class="text-btn" data-fin-edit-extra>Edit</button></strong></div></div><div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div><div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
     $$('[data-fin-remove-income]').forEach(btn=>btn.addEventListener('click',()=>{d.incomes.splice(Number(btn.dataset.finRemoveIncome),1);renderReview();}));
     $$('[data-fin-remove-expense]').forEach(btn=>btn.addEventListener('click',()=>{d.expenses.splice(Number(btn.dataset.finRemoveExpense),1);renderReview();}));
     $('[data-fin-add-income]')?.addEventListener('click',()=>{flow.stage='incomeSource';renderWizard();});
@@ -535,13 +538,29 @@
     $('[data-fin-edit-extra]')?.addEventListener('click',()=>{flow.stage='extraBudget';renderWizard();});
     $('[data-fin-edit-investments]')?.addEventListener('click',()=>{flow.stage='investmentTotal';renderWizard();});
     $('[data-fin-cancel]')?.addEventListener('click',resetWizard);
-    $('[data-fin-save]')?.addEventListener('click',saveMonth);
+    $('[data-fin-save-draft]')?.addEventListener('click',()=>saveMonth(false));
+    $('[data-fin-finalize]')?.addEventListener('click',()=>saveMonth(true));
   }
 
-  async function saveMonth(){
+  async function confirmExistingMonth(rec){
+    if(!rec||rec.finalized===true)return;
+    if(financeState.version<10)return toast('Final locking needs the latest backend deployment','warn');
+    const d=cloneRecord(rec); d.finalized=true; d.finalizedAt=new Date().toISOString();
+    try{
+      await post('saveFinanceMonth',{monthData:d});
+      const list=financeState.finances[actor()]||[]; const idx=list.findIndex(x=>x.month===d.month);
+      const saved={...d,updatedAt:new Date().toISOString(),updatedBy:actor()};
+      if(idx>=0)list[idx]=saved; else list.push(saved);
+      renderPage(); renderDetail(saved); toast('Month confirmed and locked'); setTimeout(loadState,1200);
+    }catch(err){toast(err.message||'Could not confirm month','warn');}
+  }
+
+  async function saveMonth(finalize=false){
     if(!flow) return;
     const d=cloneRecord(flow.data); if(!d.month) return toast('Choose a month first','warn');
-    const btn=$('[data-fin-save]'); if(btn) btn.disabled=true;
+    if(finalize&&financeState.version<10)return toast('Final locking needs the latest backend deployment','warn');
+    d.finalized=!!finalize; d.finalizedAt=finalize?new Date().toISOString():'';
+    const btn=$(finalize?'[data-fin-finalize]':'[data-fin-save-draft]'); if(btn) btn.disabled=true;
     try{
       await post('saveFinanceMonth',{monthData:d});
       const list=financeState.finances[actor()]||[];
@@ -549,7 +568,7 @@
       const saved={...d,updatedAt:new Date().toISOString(),updatedBy:actor()};
       if(idx>=0)list[idx]=saved;else list.push(saved);
       list.sort((a,b)=>String(a.month).localeCompare(String(b.month)));
-      selectedMonth=d.month; flow=null; renderPage(); renderWizard(); renderDetail(saved); toast('Monthly finances saved'); setTimeout(loadState,1400);
+      selectedMonth=d.month; flow=null; renderPage(); renderWizard(); renderDetail(saved); toast(finalize?'Month confirmed and locked':'Draft saved — you can keep editing it'); setTimeout(loadState,1400);
     }catch(err){ toast(err.message||'Could not save month','warn'); if(btn)btn.disabled=false; }
   }
 

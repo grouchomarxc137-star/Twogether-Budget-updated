@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 9,
+    version: 10,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
@@ -31,7 +31,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 9,
+      version: 10,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -89,7 +89,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 9;
+  state.version = 10;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -111,7 +111,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:9, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:10, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -407,8 +407,13 @@ function doPost(e) {
       state.finances = sanitizeFinances_(state.finances);
       const list = state.finances[actor] || [];
       const idx = list.findIndex(x => x.month === monthData.month);
-      monthData.updatedAt = new Date().toISOString();
+      const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
+      if (existing && existing.finalized) throw new Error('This month is final and locked');
+      const now = new Date().toISOString();
+      monthData.updatedAt = now;
       monthData.updatedBy = actor;
+      monthData.finalized = monthData.finalized === true;
+      monthData.finalizedAt = monthData.finalized ? (monthData.finalizedAt || now) : '';
       if (idx >= 0) list[idx] = monthData; else list.push(monthData);
       list.sort((a,b) => String(a.month).localeCompare(String(b.month)));
       state.finances[actor] = list;
@@ -493,9 +498,11 @@ function sanitizeFinanceMonth_(record, actor) {
     month: cleanText_(record && record.month, 10),
     incomes: incomes,
     expenses: expenses,
-    extraBudget: cleanMoney_(record && record.extraBudget),
+    extraBudget: (function(){ const x=cleanMoney_(record && record.extraBudget); return x === '' || Number(x) <= 0 ? 255 : x; })(),
     investmentTotal: cleanMoney_(record && record.investmentTotal),
     sisterInvestments: cleanMoney_(record && record.sisterInvestments),
+    finalized: !!(record && record.finalized === true),
+    finalizedAt: cleanText_(record && record.finalizedAt, 40),
     updatedAt: cleanText_(record && record.updatedAt, 40),
     updatedBy: cleanActor_(record && record.updatedBy || actor)
   };
