@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 11,
+    version: 12,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
@@ -31,7 +31,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 11,
+      version: 12,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -89,7 +89,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 11;
+  state.version = 12;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -111,7 +111,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:11, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:12, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -494,20 +494,26 @@ function sanitizeFinanceReserved_(item) {
 function sanitizeFinanceMonth_(record, actor) {
   const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
   let expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
-  let rawExtraBudget = cleanMoney_(record && record.extraBudget);
-  const legacyBudget = rawExtraBudget === '' || Number(rawExtraBudget) <= 0 || Number(rawExtraBudget) === 255;
-  if (legacyBudget) {
-    const legacyExtraIndex = expenses.findIndex(function(x){ return x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra' && Number(x.amount) === 250; });
-    if (legacyExtraIndex >= 0) {
-      expenses.splice(legacyExtraIndex, 1);
-      rawExtraBudget = 250;
+  let foundFixedExtra = false;
+  expenses = expenses.filter(function(x){
+    if (x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') {
+      if (foundFixedExtra) return false;
+      foundFixedExtra = true;
+      x.amount = 250;
     }
-  }
+    return true;
+  });
+  if (!foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:250});
+  const sourceRaw = String(record && record.extraOverspendSource || '');
+  const extraOverspendSource = sourceRaw === 'creditcard' || sourceRaw === 'savings' ? sourceRaw : '';
+  const extraOverspendAmount = cleanMoney_(record && record.extraOverspendAmount);
   return {
     month: cleanText_(record && record.month, 10),
     incomes: incomes,
     expenses: expenses,
-    extraBudget: rawExtraBudget === '' || Number(rawExtraBudget) <= 0 ? 250 : rawExtraBudget,
+    extraBudget: 250,
+    extraOverspendSource: extraOverspendSource,
+    extraOverspendAmount: extraOverspendAmount === '' ? 0 : extraOverspendAmount,
     investmentTotal: cleanMoney_(record && record.investmentTotal),
     sisterInvestments: cleanMoney_(record && record.sisterInvestments),
     finalized: !!(record && record.finalized === true),
