@@ -1,0 +1,31 @@
+name: Apply finance v9
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-finance-v9.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply finance v9 backend patch
+        run: python maintenance/apply_finance_v9_backend.py
+      - name: Validate finance JavaScript
+        run: node --check finances.js
+      - name: Validate Apps Script syntax
+        run: |
+          cp backend/Code.gs /tmp/Code.js
+          node --check /tmp/Code.js
+      - name: Commit validated finance v9
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add finances.js backend/Code.gs
+          git diff --cached --quiet && exit 0
+          git commit -m "Store finance profiles and investment snapshots"
+          git push
