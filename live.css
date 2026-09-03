@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap');
-
 /* Identity theme */
 body[data-actor="Principessa"]{--accent:#c49a2f;--accent-dark:#80620f;--accent-soft:#f7edc8;--rose:#d3af43;--rose-soft:#fbf3d3;background:linear-gradient(180deg,#fbf7e9 0,var(--bg) 440px) fixed}
 body[data-actor="Principe"]{--accent:#d9772d;--accent-dark:#934514;--accent-soft:#f8e1d0;--rose:#df8843;--rose-soft:#fbe8d9;background:linear-gradient(180deg,#fcf1e8 0,var(--bg) 440px) fixed}
@@ -36,7 +34,7 @@ body[data-actor="Principe"] .tab.active{box-shadow:0 8px 26px rgba(154,78,27,.09
 @media(max-width:980px){.compare-split{grid-template-columns:1fr}}
 @media(max-width:680px){.compare-scenario-grid{grid-template-columns:1fr}.compare-scenario-grid .highlight-card{grid-column:auto}}
 
-/* Crimson Pro typography */
+/* Crimson Pro typography — font itself is loaded asynchronously after first paint. */
 html,body,button,input,select,textarea,table,th,td,.brand,.brand-sub,.tab,.hero-copy h1,.page-heading h1,.question-stage h2,.section-heading h2,.panel-head h2,.table-title h2,.trip-story-card h3,.trip-card-bottom strong,.kpi strong,.review-total strong,.compare-head,.rows,.identity-card,.trip-modal-card,.toast{font-family:'Crimson Pro',Georgia,serif!important}
 body,button,input,select,textarea{font-size:17.5px}.brand{font-size:25.5px}.brand-sub{font-size:12.5px}.soft-btn{font-size:14.5px}.connection{font-size:13.5px}.who-badge{font-size:13.5px}.tab{font-size:17.5px}.setup-notice{font-size:14.5px}
 .eyebrow,.panel-kicker{font-size:12.5px}.hero-copy h1{font-size:calc(clamp(44px,5vw,74px) + 1.5px)}.page-heading h1{font-size:calc(clamp(40px,5vw,62px) + 1.5px)}.hero-copy p,.page-heading p,.section-heading p{font-size:17.5px}
