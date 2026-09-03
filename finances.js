@@ -390,7 +390,7 @@
       const group=grouped[tone],total=group.reduce((sum,x)=>sum+n(x.amount),0);
       const itemRows=group.map(x=>{
         const label=x.group==='extra'&&x.name&&x.name!=='Extra'?`Extra · ${esc(x.name)}`:esc(x.name||groupLabel(x.group));
-        const remove=removable?` <button class="text-btn" data-fin-remove-expense="${x.index}">×</button>`:'';
+        const remove=removable?` <span class="finance-inline-actions"><button class="text-btn" data-fin-edit-expense="${x.index}">Edit</button><button class="text-btn" data-fin-remove-expense="${x.index}">×</button></span>`:'';
         return `<div class="finance-category-item"><span>${label}</span><strong>${money(x.amount)}${remove}</strong></div>`;
       }).join('');
       return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(CATEGORY_LABELS[tone]||tone)}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
@@ -455,6 +455,16 @@
       setProgress('INCOME',31);
       body.innerHTML=wizardHtml('Any more income this month?','You can add as many sources as you need.',`${listHtml(d.incomes,x=>x.name)}<div class="finance-choice-stack"><button class="finance-choice" data-fin-yes><div><strong>Yes, add another</strong></div><span>＋</span></button><button class="finance-choice" data-fin-no><div><strong>No, continue to expenses</strong></div><span>→</span></button></div>`);
       $('[data-fin-yes]')?.addEventListener('click',()=>{flow.stage='incomeSource';renderWizard();}); $('[data-fin-no]')?.addEventListener('click',()=>{flow.stage='expenseGroup';renderWizard();}); return;
+    }
+
+    if(flow.stage==='editExistingExpense'){
+      const idx=Number(t.editExpenseIndex),item=d.expenses?.[idx];
+      if(!item){flow.temp={};flow.stage='review';renderWizard();return;}
+      setProgress('EDIT EXPENSE',58);
+      body.innerHTML=wizardHtml(`Edit ${item.name||groupLabel(item.group)}`,'Update this saved draft expense. You can keep changing it until the month is confirmed.',`<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(CATEGORY_LABELS[groupTone(item.group)]||groupLabel(item.group))}</span><strong>${esc(item.name||groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount??''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+      bindBack(()=>{flow.temp={};flow.stage='review';renderWizard();});
+      $('[data-fin-next]')?.addEventListener('click',()=>{const v=$('#finMoney')?.value||'';if(v===''||!Number.isFinite(Number(v.replace(',','.'))))return toast('Enter a valid amount','warn');item.amount=n(v);flow.temp={};flow.stage='review';renderWizard();});
+      return;
     }
 
     if(flow.stage==='expenseGroup'){
@@ -532,6 +542,7 @@
     const investmentLines=c.investmentTotal==null?'<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>':`<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value<0?'finance-negative':'finance-positive'}"><span>G/L p/m${gl?` vs ${monthLabel(gl.previousMonth)}`:''}</span><strong>${gl?signedMoney(gl.value):'—'}</strong></div>`;
     body.innerHTML=wizardHtml(`Ready to save ${monthLabel(d.month)}?`,'Review your personal monthly picture before saving.',`<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover<0?'Overspent':'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button></div><div class="finance-review-section"><h3>Monthly allocation</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Save up</span><strong>${money(c.savings)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Investments contribution</span><strong>${money(c.investmentContribution)}</strong></div><div class="finance-breakdown-row"><span>Extra budget</span><strong>${money(c.extraBudget)} <button class="text-btn" data-fin-edit-extra>Edit</button></strong></div></div><div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div><div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
     $$('[data-fin-remove-income]').forEach(btn=>btn.addEventListener('click',()=>{d.incomes.splice(Number(btn.dataset.finRemoveIncome),1);renderReview();}));
+    $$('[data-fin-edit-expense]').forEach(btn=>btn.addEventListener('click',()=>{flow.temp={editExpenseIndex:Number(btn.dataset.finEditExpense)};flow.stage='editExistingExpense';renderWizard();}));
     $$('[data-fin-remove-expense]').forEach(btn=>btn.addEventListener('click',()=>{d.expenses.splice(Number(btn.dataset.finRemoveExpense),1);renderReview();}));
     $('[data-fin-add-income]')?.addEventListener('click',()=>{flow.stage='incomeSource';renderWizard();});
     $('[data-fin-add-expense]')?.addEventListener('click',()=>{flow.stage='expenseGroup';renderWizard();});
