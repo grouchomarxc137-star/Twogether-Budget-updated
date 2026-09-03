@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 4,
+    version: 5,
     trips: [],
     plans: [],
     compare: {
@@ -26,7 +26,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 4,
+      version: 5,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
@@ -82,7 +82,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 4;
+  state.version = 5;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -103,7 +103,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:4, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:5, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -133,6 +133,15 @@ function doPost(e) {
 
       if (idx >= 0) {
         plan = sanitizePlan_(state.plans[idx]);
+        if (plan.linkedTripId) {
+          const linkedTrip = state.trips.find(t => t.id === plan.linkedTripId);
+          if (linkedTrip) {
+            const safeTrip = sanitizeTripRecord_(linkedTrip);
+            if (safeTrip.submissions[actor]) {
+              throw new Error('Your planned budget is locked because you already logged your actual expenses');
+            }
+          }
+        }
         if (payload.meta && actor === plan.createdBy) {
           plan.meta = sanitizePlanMeta_(payload.meta);
         }
