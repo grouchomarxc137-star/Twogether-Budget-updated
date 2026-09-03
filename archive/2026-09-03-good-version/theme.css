@@ -1,0 +1,54 @@
+/* Identity themes: keep the same Together design, tint the main UI by who is logged in. */
+body[data-actor="Principessa"]{
+  --accent:#c49a2f;
+  --accent-dark:#80620f;
+  --accent-soft:#f7edc8;
+  --rose:#d3af43;
+  --rose-soft:#fbf3d3;
+  background:linear-gradient(180deg,#fbf7e9 0,var(--bg) 440px) fixed;
+}
+
+body[data-actor="Principe"]{
+  --accent:#d9772d;
+  --accent-dark:#934514;
+  --accent-soft:#f8e1d0;
+  --rose:#df8843;
+  --rose-soft:#fbe8d9;
+  background:linear-gradient(180deg,#fcf1e8 0,var(--bg) 440px) fixed;
+}
+
+body[data-actor="Principessa"] .who-badge{
+  background:#f6e7aa;
+  color:#755800;
+  border:1px solid #e6ca63;
+}
+
+body[data-actor="Principe"] .who-badge{
+  background:#f5d1b4;
+  color:#873f11;
+  border:1px solid #e3a46d;
+}
+
+body[data-actor] .who-badge{
+  padding:8px 13px;
+  font-weight:800;
+  box-shadow:0 4px 14px rgba(70,50,30,.06);
+}
+
+body[data-actor="Principessa"] .wizard-card{
+  border-color:#ead99a;
+  box-shadow:0 20px 60px rgba(151,116,24,.10);
+}
+
+body[data-actor="Principe"] .wizard-card{
+  border-color:#ecc6a8;
+  box-shadow:0 20px 60px rgba(154,78,27,.10);
+}
+
+body[data-actor="Principessa"] .tab.active{
+  box-shadow:0 8px 26px rgba(151,116,24,.09);
+}
+
+body[data-actor="Principe"] .tab.active{
+  box-shadow:0 8px 26px rgba(154,78,27,.09);
+}

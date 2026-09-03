@@ -1,0 +1,7 @@
+/* Functional Compare-page layout fix: cards size to their own content instead of stretching. */
+.compare-grid{
+  align-items:start;
+}
+.compare-card{
+  align-self:start;
+}

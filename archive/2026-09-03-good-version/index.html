@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f4ef">
+<title>Twogether Budget</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="theme.css?v=2">
+<link rel="stylesheet" href="header-colors-v1.css?v=4">
+<link rel="stylesheet" href="compare-layout-fix.css?v=1">
+<link rel="stylesheet" href="compare-shadow-experiment.css?v=1">
+<link rel="stylesheet" href="compare-split-v1.css?v=1">
+<link rel="stylesheet" href="font-test-crimson-pro.css?v=3">
+<link rel="stylesheet" href="activity-limit.css?v=1">
+<link rel="stylesheet" href="features-v4.css?v=1">
+<link rel="stylesheet" href="month-highlight-v1.css?v=2">
+<link rel="stylesheet" href="confirmed-overview-v1.css?v=1">
+<link rel="stylesheet" href="budget-visuals-v1.css?v=1">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand-wrap"><div class="brand-mark" id="brandMark">♡</div><div><div class="brand">Twogether</div><div class="brand-sub">shared trip budget</div></div></div>
+    <div class="top-actions"><span id="loggedUserBadge" class="who-badge hidden" aria-live="polite"></span></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-sheet="log" type="button">Log trip</button>
+    <button class="tab" data-sheet="monthly" type="button">Monthly</button>
+    <button class="tab" data-sheet="compare" type="button">Compare</button>
+  </nav>
+
+  <main class="main">
+    <section id="log" class="sheet active">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">SHARED BETWEEN PRINCIPE AND PRINCIPESSA</span>
+          <h1>Log your most recent trip</h1>
+          <p>One question at a time. You only enter what <em>you</em> remember and what <em>you</em> paid. If your versions differ, Twogether highlights exactly where.</p>
+        </div>
+        <div class="wizard-card" id="wizardCard">
+          <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="wizardStep">Question 1</div><div class="wizard-progress"><span id="wizardProgress"></span></div></div><button class="text-btn" id="restartWizard" type="button">Start over</button></div>
+          <div id="wizardBody" class="wizard-body"></div>
+        </div>
+      </div>
+
+      <section class="trip-gallery-section">
+        <div class="section-heading"><div><span class="panel-kicker">YOUR TRIPS</span><h2>Trip stories</h2><p>Tap any trip to compare your versions, edit calculations before confirmation, and review the final expenses.</p></div></div>
+        <div id="tripGallery" class="trip-gallery"></div>
+      </section>
+
+      <div class="lower-grid single-activity">
+        <section class="panel activity-card"><div class="panel-head"><div><span class="panel-kicker">ACTIVITY</span><h2>Who changed what</h2></div></div><div id="activityList" class="activity-list"></div></section>
+      </div>
+    </section>
+
+    <section id="monthly" class="sheet">
+      <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>January through December 2026. Trips that are not fully confirmed yet remain marked as estimates.</p></div>
+      <div class="kpis">
+        <div class="kpi"><span>12-month total</span><strong id="kpiTotal">€0.00</strong></div>
+        <div class="kpi"><span>Average / month</span><strong id="kpiMonth">€0.00</strong></div>
+        <div class="kpi"><span>Per person / month</span><strong id="kpiPerson">€0.00</strong></div>
+        <div class="kpi"><span>Average / trip</span><strong id="kpiTrip">€0.00</strong></div>
+        <div class="kpi accent-kpi"><span>Trips / year</span><strong id="kpiTrips">0</strong></div>
+      </div>
+      <div class="table-card"><div class="table-title"><h2>Monthly breakdown</h2><span>~ means at least one amount is estimated or still awaiting confirmation</span></div><div class="table-wrap"><table class="overview-table"><thead><tr><th>Month</th><th>Trips</th><th>Accommodation</th><th>Groceries</th><th>Eating out</th><th>Flights / Train</th><th>Fuel</th><th>Tolls / Parking</th><th>Other</th><th>Total</th><th>Per person</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div>
+    </section>
+
+    <section id="compare" class="sheet">
+      <div class="page-heading"><span class="eyebrow">WHAT IF?</span><h1>Compare the next step</h1><p>Your current Airbnb/travel lifestyle and a temporary rental are alternative situations, so they are compared separately rather than added together.</p></div>
+      <div class="compare-split">
+        <section class="compare-zone compare-current-zone">
+          <div class="compare-zone-title">Current situation</div>
+          <div class="compare-grid compare-current-grid">
+            <div class="compare-card"><div class="compare-head"><span>Current situation</span><small>Actual monthly</small></div><div class="rows"><div class="r"><span>Actual paid / month</span><strong id="currentAvg">€0.00</strong></div><div class="r"><span>Principessa actual / month</span><strong id="yourShare">€0.00</strong></div><div class="r"><span>Principe actual / month</span><strong id="hisShare">€0.00</strong></div><div class="r"><span>Trips logged</span><strong id="tripAvg">0</strong></div></div></div>
+          </div>
+        </section>
+
+        <section class="compare-zone compare-scenario-zone">
+          <div class="compare-zone-title">Test scenarios / decision</div>
+          <div class="compare-grid compare-scenario-grid">
+            <div class="compare-card"><div class="compare-head"><span>Renting a place</span><small>Monthly</small></div><div class="rows" id="rentRows"></div></div>
+            <div class="compare-card"><div class="compare-head"><span>Car budget</span><small>Monthly</small></div><div class="rows" id="carRows"></div></div>
+            <div class="compare-card highlight-card"><div class="compare-head"><span>Decision snapshot</span><small>Monthly</small></div><div class="rows"><div class="r"><span>Current lifestyle</span><strong id="snapCurrent">€0.00</strong></div><div class="r"><span>Current + car</span><strong id="snapCurrentCar">€0.00</strong></div><div class="r"><span>Rental lifestyle</span><strong id="snapRent">€0.00</strong></div><div class="r total-row"><span>Rental + car</span><strong id="snapRentCar">€0.00</strong></div></div></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="identity-modal" id="identityModal" aria-hidden="true"><div class="identity-backdrop"></div><div class="identity-card" role="dialog" aria-modal="true"><div class="identity-heart">♡</div><span class="eyebrow">WELCOME BACK</span><h2>Who is logging in?</h2><p>Your choice is remembered on this device, so refreshing will not log you out.</p><div class="identity-grid"><button class="identity-choice" data-actor="Principessa" type="button"><span>♕</span><strong>Principessa</strong><small>Log as Principessa</small></button><button class="identity-choice" data-actor="Principe" type="button"><span>♔</span><strong>Principe</strong><small>Log as Principe</small></button></div></div></div>
+
+  <div class="trip-modal" id="tripModal" aria-hidden="true"><div class="trip-modal-backdrop" data-close-trip></div><div class="trip-modal-card"><button class="trip-close" type="button" data-close-trip>×</button><div id="tripModalBody"></div></div></div>
+  <iframe name="backendFrame" title="backend" class="backend-frame"></iframe>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</div>
+<script src="config.js"></script><script src="reload-stability-v1.js?v=1"></script><script src="app-v4.js?v=1" defer></script><script src="workflow-v5.js?v=1" defer></script><script src="confirmed-overview-v1.js?v=1" defer></script><script src="ui-polish-v6.js?v=1" defer></script><script src="budget-visuals-v1.js?v=1" defer></script>
+</body>
+</html>
