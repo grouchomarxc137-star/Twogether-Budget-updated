@@ -1,0 +1,33 @@
+name: Fix Extra overage edges v14b
+
+on:
+  push:
+    branches:
+      - finance-extra-budget-fix-test
+    paths:
+      - '.github/workflows/one-time-extra-overage-edges-v14b.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply edge fixes
+        run: python maintenance/fix_extra_overage_edges_v14b.py
+      - name: Validate frontend JavaScript
+        run: node --check finances.js
+      - name: Validate Apps Script syntax
+        run: |
+          cp backend/Code.gs /tmp/Code.js
+          node --check /tmp/Code.js
+      - name: Commit validated patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add finances.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Lock fixed Extra allocation in draft flow"
+          git push
