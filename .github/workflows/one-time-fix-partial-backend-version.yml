@@ -1,0 +1,27 @@
+name: Fix partial backend version stamp
+
+on:
+  push:
+    paths:
+      - 'maintenance/fix_partial_backend_version.py'
+      - '.github/workflows/one-time-fix-partial-backend-version.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix backend version stamp
+        run: python maintenance/fix_partial_backend_version.py
+      - name: Validate Apps Script syntax
+        run: cp backend/Code.gs /tmp/twogether-backend.js && node --check /tmp/twogether-backend.js
+      - name: Commit validated fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/Code.gs
+          git diff --cached --quiet || git commit -m "Write backend state as version 6"
+          git push
