@@ -5,9 +5,10 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 7,
+    version: 8,
     trips: [],
     plans: [],
+    finances: {Principessa:[], Principe:[]},
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
       carpay: 250, insurance: 90, tax: 45, carfuel: 120, maintenance: 50
@@ -26,9 +27,10 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 7,
+      version: 8,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
+      finances: sanitizeFinances_(parsed.finances),
       compare: Object.assign(base.compare, parsed.compare || {}),
       audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
@@ -82,10 +84,11 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 7;
+  state.version = 8;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
+  state.finances = sanitizeFinances_(state.finances);
   PropertiesService.getScriptProperties().setProperty(STATE_KEY, JSON.stringify(state));
 }
 
@@ -103,7 +106,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:7, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:8, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -393,6 +396,29 @@ function doPost(e) {
       return output_({ok:true});
     }
 
+    if (action === 'saveFinanceMonth') {
+      const monthData = sanitizeFinanceMonth_(payload.monthData || {}, actor);
+      if (!/^\d{4}-\d{2}$/.test(monthData.month)) throw new Error('Choose a valid month');
+      state.finances = sanitizeFinances_(state.finances);
+      const list = state.finances[actor] || [];
+      const idx = list.findIndex(x => x.month === monthData.month);
+      monthData.updatedAt = new Date().toISOString();
+      monthData.updatedBy = actor;
+      if (idx >= 0) list[idx] = monthData; else list.push(monthData);
+      list.sort((a,b) => String(a.month).localeCompare(String(b.month)));
+      state.finances[actor] = list;
+      saveState_(state);
+      return output_({ok:true, month:monthData.month});
+    }
+
+    if (action === 'deleteFinanceMonth') {
+      const month = cleanText_(payload.month, 10);
+      state.finances = sanitizeFinances_(state.finances);
+      state.finances[actor] = (state.finances[actor] || []).filter(x => x.month !== month);
+      saveState_(state);
+      return output_({ok:true});
+    }
+
     if (action === 'updateCompare') {
       const allowed = ['rent','utilities','condo','stilltravel','food','carpay','insurance','tax','carfuel','maintenance'];
       const key = String(payload.key || '');
@@ -426,6 +452,53 @@ function cleanMoney_(value) {
   if (value === '' || value == null || value === '-') return '';
   const num = Number(String(value).replace(',', '.'));
   return isFinite(num) && num >= 0 ? num : '';
+}
+
+function sanitizeFinanceIncome_(item) {
+  return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
+}
+
+function sanitizeFinanceExpense_(item) {
+  const allowed = ['health','subscriptions','living','transport','groceries','extra','savings','investments','other'];
+  const group = allowed.indexOf(String(item && item.group || '')) >= 0 ? String(item.group) : 'other';
+  return {group:group, name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
+}
+
+function sanitizeFinanceReserved_(item) {
+  return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
+}
+
+function sanitizeFinanceMonth_(record, actor) {
+  const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
+  const expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
+  const reserved = Array.isArray(record && record.reserved) ? record.reserved.slice(0,40).map(sanitizeFinanceReserved_).filter(x => x.name && x.amount !== '') : [];
+  return {
+    month: cleanText_(record && record.month, 10),
+    incomes: incomes,
+    expenses: expenses,
+    extraBudget: cleanMoney_(record && record.extraBudget),
+    reserved: reserved,
+    updatedAt: cleanText_(record && record.updatedAt, 40),
+    updatedBy: cleanActor_(record && record.updatedBy || actor)
+  };
+}
+
+function sanitizeFinanceList_(list, actor) {
+  if (!Array.isArray(list)) return [];
+  const byMonth = {};
+  list.slice(-36).forEach(function(record) {
+    const safe = sanitizeFinanceMonth_(record, actor);
+    if (/^\d{4}-\d{2}$/.test(safe.month)) byMonth[safe.month] = safe;
+  });
+  return Object.keys(byMonth).sort().map(function(month){ return byMonth[month]; });
+}
+
+function sanitizeFinances_(finances) {
+  const source = finances && typeof finances === 'object' ? finances : {};
+  return {
+    Principessa: sanitizeFinanceList_(source.Principessa, 'Principessa'),
+    Principe: sanitizeFinanceList_(source.Principe, 'Principe')
+  };
 }
 
 function cleanUncertain_(obj) {
