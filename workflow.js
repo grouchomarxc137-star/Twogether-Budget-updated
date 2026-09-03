@@ -179,7 +179,7 @@
     if(!section||!root) return;
     if(sharedState.version<4){ section.classList.add('hidden'); root.innerHTML=''; return; }
     section.classList.remove('hidden');
-    const plans=[...sharedState.plans].filter(plan=>!isLocked(tripForPlan(plan))).sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
+    const plans=[...sharedState.plans].sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
     if(!plans.length){ root.innerHTML='<div class="budget-empty">No planned trip budgets yet. Create one before your next trip.</div>'; return; }
     const a=actor();
     root.innerHTML=plans.map(plan=>{
@@ -190,9 +190,8 @@
       const bothBudgets=pBudget!==''&&qBudget!==''; const bothActual=pActual!==''&&qActual!=='';
       const totalVar=bothBudgets&&bothActual?variance(n(pBudget)+n(qBudget),n(pActual)+n(qActual)):{text:bothBudgets?'Waiting for both actual spends':'Waiting for both budgets',cls:''};
       const ownBudget=plan?.budgets?.[a]??''; const ownSub=trip?.submissions?.[a]||null;
-      const status=trip?'Trip expenses in progress':'Waiting for the trip';
-      const combinedPlanned=bothBudgets ? money(n(pBudget)+n(qBudget)) : 'Waiting for both budgets';
-      return `<article class="budget-plan-card" data-v5-plan="${esc(plan.id)}"><div class="budget-plan-top"><div><span class="trip-country">${esc(locationLabel(meta))}</span><h3>${esc(meta.city||locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p></div><span class="budget-plan-status ${trip?'live':''}">${esc(status)}</span></div><div class="budget-combined-planned"><span>Combined planned budget</span><strong>${esc(combinedPlanned)}</strong></div><div class="budget-person-grid"><div class="budget-person ${pv.cls}"><span>Principessa</span><strong>${pBudget===''?'No budget':money(pBudget)}</strong><small>${esc(pv.text)}${pActual!==''?` · actual ${money(pActual)}`:''}</small></div><div class="budget-person ${qv.cls}"><span>Principe</span><strong>${qBudget===''?'No budget':money(qBudget)}</strong><small>${esc(qv.text)}${qActual!==''?` · actual ${money(qActual)}`:''}</small></div></div><div class="budget-total-check ${totalVar.cls}"><span>Combined</span><strong>${esc(totalVar.text)}</strong></div><div class="budget-plan-actions">${a?`<button class="btn ghost" type="button" data-v5-own-budget>${ownBudget===''?'Add my budget':'Edit my budget'}</button>`:''}${a&&!locked&&ownBudget!==''?`<button class="btn primary" type="button" data-v5-actual>${ownSub?'Edit my actual expenses':'Log actual expenses'}</button>`:''}${trip?'<button class="btn ghost" type="button" data-v5-open-trip>Open trip</button>':''}</div></article>`;
+      const status=locked?'Budget checked':trip?'Trip expenses in progress':'Waiting for the trip';
+      return `<article class="budget-plan-card" data-v5-plan="${esc(plan.id)}"><div class="budget-plan-top"><div><span class="trip-country">${esc(locationLabel(meta))}</span><h3>${esc(meta.city||locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p></div><span class="budget-plan-status ${locked?'done':trip?'live':''}">${esc(status)}</span></div><div class="budget-person-grid"><div class="budget-person ${pv.cls}"><span>Principessa</span><strong>${pBudget===''?'No budget':money(pBudget)}</strong><small>${esc(pv.text)}${pActual!==''?` · actual ${money(pActual)}`:''}</small></div><div class="budget-person ${qv.cls}"><span>Principe</span><strong>${qBudget===''?'No budget':money(qBudget)}</strong><small>${esc(qv.text)}${qActual!==''?` · actual ${money(qActual)}`:''}</small></div></div><div class="budget-total-check ${totalVar.cls}"><span>Combined</span><strong>${esc(totalVar.text)}</strong></div><div class="budget-plan-actions">${a?`<button class="btn ghost" type="button" data-v5-own-budget>${ownBudget===''?'Add my budget':'Edit my budget'}</button>`:''}${a&&!locked&&ownBudget!==''?`<button class="btn primary" type="button" data-v5-actual>${ownSub?'Edit my actual expenses':'Log actual expenses'}</button>`:''}${trip?'<button class="btn ghost" type="button" data-v5-open-trip>Open trip</button>':''}</div></article>`;
     }).join('');
     $$('[data-v5-plan]',root).forEach(card=>{
       const id=card.dataset.v5Plan;
@@ -405,7 +404,8 @@
     MONEY_FIELDS.forEach(key=>{
       const amountDiff=Math.abs(n(own[key])-n(other[key]))>.01;
       const certaintyDiff=!!own?.uncertain?.[key]!==!!other?.uncertain?.[key];
-      if(amountDiff || certaintyDiff)steps.push({key,label:MONEY_LABELS[key],type:'money'});
+      if(amountDiff)steps.push({key,label:MONEY_LABELS[key],type:'money'});
+      else if(certaintyDiff)steps.push({key,label:MONEY_LABELS[key]+' certainty',type:'certainty'});
     });
     if(String(own.otherNote||'').trim().toLowerCase()!==String(other.otherNote||'').trim().toLowerCase())steps.push({key:'otherNote',label:'Other expense note',type:'text'});
     return steps;
