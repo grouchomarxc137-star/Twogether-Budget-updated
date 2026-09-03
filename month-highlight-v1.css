@@ -5,12 +5,20 @@
   font-weight:800;
   box-shadow:inset 3px 0 0 #d8bd78;
 }
+.overview-table tbody td{
+  transition:background-color .14s ease;
+}
 .overview-table tbody td:first-child{
   background:#fbf5e7;
   color:#4f493f;
   font-weight:700;
   box-shadow:inset 3px 0 0 #ead9ad;
 }
-.overview-table tbody tr:hover td:first-child{
+/* Hovering anywhere on a month makes the complete row softly stand out. */
+.overview-table tbody tr:hover td{
   background:#f7eed8;
+}
+.overview-table tbody tr:hover td:first-child{
+  background:#f3e5c5;
+  box-shadow:inset 3px 0 0 #d9bd78;
 }
