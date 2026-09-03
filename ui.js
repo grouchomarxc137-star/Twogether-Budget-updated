@@ -264,9 +264,11 @@
       const who=item.querySelector('strong')?.textContent?.trim()||'';
       if(!wrap)return;
       [...wrap.childNodes].forEach(node=>{
-        if(node.nodeType!==Node.TEXT_NODE||!/setIndividualBudget/.test(node.textContent||''))return;
+        if(node.nodeType!==Node.TEXT_NODE)return;
         const possessive=who==='Principessa'?'her':who==='Principe'?'his':'their';
-        node.textContent=(node.textContent||'').replace(/setIndividualBudget/g,`set ${possessive} trip budget`);
+        node.textContent=(node.textContent||'')
+          .replace(/setIndividualBudget/g,`set ${possessive} trip budget`)
+          .replace(/savePartialActual/g,'saved early trip expenses');
       });
     });
   }
@@ -278,7 +280,7 @@
     const index=current==='Principessa'?0:1;
     [...grid.querySelectorAll('.budget-plan-card')].forEach(card=>{
       const mine=[...card.querySelectorAll('.budget-person')][index];
-      const hasActual=/\bactual\s+€/i.test(mine?.querySelector('small')?.textContent||'');
+      const hasActual=/\bactual\s+€|saved early:/i.test(mine?.querySelector('small')?.textContent||'');
       const edit=card.querySelector('[data-v5-own-budget]');
       let note=card.querySelector('.budget-locked-note');
       if(hasActual){
@@ -302,7 +304,7 @@
     if(!header||!grid)return;
     const current=actor();
     const index=current==='Principessa'?0:1;
-    const openCards=[...grid.querySelectorAll('.budget-plan-card')].filter(card=>card.querySelector('.budget-plan-status')?.textContent?.trim()!=='Budget checked');
+    const openCards=[...grid.querySelectorAll('.budget-plan-card')].filter(card=>!card.classList.contains('hidden'));
     const card=openCards[0]||null;
     if(!card){
       header.textContent='Plan a trip budget';
@@ -312,7 +314,7 @@
       return;
     }
     const mine=[...card.querySelectorAll('.budget-person')][index];
-    const hasActual=/\bactual\s+€/i.test(mine?.querySelector('small')?.textContent||'');
+    const hasActual=/\bactual\s+€|saved early:/i.test(mine?.querySelector('small')?.textContent||'');
     const ownButton=card.querySelector('[data-v5-own-budget]');
     if(hasActual){
       header.textContent='Budget locked';
