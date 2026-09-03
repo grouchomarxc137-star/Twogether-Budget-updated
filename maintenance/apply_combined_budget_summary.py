@@ -19,4 +19,4 @@ next_v = int(m.group(1)) + 1
 s = re.sub(r'workflow\.js\?v=\d+', f'workflow.js?v={next_v}', s, count=1)
 p.write_text(s, encoding='utf-8')
 
-# trigger
+# trigger: 2026-09-03T14:13+02:00
