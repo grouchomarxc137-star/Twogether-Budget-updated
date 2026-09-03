@@ -183,11 +183,13 @@
   let lastTripId='';
   let stateCache=null;
   let statePromise=null;
+  let decorateQueued=false;
 
   const money=v=>'€'+Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   const n=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0;};
   const has=v=>v!==''&&v!=null;
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const norm=v=>String(v??'').trim().toLowerCase();
 
   function actor(){
     const a=document.body.dataset.actor||'';
@@ -236,11 +238,29 @@
     return `<div class="confirmed-budget-item ${v.cls}"><span>${esc(label)}</span><strong>${budgetText}</strong><small>${esc(v.text)} · actual ${actualText}</small></div>`;
   }
 
+  function tripMeta(trip){
+    return trip?.submissions?.Principessa || trip?.submissions?.Principe || {};
+  }
+
+  function planForTrip(state,trip){
+    const plans=Array.isArray(state?.plans)?state.plans:[];
+    const direct=plans.find(p=>p?.linkedTripId===trip?.id);
+    if(direct)return direct;
+
+    const meta=tripMeta(trip);
+    return plans.find(p=>{
+      const pm=p?.meta||{};
+      return norm(pm.city)===norm(meta.city) &&
+        String(pm.start||'')===String(meta.start||'') &&
+        String(pm.end||'')===String(meta.end||'');
+    }) || null;
+  }
+
   function decorateConfirmedBudget(state,tripId){
     const root=document.getElementById('tripModalBody');
     if(!root||!tripId)return;
     const trip=(state?.trips||[]).find(t=>t.id===tripId);
-    const plan=(state?.plans||[]).find(p=>p.linkedTripId===tripId);
+    const plan=trip?planForTrip(state,trip):null;
     if(!trip||!plan||!(trip?.confirmed?.Principessa&&trip?.confirmed?.Principe))return;
 
     const pb=plan?.budgets?.Principessa??'';
@@ -250,11 +270,16 @@
     const combinedBudget=has(pb)&&has(qb)?n(pb)+n(qb):'';
     const combinedActual=has(pa)&&has(qa)?n(pa)+n(qa):'';
     const combinedVar=variance(combinedBudget,combinedActual);
+    const signature=[tripId,pb,qb,pa,qa].join('|');
 
-    const old=root.querySelector('.confirmed-budget-comparison');
-    if(old)old.remove();
+    const existing=root.querySelector('.confirmed-budget-comparison');
+    const summary=root.querySelector('.budget-check');
+    if(existing?.dataset.signature===signature && summary?.dataset.individualBudgetSignature===signature)return;
+
+    if(existing)existing.remove();
     const box=document.createElement('section');
     box.className='confirmed-budget-comparison';
+    box.dataset.signature=signature;
     box.innerHTML=`<h3>Budget comparison</h3><p>Your planned limits compared with what each of you actually paid.</p><div class="confirmed-budget-grid">${item('Principessa',pb,pa)}${item('Principe',qb,qa)}${item('Combined',combinedBudget,combinedActual)}</div>`;
 
     const analysis=root.querySelector('.confirmed-spend-overview');
@@ -263,7 +288,6 @@
     if(anchor)anchor.parentNode.insertBefore(box,anchor);
     else root.appendChild(box);
 
-    const summary=root.querySelector('.budget-check');
     if(summary){
       const cells=[...summary.children];
       if(cells[0]){
@@ -284,7 +308,16 @@
       summary.classList.remove('ok','warn');
       if(combinedVar.cls==='under'||combinedVar.cls==='on')summary.classList.add('ok');
       if(combinedVar.cls==='over')summary.classList.add('warn');
+      summary.dataset.individualBudgetSignature=signature;
     }
+  }
+
+  function scheduleBudgetDecoration(force=false){
+    if(!lastTripId||decorateQueued)return;
+    decorateQueued=true;
+    getState(force).then(state=>{
+      requestAnimationFrame(()=>decorateConfirmedBudget(state,lastTripId));
+    }).catch(()=>{}).finally(()=>{decorateQueued=false;});
   }
 
   function lockSubmittedBudgetButtons(){
@@ -320,10 +353,18 @@
     const tripCard=event.target.closest?.('[data-open-trip]');
     if(!tripCard)return;
     lastTripId=tripCard.dataset.openTrip||'';
-    getState(true).then(state=>decorateConfirmedBudget(state,lastTripId)).catch(()=>{});
+    scheduleBudgetDecoration(true);
+    setTimeout(()=>scheduleBudgetDecoration(false),80);
   },true);
 
   document.addEventListener('DOMContentLoaded',()=>{
+    const modalBody=document.getElementById('tripModalBody');
+    if(modalBody){
+      new MutationObserver(()=>{
+        if(lastTripId) setTimeout(()=>scheduleBudgetDecoration(false),0);
+      }).observe(modalBody,{childList:true});
+    }
+
     const grid=document.getElementById('budgetPlanGrid');
     if(grid){
       lockSubmittedBudgetButtons();
