@@ -5,8 +5,9 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 3,
+    version: 4,
     trips: [],
+    plans: [],
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
       carpay: 250, insurance: 90, tax: 45, carfuel: 120, maintenance: 50
@@ -25,8 +26,9 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 3,
+      version: 4,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
+      plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
       audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
@@ -80,9 +82,10 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 3;
+  state.version = 4;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
+  state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
   PropertiesService.getScriptProperties().setProperty(STATE_KEY, JSON.stringify(state));
 }
 
@@ -100,7 +103,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:3, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:4, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -121,6 +124,96 @@ function doPost(e) {
   lock.waitLock(10000);
   try {
     const state = readState_();
+
+    if (action === 'savePlan') {
+      const id = cleanText_(payload.id, 80);
+      const now = new Date().toISOString();
+      let idx = id ? state.plans.findIndex(x => x.id === id) : -1;
+      let plan;
+
+      if (idx >= 0) {
+        plan = sanitizePlan_(state.plans[idx]);
+        if (payload.meta && actor === plan.createdBy) {
+          plan.meta = sanitizePlanMeta_(payload.meta);
+        }
+      } else {
+        const meta = sanitizePlanMeta_(payload.meta || {});
+        if (!meta.location || !meta.city || !meta.start || !meta.end) {
+          throw new Error('Add the trip location, city and dates first');
+        }
+        plan = {
+          id: Utilities.getUuid(),
+          meta: meta,
+          budgets: {Principessa:'', Principe:''},
+          linkedTripId: '',
+          createdAt: now,
+          createdBy: actor,
+          updatedAt: now,
+          updatedBy: actor
+        };
+        state.plans.push(plan);
+        idx = state.plans.length - 1;
+      }
+
+      const budget = cleanMoney_(payload.budget);
+      if (budget === '') throw new Error('Enter your individual budget');
+      plan.budgets[actor] = budget;
+      plan.updatedAt = now;
+      plan.updatedBy = actor;
+      state.plans[idx] = plan;
+      addAudit_(state, actor, 'setIndividualBudget', plan.id);
+      saveState_(state);
+      return output_({ok:true, planId:plan.id});
+    }
+
+    if (action === 'savePlanSubmission') {
+      const planId = cleanText_(payload.planId, 80);
+      const planIdx = state.plans.findIndex(x => x.id === planId);
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const now = new Date().toISOString();
+      let tripIdx = plan.linkedTripId ? state.trips.findIndex(t => t.id === plan.linkedTripId) : -1;
+      let trip;
+
+      if (tripIdx >= 0) {
+        trip = sanitizeTripRecord_(state.trips[tripIdx]);
+        if (trip.confirmed.Principessa && trip.confirmed.Principe) {
+          throw new Error('This trip is already confirmed by both of you');
+        }
+      } else {
+        trip = {
+          id: Utilities.getUuid(),
+          budget: '',
+          submissions: {Principessa:null, Principe:null},
+          confirmed: {Principessa:false, Principe:false},
+          createdAt: now,
+          createdBy: actor,
+          updatedAt: now,
+          updatedBy: actor
+        };
+        state.trips.push(trip);
+        tripIdx = state.trips.length - 1;
+        plan.linkedTripId = trip.id;
+      }
+
+      const merged = Object.assign({}, payload.submission || {}, plan.meta || {});
+      const incoming = sanitizeSubmission_(merged, actor);
+      const wasExisting = !!trip.submissions[actor];
+      incoming.submittedAt = now;
+      incoming.submittedBy = actor;
+      trip.submissions[actor] = incoming;
+      trip.confirmed = {Principessa:false, Principe:false};
+      trip.updatedAt = now;
+      trip.updatedBy = actor;
+      state.trips[tripIdx] = trip;
+
+      plan.updatedAt = now;
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, wasExisting ? 'updateSubmission' : 'addSubmission', trip.id);
+      saveState_(state);
+      return output_({ok:true, tripId:trip.id, planId:plan.id});
+    }
 
     if (action === 'saveSubmission') {
       const incoming = sanitizeSubmission_(payload.submission || {}, actor);
@@ -235,6 +328,11 @@ function doPost(e) {
       const id = cleanText_(payload.id, 80);
       const before = state.trips.length;
       state.trips = state.trips.filter(t => t.id !== id);
+      state.plans = state.plans.map(plan => {
+        const p = sanitizePlan_(plan);
+        if (p.linkedTripId === id) p.linkedTripId = '';
+        return p;
+      });
       if (state.trips.length !== before) addAudit_(state, actor, 'deleteTrip', id);
       saveState_(state);
       return output_({ok:true});
@@ -280,6 +378,33 @@ function cleanUncertain_(obj) {
   const source = obj && typeof obj === 'object' ? obj : {};
   MONEY_FIELDS.forEach(k => { if (source[k] === true) out[k] = true; });
   return out;
+}
+
+function sanitizePlanMeta_(meta) {
+  return {
+    location: cleanText_(meta && meta.location, 80),
+    otherLocation: cleanText_(meta && meta.otherLocation, 120),
+    city: cleanText_(meta && meta.city, 160),
+    start: cleanText_(meta && meta.start, 20),
+    end: cleanText_(meta && meta.end, 20)
+  };
+}
+
+function sanitizePlan_(plan) {
+  const budgets = plan && plan.budgets || {};
+  return {
+    id: cleanText_(plan && plan.id, 80) || Utilities.getUuid(),
+    meta: sanitizePlanMeta_(plan && plan.meta || {}),
+    budgets: {
+      Principessa: cleanMoney_(budgets.Principessa),
+      Principe: cleanMoney_(budgets.Principe)
+    },
+    linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
+    createdAt: cleanText_(plan && plan.createdAt, 40),
+    createdBy: cleanActor_(plan && plan.createdBy),
+    updatedAt: cleanText_(plan && plan.updatedAt, 40),
+    updatedBy: cleanActor_(plan && plan.updatedBy)
+  };
 }
 
 function sanitizeSubmission_(s, actor) {
