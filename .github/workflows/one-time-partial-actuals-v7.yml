@@ -1,0 +1,29 @@
+name: Apply guarded partial actuals v7
+
+on:
+  push:
+    paths:
+      - 'maintenance/apply_partial_actuals_v7.py'
+      - '.github/workflows/one-time-partial-actuals-v7.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply partial actuals v7
+        run: python maintenance/apply_partial_actuals_v7.py
+      - name: Validate workflow JavaScript
+        run: node --check workflow.js
+      - name: Validate Apps Script JavaScript
+        run: cp backend/Code.gs /tmp/twogether-backend.js && node --check /tmp/twogether-backend.js
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workflow.js backend/Code.gs index.html
+          git diff --cached --quiet || git commit -m "Fix actual-expense launch and expand partial logging"
+          git push
