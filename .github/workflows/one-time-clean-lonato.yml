@@ -25,7 +25,7 @@ jobs:
 
           for id in "${ids[@]}"; do
             payload="$(jq -nc --arg id "$id" '{id:$id}')"
-            result="$(curl -fsSL -X POST \
+            result="$(curl -fsSL \
               --data-urlencode 'action=deleteTrip' \
               --data-urlencode 'actor=Principessa' \
               --data-urlencode "payload=$payload" \
