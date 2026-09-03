@@ -82,7 +82,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 5;
+  state.version = 6;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
