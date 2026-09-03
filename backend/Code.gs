@@ -5,10 +5,14 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 8,
+    version: 9,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
+    financeProfiles: {
+      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[]},
+      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[]}
+    },
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
       carpay: 250, insurance: 90, tax: 45, carfuel: 120, maintenance: 50
@@ -27,10 +31,11 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 8,
+      version: 9,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
+      financeProfiles: sanitizeFinanceProfiles_(parsed.financeProfiles),
       compare: Object.assign(base.compare, parsed.compare || {}),
       audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
@@ -84,7 +89,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 8;
+  state.version = 9;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -106,7 +111,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:8, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:9, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -419,6 +424,16 @@ function doPost(e) {
       return output_({ok:true});
     }
 
+    if (action === 'saveFinanceProfile') {
+      state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
+      const profile = sanitizeFinanceProfile_(payload.profile || {}, actor);
+      profile.updatedAt = new Date().toISOString();
+      profile.updatedBy = actor;
+      state.financeProfiles[actor] = profile;
+      saveState_(state);
+      return output_({ok:true});
+    }
+
     if (action === 'updateCompare') {
       const allowed = ['rent','utilities','condo','stilltravel','food','carpay','insurance','tax','carfuel','maintenance'];
       const key = String(payload.key || '');
@@ -459,8 +474,11 @@ function sanitizeFinanceIncome_(item) {
 }
 
 function sanitizeFinanceExpense_(item) {
-  const allowed = ['health','subscriptions','living','transport','groceries','extra','savings','investments','other'];
-  const group = allowed.indexOf(String(item && item.group || '')) >= 0 ? String(item.group) : 'other';
+  const allowed = ['medical','subscriptions','rent','transport','groceries','extra','savings','investments','other'];
+  let group = String(item && item.group || '');
+  if (group === 'health') group = 'medical';
+  if (group === 'living') group = 'rent';
+  if (allowed.indexOf(group) < 0) group = 'other';
   return {group:group, name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
 }
 
@@ -471,13 +489,13 @@ function sanitizeFinanceReserved_(item) {
 function sanitizeFinanceMonth_(record, actor) {
   const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
   const expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
-  const reserved = Array.isArray(record && record.reserved) ? record.reserved.slice(0,40).map(sanitizeFinanceReserved_).filter(x => x.name && x.amount !== '') : [];
   return {
     month: cleanText_(record && record.month, 10),
     incomes: incomes,
     expenses: expenses,
     extraBudget: cleanMoney_(record && record.extraBudget),
-    reserved: reserved,
+    investmentTotal: cleanMoney_(record && record.investmentTotal),
+    sisterInvestments: cleanMoney_(record && record.sisterInvestments),
     updatedAt: cleanText_(record && record.updatedAt, 40),
     updatedBy: cleanActor_(record && record.updatedBy || actor)
   };
@@ -498,6 +516,51 @@ function sanitizeFinances_(finances) {
   return {
     Principessa: sanitizeFinanceList_(source.Principessa, 'Principessa'),
     Principe: sanitizeFinanceList_(source.Principe, 'Principe')
+  };
+}
+
+function sanitizeFinanceBank_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    name: cleanText_(item && item.name, 100),
+    balance: cleanMoney_(item && item.balance)
+  };
+}
+
+function sanitizeFinanceHold_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    name: cleanText_(item && item.name, 120),
+    amount: cleanMoney_(item && item.amount)
+  };
+}
+
+function sanitizeFinanceReceivable_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    person: cleanText_(item && item.person, 100),
+    reason: cleanText_(item && item.reason, 180),
+    amount: cleanMoney_(item && item.amount)
+  };
+}
+
+function sanitizeFinanceProfile_(profile, actor) {
+  const source = profile && typeof profile === 'object' ? profile : {};
+  return {
+    bankAccounts: Array.isArray(source.bankAccounts) ? source.bankAccounts.slice(0,30).map(sanitizeFinanceBank_).filter(x => x.name && x.balance !== '') : [],
+    savingsTotal: cleanMoney_(source.savingsTotal),
+    savingsReserved: Array.isArray(source.savingsReserved) ? source.savingsReserved.slice(0,40).map(sanitizeFinanceHold_).filter(x => x.name && x.amount !== '') : [],
+    receivables: Array.isArray(source.receivables) ? source.receivables.slice(0,40).map(sanitizeFinanceReceivable_).filter(x => x.person && x.reason && x.amount !== '') : [],
+    updatedAt: cleanText_(source.updatedAt, 40),
+    updatedBy: cleanActor_(source.updatedBy || actor)
+  };
+}
+
+function sanitizeFinanceProfiles_(profiles) {
+  const source = profiles && typeof profiles === 'object' ? profiles : {};
+  return {
+    Principessa: sanitizeFinanceProfile_(source.Principessa, 'Principessa'),
+    Principe: sanitizeFinanceProfile_(source.Principe, 'Principe')
   };
 }
 
