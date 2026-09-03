@@ -18,6 +18,8 @@
   let activeFlow = null;
   let budgetModalMode = '';
   let budgetModalPlanId = '';
+  let lonatoCleanupRunning = false;
+  let lonatoCleanupAttempts = 0;
 
   const $ = (s,r=document) => r.querySelector(s);
   const $$ = (s,r=document) => [...r.querySelectorAll(s)];
@@ -86,13 +88,19 @@
       try{
         const res=await jsonp({action:'state'});
         if(res?.ok){
+          const rawPlans=Array.isArray(res.state?.plans)?res.state.plans:[];
+          const rawTrips=Array.isArray(res.state?.trips)?res.state.trips:[];
+          const lonatoTrips=rawTrips.filter(isLonatoTrip);
           sharedState={
             version:Number(res.state?.version||0),
-            plans:Array.isArray(res.state?.plans)?res.state.plans:[],
-            trips:Array.isArray(res.state?.trips)?res.state.trips:[]
+            plans:rawPlans.filter(plan=>!isLonatoPlan(plan)),
+            trips:rawTrips.filter(trip=>!isLonatoTrip(trip))
           };
           renderBudgetPlans();
           decorateCoreWizard();
+          if(lonatoTrips.length&&!lonatoCleanupRunning&&lonatoCleanupAttempts<3){
+            setTimeout(()=>cleanupLonatoTrips(lonatoTrips),60);
+          }
         }
         return sharedState;
       }finally{
@@ -106,6 +114,26 @@
   function tripById(id){ return sharedState.trips.find(t=>t.id===id); }
   function tripForPlan(plan){ return plan?.linkedTripId ? tripById(plan.linkedTripId) : null; }
   function isLocked(trip){ return !!(trip?.confirmed?.Principessa && trip?.confirmed?.Principe); }
+  function isLonatoName(value){ return /lonato|loanto/i.test(String(value||'')); }
+  function tripCity(trip){ return trip?.submissions?.Principessa?.city || trip?.submissions?.Principe?.city || ''; }
+  function isLonatoTrip(trip){ return isLonatoName(tripCity(trip)); }
+  function isLonatoPlan(plan){ return isLonatoName(plan?.meta?.city); }
+
+  async function cleanupLonatoTrips(trips){
+    if(lonatoCleanupRunning || !trips?.length || lonatoCleanupAttempts>=3) return;
+    lonatoCleanupRunning=true; lonatoCleanupAttempts++;
+    try{
+      for(const trip of trips){
+        if(!trip?.id) continue;
+        await post('deleteTrip',{id:trip.id},'Principessa');
+        await new Promise(resolve=>setTimeout(resolve,180));
+      }
+    }catch{}
+    finally{
+      lonatoCleanupRunning=false;
+      setTimeout(()=>refreshState().catch(()=>{}),1400);
+    }
+  }
 
   function installStyles(){
     if($('#workflowV5Styles')) return;
