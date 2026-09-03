@@ -179,7 +179,7 @@
     if(!section||!root) return;
     if(sharedState.version<4){ section.classList.add('hidden'); root.innerHTML=''; return; }
     section.classList.remove('hidden');
-    const plans=[...sharedState.plans].sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
+    const plans=[...sharedState.plans].filter(plan=>!isLocked(tripForPlan(plan))).sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
     if(!plans.length){ root.innerHTML='<div class="budget-empty">No planned trip budgets yet. Create one before your next trip.</div>'; return; }
     const a=actor();
     root.innerHTML=plans.map(plan=>{
