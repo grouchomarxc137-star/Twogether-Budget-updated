@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="live.css?v=1">
-<link rel="stylesheet" href="finance.css?v=1">
+<link rel="stylesheet" href="finance.css?v=2">
 </head>
 <body>
 <div class="app" id="app">
@@ -84,9 +84,10 @@
 
     <section id="finances" class="sheet finance-page">
       <div class="finance-hero">
-        <div><span class="eyebrow">PERSONAL MONTHLY MONEY</span><h1>My finances</h1><p>Income, monthly expenses, savings, investments and flexible spending — kept separately for whoever is logged in.</p></div>
+        <div><span class="eyebrow">PERSONAL MONTHLY MONEY</span><h1>My finances</h1><p>Monthly income and spending, current savings, investments, bank balances and money still owed to you — kept separately for whoever is logged in.</p></div>
       </div>
       <div id="financeSummary" class="finance-summary"></div>
+      <section id="financeCurrent" class="finance-current"></section>
       <div class="finance-grid">
         <div class="wizard-card finance-wizard" id="financeWizardCard">
           <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="financeWizardStep">Monthly finances</div><div class="wizard-progress"><span id="financeWizardProgress"></span></div></div><button class="text-btn" id="restartFinanceWizard" type="button">Start over</button></div>
@@ -112,6 +113,6 @@
 <script src="app.js?v=2" defer></script>
 <script src="workflow.js?v=10" defer></script>
 <script src="ui.js?v=4" defer></script>
-<script src="finances.js?v=1" defer></script>
+<script src="finances.js?v=2" defer></script>
 </body>
 </html>
