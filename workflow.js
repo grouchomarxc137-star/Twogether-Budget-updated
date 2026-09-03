@@ -277,7 +277,7 @@
     const plan=planById(planId); const a=actor(); if(!plan||!a)return;
     const trip=tripForPlan(plan); const existing=trip?.submissions?.[a]||{};
     activeFlow={
-      type:'actual', planId, index:0,
+      type:'actual', planId, index:0, otherFlow:null,
       draft:{accom:'',groceries:'',eat:'',travel:'',fuel:'',tolls:'',other:'',otherNote:'',paid:'',uncertain:{},...existing,uncertain:{...(existing.uncertain||{})}}
     };
     closeBudgetModal();
@@ -288,12 +288,68 @@
 
   function actualSteps(){
     const base=[
-      ['accom','How much was accommodation?'],['groceries','How much on groceries?'],['eat','How much on eating out?'],['travel','How much on flights or trains?'],['fuel','How much on fuel?'],['tolls','How much on tolls or parking?'],['other','Any other expenses?']
+      ['accom','How much was accommodation?'],['groceries','How much on groceries?'],['eat','How much on eating out?'],['travel','How much on flights or trains?'],['fuel','How much on fuel?'],['tolls','How much on tolls or parking?']
     ].map(([key,title])=>({key,title,type:'money'}));
-    if(n(activeFlow?.draft?.other)>0) base.push({key:'otherNote',title:'What were the other expenses?',type:'text'});
+    base.push({key:'otherFlow',title:'Other expenses',type:'otherExpenses'});
     base.push({key:'paid',title:`How much did ${actor()} actually pay?`,type:'money',noUncertain:true});
     base.push({key:'review',title:'Ready to save your actual expenses?',type:'review'});
     return base;
+  }
+
+  function ensureActualOtherFlow(){
+    if(!activeFlow.otherFlow){
+      const existing=n(activeFlow.draft.other);
+      activeFlow.otherFlow={stage:'amount',items:[],amount:existing>0?String(activeFlow.draft.other??existing):'',name:existing>0?String(activeFlow.draft.otherNote||''):'',uncertain:!!activeFlow.draft?.uncertain?.other};
+    }
+    return activeFlow.otherFlow;
+  }
+
+  function syncActualOtherDraft(){
+    const f=ensureActualOtherFlow();
+    activeFlow.draft.other=String(f.items.reduce((sum,item)=>sum+n(item.amount),0));
+    activeFlow.draft.otherNote=f.items.map(item=>`${item.name} · ${money(item.amount)}`).join(' + ');
+    activeFlow.draft.uncertain={...(activeFlow.draft.uncertain||{})};
+    activeFlow.draft.uncertain.other=f.items.some(item=>!!item.uncertain);
+  }
+
+  function actualOtherList(){
+    const f=ensureActualOtherFlow();
+    return f.items.length?`<div class="v5-review">${f.items.map(item=>`<div class="v5-review-row"><span>${esc(item.name)}</span><strong>${item.uncertain?'~ ':''}${money(item.amount)}</strong></div>`).join('')}</div>`:'';
+  }
+
+  function renderActualOtherExpenses(plan,steps,qCount,qNum){
+    const f=ensureActualOtherFlow();
+    const list=actualOtherList();
+    const title=f.stage==='name'?'What was this expense?':f.stage==='more'?'Any more other expenses?':f.items.length?'How much was the next other expense?':'Any other expenses?';
+    let control='';
+    if(f.stage==='name'){
+      control=`${list}<div class="v5-reference"><span>Amount</span><strong>${f.uncertain?'~ ':''}${money(f.amount)}</strong></div><div class="field-wrap"><input id="v5OtherName" class="big-input" value="${esc(f.name||'')}" placeholder="e.g. museum tickets"></div><div class="v5-actions"><button class="btn ghost" type="button" data-v5-other-back>Back</button><button class="btn primary big" type="button" data-v5-other-next>Next</button></div>`;
+    }else if(f.stage==='more'){
+      control=`${list}<div class="v5-choice-stack"><button class="trip-pick" type="button" data-v5-other-more="yes"><span class="pick-icon">＋</span><div><strong>Yes, add another</strong><small>Add another amount and its name.</small></div></button><button class="trip-pick" type="button" data-v5-other-more="no"><span class="pick-icon">✓</span><div><strong>No, continue</strong><small>Continue to what you actually paid.</small></div></button></div>`;
+    }else{
+      control=`${list}<div class="${f.uncertain?'uncertain-mode':''}"><div class="money-input-wrap"><span>€</span><input id="v5OtherAmount" class="big-input money-field" inputmode="decimal" value="${esc(f.amount||'')}" placeholder="0.00"></div><div class="certainty-row"><button class="certainty ${!f.uncertain?'active':''}" type="button" data-v5-other-cert="exact">Exact</button><button class="certainty ${f.uncertain?'active':''}" type="button" data-v5-other-cert="estimate">Not sure · estimate</button></div>${f.items.length?'':'<button class="btn ghost full" type="button" data-v5-other-none>No other expenses</button>'}</div><div class="v5-actions"><button class="btn ghost" type="button" data-v5-other-back>Back</button><button class="btn primary big" type="button" data-v5-other-next>Next</button></div>`;
+    }
+    showOverlay(`QUESTION ${Math.max(1,qNum)} OF ${qCount}`,((activeFlow.index+1)/steps.length)*100,title,`Budgeted trip: ${plan.meta?.city||locationLabel(plan.meta)} · ${fmtDate(plan.meta?.start)}–${fmtDate(plan.meta?.end)}`,control);
+    const amount=$('#v5OtherAmount'),name=$('#v5OtherName');
+    amount?.addEventListener('input',()=>{f.amount=amount.value;});name?.addEventListener('input',()=>{f.name=name.value;});setTimeout(()=>{(amount||name)?.focus();},0);
+    $$('[data-v5-other-cert]').forEach(btn=>btn.addEventListener('click',()=>{f.uncertain=btn.dataset.v5OtherCert==='estimate';renderActualFlow();}));
+    $('[data-v5-other-none]')?.addEventListener('click',()=>{f.items=[];activeFlow.draft.other='0';activeFlow.draft.otherNote='';activeFlow.draft.uncertain.other=false;activeFlow.index++;renderActualFlow();});
+    $('[data-v5-other-more="yes"]')?.addEventListener('click',()=>{f.stage='amount';f.amount='';f.name='';f.uncertain=false;renderActualFlow();});
+    $('[data-v5-other-more="no"]')?.addEventListener('click',()=>{syncActualOtherDraft();activeFlow.index++;renderActualFlow();});
+    $('[data-v5-other-back]')?.addEventListener('click',()=>{
+      if(f.stage==='name'){f.stage='amount';renderActualFlow();return;}
+      if(f.stage==='more'){f.stage='name';const last=f.items.pop();if(last){f.amount=String(last.amount);f.name=last.name;f.uncertain=!!last.uncertain;syncActualOtherDraft();}renderActualFlow();return;}
+      if(f.items.length){f.stage='more';renderActualFlow();return;}
+      if(activeFlow.index===0)closeOverlay();else{activeFlow.index--;renderActualFlow();}
+    });
+    $('[data-v5-other-next]')?.addEventListener('click',()=>{
+      if(f.stage==='amount'){
+        const value=String(f.amount||'').trim();if(!value||!Number.isFinite(Number(value.replace(',','.')))){toast('Enter a valid amount first','warn');return;}f.stage='name';renderActualFlow();return;
+      }
+      if(f.stage==='name'){
+        const expenseName=String(f.name||'').trim();if(!expenseName){toast('Add the name of the expense first','warn');return;}f.items.push({amount:String(f.amount),name:expenseName,uncertain:!!f.uncertain});syncActualOtherDraft();f.amount='';f.name='';f.uncertain=false;f.stage='more';renderActualFlow();
+      }
+    });
   }
 
   function renderActualFlow(){
@@ -311,6 +367,7 @@
       $('[data-v5-save-actual]')?.addEventListener('click',savePlanActual);
       return;
     }
+    if(step.type==='otherExpenses'){renderActualOtherExpenses(plan,steps,qCount,qNum);return;}
     const uncertain=!!activeFlow.draft?.uncertain?.[step.key];
     let control='';
     if(step.type==='text'){

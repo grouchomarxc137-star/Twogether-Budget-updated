@@ -65,7 +65,7 @@
   }
 
   function freshWizard(){
-    return {mode:null,tripId:'',draft:freshDraft(),index:0};
+    return {mode:null,tripId:'',draft:freshDraft(),index:0,otherFlow:null};
   }
 
   function normalizeState(s){
@@ -300,7 +300,7 @@
   }
 
   function beginNew(){
-    wizard = {mode:'new',tripId:'',draft:freshDraft(),index:0};
+    wizard = {mode:'new',tripId:'',draft:freshDraft(),index:0,otherFlow:null};
     renderWizard();
   }
 
@@ -309,7 +309,7 @@
     if(!t || isLocked(t)) return;
     const meta = tripMeta(t);
     wizard = {
-      mode:'join',tripId:id,index:0,
+      mode:'join',tripId:id,index:0,otherFlow:null,
       draft:{...freshDraft(),...meta,budget:t.budget ?? '',uncertain:{}}
     };
     renderWizard();
@@ -321,7 +321,7 @@
     if(!t || !own || isLocked(t)) return;
     const meta = tripMeta(t);
     wizard = {
-      mode:'edit',tripId:id,index:0,
+      mode:'edit',tripId:id,index:0,otherFlow:null,
       draft:{...freshDraft(),...meta,...own,budget:t.budget ?? '',uncertain:{...(own.uncertain||{})}}
     };
     closeTripModal();
@@ -342,8 +342,7 @@
       {key:'travel',title:'How much on flights or trains?',type:'money'},
       {key:'fuel',title:'How much on fuel?',type:'money'},
       {key:'tolls',title:'How much on tolls or parking?',type:'money'},
-      {key:'other',title:'Any other expenses?',type:'moneyOrNone'},
-      {key:'otherNote',title:'What were the other expenses?',type:'text',optional:true,when:d=>n(d.other)>0},
+      {key:'otherFlow',title:'Other expenses',type:'otherExpenses'},
       {key:'paid',title:`How much did ${actor} actually pay?`,type:'money',optional:true,noUncertain:true},
       {key:'review',title:wizard.mode==='edit' ? 'Save your corrected version?' : 'Ready to save your version?',type:'review'}
     ];
@@ -379,11 +378,59 @@
     return `<div class="existing-trip-context"><strong>${verb} ${esc(m.city || locationLabel(m))}</strong><span>${esc(locationLabel(m))} · ${fmtDate(m.start)}–${fmtDate(m.end)}</span></div>`;
   }
 
+  function ensureOtherFlow(){
+    if(!wizard.otherFlow){
+      const existing=n(wizard.draft.other);
+      wizard.otherFlow={
+        stage:'amount',items:[],
+        amount:existing>0 ? String(wizard.draft.other ?? existing) : '',
+        name:existing>0 ? String(wizard.draft.otherNote || '') : '',
+        uncertain:!!wizard.draft?.uncertain?.other
+      };
+    }
+    return wizard.otherFlow;
+  }
+
+  function syncOtherDraft(){
+    const f=ensureOtherFlow();
+    const total=f.items.reduce((sum,item)=>sum+n(item.amount),0);
+    wizard.draft.other=String(total);
+    wizard.draft.otherNote=f.items.map(item=>`${item.name} · ${money(item.amount)}`).join(' + ');
+    wizard.draft.uncertain={...(wizard.draft.uncertain||{})};
+    wizard.draft.uncertain.other=f.items.some(item=>!!item.uncertain);
+  }
+
+  function otherFlowTitle(){
+    const f=ensureOtherFlow();
+    if(f.stage==='name') return 'What was this expense?';
+    if(f.stage==='more') return 'Any more other expenses?';
+    return f.items.length ? 'How much was the next other expense?' : 'Any other expenses?';
+  }
+
+  function otherCollectedHtml(){
+    const f=ensureOtherFlow();
+    if(!f.items.length) return '';
+    return `<div class="v5-review">${f.items.map(item=>`<div class="v5-review-row"><span>${esc(item.name)}</span><strong>${item.uncertain?'~ ':''}${money(item.amount)}</strong></div>`).join('')}</div>`;
+  }
+
+  function otherExpensesControl(){
+    const f=ensureOtherFlow();
+    const list=otherCollectedHtml();
+    if(f.stage==='name'){
+      return `${list}<div class="v5-reference"><span>Amount</span><strong>${f.uncertain?'~ ':''}${money(f.amount)}</strong></div><div class="field-wrap"><input id="wizardOtherName" class="big-input" type="text" value="${esc(f.name||'')}" placeholder="e.g. museum tickets"></div><div class="wizard-actions"><button class="btn ghost" type="button" data-other-back>Back</button><button class="btn primary big" type="button" data-other-next>Next</button></div>`;
+    }
+    if(f.stage==='more'){
+      return `${list}<div class="choice-grid"><button class="choice" type="button" data-other-more="yes">Yes, add another</button><button class="choice" type="button" data-other-more="no">No, continue</button></div>`;
+    }
+    return `${list}<div class="${f.uncertain?'uncertain-mode':''}"><div class="money-input-wrap"><span>€</span><input id="wizardOtherAmount" class="big-input money-field" inputmode="decimal" value="${esc(f.amount||'')}" placeholder="0.00"></div><div class="certainty-row"><button class="certainty ${!f.uncertain?'active':''}" type="button" data-other-certainty="exact">Exact</button><button class="certainty ${f.uncertain?'active':''}" type="button" data-other-certainty="estimate">Not sure · estimate</button></div>${f.items.length?'':'<button class="btn ghost full" type="button" data-other-none>No other expenses</button>'}</div><div class="wizard-actions"><button class="btn ghost" type="button" data-other-back>Back</button><button class="btn primary big" type="button" data-other-next>Next</button></div>`;
+  }
+
   function renderWizard(){
     const body = $('#wizardBody');
     if(!body || !actor) return;
     const steps = flowSteps();
     const s = currentStep();
+    if(s.type==='otherExpenses') s.title=otherFlowTitle();
     const stepEl = $('#wizardStep');
     const progress = $('#wizardProgress');
 
@@ -397,7 +444,9 @@
     if(progress) progress.style.width = `${Math.max(8,((wizard.index+1)/Math.max(1,steps.length))*100)}%`;
 
     let control = '';
-    if(s.type === 'tripChoice'){
+    if(s.type === 'otherExpenses'){
+      control = otherExpensesControl();
+    } else if(s.type === 'tripChoice'){
       const pending = pendingForActor();
       const editable = editableForActor().filter(t => t.submissions?.Principessa && t.submissions?.Principe && differences(t).length);
       control = `<div class="trip-choice-stack">
@@ -438,7 +487,7 @@
   }
 
   function wizardActions(s){
-    if(s.type === 'tripChoice' || s.type === 'choice' || s.type === 'review') return '';
+    if(s.type === 'tripChoice' || s.type === 'choice' || s.type === 'review' || s.type === 'otherExpenses') return '';
     const back = `<button class="btn ghost" type="button" data-wizard-back>Back</button>`;
     const optional = s.optional;
     return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${optional?'Continue':'Next'}</button></div>`;
@@ -471,6 +520,49 @@
       wizard.index++;
       renderWizard();
     }));
+
+
+
+    if(s.type==='otherExpenses'){
+      const f=ensureOtherFlow();
+      const amountInput=$('#wizardOtherAmount');
+      const nameInput=$('#wizardOtherName');
+      amountInput?.addEventListener('input',()=>{f.amount=amountInput.value;});
+      nameInput?.addEventListener('input',()=>{f.name=nameInput.value;});
+      setTimeout(()=>{(amountInput||nameInput)?.focus();},0);
+      $$('[data-other-certainty]').forEach(btn=>btn.addEventListener('click',()=>{
+        f.uncertain=btn.dataset.otherCertainty==='estimate';renderWizard();
+      }));
+      $('[data-other-none]')?.addEventListener('click',()=>{
+        f.items=[];wizard.draft.other='0';wizard.draft.otherNote='';wizard.draft.uncertain.other=false;wizard.index++;renderWizard();
+      });
+      $('[data-other-more="yes"]')?.addEventListener('click',()=>{
+        f.stage='amount';f.amount='';f.name='';f.uncertain=false;renderWizard();
+      });
+      $('[data-other-more="no"]')?.addEventListener('click',()=>{
+        syncOtherDraft();wizard.index++;renderWizard();
+      });
+      $('[data-other-back]')?.addEventListener('click',()=>{
+        if(f.stage==='name'){f.stage='amount';renderWizard();return;}
+        if(f.stage==='more'){f.stage='name';const last=f.items.pop();if(last){f.amount=String(last.amount);f.name=last.name;f.uncertain=!!last.uncertain;syncOtherDraft();}renderWizard();return;}
+        if(f.items.length){f.stage='more';renderWizard();return;}
+        if(wizard.index>0){wizard.index--;renderWizard();}else{wizard=freshWizard();renderWizard();}
+      });
+      $('[data-other-next]')?.addEventListener('click',()=>{
+        if(f.stage==='amount'){
+          const value=String(f.amount||'').trim();
+          if(!value||!Number.isFinite(Number(value.replace(',','.')))){toast('Enter a valid amount','warn');return;}
+          f.stage='name';renderWizard();return;
+        }
+        if(f.stage==='name'){
+          const name=String(f.name||'').trim();
+          if(!name){toast('Add the name of the expense first','warn');return;}
+          f.items.push({amount:String(f.amount),name,uncertain:!!f.uncertain});
+          syncOtherDraft();f.amount='';f.name='';f.uncertain=false;f.stage='more';renderWizard();
+        }
+      });
+      return;
+    }
 
     const input = $('#wizardInput');
     if(input){
