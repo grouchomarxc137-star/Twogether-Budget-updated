@@ -407,7 +407,8 @@
       const group=grouped[tone],total=group.reduce((sum,x)=>sum+n(x.amount),0);
       const itemRows=group.map(x=>{
         const label=x.group==='extra'&&x.name&&x.name!=='Extra'?`Extra · ${esc(x.name)}`:esc(x.name||groupLabel(x.group));
-        const remove=removable?` <span class="finance-inline-actions"><button class="text-btn" data-fin-edit-expense="${x.index}">Edit</button><button class="text-btn" data-fin-remove-expense="${x.index}">×</button></span>`:'';
+        const fixedExtra=x.group==='extra'&&String(x.name||'').trim().toLowerCase()==='extra';
+        const remove=removable&&!fixedExtra?` <span class="finance-inline-actions"><button class="text-btn" data-fin-edit-expense="${x.index}">Edit</button><button class="text-btn" data-fin-remove-expense="${x.index}">×</button></span>`:'';
         return `<div class="finance-category-item"><span>${label}</span><strong>${money(x.amount)}${remove}</strong></div>`;
       }).join('');
       return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(CATEGORY_LABELS[tone]||tone)}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
@@ -540,7 +541,7 @@
         else flow.stage='expenseName';
         renderWizard();
       }));
-      $('[data-fin-exp-done]')?.addEventListener('click',()=>{flow.stage='extraBudget';renderWizard();}); return;
+      $('[data-fin-exp-done]')?.addEventListener('click',()=>{flow.stage='extraSpentAsk';renderWizard();}); return;
     }
 
     if(flow.stage==='expenseName'){
@@ -568,7 +569,7 @@
     if(flow.stage==='expenseMore'){
       setProgress('EXPENSES',60);
       body.innerHTML=wizardHtml('Anything else this month?','Keep adding expenses, Save up or Investments until the month is complete.',`${listHtml(d.expenses,x=>`${x.name} · ${groupLabel(x.group)}`)}<div class="finance-choice-stack"><button class="finance-choice" data-fin-yes><div><strong>Yes, add another</strong></div><span>＋</span></button><button class="finance-choice" data-fin-no><div><strong>No, continue</strong></div><span>→</span></button></div>`);
-      $('[data-fin-yes]')?.addEventListener('click',()=>{flow.stage='expenseGroup';renderWizard();}); $('[data-fin-no]')?.addEventListener('click',()=>{flow.stage='extraBudget';renderWizard();}); return;
+      $('[data-fin-yes]')?.addEventListener('click',()=>{flow.stage='expenseGroup';renderWizard();}); $('[data-fin-no]')?.addEventListener('click',()=>{flow.stage='extraSpentAsk';renderWizard();}); return;
     }
 
     if(flow.stage==='extraBudget'){
