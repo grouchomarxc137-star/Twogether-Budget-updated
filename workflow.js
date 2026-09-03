@@ -404,8 +404,7 @@
     MONEY_FIELDS.forEach(key=>{
       const amountDiff=Math.abs(n(own[key])-n(other[key]))>.01;
       const certaintyDiff=!!own?.uncertain?.[key]!==!!other?.uncertain?.[key];
-      if(amountDiff)steps.push({key,label:MONEY_LABELS[key],type:'money'});
-      else if(certaintyDiff)steps.push({key,label:MONEY_LABELS[key]+' certainty',type:'certainty'});
+      if(amountDiff || certaintyDiff)steps.push({key,label:MONEY_LABELS[key],type:'money'});
     });
     if(String(own.otherNote||'').trim().toLowerCase()!==String(other.otherNote||'').trim().toLowerCase())steps.push({key:'otherNote',label:'Other expense note',type:'text'});
     return steps;
