@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 5,
+    version: 6,
     trips: [],
     plans: [],
     compare: {
@@ -26,7 +26,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 5,
+      version: 6,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
@@ -103,7 +103,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:5, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:6, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -133,6 +133,9 @@ function doPost(e) {
 
       if (idx >= 0) {
         plan = sanitizePlan_(state.plans[idx]);
+        if (plan.partials && plan.partials[actor]) {
+          throw new Error('Your planned budget is locked because you already started logging actual expenses');
+        }
         if (plan.linkedTripId) {
           const linkedTrip = state.trips.find(t => t.id === plan.linkedTripId);
           if (linkedTrip) {
@@ -154,6 +157,7 @@ function doPost(e) {
           id: Utilities.getUuid(),
           meta: meta,
           budgets: {Principessa:'', Principe:''},
+          partials: {Principessa:null, Principe:null},
           linkedTripId: '',
           createdAt: now,
           createdBy: actor,
@@ -171,6 +175,36 @@ function doPost(e) {
       plan.updatedBy = actor;
       state.plans[idx] = plan;
       addAudit_(state, actor, 'setIndividualBudget', plan.id);
+      saveState_(state);
+      return output_({ok:true, planId:plan.id});
+    }
+
+    if (action === 'savePlanPartial') {
+      const planId = cleanText_(payload.planId, 80);
+      const planIdx = state.plans.findIndex(x => x.id === planId);
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      if (plan.linkedTripId) {
+        const linkedTrip = state.trips.find(t => t.id === plan.linkedTripId);
+        if (linkedTrip) {
+          const safeTrip = sanitizeTripRecord_(linkedTrip);
+          if (safeTrip.submissions[actor]) throw new Error('You already logged your full actual expenses');
+        }
+      }
+      const previous = plan.partials && plan.partials[actor] ? plan.partials[actor] : {};
+      const incoming = payload.partial || {};
+      const merged = Object.assign({}, previous);
+      if (incoming.accom !== undefined) merged.accom = incoming.accom;
+      if (incoming.travel !== undefined) merged.travel = incoming.travel;
+      merged.uncertain = Object.assign({}, previous.uncertain || {}, incoming.uncertain || {});
+      merged.updatedAt = new Date().toISOString();
+      const partial = sanitizePartialActual_(merged, actor);
+      if (!partial) throw new Error('Add accommodation or Flights / Train first');
+      plan.partials[actor] = partial;
+      plan.updatedAt = merged.updatedAt;
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, 'savePartialActual', plan.id);
       saveState_(state);
       return output_({ok:true, planId:plan.id});
     }
@@ -205,7 +239,14 @@ function doPost(e) {
         plan.linkedTripId = trip.id;
       }
 
-      const merged = Object.assign({}, payload.submission || {}, plan.meta || {});
+      const submitted = Object.assign({}, payload.submission || {});
+      const partial = plan.partials && plan.partials[actor] ? plan.partials[actor] : null;
+      if (partial) {
+        if (submitted.accom === '' || submitted.accom == null) submitted.accom = partial.accom;
+        if (submitted.travel === '' || submitted.travel == null) submitted.travel = partial.travel;
+        submitted.uncertain = Object.assign({}, partial.uncertain || {}, submitted.uncertain || {});
+      }
+      const merged = Object.assign({}, submitted, plan.meta || {});
       const incoming = sanitizeSubmission_(merged, actor);
       const wasExisting = !!trip.submissions[actor];
       incoming.submittedAt = now;
@@ -216,6 +257,7 @@ function doPost(e) {
       trip.updatedBy = actor;
       state.trips[tripIdx] = trip;
 
+      plan.partials[actor] = null;
       plan.updatedAt = now;
       plan.updatedBy = actor;
       state.plans[planIdx] = plan;
@@ -399,14 +441,34 @@ function sanitizePlanMeta_(meta) {
   };
 }
 
+function sanitizePartialActual_(partial, actor) {
+  if (!partial || typeof partial !== 'object') return null;
+  const accom = cleanMoney_(partial.accom);
+  const travel = cleanMoney_(partial.travel);
+  if (accom === '' && travel === '') return null;
+  const uncertain = cleanUncertain_(partial.uncertain);
+  return {
+    accom: accom,
+    travel: travel,
+    uncertain: uncertain,
+    updatedAt: cleanText_(partial.updatedAt, 40),
+    updatedBy: cleanActor_(partial.updatedBy || actor)
+  };
+}
+
 function sanitizePlan_(plan) {
   const budgets = plan && plan.budgets || {};
+  const partials = plan && plan.partials || {};
   return {
     id: cleanText_(plan && plan.id, 80) || Utilities.getUuid(),
     meta: sanitizePlanMeta_(plan && plan.meta || {}),
     budgets: {
       Principessa: cleanMoney_(budgets.Principessa),
       Principe: cleanMoney_(budgets.Principe)
+    },
+    partials: {
+      Principessa: sanitizePartialActual_(partials.Principessa, 'Principessa'),
+      Principe: sanitizePartialActual_(partials.Principe, 'Principe')
     },
     linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
     createdAt: cleanText_(plan && plan.createdAt, 40),

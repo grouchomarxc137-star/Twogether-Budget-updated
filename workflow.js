@@ -173,31 +173,49 @@
     return d>0 ? {text:`${money(d)} under budget`,cls:'under'} : {text:`${money(Math.abs(d))} over budget`,cls:'over'};
   }
 
+  function partialSummary(partial){
+    if(!partial)return '';
+    const parts=[];
+    if(partial.accom!==''&&partial.accom!=null)parts.push(`Accommodation ${money(partial.accom)}`);
+    if(partial.travel!==''&&partial.travel!=null)parts.push(`Flights / Train ${money(partial.travel)}`);
+    return parts.join(' · ');
+  }
+
+  function hasPartial(partial){
+    return !!partialSummary(partial);
+  }
+
   function renderBudgetPlans(){
     installUi();
     const section=$('#budgetPlannerSection'); const root=$('#budgetPlanGrid');
     if(!section||!root) return;
     if(sharedState.version<4){ section.classList.add('hidden'); root.innerHTML=''; return; }
     section.classList.remove('hidden');
-    const plans=[...sharedState.plans].filter(plan=>!isLocked(tripForPlan(plan))).sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
+    const plans=[...sharedState.plans].sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
     if(!plans.length){ root.innerHTML='<div class="budget-empty">No planned trip budgets yet. Create one before your next trip.</div>'; return; }
+    const visiblePlans=plans.filter(plan=>!isLocked(tripForPlan(plan)));
     const a=actor();
-    root.innerHTML=plans.map(plan=>{
+    const emptyActive=visiblePlans.length?'':'<div class="budget-empty">No active trip budgets right now. Your confirmed budgets stay inside their trip pages.</div>';
+    root.innerHTML=emptyActive+plans.map(plan=>{
       const meta=plan.meta||{}; const trip=tripForPlan(plan); const locked=isLocked(trip);
       const pBudget=plan?.budgets?.Principessa??''; const qBudget=plan?.budgets?.Principe??'';
       const pActual=trip?.submissions?.Principessa?.paid??''; const qActual=trip?.submissions?.Principe?.paid??'';
+      const pPartial=plan?.partials?.Principessa||null; const qPartial=plan?.partials?.Principe||null;
+      const pEarly=partialSummary(pPartial), qEarly=partialSummary(qPartial);
       const pv=variance(pBudget,pActual), qv=variance(qBudget,qActual);
       const bothBudgets=pBudget!==''&&qBudget!==''; const bothActual=pActual!==''&&qActual!=='';
       const totalVar=bothBudgets&&bothActual?variance(n(pBudget)+n(qBudget),n(pActual)+n(qActual)):{text:bothBudgets?'Waiting for both actual spends':'Waiting for both budgets',cls:''};
       const ownBudget=plan?.budgets?.[a]??''; const ownSub=trip?.submissions?.[a]||null;
-      const status=trip?'Trip expenses in progress':'Waiting for the trip';
+      const ownPartial=plan?.partials?.[a]||null; const ownStarted=hasPartial(ownPartial);
+      const anyPartial=hasPartial(pPartial)||hasPartial(qPartial);
+      const status=trip?'Trip expenses in progress':anyPartial?'Some expenses logged':'Waiting for the trip';
       const combinedPlanned=bothBudgets ? money(n(pBudget)+n(qBudget)) : 'Waiting for both budgets';
-      return `<article class="budget-plan-card" data-v5-plan="${esc(plan.id)}"><div class="budget-plan-top"><div><span class="trip-country">${esc(locationLabel(meta))}</span><h3>${esc(meta.city||locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p></div><span class="budget-plan-status ${trip?'live':''}">${esc(status)}</span></div><div class="v5-reference"><span>Combined planned budget</span><strong>${esc(combinedPlanned)}</strong></div><div class="budget-person-grid"><div class="budget-person ${pv.cls}"><span>Principessa</span><strong>${pBudget===''?'No budget':money(pBudget)}</strong><small>${esc(pv.text)}${pActual!==''?` · actual ${money(pActual)}`:''}</small></div><div class="budget-person ${qv.cls}"><span>Principe</span><strong>${qBudget===''?'No budget':money(qBudget)}</strong><small>${esc(qv.text)}${qActual!==''?` · actual ${money(qActual)}`:''}</small></div></div><div class="budget-total-check ${totalVar.cls}"><span>Combined</span><strong>${esc(totalVar.text)}</strong></div><div class="budget-plan-actions">${a?`<button class="btn ghost" type="button" data-v5-own-budget>${ownBudget===''?'Add my budget':'Edit my budget'}</button>`:''}${a&&!locked&&ownBudget!==''?`<button class="btn primary" type="button" data-v5-actual>${ownSub?'Edit my actual expenses':'Log actual expenses'}</button>`:''}${trip?'<button class="btn ghost" type="button" data-v5-open-trip>Open trip</button>':''}</div></article>`;
+      return `<article class="budget-plan-card ${locked?'hidden':''}" data-v5-plan="${esc(plan.id)}"><div class="budget-plan-top"><div><span class="trip-country">${esc(locationLabel(meta))}</span><h3>${esc(meta.city||locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p></div><span class="budget-plan-status ${trip||anyPartial?'live':''}">${esc(status)}</span></div><div class="v5-reference"><span>Combined planned budget</span><strong>${esc(combinedPlanned)}</strong></div><div class="budget-person-grid"><div class="budget-person ${pv.cls}"><span>Principessa</span><strong>${pBudget===''?'No budget':money(pBudget)}</strong><small>${esc(pv.text)}${pActual!==''?` · actual ${money(pActual)}`:''}${pEarly?` · saved early: ${esc(pEarly)}`:''}</small></div><div class="budget-person ${qv.cls}"><span>Principe</span><strong>${qBudget===''?'No budget':money(qBudget)}</strong><small>${esc(qv.text)}${qActual!==''?` · actual ${money(qActual)}`:''}${qEarly?` · saved early: ${esc(qEarly)}`:''}</small></div></div><div class="budget-total-check ${totalVar.cls}"><span>Combined</span><strong>${esc(totalVar.text)}</strong></div><div class="budget-plan-actions">${a&&!ownSub&&!ownStarted?`<button class="btn ghost" type="button" data-v5-own-budget>${ownBudget===''?'Add my budget':'Edit my budget'}</button>`:a&&(ownSub||ownStarted)?'<span class="budget-locked-note">Your planned budget is locked because you already started logging actual expenses.</span>':''}${a&&!locked&&ownBudget!==''?`<button class="btn primary" type="button" data-v5-actual>${ownSub?'Edit my actual expenses':ownStarted?'Continue actual expenses':'Log actual expenses'}</button>`:''}${trip?'<button class="btn ghost" type="button" data-v5-open-trip>Open trip</button>':''}</div></article>`;
     }).join('');
     $$('[data-v5-plan]',root).forEach(card=>{
       const id=card.dataset.v5Plan;
       $('[data-v5-own-budget]',card)?.addEventListener('click',()=>openBudgetOnly(id));
-      $('[data-v5-actual]',card)?.addEventListener('click',()=>startPlanActual(id));
+      $('[data-v5-actual]',card)?.addEventListener('click',()=>startActualChoice(id));
       $('[data-v5-open-trip]',card)?.addEventListener('click',()=>{
         const plan=planById(id); const tripId=plan?.linkedTripId;
         if(tripId) document.querySelector(`[data-open-trip="${CSS.escape(tripId)}"]`)?.click();
@@ -267,19 +285,82 @@
     activeFlow={type:'choosePlan',originalButton};
     const choices=`<div class="v5-choice-stack">${plans.map(plan=>`<button class="trip-pick" type="button" data-v5-plan-actual="${esc(plan.id)}"><span class="pick-icon">↔</span><div><strong>Yes · ${esc(plan.meta?.city||locationLabel(plan.meta))}</strong><small>${fmtDate(plan.meta?.start)}–${fmtDate(plan.meta?.end)} · log the actual expenses</small></div></button>`).join('')}<button class="trip-pick new-trip-pick" type="button" data-v5-really-new><span class="pick-icon">＋</span><div><strong>No · this is a different trip</strong><small>Start the normal new-trip questions.</small></div></button></div>`;
     showOverlay('TRIP TYPE',12,'Is this one of your budgeted trips?','Choose the planned trip to enter its actual expenses, or start a completely new trip.',choices);
-    $$('[data-v5-plan-actual]').forEach(btn=>btn.addEventListener('click',()=>startPlanActual(btn.dataset.v5PlanActual)));
+    $$('[data-v5-plan-actual]').forEach(btn=>btn.addEventListener('click',()=>startActualChoice(btn.dataset.v5PlanActual)));
     $('[data-v5-really-new]')?.addEventListener('click',()=>{
       const btn=activeFlow?.originalButton||originalButton; closeOverlay();
       bypassNewTrip=true; btn.click(); bypassNewTrip=false;
     });
   }
 
+  function startActualChoice(planId){
+    const plan=planById(planId); const a=actor(); if(!plan||!a)return;
+    if(sharedState.version<6){ startPlanActual(planId); return; }
+    const partial=plan?.partials?.[a]||null;
+    const saved=partialSummary(partial);
+    const content=`${saved?`<div class="v5-reference"><span>Already saved for later</span><strong>${esc(saved)}</strong></div>`:''}<div class="v5-choice-stack"><button class="trip-pick" type="button" data-v5-actual-mode="full"><span class="pick-icon">✓</span><div><strong>Log everything now</strong><small>Use the normal full trip-expense wizard.</small></div></button><button class="trip-pick" type="button" data-v5-actual-mode="partial"><span class="pick-icon">＋</span><div><strong>Log some expenses now</strong><small>Save accommodation and/or Flights / Train now, then finish the rest later.</small></div></button></div>`;
+    showOverlay('ACTUAL EXPENSES',12,'How much do you want to log now?','You can record early bookings now without completing the whole trip.',content);
+    $('[data-v5-actual-mode="full"]')?.addEventListener('click',()=>startPlanActual(planId));
+    $('[data-v5-actual-mode="partial"]')?.addEventListener('click',()=>startPartialActual(planId));
+  }
+
+  function startPartialActual(planId){
+    const plan=planById(planId); const a=actor(); if(!plan||!a)return;
+    const existing=plan?.partials?.[a]||{};
+    activeFlow={type:'partial',planId,stage:'choose',key:'',draft:{accom:existing.accom??'',travel:existing.travel??'',uncertain:{...(existing.uncertain||{})}}};
+    closeBudgetModal();
+    document.querySelector('.tab[data-sheet="log"]')?.click();
+    renderPartialActual();
+    $('#wizardCard')?.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+
+  function renderPartialActual(){
+    const f=activeFlow; if(!f||f.type!=='partial')return;
+    const plan=planById(f.planId); if(!plan)return closeOverlay();
+    const saved=partialSummary(f.draft);
+    if(f.stage==='choose'){
+      const content=`${saved?`<div class="v5-reference"><span>Saved in this session</span><strong>${esc(saved)}</strong></div>`:''}<div class="v5-choice-stack"><button class="trip-pick" type="button" data-v5-partial-key="accom"><span class="pick-icon">⌂</span><div><strong>Accommodation</strong><small>${f.draft.accom!==''?`Currently ${money(f.draft.accom)}`:'Add accommodation cost'}</small></div></button><button class="trip-pick" type="button" data-v5-partial-key="travel"><span class="pick-icon">✈</span><div><strong>Flights / Train</strong><small>${f.draft.travel!==''?`Currently ${money(f.draft.travel)}`:'Add flight or train cost'}</small></div></button></div>${saved?'<div class="v5-actions"><button class="btn ghost" type="button" data-v5-partial-cancel>Cancel</button><button class="btn primary big" type="button" data-v5-partial-save>Save for later</button></div>':''}`;
+      showOverlay('EARLY EXPENSES',24,'What do you want to log?','Choose accommodation or Flights / Train. You can add the other one afterward.',content);
+      $$('[data-v5-partial-key]').forEach(btn=>btn.addEventListener('click',()=>{f.key=btn.dataset.v5PartialKey;f.stage='amount';renderPartialActual();}));
+      $('[data-v5-partial-cancel]')?.addEventListener('click',closeOverlay);
+      $('[data-v5-partial-save]')?.addEventListener('click',savePartialActual);
+      return;
+    }
+    if(f.stage==='more'){
+      const content=`<div class="v5-reference"><span>Saved so far</span><strong>${esc(saved||'—')}</strong></div><div class="v5-choice-stack"><button class="trip-pick" type="button" data-v5-partial-more="yes"><span class="pick-icon">＋</span><div><strong>Yes, log something else</strong><small>Add or update Accommodation or Flights / Train.</small></div></button><button class="trip-pick" type="button" data-v5-partial-more="no"><span class="pick-icon">✓</span><div><strong>No, that’s all for now</strong><small>Save these expenses and finish the trip later.</small></div></button></div>`;
+      showOverlay('EARLY EXPENSES',72,'Anything else to log now?','Your entries stay attached to this budgeted trip until you finish the full expenses.',content);
+      $('[data-v5-partial-more="yes"]')?.addEventListener('click',()=>{f.stage='choose';f.key='';renderPartialActual();});
+      $('[data-v5-partial-more="no"]')?.addEventListener('click',savePartialActual);
+      return;
+    }
+    const key=f.key; const label=MONEY_LABELS[key]; const uncertain=!!f.draft?.uncertain?.[key];
+    const pot=key==='accom'?`<div class="v5-reference" id="v5JointPot"><span>20% available from your joint pot</span><strong>${money(n(f.draft.accom)*.20)}</strong><small>This is informational only; it does not change the accommodation expense.</small></div>`:'';
+    const content=`<div class="money-input-wrap"><span>€</span><input id="v5PartialAmount" class="big-input money-field" inputmode="decimal" value="${esc(String(f.draft[key]??''))}" placeholder="0.00"></div><div class="certainty-row"><button class="certainty ${!uncertain?'active':''}" type="button" data-v5-partial-cert="exact">Exact</button><button class="certainty ${uncertain?'active':''}" type="button" data-v5-partial-cert="estimate">Not sure · estimate</button></div>${pot}<div class="v5-actions"><button class="btn ghost" type="button" data-v5-partial-back>Back</button><button class="btn primary big" type="button" data-v5-partial-next>Next</button></div>`;
+    showOverlay('EARLY EXPENSES',48,`How much was ${label.toLowerCase()}?`,`Budgeted trip: ${plan.meta?.city||locationLabel(plan.meta)} · ${fmtDate(plan.meta?.start)}–${fmtDate(plan.meta?.end)}`,content);
+    const input=$('#v5PartialAmount');
+    input?.addEventListener('input',()=>{f.draft[key]=input.value;if(key==='accom'){const strong=$('#v5JointPot strong');if(strong)strong.textContent=money(n(input.value)*.20);}});
+    setTimeout(()=>input?.focus(),0);
+    $$('[data-v5-partial-cert]').forEach(btn=>btn.addEventListener('click',()=>{f.draft.uncertain={...(f.draft.uncertain||{})};f.draft.uncertain[key]=btn.dataset.v5PartialCert==='estimate';renderPartialActual();}));
+    $('[data-v5-partial-back]')?.addEventListener('click',()=>{f.stage='choose';renderPartialActual();});
+    $('[data-v5-partial-next]')?.addEventListener('click',()=>{const value=String(f.draft[key]??'').trim();if(!value||!Number.isFinite(Number(value.replace(',','.')))){toast('Enter a valid amount first','warn');return;}f.stage='more';renderPartialActual();});
+  }
+
+  async function savePartialActual(){
+    const f=activeFlow; if(!f||f.type!=='partial')return;
+    if(!hasPartial(f.draft)){toast('Add at least one expense first','warn');return;}
+    const btn=$('[data-v5-partial-save],[data-v5-partial-more="no"]'); if(btn)btn.disabled=true;
+    try{
+      await post('savePlanPartial',{planId:f.planId,partial:{accom:f.draft.accom,travel:f.draft.travel,uncertain:{...(f.draft.uncertain||{})}}});
+      closeOverlay(); toast('Saved. You can finish the rest later.');
+      setTimeout(refreshState,750);
+    }catch(err){toast(err.message||'Could not save early expenses','warn');if(btn)btn.disabled=false;}
+  }
+
   function startPlanActual(planId){
     const plan=planById(planId); const a=actor(); if(!plan||!a)return;
-    const trip=tripForPlan(plan); const existing=trip?.submissions?.[a]||{};
+    const trip=tripForPlan(plan); const existing=trip?.submissions?.[a]||{}; const partial=plan?.partials?.[a]||{};
     activeFlow={
       type:'actual', planId, index:0, otherFlow:null,
-      draft:{accom:'',groceries:'',eat:'',travel:'',fuel:'',tolls:'',other:'',otherNote:'',paid:'',uncertain:{},...existing,uncertain:{...(existing.uncertain||{})}}
+      draft:{accom:'',groceries:'',eat:'',travel:'',fuel:'',tolls:'',other:'',otherNote:'',paid:'',uncertain:{},...partial,...existing,uncertain:{...(partial.uncertain||{}),...(existing.uncertain||{})}}
     };
     closeBudgetModal();
     document.querySelector('.tab[data-sheet="log"]')?.click();
