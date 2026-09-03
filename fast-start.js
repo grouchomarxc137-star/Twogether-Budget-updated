@@ -2,11 +2,26 @@
   'use strict';
 
   const ACTOR_KEY = 'twogether_actor_v1';
+  const CACHE_KEY = 'twogether_state_cache_v1';
   const ACTORS = ['Principessa','Principe'];
   const API_URL = String(window.TOGETHER_BUDGET_CONFIG?.appsScriptUrl || '').trim();
+  const app = document.getElementById('app');
 
-  // Restore the remembered identity immediately so the page paints in the right theme
-  // without waiting for the app runtime or backend.
+  // Keep the shell hidden for just the first render cycle so cached data, identity,
+  // monthly totals and budget cards appear together instead of filling in separately.
+  if (app) {
+    app.style.visibility = 'hidden';
+    app.style.opacity = '0';
+  }
+
+  let cachedState = null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    cachedState = raw ? JSON.parse(raw) : null;
+    if (cachedState) window.__TWOGETHER_CACHED_STATE__ = cachedState;
+  } catch {}
+
+  // Restore the remembered identity immediately so the page paints in the right theme.
   try {
     const saved = localStorage.getItem(ACTOR_KEY) || '';
     if (ACTORS.includes(saved)) {
@@ -22,40 +37,95 @@
     }
   } catch {}
 
-  // Do not let Apps Script JSONP requests keep the browser's initial reload open.
-  // Queue only those script requests until the normal window load event has fired.
   const nativeAppend = document.head.appendChild.bind(document.head);
   let initialLoadDone = document.readyState === 'complete';
   const queuedBackendScripts = [];
 
+  function callbackName(src) {
+    try { return new URL(src).searchParams.get('callback') || ''; }
+    catch { return ''; }
+  }
+
+  function rememberResponse(data) {
+    if (!data?.ok || !data.state) return;
+    cachedState = data.state;
+    window.__TWOGETHER_CACHED_STATE__ = data.state;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data.state)); } catch {}
+  }
+
+  function wrapCallback(name) {
+    if (!name || typeof window[name] !== 'function' || window[name].__twogetherWrapped) return;
+    const original = window[name];
+    const wrapped = data => {
+      rememberResponse(data);
+      return original(data);
+    };
+    wrapped.__twogetherWrapped = true;
+    window[name] = wrapped;
+  }
+
+  // During the first load, satisfy Apps Script state requests from the last synced cache.
+  // The real network refresh resumes immediately after load, so reload is instant but data
+  // still stays fresh in the background.
   document.head.appendChild = function(node) {
     const src = node?.tagName === 'SCRIPT' ? String(node.src || '') : '';
-    if (!initialLoadDone && API_URL && src.startsWith(API_URL)) {
-      queuedBackendScripts.push(node);
-      return node;
+    if (API_URL && src.startsWith(API_URL)) {
+      const cb = callbackName(src);
+      wrapCallback(cb);
+
+      if (!initialLoadDone && cachedState && cb && typeof window[cb] === 'function') {
+        queueMicrotask(() => {
+          if (typeof window[cb] === 'function') window[cb]({ok:true,state:cachedState});
+        });
+        return node;
+      }
+
+      if (!initialLoadDone) {
+        queuedBackendScripts.push(node);
+        return node;
+      }
     }
     return nativeAppend(node);
   };
 
+  function releaseQueuedRequests() {
+    while (queuedBackendScripts.length) {
+      const node = queuedBackendScripts.shift();
+      const cb = callbackName(String(node.src || ''));
+      wrapCallback(cb);
+      nativeAppend(node);
+    }
+  }
+
+  function revealApp() {
+    if (!app) return;
+    app.style.transition = 'opacity .12s ease';
+    app.style.visibility = 'visible';
+    app.style.opacity = '1';
+  }
+
   function finishInitialLoad() {
     if (initialLoadDone) return;
     initialLoadDone = true;
-    // Give the browser one frame to finish painting before background sync begins.
     requestAnimationFrame(() => {
-      while (queuedBackendScripts.length) nativeAppend(queuedBackendScripts.shift());
+      releaseQueuedRequests();
+      setTimeout(revealApp, 0);
     });
   }
 
   if (initialLoadDone) {
     queueMicrotask(() => {
-      while (queuedBackendScripts.length) nativeAppend(queuedBackendScripts.shift());
+      releaseQueuedRequests();
+      revealApp();
     });
   } else {
     window.addEventListener('load', finishInitialLoad, {once:true});
+    // DOMContentLoaded lets the cached app render first; reveal on the next task so
+    // all DOMContentLoaded handlers have finished hydrating their sections.
+    window.addEventListener('DOMContentLoaded', () => setTimeout(revealApp, 0), {once:true});
   }
 
-  // Crimson Pro stays the chosen font, but loading Google Fonts is now background work
-  // and no longer blocks the page from finishing its reload.
+  // Crimson Pro remains the active font but stays non-blocking for reload speed.
   function loadFont() {
     if (document.getElementById('twogetherCrimsonFont')) return;
     const link = document.createElement('link');
