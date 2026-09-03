@@ -1,0 +1,26 @@
+name: Apply guarded Twogether matching fix
+
+on:
+  push:
+    paths:
+      - 'maintenance/apply_match_amount_only.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply matching patch
+        run: python maintenance/apply_match_amount_only.py
+      - name: Validate JavaScript syntax
+        run: node --check workflow.js
+      - name: Commit validated patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189823+github-actions[bot]@users.noreply.github.com"
+          git add workflow.js index.html
+          git diff --cached --quiet || git commit -m "Match amount and certainty in one step"
+          git push
