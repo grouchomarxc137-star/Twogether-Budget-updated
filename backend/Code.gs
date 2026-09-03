@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 2,
+    version: 3,
     trips: [],
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
@@ -17,27 +17,32 @@ function defaultState_() {
 }
 
 function readState_() {
-  const raw = PropertiesService.getScriptProperties().getProperty(STATE_KEY);
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(STATE_KEY);
   if (!raw) return defaultState_();
+
   try {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
-    return {
-      version: 2,
+    const state = {
+      version: 3,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
       audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
     };
+
+    if (Array.isArray(parsed.audit) && parsed.audit.length > MAX_AUDIT) {
+      props.setProperty(STATE_KEY, JSON.stringify(state));
+    }
+    return state;
   } catch (err) {
     return defaultState_();
   }
 }
 
 function migrateTrip_(trip) {
-  if (trip && trip.submissions) {
-    return sanitizeTripRecord_(trip);
-  }
+  if (trip && trip.submissions) return sanitizeTripRecord_(trip);
 
   const who = cleanActor_(trip && (trip.updatedBy || trip.createdBy));
   const actor = who === 'Unknown' ? 'Principessa' : who;
@@ -59,12 +64,15 @@ function migrateTrip_(trip) {
     uncertain: {}
   }, actor);
 
+  const now = new Date().toISOString();
   const out = {
     id: cleanText_(trip && trip.id, 80) || Utilities.getUuid(),
+    budget: cleanMoney_(trip && trip.budget),
     submissions: {Principessa:null, Principe:null},
-    createdAt: cleanText_(trip && trip.createdAt, 40) || new Date().toISOString(),
+    confirmed: {Principessa:false, Principe:false},
+    createdAt: cleanText_(trip && trip.createdAt, 40) || now,
     createdBy: cleanActor_(trip && trip.createdBy) === 'Unknown' ? actor : cleanActor_(trip && trip.createdBy),
-    updatedAt: cleanText_(trip && trip.updatedAt, 40) || new Date().toISOString(),
+    updatedAt: cleanText_(trip && trip.updatedAt, 40) || now,
     updatedBy: cleanActor_(trip && trip.updatedBy) === 'Unknown' ? actor : cleanActor_(trip && trip.updatedBy)
   };
   out.submissions[actor] = submission;
@@ -72,7 +80,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 2;
+  state.version = 3;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   PropertiesService.getScriptProperties().setProperty(STATE_KEY, JSON.stringify(state));
@@ -92,7 +100,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:2, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:3, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -123,10 +131,15 @@ function doPost(e) {
 
       if (idx >= 0) {
         trip = sanitizeTripRecord_(state.trips[idx]);
+        if (trip.confirmed.Principessa && trip.confirmed.Principe) {
+          throw new Error('This trip is already confirmed by both of you');
+        }
       } else {
         trip = {
           id: Utilities.getUuid(),
+          budget: cleanMoney_(payload.budget),
           submissions: {Principessa:null, Principe:null},
+          confirmed: {Principessa:false, Principe:false},
           createdAt: now,
           createdBy: actor,
           updatedAt: now,
@@ -140,12 +153,51 @@ function doPost(e) {
       incoming.submittedAt = now;
       incoming.submittedBy = actor;
       trip.submissions[actor] = incoming;
+      trip.confirmed = {Principessa:false, Principe:false};
       trip.updatedAt = now;
       trip.updatedBy = actor;
       state.trips[idx] = trip;
       addAudit_(state, actor, wasExisting ? 'updateSubmission' : 'addSubmission', trip.id);
       saveState_(state);
       return output_({ok:true, tripId:trip.id});
+    }
+
+    if (action === 'confirmTrip') {
+      const id = cleanText_(payload.id, 80);
+      const idx = state.trips.findIndex(t => t.id === id);
+      if (idx < 0) throw new Error('Trip not found');
+      const trip = sanitizeTripRecord_(state.trips[idx]);
+      if (!trip.submissions.Principessa || !trip.submissions.Principe) {
+        throw new Error('Both versions must be logged before confirming');
+      }
+      if (!submissionsMatch_(trip.submissions.Principessa, trip.submissions.Principe)) {
+        throw new Error('Your versions still differ. Edit them until they match first.');
+      }
+      trip.confirmed[actor] = true;
+      trip.updatedAt = new Date().toISOString();
+      trip.updatedBy = actor;
+      state.trips[idx] = trip;
+      addAudit_(state, actor, 'confirmTrip', trip.id);
+      saveState_(state);
+      return output_({ok:true});
+    }
+
+    if (action === 'updateTripBudget') {
+      const id = cleanText_(payload.id, 80);
+      const idx = state.trips.findIndex(t => t.id === id);
+      if (idx < 0) throw new Error('Trip not found');
+      const trip = sanitizeTripRecord_(state.trips[idx]);
+      if (trip.confirmed.Principessa && trip.confirmed.Principe) {
+        throw new Error('This trip is already confirmed by both of you');
+      }
+      trip.budget = cleanMoney_(payload.budget);
+      trip.confirmed = {Principessa:false, Principe:false};
+      trip.updatedAt = new Date().toISOString();
+      trip.updatedBy = actor;
+      state.trips[idx] = trip;
+      addAudit_(state, actor, 'updateTripBudget', trip.id);
+      saveState_(state);
+      return output_({ok:true});
     }
 
     if (action === 'upsertTrip') {
@@ -162,11 +214,17 @@ function doPost(e) {
       const now = new Date().toISOString();
       let idx = tripId ? state.trips.findIndex(t => t.id === tripId) : -1;
       let trip = idx >= 0 ? sanitizeTripRecord_(state.trips[idx]) : {
-        id: Utilities.getUuid(), submissions:{Principessa:null,Principe:null},
+        id: Utilities.getUuid(), budget:'', submissions:{Principessa:null,Principe:null},
+        confirmed:{Principessa:false,Principe:false},
         createdAt:now, createdBy:actor, updatedAt:now, updatedBy:actor
       };
+      if (trip.confirmed.Principessa && trip.confirmed.Principe) {
+        throw new Error('This trip is already confirmed by both of you');
+      }
       trip.submissions[actor] = submission;
-      trip.updatedAt = now; trip.updatedBy = actor;
+      trip.confirmed = {Principessa:false, Principe:false};
+      trip.updatedAt = now;
+      trip.updatedBy = actor;
       if (idx >= 0) state.trips[idx] = trip; else state.trips.push(trip);
       addAudit_(state, actor, 'addSubmission', trip.id);
       saveState_(state);
@@ -214,7 +272,7 @@ function cleanText_(value, maxLen) {
 function cleanMoney_(value) {
   if (value === '' || value == null || value === '-') return '';
   const num = Number(String(value).replace(',', '.'));
-  return isFinite(num) ? num : '';
+  return isFinite(num) && num >= 0 ? num : '';
 }
 
 function cleanUncertain_(obj) {
@@ -249,7 +307,12 @@ function sanitizeSubmission_(s, actor) {
 function sanitizeTripRecord_(t) {
   const out = {
     id: cleanText_(t && t.id, 80) || Utilities.getUuid(),
+    budget: cleanMoney_(t && t.budget),
     submissions: {Principessa:null, Principe:null},
+    confirmed: {
+      Principessa: !!(t && t.confirmed && t.confirmed.Principessa),
+      Principe: !!(t && t.confirmed && t.confirmed.Principe)
+    },
     createdAt: cleanText_(t && t.createdAt, 40),
     createdBy: cleanActor_(t && t.createdBy),
     updatedAt: cleanText_(t && t.updatedAt, 40),
@@ -262,7 +325,18 @@ function sanitizeTripRecord_(t) {
   return out;
 }
 
+function submissionsMatch_(a, b) {
+  for (let i = 0; i < MONEY_FIELDS.length; i++) {
+    const k = MONEY_FIELDS[i];
+    if (Math.abs(Number(a[k] || 0) - Number(b[k] || 0)) > 0.01) return false;
+    if (!!(a.uncertain && a.uncertain[k]) !== !!(b.uncertain && b.uncertain[k])) return false;
+  }
+  if (String(a.otherNote || '').trim().toLowerCase() !== String(b.otherNote || '').trim().toLowerCase()) return false;
+  return true;
+}
+
 function addAudit_(state, actor, action, ref) {
+  state.audit = Array.isArray(state.audit) ? state.audit : [];
   state.audit.push({
     id: Utilities.getUuid(), actor: actor, action: action,
     ref: String(ref || ''), at: new Date().toISOString()
