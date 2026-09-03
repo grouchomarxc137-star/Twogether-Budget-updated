@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 6,
+    version: 7,
     trips: [],
     plans: [],
     compare: {
@@ -26,7 +26,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 6,
+      version: 7,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       compare: Object.assign(base.compare, parsed.compare || {}),
@@ -82,7 +82,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 6;
+  state.version = 7;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -103,7 +103,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:6, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:7, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -194,12 +194,14 @@ function doPost(e) {
       const previous = plan.partials && plan.partials[actor] ? plan.partials[actor] : {};
       const incoming = payload.partial || {};
       const merged = Object.assign({}, previous);
-      if (incoming.accom !== undefined) merged.accom = incoming.accom;
-      if (incoming.travel !== undefined) merged.travel = incoming.travel;
+      MONEY_FIELDS.forEach(function(key) {
+        if (incoming[key] !== undefined) merged[key] = incoming[key];
+      });
+      if (incoming.otherNote !== undefined) merged.otherNote = incoming.otherNote;
       merged.uncertain = Object.assign({}, previous.uncertain || {}, incoming.uncertain || {});
       merged.updatedAt = new Date().toISOString();
       const partial = sanitizePartialActual_(merged, actor);
-      if (!partial) throw new Error('Add accommodation or Flights / Train first');
+      if (!partial) throw new Error('Add at least one expense first');
       plan.partials[actor] = partial;
       plan.updatedAt = merged.updatedAt;
       plan.updatedBy = actor;
@@ -242,8 +244,10 @@ function doPost(e) {
       const submitted = Object.assign({}, payload.submission || {});
       const partial = plan.partials && plan.partials[actor] ? plan.partials[actor] : null;
       if (partial) {
-        if (submitted.accom === '' || submitted.accom == null) submitted.accom = partial.accom;
-        if (submitted.travel === '' || submitted.travel == null) submitted.travel = partial.travel;
+        MONEY_FIELDS.forEach(function(key) {
+          if ((submitted[key] === '' || submitted[key] == null) && partial[key] !== '' && partial[key] != null) submitted[key] = partial[key];
+        });
+        if (!submitted.otherNote && partial.otherNote) submitted.otherNote = partial.otherNote;
         submitted.uncertain = Object.assign({}, partial.uncertain || {}, submitted.uncertain || {});
       }
       const merged = Object.assign({}, submitted, plan.meta || {});
@@ -443,17 +447,18 @@ function sanitizePlanMeta_(meta) {
 
 function sanitizePartialActual_(partial, actor) {
   if (!partial || typeof partial !== 'object') return null;
-  const accom = cleanMoney_(partial.accom);
-  const travel = cleanMoney_(partial.travel);
-  if (accom === '' && travel === '') return null;
-  const uncertain = cleanUncertain_(partial.uncertain);
-  return {
-    accom: accom,
-    travel: travel,
-    uncertain: uncertain,
+  const out = {
+    otherNote: cleanText_(partial.otherNote, 200),
+    uncertain: cleanUncertain_(partial.uncertain),
     updatedAt: cleanText_(partial.updatedAt, 40),
     updatedBy: cleanActor_(partial.updatedBy || actor)
   };
+  let hasAny = false;
+  MONEY_FIELDS.forEach(function(key) {
+    out[key] = cleanMoney_(partial[key]);
+    if (out[key] !== '') hasAny = true;
+  });
+  return hasAny ? out : null;
 }
 
 function sanitizePlan_(plan) {
