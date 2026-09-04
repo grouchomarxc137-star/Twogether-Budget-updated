@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="live.css?v=1">
-<link rel="stylesheet" href="finance.css?v=4">
+<link rel="stylesheet" href="finance.css?v=5">
 <link rel="stylesheet" href="navigation.css?v=2">
-<link rel="stylesheet" href="wishlist.css?v=1">
+<link rel="stylesheet" href="wishlist.css?v=2">
 </head>
 <body>
 <div class="app" id="app">
@@ -95,15 +95,16 @@
     </section>
 
     <section id="finances" class="sheet finance-page">
-      <div class="finance-hero">
-        <div><span class="eyebrow">PERSONAL MONEY</span><h1>My finances</h1><p>Keep monthly finances, balances, loans and purchase ideas organised in separate pages.</p></div>
-      </div>
       <div class="finance-subview active" data-fin-view="overview">
+        <div class="finance-hero">
+          <div><span class="eyebrow">PERSONAL MONEY</span><h1>My finances</h1><p>Keep monthly finances, balances, loans and purchase ideas organised in separate pages.</p></div>
+        </div>
         <div id="financeSummary" class="finance-summary"></div>
         <p class="finance-overview-note">Use the pages above when you want to update a month, check balances and loans, or test a possible purchase.</p>
       </div>
 
       <div class="finance-subview" data-fin-view="monthly">
+        <div class="finance-subpage-heading"><span class="eyebrow">MONTH BY MONTH</span><h1>Monthly finances</h1><p>Review, edit and confirm your personal finances one month at a time.</p></div>
         <div class="finance-grid">
           <div class="wizard-card finance-wizard" id="financeWizardCard">
             <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="financeWizardStep">Monthly finances</div><div class="wizard-progress"><span id="financeWizardProgress"></span></div></div><button class="text-btn" id="restartFinanceWizard" type="button">Start over</button></div>
@@ -118,14 +119,17 @@
       </div>
 
       <div class="finance-subview" data-fin-view="balances">
+        <div class="finance-subpage-heading"><span class="eyebrow">CURRENT POSITION</span><h1>Balances & loans</h1><p>Keep track of cash, savings on hold, investments and money that still needs to be paid back to you.</p></div>
         <section id="financeCurrent" class="finance-current"></section>
       </div>
 
       <div class="finance-subview" data-fin-view="scenarios">
+        <div class="finance-subpage-heading"><span class="eyebrow">WHAT IF?</span><h1>Test scenarios</h1><p>Test a possible purchase against your Main account leftover, available savings and usual monthly leftover.</p></div>
         <section id="financeScenarios"></section>
       </div>
 
       <div class="finance-subview" data-fin-view="wishlist">
+        <div class="finance-subpage-heading"><span class="eyebrow">LATER</span><h1>Wishlist</h1><p>Keep things you may want to buy later without adding them to your budget yet.</p></div>
         <section id="financeWishlist"></section>
       </div>
     </section>
@@ -141,9 +145,9 @@
 <script src="fast-start.js?v=2"></script>
 <script src="app.js?v=2" defer></script>
 <script src="workflow.js?v=10" defer></script>
-<script src="ui.js?v=4" defer></script>
+<script src="ui.js?v=5" defer></script>
 <script src="finances.js?v=9" defer></script>
-<script src="wishlist.js?v=1" defer></script>
+<script src="wishlist.js?v=2" defer></script>
 <script src="navigation.js?v=4" defer></script>
 </body>
 </html>

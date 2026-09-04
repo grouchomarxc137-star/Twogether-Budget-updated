@@ -302,32 +302,11 @@
     const header=document.querySelector('[data-v5-new-plan]');
     const grid=document.getElementById('budgetPlanGrid');
     if(!header||!grid)return;
-    const current=actor();
-    const index=current==='Principessa'?0:1;
     const openCards=[...grid.querySelectorAll('.budget-plan-card')].filter(card=>!card.classList.contains('hidden'));
-    const card=openCards[0]||null;
-    if(!card){
-      header.textContent='Plan a trip budget';
-      header.disabled=false;
-      header.dataset.v6Mode='new';
-      delete header.dataset.v6PlanId;
-      return;
-    }
-    const mine=[...card.querySelectorAll('.budget-person')][index];
-    const hasActual=/\bactual\s+€|saved early:/i.test(mine?.querySelector('small')?.textContent||'');
-    const ownButton=card.querySelector('[data-v5-own-budget]');
-    if(hasActual){
-      header.textContent='Budget locked';
-      header.disabled=true;
-      header.dataset.v6Mode='locked';
-      return;
-    }
-    if(ownButton){
-      header.textContent=ownButton.textContent.trim();
-      header.disabled=false;
-      header.dataset.v6Mode='existing';
-      header.dataset.v6PlanId=card.dataset.v5Plan||'';
-    }
+    header.textContent=openCards.length?'Plan another trip budget':'Plan a trip budget';
+    header.disabled=false;
+    header.dataset.v6Mode='new';
+    delete header.dataset.v6PlanId;
   }
 
   function refreshBudgetUi(){

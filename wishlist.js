@@ -60,14 +60,32 @@
     return Array.isArray(list)?list.map(x=>({id:x.id||uid(),name:String(x.name||''),price:x.price??'',note:String(x.note||''),createdAt:String(x.createdAt||'')})).filter(x=>x.name):[];
   }
 
+
+  function wishlistNoteParts(value){
+    const note=String(value||'').trim();
+    if(!note)return {text:'',link:''};
+    const match=note.match(/https?:\/\/\S+/i);
+    if(!match)return {text:note,link:''};
+    const link=match[0];
+    const text=(note.slice(0,match.index)+note.slice((match.index||0)+link.length)).trim().replace(/^[-–—·|:,;\s]+|[-–—·|:,;\s]+$/g,'');
+    return {text,link};
+  }
+
+  function wishlistNoteHtml(value){
+    const parts=wishlistNoteParts(value);
+    const text=parts.text?`<span class="wishlist-note-text">${esc(parts.text)}</span>`:'';
+    const link=parts.link?`<a class="wishlist-open-link" href="${esc(parts.link)}" target="_blank" rel="noopener noreferrer">Open link ↗</a>`:'';
+    return text||link?`${text}${link}`:'<span class="wishlist-muted">—</span>';
+  }
+
   function render(){
     const root=$('#financeWishlist'); if(!root) return;
     const a=actor();
     if(!a){root.innerHTML='<div class="finance-current-empty">Choose Principessa or Principe first.</div>';return;}
     const priced=items.filter(x=>x.price!==''&&x.price!=null);
     const total=priced.reduce((sum,x)=>sum+n(x.price),0);
-    const cards=items.length?items.map((x,i)=>`<button class="wishlist-card" type="button" data-wish-index="${i}"><div class="wishlist-card-top"><span class="panel-kicker">WISH</span><strong>${x.price!==''&&x.price!=null?money(x.price):'Price not set'}</strong></div><h3>${esc(x.name)}</h3>${x.note?`<p>${esc(x.note)}</p>`:'<p class="wishlist-muted">No note added.</p>'}</button>`).join(''):'<div class="wishlist-empty"><span>♡</span><h3>Your wishlist is empty</h3><p>Add things you might want to buy later without putting them into your budget yet.</p></div>';
-    root.innerHTML=`<div class="wishlist-wrap"><div class="wishlist-head"><div><span class="panel-kicker">LATER</span><h2>${esc(a)}’s wishlist</h2><p>Keep future wants here. Wishlist items do not affect your budget, savings, or net worth.</p></div><button class="btn primary" type="button" data-wish-add>+ Add wish</button></div><div class="wishlist-summary"><strong>${items.length}</strong><span>${items.length===1?'item':'items'}</span><strong>${priced.length?money(total):'—'}</strong><span>estimated total</span></div><div class="wishlist-grid">${cards}</div></div>`;
+    const rows=items.length?items.map((x,i)=>`<tr><td class="wishlist-item-name"><strong>${esc(x.name)}</strong></td><td class="wishlist-note-cell">${wishlistNoteHtml(x.note)}</td><td class="wishlist-price-cell">${x.price!==''&&x.price!=null?money(x.price):'—'}</td><td class="wishlist-edit-cell"><button class="wishlist-edit-btn" type="button" data-wish-index="${i}" aria-label="Edit ${esc(x.name)}">Edit</button></td></tr>`).join(''):`<tr><td colspan="4"><div class="wishlist-empty-row">Your wishlist is empty. Add something you may want to buy later.</div></td></tr>`;
+    root.innerHTML=`<div class="wishlist-wrap"><div class="wishlist-head"><div><h2>${esc(a)}’s wishlist</h2><p>Wishlist items are informational only and do not affect your budget, savings or net worth.</p></div><button class="btn primary" type="button" data-wish-add>+ Add wish</button></div><div class="wishlist-table-wrap"><table class="wishlist-table"><thead><tr><th>Item</th><th>Note / Link</th><th>Estimated price</th><th class="wishlist-edit-head">Edit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total</strong><small>${items.length} ${items.length===1?'item':'items'}</small></td><td class="wishlist-price-cell"><strong>${priced.length?money(total):'—'}</strong></td><td></td></tr></tfoot></table></div></div>`;
     $('[data-wish-add]',root)?.addEventListener('click',()=>openModal(-1));
     root.querySelectorAll('[data-wish-index]').forEach(btn=>btn.addEventListener('click',()=>openModal(Number(btn.dataset.wishIndex))));
   }
