@@ -5,7 +5,7 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 13,
+    version: 14,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
@@ -31,7 +31,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 13,
+      version: 14,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -89,7 +89,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 13;
+  state.version = 14;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -491,29 +491,48 @@ function sanitizeFinanceReserved_(item) {
   return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
 }
 
+function sanitizeFinanceExtraSpend_(item) {
+  const sourceRaw = String(item && item.source || '');
+  const source = sourceRaw === 'creditcard' || sourceRaw === 'savings' || sourceRaw === 'main' ? sourceRaw : '';
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    source: source,
+    amount: cleanMoney_(item && item.amount)
+  };
+}
+
 function sanitizeFinanceMonth_(record, actor) {
   const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
   let expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
+  const rawBudget = cleanMoney_(record && record.extraBudget);
+  const extraBudget = rawBudget === '' ? 250 : rawBudget;
   let foundFixedExtra = false;
   expenses = expenses.filter(function(x){
     if (x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') {
       if (foundFixedExtra) return false;
       foundFixedExtra = true;
-      x.amount = 250;
+      x.amount = extraBudget;
     }
     return true;
   });
-  if (!foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:250});
-  const sourceRaw = String(record && record.extraOverspendSource || '');
-  const extraOverspendSource = sourceRaw === 'creditcard' || sourceRaw === 'savings' || sourceRaw === 'main' ? sourceRaw : '';
-  const extraOverspendAmount = cleanMoney_(record && record.extraOverspendAmount);
+  if (!foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget});
+
+  let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return x.source && x.amount !== '' && Number(x.amount) > 0; }) : [];
+  if (!extraSpends.length) {
+    const legacySourceRaw = String(record && record.extraOverspendSource || '');
+    const legacySource = legacySourceRaw === 'creditcard' || legacySourceRaw === 'savings' || legacySourceRaw === 'main' ? legacySourceRaw : '';
+    const legacyAmount = cleanMoney_(record && record.extraOverspendAmount);
+    if (legacySource && legacyAmount !== '' && Number(legacyAmount) > 0) extraSpends.push({id:Utilities.getUuid(),source:legacySource,amount:legacyAmount});
+  }
+  const legacyTotal = extraSpends.reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
   return {
     month: cleanText_(record && record.month, 10),
     incomes: incomes,
     expenses: expenses,
-    extraBudget: 250,
-    extraOverspendSource: extraOverspendSource,
-    extraOverspendAmount: extraOverspendAmount === '' ? 0 : extraOverspendAmount,
+    extraBudget: extraBudget,
+    extraSpends: extraSpends,
+    extraOverspendSource: extraSpends.length ? extraSpends[0].source : '',
+    extraOverspendAmount: legacyTotal,
     investmentTotal: cleanMoney_(record && record.investmentTotal),
     sisterInvestments: cleanMoney_(record && record.sisterInvestments),
     finalized: !!(record && record.finalized === true),
@@ -523,7 +542,7 @@ function sanitizeFinanceMonth_(record, actor) {
   };
 }
 
-function sanitizeFinanceList_(list, actor) {
+  function sanitizeFinanceList_(list, actor) {
   if (!Array.isArray(list)) return [];
   const byMonth = {};
   list.slice(-36).forEach(function(record) {

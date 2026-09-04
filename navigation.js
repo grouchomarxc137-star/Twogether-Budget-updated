@@ -9,6 +9,7 @@
   function setHub(name){
     $$('[data-hub]').forEach(btn=>btn.classList.toggle('active',btn.dataset.hub===name));
     $('#tripSubnav')?.classList.toggle('hidden',name!=='trips');
+    $('#financeSubnav')?.classList.toggle('hidden',name!=='finances');
   }
 
   function activateTrip(sheet){

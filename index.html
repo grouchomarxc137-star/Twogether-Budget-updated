@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="live.css?v=1">
 <link rel="stylesheet" href="finance.css?v=4">
-<link rel="stylesheet" href="navigation.css?v=1">
+<link rel="stylesheet" href="navigation.css?v=2">
 </head>
 <body>
 <div class="app" id="app">
@@ -27,6 +27,12 @@
     <button class="tab active" data-sheet="log" type="button">Log trip</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
+  </nav>
+  <nav class="tabs finance-subnav hidden" id="financeSubnav" role="tablist" aria-label="Finance pages">
+    <button class="tab active" type="button" data-fin-subview="overview">Overview</button>
+    <button class="tab" type="button" data-fin-subview="monthly">Monthly finances</button>
+    <button class="tab" type="button" data-fin-subview="balances">Balances & loans</button>
+    <button class="tab" type="button" data-fin-subview="scenarios">Test scenarios</button>
   </nav>
 
   <main class="main">
@@ -90,13 +96,6 @@
       <div class="finance-hero">
         <div><span class="eyebrow">PERSONAL MONEY</span><h1>My finances</h1><p>Keep monthly finances, balances, loans and purchase ideas organised in separate pages.</p></div>
       </div>
-      <nav class="finance-subnav" aria-label="Finance pages">
-        <button class="active" type="button" data-fin-subview="overview">Overview</button>
-        <button type="button" data-fin-subview="monthly">Monthly finances</button>
-        <button type="button" data-fin-subview="balances">Balances & loans</button>
-        <button type="button" data-fin-subview="scenarios">Test scenarios</button>
-      </nav>
-
       <div class="finance-subview active" data-fin-view="overview">
         <div id="financeSummary" class="finance-summary"></div>
         <p class="finance-overview-note">Use the pages above when you want to update a month, check balances and loans, or test a possible purchase.</p>
@@ -137,7 +136,7 @@
 <script src="app.js?v=2" defer></script>
 <script src="workflow.js?v=10" defer></script>
 <script src="ui.js?v=4" defer></script>
-<script src="finances.js?v=8" defer></script>
-<script src="navigation.js?v=1" defer></script>
+<script src="finances.js?v=9" defer></script>
+<script src="navigation.js?v=2" defer></script>
 </body>
 </html>
