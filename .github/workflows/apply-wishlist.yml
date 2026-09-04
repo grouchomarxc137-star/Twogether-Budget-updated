@@ -1,0 +1,237 @@
+name: Apply wishlist feature
+
+on:
+  push:
+    branches: [feature-wishlist]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-wishlist
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply wishlist changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # index.html
+          p = Path('index.html')
+          s = p.read_text()
+          old = '<link rel="stylesheet" href="navigation.css?v=2">'
+          assert old in s
+          s = s.replace(old, old + '\n<link rel="stylesheet" href="wishlist.css?v=1">', 1)
+
+          old = '    <button class="tab" data-sheet="finances" type="button" data-fin-subview="scenarios">Test scenarios</button>\n'
+          assert old in s
+          s = s.replace(old, old + '    <button class="tab" data-sheet="finances" type="button" data-fin-subview="wishlist">Wishlist</button>\n', 1)
+
+          old = '      <div class="finance-subview" data-fin-view="scenarios">\n        <section id="financeScenarios"></section>\n      </div>\n'
+          assert old in s
+          s = s.replace(old, old + '\n      <div class="finance-subview" data-fin-view="wishlist">\n        <section id="financeWishlist"></section>\n      </div>\n', 1)
+
+          old = '<script src="finances.js?v=9" defer></script>\n<script src="navigation.js?v=3" defer></script>'
+          assert old in s
+          s = s.replace(old, '<script src="finances.js?v=9" defer></script>\n<script src="wishlist.js?v=1" defer></script>\n<script src="navigation.js?v=4" defer></script>', 1)
+          p.write_text(s)
+
+          # navigation.js
+          p = Path('navigation.js')
+          s = p.read_text()
+          old = "const valid=['overview','monthly','balances','scenarios'];"
+          assert old in s
+          s = s.replace(old, "const valid=['overview','monthly','balances','scenarios','wishlist'];", 1)
+          p.write_text(s)
+
+          # backend/Code.gs
+          p = Path('backend/Code.gs')
+          s = p.read_text()
+          assert 'version: 14' in s
+          s = s.replace('version: 14', 'version: 15')
+          s = s.replace("Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]}", "Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]}")
+          s = s.replace("Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]}", "Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]}")
+
+          marker = "function sanitizeFinanceProfile_(profile, actor) {"
+          assert marker in s
+          insert = """function sanitizeFinanceWishlistItem_(item) {
+            return {
+              id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+              name: cleanText_(item && item.name, 160),
+              price: cleanMoney_(item && item.price),
+              note: cleanText_(item && item.note, 300),
+              createdAt: cleanText_(item && item.createdAt, 40)
+            };
+          }
+
+          """
+          s = s.replace(marker, insert + marker, 1)
+          old = "    scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],\n"
+          assert old in s
+          s = s.replace(old, old + "    wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],\n", 1)
+          p.write_text(s)
+
+          Path('wishlist.js').write_text(r'''(() => {
+            'use strict';
+
+            const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
+            const API_URL = String(CONFIG.appsScriptUrl || '').trim();
+            const ACTOR_KEY = 'twogether_actor_v1';
+            const ACTORS = ['Principessa','Principe'];
+            let items = [];
+            let backendVersion = 0;
+            let loading = false;
+
+            const $ = (s,r=document) => r.querySelector(s);
+            const esc = v => String(v ?? '').replace(/[&<>"']/g,ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            const n = v => { const x=Number(String(v ?? '').replace(',','.')); return Number.isFinite(x)?x:0; };
+            const money = v => '€' + n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+            const uid = () => (globalThis.crypto?.randomUUID?.() || `wish_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+
+            function actor(){
+              const current=document.body.dataset.actor||'';
+              if(ACTORS.includes(current)) return current;
+              try{const saved=localStorage.getItem(ACTOR_KEY)||'';return ACTORS.includes(saved)?saved:'';}catch{return '';}
+            }
+
+            function toast(msg,tone='ok'){
+              const el=$('#toast'); if(!el) return;
+              el.textContent=msg; el.className='toast show '+tone;
+              clearTimeout(el._wishT); el._wishT=setTimeout(()=>el.className='toast',2600);
+            }
+
+            function jsonp(params={}){
+              return new Promise((resolve,reject)=>{
+                if(!API_URL) return reject(new Error('Backend URL missing'));
+                const cb='__twogether_wish_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+                const script=document.createElement('script');
+                const timer=setTimeout(()=>done(new Error('Sync timed out')),10000);
+                function done(err,data){clearTimeout(timer);try{delete window[cb];}catch{}script.remove();err?reject(err):resolve(data);}
+                window[cb]=data=>done(null,data);
+                const q=new URLSearchParams({...params,callback:cb,_:String(Date.now())});
+                script.src=API_URL+(API_URL.includes('?')?'&':'?')+q.toString();
+                script.onerror=()=>done(new Error('Could not reach Apps Script'));
+                document.head.appendChild(script);
+              });
+            }
+
+            function post(action,payload){
+              return new Promise((resolve,reject)=>{
+                const a=actor();
+                if(!API_URL) return reject(new Error('Backend URL missing'));
+                if(!a) return reject(new Error('Choose your profile first'));
+                const frame=document.querySelector('iframe[name="backendFrame"]');
+                if(!frame) return reject(new Error('Backend frame missing'));
+                const form=document.createElement('form');
+                form.method='POST';form.action=API_URL;form.target='backendFrame';form.style.display='none';
+                Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{const input=document.createElement('input');input.type='hidden';input.name=k;input.value=v;form.appendChild(input);});
+                document.body.appendChild(form);form.submit();form.remove();setTimeout(resolve,700);
+              });
+            }
+
+            function normalizeWishlist(list){
+              return Array.isArray(list)?list.map(x=>({id:x.id||uid(),name:String(x.name||''),price:x.price??'',note:String(x.note||''),createdAt:String(x.createdAt||'')})).filter(x=>x.name):[];
+            }
+
+            function render(){
+              const root=$('#financeWishlist'); if(!root) return;
+              const a=actor();
+              if(!a){root.innerHTML='<div class="finance-current-empty">Choose Principessa or Principe first.</div>';return;}
+              const priced=items.filter(x=>x.price!==''&&x.price!=null);
+              const total=priced.reduce((sum,x)=>sum+n(x.price),0);
+              const cards=items.length?items.map((x,i)=>`<button class="wishlist-card" type="button" data-wish-index="${i}"><div class="wishlist-card-top"><span class="panel-kicker">WISH</span><strong>${x.price!==''&&x.price!=null?money(x.price):'Price not set'}</strong></div><h3>${esc(x.name)}</h3>${x.note?`<p>${esc(x.note)}</p>`:'<p class="wishlist-muted">No note added.</p>'}</button>`).join(''):'<div class="wishlist-empty"><span>♡</span><h3>Your wishlist is empty</h3><p>Add things you might want to buy later without putting them into your budget yet.</p></div>';
+              root.innerHTML=`<div class="wishlist-wrap"><div class="wishlist-head"><div><span class="panel-kicker">LATER</span><h2>${esc(a)}’s wishlist</h2><p>Keep future wants here. Wishlist items do not affect your budget, savings, or net worth.</p></div><button class="btn primary" type="button" data-wish-add>+ Add wish</button></div><div class="wishlist-summary"><strong>${items.length}</strong><span>${items.length===1?'item':'items'}</span><strong>${priced.length?money(total):'—'}</strong><span>estimated total</span></div><div class="wishlist-grid">${cards}</div></div>`;
+              $('[data-wish-add]',root)?.addEventListener('click',()=>openModal(-1));
+              root.querySelectorAll('[data-wish-index]').forEach(btn=>btn.addEventListener('click',()=>openModal(Number(btn.dataset.wishIndex))));
+            }
+
+            function ensureModal(){
+              if($('#wishlistMiniModal')) return;
+              const modal=document.createElement('div');
+              modal.id='wishlistMiniModal';modal.className='finance-mini-modal';modal.setAttribute('aria-hidden','true');
+              modal.innerHTML='<div class="finance-mini-backdrop" data-wish-close></div><div class="finance-mini-card"><button class="finance-mini-close" type="button" data-wish-close>×</button><div id="wishlistMiniBody"></div></div>';
+              document.body.appendChild(modal);
+              modal.querySelectorAll('[data-wish-close]').forEach(el=>el.addEventListener('click',closeModal));
+            }
+
+            function showModal(html){ensureModal();$('#wishlistMiniBody').innerHTML=html;$('#wishlistMiniModal').classList.add('show');$('#wishlistMiniModal').setAttribute('aria-hidden','false');}
+            function closeModal(){const modal=$('#wishlistMiniModal');modal?.classList.remove('show');modal?.setAttribute('aria-hidden','true');}
+
+            function openModal(index){
+              const item=index>=0?items[index]:null;
+              showModal(`<span class="panel-kicker">WISHLIST</span><h2>${item?'Edit wish':'Add a wish'}</h2><p>Save something you may want later. The price is optional and never affects your finances until you actually buy it.</p><div class="wishlist-fields"><label>What do you want?<input id="wishName" value="${esc(item?.name||'')}" placeholder="e.g. New laptop"></label><label>Estimated price, optional<div class="finance-money mini"><span>€</span><input id="wishPrice" inputmode="decimal" value="${esc(String(item?.price??''))}" placeholder="0.00"></div></label><label class="full">Note, optional<textarea id="wishNote" rows="4" placeholder="Why you want it, model, size, link note...">${esc(item?.note||'')}</textarea></label></div><div class="finance-mini-actions">${item?'<button class="btn ghost" type="button" data-wish-delete>Delete</button>':'<span></span>'}<button class="btn primary" type="button" data-wish-save>Save wish</button></div>`);
+              $('[data-wish-save]')?.addEventListener('click',async()=>{
+                const name=String($('#wishName')?.value||'').trim();
+                const raw=String($('#wishPrice')?.value||'').trim();
+                const note=String($('#wishNote')?.value||'').trim();
+                if(!name)return toast('Add what you wish to buy first','warn');
+                if(raw!==''&&!Number.isFinite(Number(raw.replace(',','.'))))return toast('Enter a valid price or leave it empty','warn');
+                const next=[...items];
+                const row={id:item?.id||uid(),name,price:raw===''?'':n(raw),note,createdAt:item?.createdAt||new Date().toISOString()};
+                if(index>=0)next[index]=row;else next.push(row);
+                await saveWishlist(next,'Wish saved');
+              });
+              $('[data-wish-delete]')?.addEventListener('click',async()=>{const next=[...items];next.splice(index,1);await saveWishlist(next,'Wish removed');});
+            }
+
+            async function saveWishlist(next,message){
+              if(backendVersion<15)return toast('Wishlist saving needs backend v15 to be deployed','warn');
+              const a=actor(); if(!a)return;
+              try{
+                const res=await jsonp({action:'state'});
+                if(!res?.ok) throw new Error('Could not load latest finances');
+                const profile=JSON.parse(JSON.stringify(res.state?.financeProfiles?.[a]||{}));
+                profile.wishlist=next;
+                items=normalizeWishlist(next);render();closeModal();
+                await post('saveFinanceProfile',{profile});
+                toast(message);setTimeout(loadState,1100);
+              }catch(err){toast(err.message||'Could not save wishlist','warn');}
+            }
+
+            async function loadState(){
+              if(loading||!actor())return;
+              loading=true;
+              try{
+                const res=await jsonp({action:'state'});
+                if(res?.ok){backendVersion=Number(res.state?.version||0);items=normalizeWishlist(res.state?.financeProfiles?.[actor()]?.wishlist);render();}
+              }catch{}
+              finally{loading=false;}
+            }
+
+            function init(){
+              ensureModal();render();
+              document.addEventListener('twogether:finance-view',e=>{if(e.detail?.view==='wishlist'){render();loadState();}});
+              new MutationObserver(()=>{items=[];render();if($('#finances')?.classList.contains('active'))loadState();}).observe(document.body,{attributes:true,attributeFilter:['data-actor']});
+            }
+
+            document.addEventListener('DOMContentLoaded',init);
+          })();
+          ''')
+
+          Path('wishlist.css').write_text(r'''.wishlist-wrap{padding-bottom:28px}.wishlist-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:16px}.wishlist-head h2{font-size:30px;margin:3px 0 5px}.wishlist-head p{margin:0;color:var(--muted);max-width:720px}.wishlist-summary{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin:0 0 16px;color:var(--muted)}.wishlist-summary strong{font-size:18px;color:var(--text)}.wishlist-summary span+strong{margin-left:14px}.wishlist-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.wishlist-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:17px;text-align:left;font:inherit;cursor:pointer;box-shadow:0 10px 28px rgba(60,45,35,.045);min-height:160px}.wishlist-card:hover{transform:translateY(-1px);box-shadow:0 13px 32px rgba(60,45,35,.07)}.wishlist-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.wishlist-card-top>strong{font-size:15px}.wishlist-card h3{font-size:22px;margin:14px 0 6px}.wishlist-card p{color:var(--muted);margin:0;line-height:1.45;white-space:pre-wrap}.wishlist-muted{opacity:.72}.wishlist-empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:20px;padding:34px;text-align:center;color:var(--muted)}.wishlist-empty>span{display:block;font-size:30px}.wishlist-empty h3{color:var(--text);margin:7px 0 4px}.wishlist-empty p{margin:0}.wishlist-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wishlist-fields label{display:grid;gap:6px;color:var(--muted);font-size:12px}.wishlist-fields label.full{grid-column:1/-1}.wishlist-fields input,.wishlist-fields textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:11px 12px;font:inherit;font-size:16px;background:#fff;outline:none;resize:vertical}.wishlist-fields input:focus,.wishlist-fields textarea:focus{border-color:var(--accent)}.wishlist-fields .finance-money input{border:0;border-radius:0;padding-left:8px}@media(max-width:900px){.wishlist-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.wishlist-head{align-items:start;flex-direction:column}.wishlist-grid{grid-template-columns:1fr}.wishlist-fields{grid-template-columns:1fr}.wishlist-fields label.full{grid-column:auto}}
+          ''')
+          PY
+
+      - name: Validate JavaScript
+        run: |
+          node --check navigation.js
+          node --check wishlist.js
+          cp backend/Code.gs /tmp/twogether-backend.js
+          node --check /tmp/twogether-backend.js
+      - name: Commit validated wishlist feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html navigation.js wishlist.js wishlist.css backend/Code.gs
+          git diff --cached --quiet && exit 0
+          git commit -m "Add personal wishlist subpage [skip ci]"
+          git push origin HEAD:feature-wishlist
