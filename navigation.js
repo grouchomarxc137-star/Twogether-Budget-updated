@@ -12,6 +12,12 @@
     $('#financeSubnav')?.classList.toggle('hidden',name!=='finances');
   }
 
+  function ensureFinanceSheet(){
+    const finance=$('#finances');
+    if(!finance) return;
+    $$('.sheet').forEach(sheet=>sheet.classList.toggle('active',sheet===finance));
+  }
+
   function activateTrip(sheet){
     const target=$(`.trip-subnav .tab[data-sheet="${sheet}"]`) || $('.trip-subnav .tab[data-sheet="log"]');
     if(target){
@@ -24,6 +30,8 @@
   function activateFinanceView(view){
     const valid=['overview','monthly','balances','scenarios'];
     const chosen=valid.includes(view)?view:'overview';
+    setHub('finances');
+    ensureFinanceSheet();
     $$('[data-fin-subview]').forEach(btn=>btn.classList.toggle('active',btn.dataset.finSubview===chosen));
     $$('[data-fin-view]').forEach(el=>el.classList.toggle('active',el.dataset.finView===chosen));
     try{localStorage.setItem(FIN_VIEW_KEY,chosen);}catch{}
@@ -42,6 +50,7 @@
 
     financeHub.addEventListener('click',()=>{
       setHub('finances');
+      ensureFinanceSheet();
       let last='overview'; try{last=localStorage.getItem(FIN_VIEW_KEY)||'overview';}catch{}
       setTimeout(()=>activateFinanceView(last),0);
     });
@@ -51,19 +60,25 @@
       try{localStorage.setItem(TRIP_VIEW_KEY,btn.dataset.sheet||'log');}catch{}
     }));
 
-    $$('[data-fin-subview]').forEach(btn=>btn.addEventListener('click',()=>activateFinanceView(btn.dataset.finSubview)));
+    $$('[data-fin-subview]').forEach(btn=>btn.addEventListener('click',()=>{
+      ensureFinanceSheet();
+      activateFinanceView(btn.dataset.finSubview);
+    }));
 
     document.addEventListener('click',e=>{
       const tab=e.target.closest?.('.tab[data-sheet="finances"]');
       if(tab){
         setHub('finances');
+        ensureFinanceSheet();
         let last='overview'; try{last=localStorage.getItem(FIN_VIEW_KEY)||'overview';}catch{}
-        setTimeout(()=>activateFinanceView(last),0);
+        setTimeout(()=>activateFinanceView(tab.dataset.finSubview||last),0);
       }
     },true);
 
     setHub('trips');
     activateFinanceView('overview');
+    setHub('trips');
+    activateTrip((()=>{try{return localStorage.getItem(TRIP_VIEW_KEY)||'log';}catch{return 'log';}})());
   }
 
   document.addEventListener('DOMContentLoaded',init);
