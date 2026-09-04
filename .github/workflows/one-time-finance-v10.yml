@@ -1,0 +1,44 @@
+name: Apply finance v10
+
+on:
+  push:
+    branches:
+      - finance-v10-test
+    paths:
+      - '.github/workflows/one-time-finance-v10.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply finance changes
+        run: python maintenance/apply_finance_v10.py
+      - name: Validate frontend JavaScript
+        run: |
+          node --check finances.js
+          node --check navigation.js
+          node --check workflow.js
+      - name: Validate Apps Script syntax
+        run: |
+          cp backend/Code.gs /tmp/Code.js
+          node --check /tmp/Code.js
+      - name: Sanity checks
+        run: |
+          grep -q 'extraSpends' finances.js
+          grep -q 'Purchase + Monthly cost' finances.js
+          grep -q 'Current Main account leftover' finances.js
+          grep -q 'financeSubnav' index.html
+          grep -q 'version: 14' backend/Code.gs
+          grep -q "state.version = 14" backend/Code.gs
+      - name: Commit validated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add finances.js backend/Code.gs index.html navigation.js navigation.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Refine finance Extra flow and purchase scenarios"
+          git push
