@@ -1,23 +1,19 @@
-# Together Budget Workbook
+# Twogether Budget
 
-A spreadsheet-style budgeting website for tracking travel/visit costs, monthly averages, rental scenarios, and car costs.
+A shared budgeting website for trips and individual monthly finances.
 
-## Features
+## What it tracks
 
-- Editable trip-cost workbook
-- Calendar date pickers for Start / End
-- Location dropdowns
-- Formula support for editable numeric cells
-- Monthly summaries
-- Rental vs current spending comparison
-- Car budget comparison
-- Automatic browser autosave
-- JSON export for backups
+- Shared trip budgets and actual expenses
+- Individual trip contributions and matching
+- Monthly trip summaries and comparison scenarios
+- Personal monthly finances for Principessa and Principe
+- Savings, bank balances, loans/paybacks, investments and purchase test scenarios
 
-## Publish with GitHub Pages
+## GitHub Pages
 
-This repository includes a GitHub Pages deployment workflow in `.github/workflows/pages.yml`.
+The site is deployed from `main` using the GitHub Pages workflow in `.github/workflows/pages.yml`.
 
-If Pages is not already enabled, open **Settings → Pages** and set **Source** to **GitHub Actions**. The included workflow will deploy the site from the repository root whenever `main` is updated.
+Live site: `https://grimreaper29.github.io/Twogether-Budget/`
 
 The entry point is `index.html`.
