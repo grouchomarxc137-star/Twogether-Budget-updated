@@ -5,13 +5,13 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 14,
+    version: 15,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
-      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]},
-      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]}
+      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]},
+      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]}
     },
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
@@ -31,7 +31,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 14,
+      version: 15,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -605,6 +605,16 @@ function sanitizeFinanceScenario_(item) {
   };
 }
 
+function sanitizeFinanceWishlistItem_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    name: cleanText_(item && item.name, 160),
+    price: cleanMoney_(item && item.price),
+    note: cleanText_(item && item.note, 300),
+    createdAt: cleanText_(item && item.createdAt, 40)
+  };
+}
+
 function sanitizeFinanceProfile_(profile, actor) {
   const source = profile && typeof profile === 'object' ? profile : {};
   return {
@@ -613,6 +623,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     savingsReserved: Array.isArray(source.savingsReserved) ? source.savingsReserved.slice(0,40).map(sanitizeFinanceHold_).filter(x => x.name && x.amount !== '') : [],
     receivables: Array.isArray(source.receivables) ? source.receivables.slice(0,60).map(sanitizeFinanceReceivable_).filter(x => x.person && x.reason && x.principal !== '') : [],
     scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
+    wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
   };

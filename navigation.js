@@ -28,7 +28,7 @@
   }
 
   function activateFinanceView(view){
-    const valid=['overview','monthly','balances','scenarios'];
+    const valid=['overview','monthly','balances','scenarios','wishlist'];
     const chosen=valid.includes(view)?view:'overview';
     setHub('finances');
     ensureFinanceSheet();
