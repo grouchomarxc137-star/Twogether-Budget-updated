@@ -226,10 +226,9 @@
     const plans=[...sharedState.plans].sort((a,b)=>String(b?.meta?.start||b.updatedAt||'').localeCompare(String(a?.meta?.start||a.updatedAt||'')));
     if(!plans.length){ root.innerHTML='<div class="budget-empty">No planned trip budgets yet. Create one before your next trip.</div>'; return; }
     const activePlans=plans.filter(plan=>!isLocked(tripForPlan(plan)));
-    const lastConfirmed=plans.find(plan=>isLocked(tripForPlan(plan)))||null;
-    const displayedPlans=lastConfirmed?[...activePlans,lastConfirmed]:activePlans;
+    const displayedPlans=activePlans;
     const a=actor();
-    const emptyActive=activePlans.length?'':'<div class="budget-empty">No active trip budgets right now. The most recent confirmed trip is still shown below.</div>';
+    const emptyActive=activePlans.length?'':'<div class="budget-empty">No active trip budgets right now. You can create one whenever you want.</div>';
     root.innerHTML=emptyActive+displayedPlans.map(plan=>{
       const meta=plan.meta||{}; const trip=tripForPlan(plan); const locked=isLocked(trip);
       const pBudget=plan?.budgets?.Principessa??''; const qBudget=plan?.budgets?.Principe??'';

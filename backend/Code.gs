@@ -5,13 +5,13 @@ const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other']
 
 function defaultState_() {
   return {
-    version: 12,
+    version: 13,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
-      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[]},
-      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[]}
+      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]},
+      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[]}
     },
     compare: {
       rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,
@@ -31,7 +31,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 12,
+      version: 13,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -89,7 +89,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 12;
+  state.version = 13;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -111,7 +111,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:12, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version:13, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -505,7 +505,7 @@ function sanitizeFinanceMonth_(record, actor) {
   });
   if (!foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:250});
   const sourceRaw = String(record && record.extraOverspendSource || '');
-  const extraOverspendSource = sourceRaw === 'creditcard' || sourceRaw === 'savings' ? sourceRaw : '';
+  const extraOverspendSource = sourceRaw === 'creditcard' || sourceRaw === 'savings' || sourceRaw === 'main' ? sourceRaw : '';
   const extraOverspendAmount = cleanMoney_(record && record.extraOverspendAmount);
   return {
     month: cleanText_(record && record.month, 10),
@@ -557,12 +557,32 @@ function sanitizeFinanceHold_(item) {
   };
 }
 
+function sanitizeFinanceRepayment_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    month: cleanText_(item && item.month, 10),
+    amount: cleanMoney_(item && item.amount),
+    at: cleanText_(item && item.at, 40)
+  };
+}
+
 function sanitizeFinanceReceivable_(item) {
+  const principal = cleanMoney_(item && (item.principal != null ? item.principal : item.amount));
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     person: cleanText_(item && item.person, 100),
     reason: cleanText_(item && item.reason, 180),
-    amount: cleanMoney_(item && item.amount)
+    principal: principal,
+    repayments: Array.isArray(item && item.repayments) ? item.repayments.slice(-120).map(sanitizeFinanceRepayment_).filter(function(x){ return /^\d{4}-\d{2}$/.test(x.month) && x.amount !== ''; }) : []
+  };
+}
+
+function sanitizeFinanceScenario_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    name: cleanText_(item && item.name, 140),
+    upfront: cleanMoney_(item && item.upfront),
+    monthly: cleanMoney_(item && item.monthly)
   };
 }
 
@@ -572,7 +592,8 @@ function sanitizeFinanceProfile_(profile, actor) {
     bankAccounts: Array.isArray(source.bankAccounts) ? source.bankAccounts.slice(0,30).map(sanitizeFinanceBank_).filter(x => x.name && x.balance !== '') : [],
     savingsTotal: cleanMoney_(source.savingsTotal),
     savingsReserved: Array.isArray(source.savingsReserved) ? source.savingsReserved.slice(0,40).map(sanitizeFinanceHold_).filter(x => x.name && x.amount !== '') : [],
-    receivables: Array.isArray(source.receivables) ? source.receivables.slice(0,40).map(sanitizeFinanceReceivable_).filter(x => x.person && x.reason && x.amount !== '') : [],
+    receivables: Array.isArray(source.receivables) ? source.receivables.slice(0,60).map(sanitizeFinanceReceivable_).filter(x => x.person && x.reason && x.principal !== '') : [],
+    scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
   };

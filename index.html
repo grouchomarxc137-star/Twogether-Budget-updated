@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="live.css?v=1">
 <link rel="stylesheet" href="finance.css?v=4">
+<link rel="stylesheet" href="navigation.css?v=1">
 </head>
 <body>
 <div class="app" id="app">
@@ -18,11 +19,14 @@
     <div class="top-actions"><span id="loggedUserBadge" class="who-badge hidden" aria-live="polite"></span></div>
   </header>
 
-  <nav class="tabs" role="tablist">
+  <nav class="hub-tabs" aria-label="Main areas">
+    <button class="hub-tab active" data-hub="trips" type="button">Trips</button>
+    <button class="hub-tab tab" data-hub="finances" data-sheet="finances" type="button">My finances</button>
+  </nav>
+  <nav class="tabs trip-subnav" id="tripSubnav" role="tablist" aria-label="Trip pages">
     <button class="tab active" data-sheet="log" type="button">Log trip</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
-    <button class="tab" data-sheet="finances" type="button">My finances</button>
   </nav>
 
   <main class="main">
@@ -84,20 +88,40 @@
 
     <section id="finances" class="sheet finance-page">
       <div class="finance-hero">
-        <div><span class="eyebrow">PERSONAL MONTHLY MONEY</span><h1>My finances</h1><p>Monthly income and spending, current savings, investments, bank balances and money still owed to you — kept separately for whoever is logged in.</p></div>
+        <div><span class="eyebrow">PERSONAL MONEY</span><h1>My finances</h1><p>Keep monthly finances, balances, loans and purchase ideas organised in separate pages.</p></div>
       </div>
-      <div id="financeSummary" class="finance-summary"></div>
-      <section id="financeCurrent" class="finance-current"></section>
-      <div class="finance-grid">
-        <div class="wizard-card finance-wizard" id="financeWizardCard">
-          <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="financeWizardStep">Monthly finances</div><div class="wizard-progress"><span id="financeWizardProgress"></span></div></div><button class="text-btn" id="restartFinanceWizard" type="button">Start over</button></div>
-          <div id="financeWizardBody" class="wizard-body"></div>
+      <nav class="finance-subnav" aria-label="Finance pages">
+        <button class="active" type="button" data-fin-subview="overview">Overview</button>
+        <button type="button" data-fin-subview="monthly">Monthly finances</button>
+        <button type="button" data-fin-subview="balances">Balances & loans</button>
+        <button type="button" data-fin-subview="scenarios">Test scenarios</button>
+      </nav>
+
+      <div class="finance-subview active" data-fin-view="overview">
+        <div id="financeSummary" class="finance-summary"></div>
+        <p class="finance-overview-note">Use the pages above when you want to update a month, check balances and loans, or test a possible purchase.</p>
+      </div>
+
+      <div class="finance-subview" data-fin-view="monthly">
+        <div class="finance-grid">
+          <div class="wizard-card finance-wizard" id="financeWizardCard">
+            <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="financeWizardStep">Monthly finances</div><div class="wizard-progress"><span id="financeWizardProgress"></span></div></div><button class="text-btn" id="restartFinanceWizard" type="button">Start over</button></div>
+            <div id="financeWizardBody" class="wizard-body"></div>
+          </div>
+          <section class="finance-month-panel">
+            <span class="panel-kicker">YOUR YEAR</span><h2>2026</h2><p>White = not logged, soft orange = draft, soft green = locked.</p>
+            <div id="financeMonths" class="finance-months"></div>
+            <div id="financeDetail" class="finance-detail"></div>
+          </section>
         </div>
-        <section class="finance-month-panel">
-          <span class="panel-kicker">YOUR YEAR</span><h2>2026</h2><p>Tap a saved month to see the breakdown or edit it.</p>
-          <div id="financeMonths" class="finance-months"></div>
-          <div id="financeDetail" class="finance-detail"></div>
-        </section>
+      </div>
+
+      <div class="finance-subview" data-fin-view="balances">
+        <section id="financeCurrent" class="finance-current"></section>
+      </div>
+
+      <div class="finance-subview" data-fin-view="scenarios">
+        <section id="financeScenarios"></section>
       </div>
     </section>
   </main>
@@ -113,6 +137,7 @@
 <script src="app.js?v=2" defer></script>
 <script src="workflow.js?v=10" defer></script>
 <script src="ui.js?v=4" defer></script>
-<script src="finances.js?v=7" defer></script>
+<script src="finances.js?v=8" defer></script>
+<script src="navigation.js?v=1" defer></script>
 </body>
 </html>
