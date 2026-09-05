@@ -94,6 +94,10 @@
 .finance-subpage-heading .eyebrow,.finance-subpage-heading>p{display:none}
 .finance-subpage-heading{margin-bottom:18px}
 #financeScenarios .panel-kicker,#financeWishlist .panel-kicker{display:none}
+.finance-subview[data-fin-view="scenarios"] .finance-scenario-head>div,
+.finance-subview[data-fin-view="wishlist"] .wishlist-head>div{display:none}
+.finance-subview[data-fin-view="scenarios"] .finance-scenario-head,
+.finance-subview[data-fin-view="wishlist"] .wishlist-head{justify-content:flex-end;margin-bottom:14px}
 
 /* Session / DEV controls. */
 #loggedUserBadge{pointer-events:auto!important;cursor:pointer!important}
