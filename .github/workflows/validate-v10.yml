@@ -1,0 +1,20 @@
+name: Validate v10 refinement
+on:
+  push:
+    branches:
+      - feature-ui-refine-2026-09-05
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check refine-v10.js
+          node --check navigation.js
+          node --check wishlist.js
+          node --check workflow.js
+      - name: Check required files are loaded
+        run: |
+          grep -q 'refine-v10.css' index.html
+          grep -q 'refine-v10.js' index.html
