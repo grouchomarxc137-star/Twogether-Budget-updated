@@ -7,8 +7,6 @@
   const API_URL = String(window.TOGETHER_BUDGET_CONFIG?.appsScriptUrl || '').trim();
   const app = document.getElementById('app');
 
-  // Keep the shell hidden for just the first render cycle so cached data, identity,
-  // monthly totals and budget cards appear together instead of filling in separately.
   if (app) {
     app.style.visibility = 'hidden';
     app.style.opacity = '0';
@@ -21,7 +19,6 @@
     if (cachedState) window.__TWOGETHER_CACHED_STATE__ = cachedState;
   } catch {}
 
-  // Restore the remembered identity immediately so the page paints in the right theme.
   try {
     const saved = localStorage.getItem(ACTOR_KEY) || '';
     if (ACTORS.includes(saved)) {
@@ -64,9 +61,6 @@
     window[name] = wrapped;
   }
 
-  // During the first load, satisfy Apps Script state requests from the last synced cache.
-  // The real network refresh resumes immediately after load, so reload is instant but data
-  // still stays fresh in the background.
   document.head.appendChild = function(node) {
     const src = node?.tagName === 'SCRIPT' ? String(node.src || '') : '';
     if (API_URL && src.startsWith(API_URL)) {
@@ -120,12 +114,9 @@
     });
   } else {
     window.addEventListener('load', finishInitialLoad, {once:true});
-    // DOMContentLoaded lets the cached app render first; reveal on the next task so
-    // all DOMContentLoaded handlers have finished hydrating their sections.
     window.addEventListener('DOMContentLoaded', () => setTimeout(revealApp, 0), {once:true});
   }
 
-  // Crimson Pro remains the active font but stays non-blocking for reload speed.
   function loadFont() {
     if (document.getElementById('twogetherCrimsonFont')) return;
     const link = document.createElement('link');
@@ -135,6 +126,25 @@
     nativeAppend(link);
   }
 
-  if (document.readyState === 'complete') setTimeout(loadFont, 0);
-  else window.addEventListener('load', () => setTimeout(loadFont, 0), {once:true});
+  function loadSharedExpenseV14(){
+    if(document.getElementById('twogetherSharedExpenseCss')) return;
+    const css=document.createElement('link');
+    css.id='twogetherSharedExpenseCss';
+    css.rel='stylesheet';
+    css.href='shared-expenses-v14.css?v=1';
+    nativeAppend(css);
+    const script=document.createElement('script');
+    script.id='twogetherSharedExpenseJs';
+    script.src='shared-expenses-v14.js?v=1';
+    script.defer=true;
+    nativeAppend(script);
+  }
+
+  if (document.readyState === 'complete') {
+    setTimeout(loadFont, 0);
+    setTimeout(loadSharedExpenseV14, 0);
+  } else {
+    window.addEventListener('load', () => setTimeout(loadFont, 0), {once:true});
+    window.addEventListener('load', () => setTimeout(loadSharedExpenseV14, 0), {once:true});
+  }
 })();
