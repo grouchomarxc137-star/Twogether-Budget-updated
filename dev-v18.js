@@ -8,6 +8,7 @@
   try{const saved=JSON.parse(localStorage.getItem(KEY)||'{}');patches=saved.patches||{};past=saved.past||[];future=saved.future||[];}catch{}
 
   function actor(){const a=document.body.dataset.actor||'';return ACTORS.includes(a)?a:'';}
+  function toast(msg,tone='ok'){const el=$('#toast');if(!el)return;el.textContent=msg;el.className='toast show '+tone;clearTimeout(el._dev18);el._dev18=setTimeout(()=>el.className='toast',2800);}
   function persist(){try{localStorage.setItem(KEY,JSON.stringify({patches,past:past.slice(-60),future:future.slice(-60)}));}catch{}}
   function emit(){document.dispatchEvent(new CustomEvent('twogether:dev-changed'));}
   function pushChange(fn){past.push(clone(patches));past=past.slice(-60);future=[];restore();fn();persist();apply();emit();}
@@ -63,12 +64,7 @@
   }
 
   function moveSelected(dx,dy){if(!selected)return;const key=selector(selected),p=patches[key]||{};const x=Number(p.x||0)+dx,y=Number(p.y||0)+dy;patchSelected({x,y,style:{position:'relative',transform:`translate(${x}px, ${y}px)`,'z-index':'2'}});}
-
-  function moveSibling(dir){
-    if(!selected?.parentElement)return;const parent=selected.parentElement;const siblings=[...parent.children].filter(x=>!x.matches('.dev-v18-tools,.dev-v18-editor,.dev-v18-strip'));const idx=siblings.indexOf(selected);const target=siblings[idx+dir];if(!target)return;
-    if(dir<0)parent.insertBefore(selected,target);else parent.insertBefore(target,selected);
-    const key=selector(selected);pushChange(()=>{const prev=patches[key]||{};patches[key]={...prev,style:{...(prev.style||{}),order:String(idx+dir)}};});
-  }
+  function moveSibling(dir){moveSelected(0,dir<0?-60:60);}
 
   function setSelected(el){if(selected&&selected!==el)selected.classList.remove('dev-v18-target');selected=el;if(selected)selected.classList.add('dev-v18-target');positionTools();}
   function clearSelected(){selected?.classList.remove('dev-v18-target');selected=null;if(tools)tools.hidden=true;}
@@ -81,7 +77,9 @@
     if(selected.children.length===0)editorField('Text','textarea',selected.textContent,v=>patchSelected({text:v}));
     editorField('Text colour','color',rgbToHex(computed.color),v=>patchSelected({style:{color:v}}));
     editorField('Background','color',rgbToHex(computed.backgroundColor),v=>patchSelected({style:{'background-color':v}}));
-    editorField('Font','select',computed.fontFamily.split(',')[0].replace(/["']/g,'').trim(),v=>patchSelected({style:{'font-family':v}}),[['Crimson Pro','Crimson Pro'],['Georgia','Georgia'],['Arial','Arial'],['Verdana','Verdana'],['Trebuchet MS','Trebuchet MS'],['monospace','Monospace']]);
+    const fonts=[['Crimson Pro','Crimson Pro'],['Georgia','Georgia'],['Arial','Arial'],['Verdana','Verdana'],['Trebuchet MS','Trebuchet MS'],['monospace','Monospace']];
+    const currentFont=computed.fontFamily.split(',')[0].replace(/["']/g,'').trim();
+    editorField('Font','select',fonts.some(([v])=>v===currentFont)?currentFont:'Crimson Pro',v=>patchSelected({style:{'font-family':v}}),fonts);
     editorField('Font size','number',parseFloat(computed.fontSize)||16,v=>patchSelected({style:{'font-size':Math.max(8,Math.min(120,Number(v)||16))+'px'}}));
     editorField('Padding','number',parseFloat(computed.padding)||0,v=>patchSelected({style:{padding:Math.max(0,Number(v)||0)+'px'}}));
     editorField('Corner radius','number',parseFloat(computed.borderRadius)||0,v=>patchSelected({style:{'border-radius':Math.max(0,Number(v)||0)+'px'}}));
