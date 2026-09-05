@@ -1,0 +1,29 @@
+name: Validate v19 aesthetic/dev
+on:
+  push:
+    branches: [feature-v19-aesthetic-dev]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and asset checks
+        run: |
+          node --check dev-v19.js
+          node --check refine-v19.js
+          node --check overview.js
+          grep -q 'refine-v19.css?v=1' index.html
+          grep -q 'dev-v19.js?v=1' index.html
+          grep -q 'refine-v19.js?v=1' index.html
+          grep -q 'overview.js?v=19' index.html
+          node tests/validate.cjs
+      - name: Backend regression
+        run: node tests/backend.cjs
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Browser regression
+        run: node tests/browser-v19.cjs
