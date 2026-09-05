@@ -1,0 +1,120 @@
+/* Approved v18: preserve rollback-ver-9 look, add only the requested interaction/UI changes. */
+
+/* Keep navigation labels and controls from being selected accidentally. */
+.hub-tabs,.hub-tabs *,#tripSubnav,#tripSubnav *,#financeSubnav,#financeSubnav *,
+.topbar,.topbar *,button,.btn,.text-btn,.tw-nav-menu,.tw-nav-menu *{user-select:none;-webkit-user-select:none}
+
+/* Main section dropdowns replace the permanently visible subnav rows. */
+.trip-subnav,.finance-subnav{display:none!important}
+.hub-tabs{position:relative;overflow:visible;gap:10px;z-index:80}
+.tw-nav-wrap{position:relative;display:inline-flex;align-items:center}
+.tw-nav-wrap>.hub-tab{position:relative;z-index:2}
+.tw-nav-menu{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(-5px);width:max-content;min-width:210px;padding:7px;background:var(--card,#fffefa);border:1px solid var(--line,#e6ddd3);border-radius:16px;box-shadow:0 18px 46px rgba(58,44,35,.13);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease,transform .15s ease,visibility .15s ease;z-index:95}
+.tw-nav-wrap.nav-visible .tw-nav-menu,.tw-nav-wrap:hover .tw-nav-menu,.tw-nav-wrap:focus-within .tw-nav-menu{opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+.tw-nav-menu button{display:block;width:100%;padding:10px 12px;border:0;background:transparent;border-radius:11px;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
+.tw-nav-menu button:hover,.tw-nav-menu button:focus-visible{background:rgba(126,104,91,.09);outline:none}
+
+/* The log page becomes wizard-first, centred, without a large descriptive left panel. */
+#log .hero-grid{display:block;max-width:930px;margin:20px auto 0}
+#log .hero-copy{max-width:720px;margin:0 auto 20px;text-align:center}
+#log .hero-copy h1{margin:.3rem 0 0}
+#log .hero-copy p{display:none}
+#log .wizard-card{width:100%;min-height:470px;margin-inline:auto}
+#log .trip-pick{min-height:74px;padding:16px 18px}
+#log .trip-pick .pick-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:rgba(121,103,90,.08);font-size:20px}
+
+/* The old budget dashboard remains available to the workflow code but is not part of the normal UI. */
+#budgetPlannerSection{display:none!important}
+
+/* Current Trips: calm, full-width story-like list. */
+.tw-current-trips-section{margin:34px 0 38px}
+.tw-current-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:14px}
+.tw-current-head h2{margin:3px 0 0;font-size:30px}
+.tw-current-head p{margin:5px 0 0;color:var(--muted)}
+.tw-current-list{display:grid;gap:11px}
+.tw-current-card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 24px rgba(55,42,33,.04);overflow:hidden}
+.tw-current-card:hover{border-color:#d4c6ba;box-shadow:0 10px 28px rgba(55,42,33,.065)}
+.tw-current-main{display:block;width:100%;padding:18px 18px 14px;border:0;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.tw-current-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tw-current-status{font-size:11px;color:var(--muted);background:#f2eee9;border-radius:999px;padding:5px 9px;white-space:nowrap}
+.tw-current-card h3{font-size:25px;margin:6px 0 2px}
+.tw-current-card>button p,.tw-current-main p{color:var(--muted);margin:0 0 14px}
+.tw-current-numbers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tw-current-numbers>div{padding:11px 12px;border-right:1px solid var(--line);min-width:0}
+.tw-current-numbers>div:last-child{border-right:0}
+.tw-current-numbers span{display:block;font-size:10px;color:var(--muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tw-current-numbers strong{font-size:14px;font-weight:700}
+.tw-current-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 18px 14px}
+.tw-current-actions .btn,.tw-current-actions button{min-height:34px;padding:7px 10px;font-size:12px}
+.tw-current-empty{padding:20px;border:1px dashed var(--line);border-radius:18px;color:var(--muted);display:grid;gap:3px}
+.tw-v18-hidden{display:none!important}
+.tw-story-empty{margin-top:10px}
+
+/* Current trip overview stays table-like and quiet. */
+.current-overview{width:min(980px,calc(100vw - 30px));max-height:calc(100vh - 30px);overflow:auto;border:1px solid var(--line);border-radius:22px;padding:24px;background:var(--card);color:var(--ink)}
+.current-overview::backdrop{background:rgba(45,38,32,.42);backdrop-filter:blur(4px)}
+.current-overview>h2{margin:0 40px 3px 0;font-size:32px}
+.current-overview>p{color:var(--muted)}
+.overview-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:18px 0}
+.overview-metrics>div{padding:12px 13px;border-right:1px solid var(--line)}
+.overview-metrics>div:last-child{border-right:0}
+.overview-metrics span{display:block;color:var(--muted);font-size:11px;margin-bottom:3px}.overview-metrics strong{font-size:15px}
+.overview-table{overflow:auto;margin:16px 0}.overview-table table{width:100%;border-collapse:collapse}.overview-table th,.overview-table td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left}.overview-table th{font-size:12px;color:var(--muted)}.overview-table tr.has-difference{background:#fff5f1}
+.overview-payment{border-top:1px solid var(--line);padding:13px 0}.overview-payment p{margin:5px 0;color:var(--muted)}
+.reconcile-warning,.tw-trip-warning{padding:11px 13px;border:1px solid #e7cfc8;background:#fff6f3;color:#844b42;border-radius:13px;line-height:1.45}
+.tw-trip-warning.soft{border-color:#ddd5ca;background:#faf7f3;color:var(--ink)}
+.tw-trip-warning strong{display:block;margin-bottom:3px}
+
+/* Shared Accommodation / Flights entry. Accommodation's 20% is always visible when a total exists/is typed. */
+.shared-entry{display:grid;gap:13px}
+.shared-entry h2{margin:0;font-size:34px}
+.shared-entry label{display:grid;gap:7px;color:var(--muted);font-size:12px}
+.shared-entry .big-input{font-size:30px}
+.shared-calculation,.bridge15-20{margin:2px 0 0;padding:10px 12px;background:#f4f0eb;border-radius:12px;color:var(--muted)}
+.shared-calculation strong,.bridge15-20 strong{color:var(--ink)}
+#v5MatchInput{display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;position:relative!important;z-index:3!important;background:#fff!important;color:var(--ink)!important}
+
+/* Partial expense selector: clear vertical order, no forced category first. */
+#workflowV5Overlay .v18-partial-picker{display:grid;grid-template-columns:1fr;gap:8px}
+
+/* Wishlist: compact columns + priority. */
+#financeWishlist .wishlist-table{table-layout:fixed;width:100%}
+#financeWishlist .wishlist-table th:nth-child(1),#financeWishlist .wishlist-table td:nth-child(1){width:64px}
+#financeWishlist .wishlist-table th:nth-child(2),#financeWishlist .wishlist-table td:nth-child(2){width:28%}
+#financeWishlist .wishlist-table th:nth-child(3),#financeWishlist .wishlist-table td:nth-child(3){width:auto}
+#financeWishlist .wishlist-table th:nth-child(4),#financeWishlist .wishlist-table td:nth-child(4){width:120px}
+#financeWishlist .wishlist-table th:nth-child(5),#financeWishlist .wishlist-table td:nth-child(5){width:76px}
+#financeWishlist .wishlist-table tbody tr{transition:background .12s ease}
+#financeWishlist .wishlist-table tbody tr:hover{background:rgba(119,100,88,.075)}
+.tw-prio-pill{display:inline-grid;place-items:center;min-width:32px;padding:4px 6px;border-radius:999px;background:#f0ece7;font-size:11px;font-weight:800}
+.tw-prio-filter{display:flex;align-items:center;gap:7px;margin-left:auto}.tw-prio-filter label{font-size:11px;color:var(--muted)}.tw-prio-filter select{border:1px solid var(--line);border-radius:10px;background:#fff;padding:7px 9px}
+.tw-wish-prio{display:grid;gap:5px}.tw-wish-prio select{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+
+/* Simpler headings: keep one strong title and reduce repeated helper copy. */
+.finance-subpage-heading .eyebrow,.finance-subpage-heading>p{display:none}
+.finance-subpage-heading{margin-bottom:18px}
+#financeScenarios .panel-kicker,#financeWishlist .panel-kicker{display:none}
+
+/* Session / DEV controls. */
+#loggedUserBadge{pointer-events:auto!important;cursor:pointer!important}
+.tw-dev-toggle{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;padding:6px 8px;border-radius:9px}
+.tw-dev-toggle:hover{background:rgba(119,100,88,.08);color:var(--ink)}
+body.dev-playground #loggedUserBadge{background:#9f4e4e!important;color:#fff!important;border-color:#9f4e4e!important}
+body.dev-playground .tw-dev-toggle{color:#9f4e4e;font-weight:800}
+
+/* DEV playground: normal site remains visible; controls appear beside what you hover. */
+.dev-v18-tools{position:fixed;z-index:420;display:flex;gap:4px;padding:4px;background:#fff;border:1px solid #d9c5c5;border-radius:10px;box-shadow:0 8px 26px rgba(70,38,38,.18)}
+.dev-v18-tools[hidden]{display:none}.dev-v18-tools button{border:0;background:#f7eeee;color:#844747;border-radius:7px;padding:5px 7px;cursor:pointer;font-weight:800}.dev-v18-tools button:hover{background:#eddede}
+.dev-v18-target{outline:1px dashed rgba(159,78,78,.42);outline-offset:3px}
+.dev-v18-editor{position:fixed;right:18px;top:72px;z-index:430;width:min(330px,calc(100vw - 32px));max-height:calc(100vh - 92px);overflow:auto;background:#fff;border:1px solid #d9c5c5;border-radius:16px;padding:14px;box-shadow:0 18px 50px rgba(70,38,38,.19)}
+.dev-v18-editor[hidden]{display:none}.dev-v18-editor h3{margin:0 0 10px}.dev-v18-editor label{display:grid;gap:4px;margin:9px 0;color:#6e5555;font-size:11px}.dev-v18-editor input,.dev-v18-editor select,.dev-v18-editor textarea{width:100%;border:1px solid #e0d2d2;border-radius:9px;padding:8px;background:#fff;font:inherit}.dev-v18-editor textarea{min-height:72px;resize:vertical}.dev-v18-editor .dev-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.dev-v18-editor button{border:1px solid #ddcccc;background:#fff;border-radius:9px;padding:7px 9px;cursor:pointer}.dev-v18-editor button.danger{color:#9b4242;border-color:#dfbebe;background:#fff6f6}
+.dev-v18-strip{position:fixed;right:16px;bottom:16px;z-index:425;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 32px);padding:6px;background:#fff;border:1px solid #d8c4c4;border-radius:12px;box-shadow:0 10px 30px rgba(70,38,38,.16)}
+.dev-v18-strip[hidden]{display:none}.dev-v18-strip button{border:0;background:#f8efef;color:#884848;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:11px;font-weight:750}.dev-v18-strip button:hover{background:#efdfdf}
+.dev-v18-added{border:1px dashed #c88383!important;min-height:44px}
+.dev-v18-delete{position:absolute;right:8px;top:8px;z-index:6;border:0;background:#fff2f2;color:#a14747;border-radius:8px;padding:4px 6px;font-size:10px;cursor:pointer}
+
+@media(max-width:760px){
+  .tw-current-head{align-items:start;flex-direction:column}.tw-current-numbers,.overview-metrics{grid-template-columns:1fr 1fr}.tw-current-numbers>div:nth-child(2),.overview-metrics>div:nth-child(2){border-right:0}.tw-current-numbers>div:nth-child(-n+2),.overview-metrics>div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .tw-nav-menu{left:0;transform:translateY(-5px);min-width:185px}.tw-nav-wrap.nav-visible .tw-nav-menu,.tw-nav-wrap:hover .tw-nav-menu,.tw-nav-wrap:focus-within .tw-nav-menu{transform:translateY(0)}
+  #financeWishlist .wishlist-table th:nth-child(3),#financeWishlist .wishlist-table td:nth-child(3){width:32%}
+}
