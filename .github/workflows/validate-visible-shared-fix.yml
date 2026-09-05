@@ -1,0 +1,23 @@
+name: Validate visible shared trip fix
+on:
+  push:
+    branches:
+      - main
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check fast-start.js
+          node --check app.js
+          node --check workflow.js
+          node --check shared-expenses-v14.js
+          node --check trip-wizard-bridge-v15.js
+      - name: Check cache-busted assets
+        run: |
+          grep -q 'fast-start.js?v=3' index.html
+          grep -q 'shared-expenses-v14.js?v=2' index.html
+          grep -q 'trip-wizard-bridge-v15.js?v=1' index.html
+          grep -q 'shared-expenses-v14.css?v=2' index.html
