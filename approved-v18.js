@@ -15,11 +15,10 @@
   let storyObserver=null;
   let actorObserver=null;
 
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const n=v=>{const x=Number(String(v??'').replace(',','.'));return Number.isFinite(x)?x:0;};
   const money=v=>'€'+n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtDate=v=>{if(!v)return '—';const [y,m,d]=String(v).split('-');return y&&m&&d?`${d}/${m}/${y}`:String(v);};
-  const cssEscape=v=>window.CSS?.escape?CSS.escape(String(v)):String(v).replace(/[^a-zA-Z0-9_-]/g,'\\$&');
   function actor(){const a=document.body.dataset.actor||localStorage.getItem(ACTOR_KEY)||'';return ACTORS.includes(a)?a:'';}
   function otherActor(){return actor()==='Principessa'?'Principe':'Principessa';}
   function has(v){return v!==''&&v!=null;}
@@ -201,17 +200,24 @@
       const head=table.querySelector('thead tr');if(head&&!head.querySelector('[data-v18-prio-head]')){const th=document.createElement('th');th.textContent='Prio';th.dataset.v18PrioHead='1';head.insertBefore(th,head.firstElementChild);}
       const rows=$$('tbody tr',table).filter(tr=>tr.querySelector('[data-wish-index]'));
       rows.forEach(tr=>{
-        const noteText=tr.querySelector('.wishlist-note-text');const raw=noteText?.textContent||'';const parts=stripPrio(raw);tr.dataset.prio=parts.prio;
-        if(noteText)noteText.textContent=parts.note;
+        const noteText=tr.querySelector('.wishlist-note-text');const raw=noteText?.textContent||'';
+        const parts=tr.dataset.prio?{prio:tr.dataset.prio,note:raw}:stripPrio(raw);tr.dataset.prio=parts.prio;
+        if(noteText&&!noteText.dataset.v18PrioStripped){noteText.textContent=parts.note;noteText.dataset.v18PrioStripped='1';}
         if(!tr.querySelector('[data-v18-prio-cell]')){const td=document.createElement('td');td.dataset.v18PrioCell='1';td.innerHTML=`<span class="tw-prio-pill">${parts.prio}</span>`;tr.insertBefore(td,tr.firstElementChild);}else tr.querySelector('.tw-prio-pill').textContent=parts.prio;
       });
-      const foot=table.querySelector('tfoot tr');if(foot&&!foot.querySelector('[data-v18-prio-foot]')){const td=document.createElement('td');td.dataset.v18PrioFoot='1';foot.insertBefore(td,foot.firstElementChild);const c=Number(foot.querySelector('td[colspan]')?.getAttribute('colspan')||2);foot.querySelector('td[colspan]')?.setAttribute('colspan',String(c));}
+      const foot=table.querySelector('tfoot tr');if(foot&&!foot.querySelector('[data-v18-prio-foot]')){const td=document.createElement('td');td.dataset.v18PrioFoot='1';foot.insertBefore(td,foot.firstElementChild);}
       let filter=$('.tw-prio-filter',root);if(!filter){filter=document.createElement('div');filter.className='tw-prio-filter';filter.innerHTML='<label>Priority</label><select aria-label="Wishlist priority filter"><option value="all">All · P1 → P5</option><option value="P1">P1 only</option><option value="P2">P2 only</option><option value="P3">P3 only</option><option value="P4">P4 only</option><option value="P5">P5 only</option></select>';const header=$('.wishlist-head',root);header?.insertBefore(filter,header.querySelector('[data-wish-add]'));filter.querySelector('select').addEventListener('change',applyWishlistFilter);}
       const tbody=table.querySelector('tbody');const ordered=[...rows].sort((a,b)=>Number(a.dataset.prio.slice(1))-Number(b.dataset.prio.slice(1)));ordered.forEach(row=>tbody.appendChild(row));applyWishlistFilter();
     }finally{wishlistEnhancing=false;}
   }
 
-  function applyWishlistFilter(){const root=$('#financeWishlist'),sel=$('.tw-prio-filter select',root);if(!sel)return;const val=sel.value;$$('.wishlist-table tbody tr[data-prio]',root).forEach(tr=>tr.style.display=val==='all'||tr.dataset.prio===val?'':'none');}
+  function applyWishlistFilter(){
+    const root=$('#financeWishlist'),sel=$('.tw-prio-filter select',root);if(!sel)return;const val=sel.value,visible=[];
+    $$('.wishlist-table tbody tr[data-prio]',root).forEach(tr=>{const show=val==='all'||tr.dataset.prio===val;tr.style.display=show?'':'none';if(show)visible.push(tr);});
+    const prices=visible.map(tr=>parseMoney(tr.querySelector('.wishlist-price-cell')?.textContent||'')).filter(v=>v!=null);
+    const count=root.querySelector('.wishlist-table tfoot small');if(count)count.textContent=`${visible.length} ${visible.length===1?'item':'items'}${val==='all'?'':` · ${val}`}`;
+    const total=root.querySelector('.wishlist-table tfoot .wishlist-price-cell strong');if(total)total.textContent=prices.length?money(prices.reduce((a,b)=>a+b,0)):'—';
+  }
 
   function enhanceWishlistModal(){
     const modal=$('#wishlistMiniModal');if(!modal?.classList.contains('show'))return;const body=$('#wishlistMiniBody');if(!body||$('.tw-wish-prio',body))return;const note=$('#wishNote',body);if(!note)return;
