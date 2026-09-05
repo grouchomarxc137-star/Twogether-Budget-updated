@@ -1,0 +1,56 @@
+/* Twogether refinement v11 — calm navigation, priority ordering and quieter trip budgets. */
+
+/* Hover navigation: the menu is reachable without clicking the hub first. */
+.tw-nav-wrap{padding-bottom:8px;margin-bottom:-8px}
+.tw-nav-menu{top:100%!important;margin-top:0!important;padding-top:9px!important;background:transparent!important;border:0!important;box-shadow:none!important;min-width:220px!important}
+.tw-nav-menu::before{content:"";position:absolute;left:0;right:0;top:0;height:10px}
+.tw-nav-menu button{background:rgba(255,254,250,.99)!important;border-left:1px solid var(--line)!important;border-right:1px solid var(--line)!important;border-radius:0!important;padding:11px 13px!important}
+.tw-nav-menu button:first-child{border-top:1px solid var(--line)!important;border-radius:14px 14px 0 0!important;padding-top:12px!important}
+.tw-nav-menu button:last-child{border-bottom:1px solid var(--line)!important;border-radius:0 0 14px 14px!important;padding-bottom:12px!important;box-shadow:0 16px 36px rgba(55,44,34,.11)}
+.tw-nav-menu button:only-child{border-radius:14px!important}
+.tw-nav-menu button:hover,.tw-nav-menu button:focus-visible{background:#eee8df!important;outline:none}
+.tw-nav-wrap.menu-open .tw-nav-menu{display:grid!important;gap:0!important}
+
+/* Wishlist priority filter: clearer labels and tighter control. */
+.tw-prio-filter{gap:8px!important}
+.tw-prio-filter select{min-width:138px;padding:7px 10px!important}
+#financeWishlist .wishlist-table tbody tr.v11-hidden{display:none!important}
+#financeWishlist .wishlist-table tbody tr{cursor:default}
+#financeWishlist .wishlist-table tbody tr:hover{background:#eee8df!important}
+
+/* Trip budgets: switch from a dashboard of colored boxes to a calm full-width list. */
+#budgetPlanGrid.budget-plan-grid{grid-template-columns:1fr!important;max-width:980px;margin-left:auto;margin-right:auto;gap:12px!important}
+.budget-planner-head{max-width:980px;margin-left:auto;margin-right:auto}
+.budget-plan-card{border-radius:18px!important;padding:18px 20px!important;box-shadow:0 5px 18px rgba(55,44,34,.035)!important;transition:background .14s ease,border-color .14s ease!important}
+.budget-plan-card:hover{background:#fdfbf7!important;border-color:#ddd3c8!important}
+.budget-plan-top{align-items:center!important}
+.budget-plan-top h3{font-size:22px!important;margin:1px 0 3px!important}
+.budget-plan-top p{font-size:12px!important}
+.budget-plan-status,.budget-plan-status.live,.budget-plan-status.done{background:transparent!important;border:0!important;padding:0!important;border-radius:0!important;font-size:10px!important;letter-spacing:.05em;text-transform:uppercase;color:#7b746d!important}
+.budget-plan-card .v5-reference{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;margin:10px 0 0!important;padding:10px 0!important;border-top:1px solid #eee7df!important;border-bottom:1px solid #eee7df!important}
+.budget-plan-card .v5-reference span{margin:0!important;font-size:11px!important;color:var(--muted)!important}
+.budget-plan-card .v5-reference strong{font-size:17px!important;margin:0!important;white-space:nowrap}
+.budget-person-grid{display:block!important;margin:0!important}
+.budget-person{display:grid!important;grid-template-columns:minmax(90px,.7fr) minmax(95px,.8fr) minmax(0,2fr)!important;align-items:center!important;gap:10px!important;background:transparent!important;border:0!important;border-bottom:1px solid #eee7df!important;border-radius:0!important;padding:10px 0!important;box-shadow:none!important}
+.budget-person:last-child{border-bottom:0!important}
+.budget-person span{font-size:11px!important;color:var(--muted)!important}
+.budget-person strong{font-size:16px!important;margin:0!important}
+.budget-person small{font-size:11px!important;line-height:1.35!important;margin:0!important;color:#777069!important}
+.budget-person.over,.budget-person.under{background:transparent!important;border-color:#eee7df!important}
+.budget-person.over small,.budget-person.over strong{color:#98574d!important}
+.budget-person.under small,.budget-person.under strong{color:#5d775d!important}
+.budget-total-check,.budget-total-check.over,.budget-total-check.under{background:transparent!important;border:0!important;border-top:1px solid #e9e1d8!important;border-radius:0!important;padding:10px 0 0!important;margin-top:0!important;font-size:12px!important}
+.budget-total-check span{color:var(--muted)!important}
+.budget-total-check strong{font-size:13px!important}
+.budget-total-check.over strong{color:#98574d!important}.budget-total-check.under strong{color:#5d775d!important}
+.budget-plan-actions{margin-top:12px!important;padding-top:0!important;gap:7px!important}
+.budget-plan-actions .btn{padding:8px 12px!important;font-size:12px!important;border-radius:11px!important}
+.budget-locked-note{width:100%;padding:0!important;margin:0 0 2px!important;color:#817a72!important;font-size:10px!important}
+
+@media(max-width:700px){
+  .tw-nav-menu{min-width:190px!important}
+  .budget-plan-card{padding:16px!important}
+  .budget-person{grid-template-columns:1fr auto!important;gap:4px 10px!important}
+  .budget-person small{grid-column:1/-1!important;padding-bottom:2px}
+  .budget-plan-card .v5-reference{align-items:flex-start!important}
+}
