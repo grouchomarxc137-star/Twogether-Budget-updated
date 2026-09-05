@@ -1,0 +1,22 @@
+const {chromium}=require('playwright');
+const http=require('http'),fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const {backend}=require('./backend.cjs');
+(async()=>{
+  const b=backend();
+  const meta={location:'Italy',city:'Lonato',start:'2026-09-03',end:'2026-09-04'};
+  b.post('savePlan',{meta,budget:234},'Principessa');
+  const server=http.createServer((req,res)=>{let name=decodeURIComponent(req.url.split('?')[0]);if(name==='/')name='/index.html';const file=path.join(process.cwd(),name);if(!file.startsWith(process.cwd()))return res.writeHead(403).end();try{const data=fs.readFileSync(file);res.setHeader('Content-Type',name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(data);}catch{res.writeHead(404).end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('https://script.google.com/**',async route=>{const req=route.request();if(req.method()==='POST'){const q=new URLSearchParams(req.postData());const result=b.post(q.get('action'),JSON.parse(q.get('payload')),q.get('actor'));await route.fulfill({contentType:'text/html',body:`<script>window.top.postMessage(${JSON.stringify({type:'twogether:saved',requestId:q.get('requestId'),result})},'*')</script>`});}else{const u=new URL(req.url()),cb=u.searchParams.get('callback');await route.fulfill({contentType:'application/javascript',body:cb+'('+JSON.stringify({ok:true,state:b.state()})+')'});}});
+  await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:''}));
+  await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.identity-choice[data-actor="Principessa"]').click();
+  const card=page.locator('[data-current-plan]').first();await card.waitFor({timeout:10000});await page.locator('.tw-trip-art').first().waitFor();
+  await page.locator('[data-hub="trips"]').hover();const menu=page.locator('.tw-nav-wrap:has([data-hub="trips"]) .tw-nav-menu');await menu.waitFor();const mb=await menu.boundingBox();assert.ok(mb.x>=0&&mb.x+mb.width<=1440,'Trips menu stays inside viewport');
+  await card.locator('[data-current-open]').click();const dialog=page.locator('dialog.current-overview');await dialog.waitFor();const db=await dialog.boundingBox();assert.ok(db.x>=0&&db.y>=0&&db.x+db.width<=1440&&db.y+db.height<=900,'Overview stays fully inside viewport');assert.equal(await dialog.locator('.overview-payment-grid').count(),1);await dialog.locator('[data-overview-close]').click();
+  await page.locator('#twDevToggle').click();assert.equal(await page.locator('#loggedUserBadge').innerText(),'DEV');assert.equal(await page.locator('body').evaluate(e=>e.classList.contains('dev-v19')),true);await page.locator('.dev19-inspector').waitFor();
+  await card.hover();await page.locator('.dev19-float').waitFor();await page.locator('.dev19-float [data-d19-edit]').click();assert.equal(await page.locator('.dev19-inspector').isVisible(),true);
+  await page.locator('.dev19-bottom [data-d19-text]').click();assert.equal(await page.locator('[data-dev19-added]').count(),1);await page.keyboard.press('Control+z');assert.equal(await page.locator('[data-dev19-added]').count(),0);await page.keyboard.press('Control+y');assert.equal(await page.locator('[data-dev19-added]').count(),1);
+  page.once('dialog',d=>d.accept());await page.locator('.dev19-bottom [data-d19-reset]').click();assert.equal(await page.locator('[data-dev19-added]').count(),0);await page.keyboard.press('Control+z');assert.equal(await page.locator('[data-dev19-added]').count(),1);await page.locator('.dev19-bottom [data-d19-exit]').click();assert.equal(await page.locator('body').evaluate(e=>e.classList.contains('dev-v19')),false);
+  assert.deepEqual(errors,[]);console.log('v19 browser regression passed: unclipped nav, aesthetic cards, contained overview, advanced DEV persistence controls.');
+  await browser.close();server.close();
+})().catch(e=>{console.error(e);process.exit(1);});
