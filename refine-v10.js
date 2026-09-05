@@ -6,7 +6,6 @@
   const CONFIG=window.TOGETHER_BUDGET_CONFIG||{};
   const API_URL=String(CONFIG.appsScriptUrl||'').trim();
   const ACTOR_KEY='twogether_actor_v1';
-  const MONEY_FIELDS=['accom','groceries','eat','travel','fuel','tolls','other'];
   const FIELD_LABELS={travel:'Flights / Train',accom:'Accommodation',fuel:'Fuel',groceries:'Groceries',eat:'Eating out',tolls:'Tolls / Parking',other:'Other'};
   const PARTIAL_ORDER=['travel','accom','fuel','groceries','eat','tolls','other'];
 
@@ -29,7 +28,7 @@
       function done(err,data){clearTimeout(timer);try{delete window[cb];}catch{}script.remove();err?reject(err):resolve(data);}
       window[cb]=data=>done(null,data);
       const q=new URLSearchParams({...params,callback:cb,_:String(Date.now())});
-      script.src=API_URL+(API_URL.includes('?')?'&':'?')+q;
+      script.src=API_URL+(API_URL.includes('?')?'&':'?')+q.toString();
       script.onerror=()=>done(new Error('Could not reach backend'));
       document.head.appendChild(script);
     });
@@ -102,6 +101,7 @@
 
   function enhanceTripChoices(root=document){
     $$('.trip-pick',root).forEach(btn=>{
+      if(btn.dataset.v10Choice==='1')return;
       const strong=btn.querySelector('strong');const icon=btn.querySelector('.pick-icon');if(!strong)return;
       const text=strong.textContent.trim();
       if(/^Yes ·/i.test(text)){strong.textContent=text.replace(/^Yes ·\s*/i,'Log expenses · ');if(icon)icon.textContent='→';}
@@ -109,6 +109,7 @@
       if(/Start a new trip/i.test(text)&&icon)icon.textContent='+';
       if(/Add your version/i.test(text)&&icon)icon.textContent='→';
       if(/Match the differences/i.test(text)&&icon)icon.textContent='=';
+      btn.dataset.v10Choice='1';
     });
   }
 
@@ -121,15 +122,11 @@
     const savedKeys=new Set($$('[data-v5-partial-saved]',overlay).map(b=>b.dataset.v5PartialSaved));
     stack.innerHTML='';
     PARTIAL_ORDER.filter(k=>!savedKeys.has(k)).forEach(key=>{
-      const clone=proxy.cloneNode(true);clone.dataset.v5PartialKey=key;
+      const clone=proxy.cloneNode(true);clone.dataset.v5PartialKey=key;clone.dataset.v10Choice='1';
       const strong=clone.querySelector('strong'),small=clone.querySelector('small'),icon=clone.querySelector('.pick-icon');
       if(strong)strong.textContent=FIELD_LABELS[key];if(small)small.textContent='Add '+FIELD_LABELS[key].toLowerCase();
       if(icon)icon.textContent=key==='travel'?'✈':key==='accom'?'⌂':key==='fuel'?'⛽':'+';
-      clone.addEventListener('click',e=>{
-        e.preventDefault();
-        const live=$('[data-v5-partial-key]',overlay);if(!live)return;
-        live.dataset.v5PartialKey=key;live.click();
-      });
+      clone.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();proxy.dataset.v5PartialKey=key;proxy.click();});
       stack.appendChild(clone);
     });
     stack.dataset.v10Expanded='1';
@@ -140,30 +137,33 @@
     let s=String(text||'').replace(/[^0-9,.-]/g,'');if(!s)return null;
     const c=s.lastIndexOf(','),d=s.lastIndexOf('.');
     if(c>=0&&d>=0){const dec=c>d?',':'.';const thou=dec===','?'.':',';s=s.split(thou).join('').replace(dec,'.');}
-    else if(c>=0)s=s.replace(',','.');
+    else if(c>=0){const tail=s.length-c-1;s=tail===2?s.replace(',','.'):s.replace(/,/g,'');}
+    else if(d>=0){const tail=s.length-d-1;if(tail!==2)s=s.replace(/\./g,'');}
     const n=Number(s);return Number.isFinite(n)?n:null;
   }
 
   function decorateTripModal(){
     const root=$('#tripModalBody');if(!root||!root.children.length)return;
-    root.querySelectorAll('.tw-trip-warning').forEach(x=>x.remove());
     const differences=$$('.difference-row',root);
+    const total=parseMoney(root.querySelector('.trip-modal-total strong')?.textContent||'');
+    const paid=$$('.submission-card',root).map(card=>{const m=(card.querySelector(':scope > small')?.textContent||'').match(/Paid:\s*([^·]+)/i);return m?parseMoney(m[1]):null;}).filter(v=>v!=null);
+    const paidTotal=paid.length>=2?paid.reduce((a,b)=>a+b,0):null;
+    const delta=total!=null&&paidTotal!=null?total-paidTotal:null;
+    const sig=`${differences.length}|${total}|${paidTotal}|${delta}`;
+    if(root.dataset.v10WarningSig===sig)return;
+    root.dataset.v10WarningSig=sig;
+    root.querySelectorAll('.tw-trip-warning').forEach(x=>x.remove());
     const anchor=root.querySelector('.difference-list')||root.querySelector('.submission-grid')||root.firstElementChild;
     if(differences.length){
       const box=document.createElement('div');box.className='tw-trip-warning soft';
-      box.innerHTML=`<strong>${differences.length} detail${differences.length===1?'':'s'} still differ</strong>The calculation amounts may match, but the trip is not fully matched until every highlighted detail matches.`;
+      box.innerHTML=`<strong>${differences.length} detail${differences.length===1?'':'s'} still differ</strong>The amounts can match while a note or other detail still differs. The trip is not fully matched until every highlighted detail matches.`;
       anchor?.parentNode?.insertBefore(box,anchor);
     }
-    const total=parseMoney(root.querySelector('.trip-modal-total strong')?.textContent||'');
-    const paid=$$('.submission-card',root).map(card=>{const m=(card.querySelector(':scope > small')?.textContent||'').match(/Paid:\s*([^·]+)/i);return m?parseMoney(m[1]):null;}).filter(v=>v!=null);
-    if(total!=null&&paid.length>=2){
-      const paidTotal=paid.reduce((a,b)=>a+b,0),delta=total-paidTotal;
-      if(Math.abs(delta)>.01){
-        const box=document.createElement('div');box.className='tw-trip-warning';
-        box.innerHTML=`<strong>Payment totals do not match the trip expenses</strong>${money(total)} in expenses are recorded, but ${money(paidTotal)} is assigned as paid. Difference: ${money(Math.abs(delta))}.`;
-        const target=root.querySelector('.trip-budget-comparison')||root.querySelector('.budget-check')||anchor;
-        target?.parentNode?.insertBefore(box,target.nextSibling);
-      }
+    if(delta!=null&&Math.abs(delta)>.01){
+      const box=document.createElement('div');box.className='tw-trip-warning';
+      box.innerHTML=`<strong>Payment totals do not match the trip expenses</strong>${money(total)} in expenses are recorded, but ${money(paidTotal)} is assigned as paid. Difference: ${money(Math.abs(delta))}.`;
+      const target=root.querySelector('.trip-budget-comparison')||root.querySelector('.budget-check')||anchor;
+      target?.parentNode?.insertBefore(box,target.nextSibling);
     }
   }
 
@@ -177,13 +177,19 @@
     const table=$('.wishlist-table',root);if(!table)return;
     if(!table.dataset.v10){
       const head=table.querySelector('thead tr'); if(head){const th=document.createElement('th');th.textContent='Prio';head.insertBefore(th,head.firstElementChild);}
-      $$('tbody tr',table).forEach(tr=>{const noteCell=tr.children[1];if(!noteCell)return;const raw=(noteCell.querySelector('.wishlist-note-text')?.textContent||'').trim();const parts=stripPrio(raw);const td=document.createElement('td');td.innerHTML=`<span class="tw-prio-pill">${parts.prio}</span>`;tr.insertBefore(td,tr.firstElementChild);const text=noteCell.querySelector('.wishlist-note-text');if(text)text.textContent=parts.note;tr.dataset.prio=parts.prio;});
-      const foot=table.querySelector('tfoot tr');if(foot){const td=document.createElement('td');td.textContent='';foot.insertBefore(td,foot.firstElementChild);const first=foot.children[1];if(first?.colSpan)first.colSpan=Math.max(1,first.colSpan-1);}
+      $$('tbody tr',table).forEach(tr=>{
+        const noteCell=tr.children[1];if(!noteCell)return;
+        const raw=(noteCell.querySelector('.wishlist-note-text')?.textContent||'').trim();const parts=stripPrio(raw);
+        const td=document.createElement('td');td.innerHTML=`<span class="tw-prio-pill">${parts.prio}</span>`;tr.insertBefore(td,tr.firstElementChild);
+        const text=noteCell.querySelector('.wishlist-note-text');if(text)text.textContent=parts.note;tr.dataset.prio=parts.prio;
+      });
+      const foot=table.querySelector('tfoot tr');if(foot){const td=document.createElement('td');td.textContent='';foot.insertBefore(td,foot.firstElementChild);}
       table.dataset.v10='1';
     }
     const headWrap=$('.wishlist-head',root);if(headWrap&&!$('.tw-prio-filter',headWrap)){
       const filter=document.createElement('div');filter.className='tw-prio-filter';filter.innerHTML='<label>Priority</label><select><option value="all">All</option><option>P1</option><option>P2</option><option>P3</option><option>P4</option><option>P5</option></select>';
-      headWrap.insertBefore(filter,headWrap.lastElementChild);filter.querySelector('select').addEventListener('change',e=>$$('tbody tr',table).forEach(tr=>tr.style.display=e.target.value==='all'||tr.dataset.prio===e.target.value?'':'none'));
+      headWrap.insertBefore(filter,headWrap.lastElementChild);
+      filter.querySelector('select').addEventListener('change',e=>$$('tbody tr',table).forEach(tr=>tr.style.display=e.target.value==='all'||tr.dataset.prio===e.target.value?'':'none'));
     }
   }
 
@@ -192,28 +198,33 @@
     const body=$('#wishlistMiniBody');if(!body||$('.tw-wish-prio',body))return;
     const note=$('#wishNote',body);if(!note)return;
     const parsed=stripPrio(note.value);note.value=parsed.note;
-    const label=document.createElement('label');label.className='tw-wish-prio';label.innerHTML=`Priority<select id="wishPrio"><option>P1</option><option>P2</option><option selected>P3</option><option>P4</option><option>P5</option></select></label>`;
+    const label=document.createElement('label');label.className='tw-wish-prio';label.innerHTML='Priority<select id="wishPrio"><option>P1</option><option>P2</option><option selected>P3</option><option>P4</option><option>P5</option></select>';
     const fields=$('.wishlist-fields',body);fields?.insertBefore(label,fields.firstElementChild);$('#wishPrio',body).value=parsed.prio;
     const save=$('[data-wish-save]',body);save?.addEventListener('click',()=>{note.value=encodePrio(note.value,$('#wishPrio',body)?.value||'P3');},true);
   }
 
   async function openDev(){
     let modal=$('#twDevModal');
-    if(!modal){modal=document.createElement('div');modal.id='twDevModal';modal.className='tw-dev-modal';modal.innerHTML='<div class="tw-dev-backdrop" data-dev-close></div><div class="tw-dev-card"><button class="tw-dev-close" type="button" data-dev-close>×</button><div id="twDevBody"></div></div>';document.body.appendChild(modal);$$('[data-dev-close]',modal).forEach(x=>x.addEventListener('click',()=>modal.classList.remove('show')));}
+    if(!modal){
+      modal=document.createElement('div');modal.id='twDevModal';modal.className='tw-dev-modal';
+      modal.innerHTML='<div class="tw-dev-backdrop" data-dev-close></div><div class="tw-dev-card"><button class="tw-dev-close" type="button" data-dev-close>×</button><div id="twDevBody"></div></div>';
+      document.body.appendChild(modal);$$('[data-dev-close]',modal).forEach(x=>x.addEventListener('click',()=>modal.classList.remove('show')));
+    }
     modal.classList.add('show');const body=$('#twDevBody');body.innerHTML='<h2>Dev tools</h2><p>Loading maintenance controls…</p>';
     try{
       const res=await jsonp({action:'state'});if(!res?.ok)throw new Error('Could not load state');const state=res.state||{};const a=actor();
       const tripRows=(state.trips||[]).map(t=>{const s=t.submissions?.Principessa||t.submissions?.Principe||{};return `<div class="tw-dev-row"><div><strong>${esc(s.city||'Trip')}</strong><small>${esc(s.start||'')} ${s.end?'– '+esc(s.end):''}</small></div><button class="tw-dev-delete" data-dev-trip="${esc(t.id)}">Delete trip</button></div>`;}).join('')||'<div class="tw-dev-empty">No trips to delete.</div>';
       const months=(state.finances?.[a]||[]).map(m=>`<div class="tw-dev-row"><div><strong>${esc(m.month||'Month')}</strong><small>${m.finalized?'Confirmed':'Draft'}</small></div><button class="tw-dev-delete" data-dev-month="${esc(m.month)}">Delete month</button></div>`).join('')||'<div class="tw-dev-empty">No finance months to delete.</div>';
-      body.innerHTML=`<h2>Dev tools</h2><p>Maintenance controls for ${esc(a||'current user')}. Deletions require confirmation.</p><section class="tw-dev-section"><h3>Trips</h3>${tripRows}</section><section class="tw-dev-section"><h3>Monthly finances</h3>${months}</section>`;
+      body.innerHTML=`<h2>Dev tools</h2><p>Maintenance controls for ${esc(a||'current user')}. Deletions always ask for confirmation.</p><section class="tw-dev-section"><h3>Trips</h3>${tripRows}</section><section class="tw-dev-section"><h3>Monthly finances</h3>${months}</section>`;
       $$('[data-dev-trip]',body).forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Delete this trip? This cannot be undone.'))return;await post('deleteTrip',{id:b.dataset.devTrip});toast('Trip deleted');setTimeout(()=>location.reload(),900);}));
       $$('[data-dev-month]',body).forEach(b=>b.addEventListener('click',async()=>{if(!confirm(`Delete finance month ${b.dataset.devMonth}?`))return;await post('deleteFinanceMonth',{month:b.dataset.devMonth});toast('Finance month deleted');setTimeout(()=>location.reload(),900);}));
     }catch(err){body.innerHTML=`<h2>Dev tools</h2><p>${esc(err.message||'Could not load dev tools')}</p>`;}
   }
 
   function simplifyText(){
-    const scenarioHead=$('#financeScenarios .finance-scenario-head h2');if(scenarioHead)scenarioHead.textContent='Purchases';
-    const compare=$('#compare .page-heading');if(compare){const h=compare.querySelector('h1');if(h)h.textContent='Compare';}
+    const scenarioHead=$('#financeScenarios .finance-scenario-head h2');if(scenarioHead&&scenarioHead.textContent!=='Purchases')scenarioHead.textContent='Purchases';
+    const compare=$('#compare .page-heading h1');if(compare&&compare.textContent!=='Compare')compare.textContent='Compare';
+    const monthly=$('#monthly .page-heading h1');if(monthly&&monthly.textContent!=='Monthly trips')monthly.textContent='Monthly trips';
   }
 
   function refreshEnhancements(){
