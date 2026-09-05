@@ -18,7 +18,9 @@ jobs:
           node --check workflow.js
           node --check app.js
       - name: Check Apps Script syntax as JavaScript
-        run: node --check backend/Code-v16.gs
+        run: |
+          cp backend/Code-v16.gs /tmp/code-v16.js
+          node --check /tmp/code-v16.js
       - name: Check new assets exist
         run: |
           test -f shared-expenses-v14.css
