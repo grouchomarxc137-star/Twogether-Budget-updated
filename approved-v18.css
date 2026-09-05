@@ -95,7 +95,7 @@
 .finance-subpage-heading{margin-bottom:18px}
 #financeScenarios .panel-kicker,#financeWishlist .panel-kicker{display:none}
 .finance-subview[data-fin-view="scenarios"] .finance-scenario-head>div,
-.finance-subview[data-fin-view="wishlist"] .wishlist-head>div{display:none}
+.finance-subview[data-fin-view="wishlist"] .wishlist-head>div:not(.tw-prio-filter){display:none}
 .finance-subview[data-fin-view="scenarios"] .finance-scenario-head,
 .finance-subview[data-fin-view="wishlist"] .wishlist-head{justify-content:flex-end;margin-bottom:14px}
 
