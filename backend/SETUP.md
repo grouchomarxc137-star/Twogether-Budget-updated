@@ -1,5 +1,11 @@
 # Google Apps Script shared backend setup
 
+## Updating the existing deployment to v17
+
+Replace Code.gs in your existing Apps Script project with the entire contents of this repository's `backend/Code.gs` (also supplied as `Code-v17.gs`). Save, then choose Deploy → Manage deployments → Edit → New version → Deploy. Keep the same Web App deployment and URL. Your saved database stays in place; do not run the reset helper.
+
+v17 is required for acknowledged saves, shared-payment reconciliation and editable current-trip budgets. The site reports an update-required error instead of claiming an unconfirmed save succeeded.
+
 The website is already prepared to use this backend. You only need to deploy the Apps Script once and paste its Web App URL into `config.js`.
 
 ## 1. Create the Apps Script project

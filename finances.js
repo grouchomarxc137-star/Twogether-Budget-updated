@@ -130,21 +130,7 @@
     });
   }
 
-  function post(action,payload){
-    return new Promise((resolve,reject)=>{
-      const a=actor();
-      if(!API_URL) return reject(new Error('Backend URL missing'));
-      if(!a) return reject(new Error('Choose your profile first'));
-      const frame=document.querySelector('iframe[name="backendFrame"]');
-      if(!frame) return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API_URL; form.target='backendFrame'; form.style.display='none';
-      Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{
-        const input=document.createElement('input'); input.type='hidden'; input.name=k; input.value=v; form.appendChild(input);
-      });
-      document.body.appendChild(form); form.submit(); form.remove(); setTimeout(resolve,700);
-    });
-  }
+  function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
 
   function ownMonths(){ return financeState.finances?.[actor()] || []; }
   function recordFor(month){ return ownMonths().find(x=>x.month===month) || null; }

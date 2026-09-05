@@ -198,33 +198,7 @@
     });
   }
 
-  function postAction(action,payload){
-    return new Promise((resolve,reject)=>{
-      if(!API_URL) return reject(new Error('Backend not configured'));
-      const frame = document.querySelector('iframe[name="backendFrame"]');
-      if(!frame) return reject(new Error('Backend frame missing'));
-
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = API_URL;
-      form.target = 'backendFrame';
-      form.style.display = 'none';
-      const fields = {action,actor,payload:JSON.stringify(payload||{})};
-      Object.entries(fields).forEach(([k,v])=>{
-        const input = document.createElement('input');
-        input.type='hidden';input.name=k;input.value=v;
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      form.remove();
-
-      setTimeout(async()=>{
-        try{ await syncNow(true); resolve(); }
-        catch(err){ reject(err); }
-      },900);
-    });
-  }
+  async function postAction(action,payload){const result=await window.TwogetherAPI.post(action,payload,actor);await syncNow(true);return result;}
 
   async function syncNow(showErrors=false){
     if(!API_URL || syncBusy) return;
@@ -305,6 +279,8 @@
   }
 
   function beginJoin(id){
+    const plan=window.TwogetherWorkflow?.state.plans.find(p=>p.linkedTripId===id);
+    if(plan){window.TwogetherWorkflow.start(plan.id);return;}
     const t = state.trips.find(x=>x.id===id);
     if(!t || isLocked(t)) return;
     const meta = tripMeta(t);
@@ -316,6 +292,8 @@
   }
 
   function beginEdit(id){
+    const plan=window.TwogetherWorkflow?.state.plans.find(p=>p.linkedTripId===id);
+    if(plan){window.TwogetherWorkflow.start(plan.id);return;}
     const t = state.trips.find(x=>x.id===id);
     const own = t?.submissions?.[actor];
     if(!t || !own || isLocked(t)) return;
@@ -359,7 +337,7 @@
       {key:'city',title:'Which city or area?',help:`For example: ${locationExample}.`,type:'text',placeholder:`e.g. ${locationExample}`},
       {key:'start',title:'When did the trip start?',type:'date'},
       {key:'end',title:'When did it end?',type:'date'},
-      {key:'budget',title:'What is your ideal total budget for this trip?',help:'This is your shared target before the trip. You can skip it if you do not want to set one.',type:'budget',optional:true},
+      {key:'budget',title:'What is your ideal total budget for this trip?',help:'Enter your own budget. Your partner adds theirs separately.',type:'budget',optional:true},
       ...moneySteps
     ].filter(s=>!s.when || s.when(wizard.draft));
   }
@@ -638,7 +616,7 @@
       return;
     }
 
-    const sorted=[...state.trips].sort((a,b)=>String(tripMeta(b).start||b.updatedAt||'').localeCompare(String(tripMeta(a).start||a.updatedAt||'')));
+    const sorted=state.trips.filter(isLocked).sort((a,b)=>String(tripMeta(b).start||b.updatedAt||'').localeCompare(String(tripMeta(a).start||a.updatedAt||'')));
     root.innerHTML=sorted.map(t=>{
       const e=effectiveTrip(t),m=tripMeta(t),d= differences(t),budget=budgetInfo(t);
       let status='';let statusClass='status-wait';
@@ -834,7 +812,10 @@
     if(brand){brand.removeAttribute('title');brand.style.cursor='default';}
   }
 
+  window.TwogetherApp={open:openTripModal};
+
   function init(){
+    document.addEventListener('twogether:saved',()=>syncNow(false));
     bindStatic();
     renderDataViews();
     let saved='';
@@ -845,3 +826,4 @@
 
   document.addEventListener('DOMContentLoaded',init);
 })();
+

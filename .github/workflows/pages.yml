@@ -23,12 +23,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Validate assets and backend
+        run: node tests/validate.cjs
+      - name: Test payment and confirmation rules
+        run: node tests/backend.cjs
+      - name: Prepare public files
+        run: |
+          mkdir public
+          cp *.html *.js *.css public/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: public
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

@@ -2,10 +2,11 @@ const STATE_KEY = 'TOGETHER_BUDGET_STATE_V1';
 const MAX_AUDIT = 2;
 const ACTORS = ['Principessa', 'Principe'];
 const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other'];
+const SHARED_EXPENSE_KEYS = ['accom','travel'];
 
 function defaultState_() {
   return {
-    version: 15,
+    version: 17,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
@@ -31,7 +32,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 15,
+      version: 17,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -78,6 +79,7 @@ function migrateTrip_(trip) {
     id: cleanText_(trip && trip.id, 80) || Utilities.getUuid(),
     budget: cleanMoney_(trip && trip.budget),
     submissions: {Principessa:null, Principe:null},
+    sharedExpenses: sanitizeSharedExpenses_(trip && trip.sharedExpenses),
     confirmed: {Principessa:false, Principe:false},
     createdAt: cleanText_(trip && trip.createdAt, 40) || now,
     createdBy: cleanActor_(trip && trip.createdBy) === 'Unknown' ? actor : cleanActor_(trip && trip.createdBy),
@@ -89,11 +91,13 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 14;
+  state.version = 17;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
+  state.trips = Array.isArray(state.trips) ? state.trips.map(sanitizeTripRecord_) : [];
   state.finances = sanitizeFinances_(state.finances);
+  state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
   PropertiesService.getScriptProperties().setProperty(STATE_KEY, JSON.stringify(state));
 }
 
@@ -111,7 +115,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version:14, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version: 17, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -119,7 +123,7 @@ function doGet(e) {
   }
 }
 
-function doPost(e) {
+function handlePost_(e) {
   const p = (e && e.parameter) || {};
   const action = String(p.action || '');
   const actor = cleanActor_(p.actor);
@@ -141,18 +145,8 @@ function doPost(e) {
 
       if (idx >= 0) {
         plan = sanitizePlan_(state.plans[idx]);
-        if (plan.partials && plan.partials[actor]) {
-          throw new Error('Your planned budget is locked because you already started logging actual expenses');
-        }
-        if (plan.linkedTripId) {
-          const linkedTrip = state.trips.find(t => t.id === plan.linkedTripId);
-          if (linkedTrip) {
-            const safeTrip = sanitizeTripRecord_(linkedTrip);
-            if (safeTrip.submissions[actor]) {
-              throw new Error('Your planned budget is locked because you already logged your actual expenses');
-            }
-          }
-        }
+        const lockedTrip=state.trips.find(t=>t.id===plan.linkedTripId);
+        if(lockedTrip && isTripLocked_(lockedTrip))throw new Error('This trip is already confirmed by both of you');
         if (payload.meta && actor === plan.createdBy) {
           plan.meta = sanitizePlanMeta_(payload.meta);
         }
@@ -161,17 +155,18 @@ function doPost(e) {
         if (!meta.location || !meta.city || !meta.start || !meta.end) {
           throw new Error('Add the trip location, city and dates first');
         }
-        plan = {
+        plan = sanitizePlan_({
           id: Utilities.getUuid(),
           meta: meta,
           budgets: {Principessa:'', Principe:''},
           partials: {Principessa:null, Principe:null},
+          sharedExpenses: {},
           linkedTripId: '',
           createdAt: now,
           createdBy: actor,
           updatedAt: now,
           updatedBy: actor
-        };
+        });
         state.plans.push(plan);
         idx = state.plans.length - 1;
       }
@@ -185,6 +180,60 @@ function doPost(e) {
       addAudit_(state, actor, 'setIndividualBudget', plan.id);
       saveState_(state);
       return output_({ok:true, planId:plan.id});
+    }
+
+    if (action === 'saveSharedExpense') {
+      const planId = cleanText_(payload.planId, 80);
+      const key = cleanText_(payload.key, 20);
+      if (SHARED_EXPENSE_KEYS.indexOf(key) < 0) throw new Error('This shared expense category is not supported yet');
+      const planIdx = state.plans.findIndex(x => x.id === planId);
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const linkedTrip = plan.linkedTripId ? state.trips.find(t => t.id === plan.linkedTripId) : null;
+      if (linkedTrip && isTripLocked_(linkedTrip)) throw new Error('This trip is already confirmed by both of you');
+
+      const current = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses[key]);
+      let total = cleanMoney_(payload.total);
+      if(payload.expectedTotal!==undefined && String(payload.expectedTotal)!==String(current.total))throw new Error('The total changed while you were editing. Reopen this expense and review the latest total.');
+      if(payload.total!=='' && payload.total!=null && total==='')throw new Error('Enter a valid non-negative total');
+      const mode = cleanSharedMode_(payload.mode);
+      const paid = cleanMoney_(payload.paid);
+      const unknown = payload.unknown === true;
+      const totalUncertain = payload.totalUncertain === true;
+      if (!mode) throw new Error('Choose whether this was fully paid by you or shared');
+      if (paid === '') throw new Error('Enter how much you paid');
+      if (mode === 'full' && total === '') total = paid;
+
+      if (mode === 'full' && Math.abs(Number(total)-Number(paid)) > .005) throw new Error('Fully paid must equal the total bill');
+      const other=actor==='Principessa'?'Principe':'Principessa';
+      if (mode === 'full') {
+        if(Number(current.paid[other])>0) throw new Error('Your partner has recorded a payment. Reconcile that payment before marking this fully paid by you.');
+        current.mode[other]='';current.paid[other]=0;current.unknown[other]=false;
+      } else if(current.mode[other]==='full') {
+        current.mode[other]='shared';
+      }
+      current.mode[actor] = mode;
+      current.paid[actor] = paid;
+      current.unknown[actor] = unknown;
+      if (total !== '') {
+        current.totals[actor]=total;
+        current.total = total;
+        current.totalUncertain = totalUncertain;
+        current.totalKnownBy = actor;
+      } else if (current.total === '' && unknown) {
+        current.total = '';
+        current.totalUncertain = true;
+      }
+      current.updatedAt = new Date().toISOString();
+      current.updatedBy = actor;
+      plan.sharedExpenses[key] = current;
+      syncSharedExpenseIntoPlanAndTrip_(state, plan, key);
+      plan.updatedAt = current.updatedAt;
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, 'saveSharedExpense:' + key, plan.id);
+      saveState_(state);
+      return output_({ok:true, planId:plan.id, sharedExpense:plan.sharedExpenses[key]});
     }
 
     if (action === 'savePlanPartial') {
@@ -207,6 +256,7 @@ function doPost(e) {
       });
       if (incoming.otherNote !== undefined) merged.otherNote = incoming.otherNote;
       merged.uncertain = Object.assign({}, previous.uncertain || {}, incoming.uncertain || {});
+      applySharedTotalsToDraft_(plan, merged);
       merged.updatedAt = new Date().toISOString();
       const partial = sanitizePartialActual_(merged, actor);
       if (!partial) throw new Error('Add at least one expense first');
@@ -234,16 +284,17 @@ function doPost(e) {
           throw new Error('This trip is already confirmed by both of you');
         }
       } else {
-        trip = {
+        trip = sanitizeTripRecord_({
           id: Utilities.getUuid(),
           budget: '',
           submissions: {Principessa:null, Principe:null},
+          sharedExpenses: plan.sharedExpenses,
           confirmed: {Principessa:false, Principe:false},
           createdAt: now,
           createdBy: actor,
           updatedAt: now,
           updatedBy: actor
-        };
+        });
         state.trips.push(trip);
         tripIdx = state.trips.length - 1;
         plan.linkedTripId = trip.id;
@@ -258,12 +309,14 @@ function doPost(e) {
         if (!submitted.otherNote && partial.otherNote) submitted.otherNote = partial.otherNote;
         submitted.uncertain = Object.assign({}, partial.uncertain || {}, submitted.uncertain || {});
       }
+      applySharedTotalsToDraft_(plan, submitted);
       const merged = Object.assign({}, submitted, plan.meta || {});
       const incoming = sanitizeSubmission_(merged, actor);
       const wasExisting = !!trip.submissions[actor];
       incoming.submittedAt = now;
       incoming.submittedBy = actor;
       trip.submissions[actor] = incoming;
+      trip.sharedExpenses = sanitizeSharedExpenses_(plan.sharedExpenses);
       trip.confirmed = {Principessa:false, Principe:false};
       trip.updatedAt = now;
       trip.updatedBy = actor;
@@ -291,16 +344,17 @@ function doPost(e) {
           throw new Error('This trip is already confirmed by both of you');
         }
       } else {
-        trip = {
+        trip = sanitizeTripRecord_({
           id: Utilities.getUuid(),
           budget: cleanMoney_(payload.budget),
           submissions: {Principessa:null, Principe:null},
+          sharedExpenses: {},
           confirmed: {Principessa:false, Principe:false},
           createdAt: now,
           createdBy: actor,
           updatedAt: now,
           updatedBy: actor
-        };
+        });
         state.trips.push(trip);
         idx = state.trips.length - 1;
       }
@@ -326,9 +380,14 @@ function doPost(e) {
       if (!trip.submissions.Principessa || !trip.submissions.Principe) {
         throw new Error('Both versions must be logged before confirming');
       }
+      if (!sharedExpensesResolved_(trip.sharedExpenses)) {
+        throw new Error('Accommodation or Flights / Train still has an unknown total. Add the total before confirming the trip.');
+      }
       if (!submissionsMatch_(trip.submissions.Principessa, trip.submissions.Principe)) {
         throw new Error('Your versions still differ. Edit them until they match first.');
       }
+      const warnings=reconciliationWarnings_(trip);
+      if(warnings.length)throw new Error(warnings.join(' '));
       trip.confirmed[actor] = true;
       trip.updatedAt = new Date().toISOString();
       trip.updatedBy = actor;
@@ -369,11 +428,10 @@ function doPost(e) {
       const tripId = cleanText_(old.id, 80);
       const now = new Date().toISOString();
       let idx = tripId ? state.trips.findIndex(t => t.id === tripId) : -1;
-      let trip = idx >= 0 ? sanitizeTripRecord_(state.trips[idx]) : {
-        id: Utilities.getUuid(), budget:'', submissions:{Principessa:null,Principe:null},
-        confirmed:{Principessa:false,Principe:false},
-        createdAt:now, createdBy:actor, updatedAt:now, updatedBy:actor
-      };
+      let trip = idx >= 0 ? sanitizeTripRecord_(state.trips[idx]) : sanitizeTripRecord_({
+        id: Utilities.getUuid(), budget:'', submissions:{Principessa:null,Principe:null}, sharedExpenses:{},
+        confirmed:{Principessa:false,Principe:false}, createdAt:now, createdBy:actor, updatedAt:now, updatedBy:actor
+      });
       if (trip.confirmed.Principessa && trip.confirmed.Principe) {
         throw new Error('This trip is already confirmed by both of you');
       }
@@ -474,6 +532,108 @@ function cleanMoney_(value) {
   return isFinite(num) && num >= 0 ? num : '';
 }
 
+function cleanSharedMode_(value) {
+  const mode = String(value || '');
+  return mode === 'full' || mode === 'shared' ? mode : '';
+}
+
+function emptySharedExpense_() {
+  return {
+    total:'', totalUncertain:false, totalKnownBy:'', totals:{Principessa:'',Principe:''},
+    mode:{Principessa:'',Principe:''},
+    paid:{Principessa:'',Principe:''},
+    unknown:{Principessa:false,Principe:false},
+    updatedAt:'', updatedBy:'Unknown'
+  };
+}
+
+function sanitizeSharedExpense_(item) {
+  const source = item && typeof item === 'object' ? item : {};
+  const out = emptySharedExpense_();
+  out.total = cleanMoney_(source.total);
+  out.totalUncertain = !!source.totalUncertain;
+  out.totalKnownBy = cleanActor_(source.totalKnownBy) === 'Unknown' ? '' : cleanActor_(source.totalKnownBy);
+  ACTORS.forEach(function(name){
+    out.totals[name] = cleanMoney_(source.totals && source.totals[name]);
+    out.mode[name] = cleanSharedMode_(source.mode && source.mode[name]);
+    out.paid[name] = cleanMoney_(source.paid && source.paid[name]);
+    out.unknown[name] = !!(source.unknown && source.unknown[name]);
+  });
+  out.updatedAt = cleanText_(source.updatedAt,40);
+  out.updatedBy = cleanActor_(source.updatedBy);
+  return out;
+}
+
+function sanitizeSharedExpenses_(source) {
+  const obj = source && typeof source === 'object' ? source : {};
+  return {
+    accom: sanitizeSharedExpense_(obj.accom),
+    travel: sanitizeSharedExpense_(obj.travel)
+  };
+}
+
+function applySharedTotalsToDraft_(plan, draft) {
+  draft.uncertain = Object.assign({}, draft.uncertain || {});
+  SHARED_EXPENSE_KEYS.forEach(function(key){
+    const meta = sanitizeSharedExpense_(plan && plan.sharedExpenses && plan.sharedExpenses[key]);
+    const hasAnyMode = !!(meta.mode.Principessa || meta.mode.Principe);
+    if (!hasAnyMode) return;
+    if (meta.total !== '') {
+      draft[key] = meta.total;
+      if (meta.totalUncertain) draft.uncertain[key] = true;
+      else if (draft.uncertain[key] === undefined) draft.uncertain[key] = false;
+    } else {
+      draft[key] = 0;
+      draft.uncertain[key] = true;
+    }
+  });
+}
+
+function syncSharedExpenseIntoPlanAndTrip_(state, plan, key) {
+  const meta = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses[key]);
+  plan.sharedExpenses[key] = meta;
+  if (meta.total !== '') {
+    ACTORS.forEach(function(name){
+      if (plan.partials && plan.partials[name]) {
+        plan.partials[name][key] = meta.total;
+        plan.partials[name].uncertain = Object.assign({}, plan.partials[name].uncertain || {});
+        plan.partials[name].uncertain[key] = !!meta.totalUncertain;
+      }
+    });
+  }
+  if (!plan.linkedTripId) return;
+  const idx = state.trips.findIndex(function(t){ return t.id === plan.linkedTripId; });
+  if (idx < 0) return;
+  const trip = sanitizeTripRecord_(state.trips[idx]);
+  trip.sharedExpenses = sanitizeSharedExpenses_(plan.sharedExpenses);
+  if (meta.total !== '') {
+    ACTORS.forEach(function(name){
+      if (trip.submissions[name]) {
+        trip.submissions[name][key] = meta.total;
+        trip.submissions[name].uncertain = Object.assign({}, trip.submissions[name].uncertain || {});
+        trip.submissions[name].uncertain[key] = !!meta.totalUncertain;
+      }
+    });
+  }
+  trip.confirmed = {Principessa:false,Principe:false};
+  trip.updatedAt = new Date().toISOString();
+  trip.updatedBy = plan.updatedBy;
+  state.trips[idx] = trip;
+}
+
+function sharedExpensesResolved_(source) {
+  const all = sanitizeSharedExpenses_(source);
+  return SHARED_EXPENSE_KEYS.every(function(key){
+    const m = all[key];
+    const used = !!(m.mode.Principessa || m.mode.Principe);
+    return !used || m.total !== '';
+  });
+}
+
+function isTripLocked_(trip) {
+  return !!(trip && trip.confirmed && trip.confirmed.Principessa && trip.confirmed.Principe);
+}
+
 function sanitizeFinanceIncome_(item) {
   return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
 }
@@ -542,7 +702,7 @@ function sanitizeFinanceMonth_(record, actor) {
   };
 }
 
-  function sanitizeFinanceList_(list, actor) {
+function sanitizeFinanceList_(list, actor) {
   if (!Array.isArray(list)) return [];
   const byMonth = {};
   list.slice(-36).forEach(function(record) {
@@ -684,6 +844,7 @@ function sanitizePlan_(plan) {
       Principessa: sanitizePartialActual_(partials.Principessa, 'Principessa'),
       Principe: sanitizePartialActual_(partials.Principe, 'Principe')
     },
+    sharedExpenses: sanitizeSharedExpenses_(plan && plan.sharedExpenses),
     linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
     createdAt: cleanText_(plan && plan.createdAt, 40),
     createdBy: cleanActor_(plan && plan.createdBy),
@@ -719,6 +880,7 @@ function sanitizeTripRecord_(t) {
     id: cleanText_(t && t.id, 80) || Utilities.getUuid(),
     budget: cleanMoney_(t && t.budget),
     submissions: {Principessa:null, Principe:null},
+    sharedExpenses: sanitizeSharedExpenses_(t && t.sharedExpenses),
     confirmed: {
       Principessa: !!(t && t.confirmed && t.confirmed.Principessa),
       Principe: !!(t && t.confirmed && t.confirmed.Principe)
@@ -756,4 +918,30 @@ function addAudit_(state, actor, action, ref) {
 
 function resetDatabaseForOwnerOnly() {
   PropertiesService.getScriptProperties().deleteProperty(STATE_KEY);
+}
+
+
+function doPost(e) {
+  const response=handlePost_(e);
+  if(!e || !e.parameter || !e.parameter.requestId)return response;
+  const message={type:'twogether:saved',requestId:String(e.parameter.requestId),result:JSON.parse(response.getContent())};
+  const safe=JSON.stringify(message).replace(/</g,'\\u003c');
+  return HtmlService.createHtmlOutput('<script>window.top.postMessage('+safe+',"*");</script>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function reconciliationWarnings_(trip) {
+  const warnings=[];
+  const shared=sanitizeSharedExpenses_(trip.sharedExpenses);
+  SHARED_EXPENSE_KEYS.forEach(function(key){
+    const m=shared[key];if(!m.mode.Principessa&&!m.mode.Principe)return;
+    if(ACTORS.every(name=>m.totals[name]!=='') && Math.abs(Number(m.totals.Principessa)-Number(m.totals.Principe))>.005)warnings.push(key+' total bills differ between profiles.');
+    if(m.total===''||m.totalUncertain){warnings.push(key+' total needs resolving.');return;}
+    const full=ACTORS.some(name=>m.mode[name]==='full');
+    if(!full && ACTORS.some(name=>m.paid[name]==='')){warnings.push(key+' is waiting for both payments.');return;}
+    const paid=Number(m.paid.Principessa||0)+Number(m.paid.Principe||0);
+    if(Math.abs(paid-Number(m.total))>.005)warnings.push(key+' payments differ from the bill by €'+Math.abs(paid-Number(m.total)).toFixed(2)+'.');
+  });
+  const a=trip.submissions.Principessa,b=trip.submissions.Principe;
+  if(a&&b){const total=MONEY_FIELDS.reduce((sum,key)=>sum+Number(a[key]||0),0);const paid=Number(a.paid||0)+Number(b.paid||0);if(Math.abs(total-paid)>.005)warnings.push('Total payments do not match trip expenses (difference €'+Math.abs(total-paid).toFixed(2)+').');}
+  return warnings;
 }

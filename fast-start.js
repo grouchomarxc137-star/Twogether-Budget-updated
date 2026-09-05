@@ -126,25 +126,12 @@
     nativeAppend(link);
   }
 
-  function loadSharedExpenseV14(){
-    if(document.getElementById('twogetherSharedExpenseCss')) return;
-    const css=document.createElement('link');
-    css.id='twogetherSharedExpenseCss';
-    css.rel='stylesheet';
-    css.href='shared-expenses-v14.css?v=1';
-    nativeAppend(css);
-    const script=document.createElement('script');
-    script.id='twogetherSharedExpenseJs';
-    script.src='shared-expenses-v14.js?v=1';
-    script.defer=true;
-    nativeAppend(script);
-  }
-
   if (document.readyState === 'complete') {
     setTimeout(loadFont, 0);
-    setTimeout(loadSharedExpenseV14, 0);
+
   } else {
     window.addEventListener('load', () => setTimeout(loadFont, 0), {once:true});
-    window.addEventListener('load', () => setTimeout(loadSharedExpenseV14, 0), {once:true});
+
   }
 })();
+

@@ -42,19 +42,7 @@
     });
   }
 
-  function post(action,payload){
-    return new Promise((resolve,reject)=>{
-      const a=actor();
-      if(!API_URL) return reject(new Error('Backend URL missing'));
-      if(!a) return reject(new Error('Choose your profile first'));
-      const frame=document.querySelector('iframe[name="backendFrame"]');
-      if(!frame) return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form');
-      form.method='POST';form.action=API_URL;form.target='backendFrame';form.style.display='none';
-      Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{const input=document.createElement('input');input.type='hidden';input.name=k;input.value=v;form.appendChild(input);});
-      document.body.appendChild(form);form.submit();form.remove();setTimeout(resolve,700);
-    });
-  }
+  function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
 
   function normalizeWishlist(list){
     return Array.isArray(list)?list.map(x=>({id:x.id||uid(),name:String(x.name||''),price:x.price??'',note:String(x.note||''),createdAt:String(x.createdAt||'')})).filter(x=>x.name):[];
@@ -151,3 +139,4 @@
 
   document.addEventListener('DOMContentLoaded',init);
 })();
+

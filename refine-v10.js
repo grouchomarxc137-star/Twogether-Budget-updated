@@ -34,15 +34,7 @@
     });
   }
 
-  function post(action,payload){
-    return new Promise((resolve,reject)=>{
-      const a=actor(); if(!API_URL)return reject(new Error('Backend URL missing')); if(!a)return reject(new Error('Choose a profile first'));
-      const frame=$('iframe[name="backendFrame"]'); if(!frame)return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form'); form.method='POST';form.action=API_URL;form.target='backendFrame';form.style.display='none';
-      Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});
-      document.body.appendChild(form);form.submit();form.remove();setTimeout(resolve,850);
-    });
-  }
+  function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
 
   function installSessionButtons(){
     if($('#twSessionActions'))return;
@@ -228,12 +220,14 @@
   }
 
   function refreshEnhancements(){
-    installSessionButtons();installHoverMenus();enhanceTripChoices();enhancePartialPicker();decorateTripModal();enhanceWishlist();enhanceWishlistModal();simplifyText();
+    if(window.TwogetherDev?.active)return;
+    installSessionButtons();installHoverMenus();enhanceTripChoices();decorateTripModal();enhanceWishlist();enhanceWishlistModal();simplifyText();
   }
 
   function init(){
-    installEnterToNext();refreshEnhancements();
-    const obs=new MutationObserver(()=>requestAnimationFrame(refreshEnhancements));obs.observe(document.body,{childList:true,subtree:true});
+    refreshEnhancements();
+    setInterval(refreshEnhancements,800);
   }
   document.addEventListener('DOMContentLoaded',init);
 })();
+

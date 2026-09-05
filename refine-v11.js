@@ -45,7 +45,7 @@
 
     rows.forEach((tr,i)=>{if(!tr.dataset.v11Order)tr.dataset.v11Order=String(i);});
     rows.sort((a,b)=>priorityNumber(a.dataset.prio)-priorityNumber(b.dataset.prio)||Number(a.dataset.v11Order)-Number(b.dataset.v11Order));
-    rows.forEach(tr=>body.appendChild(tr));
+    rows.forEach((tr,i)=>{if(body.children[i]!==tr)body.insertBefore(tr,body.children[i]||null);});
 
     const filter=$('.tw-prio-filter select',root);
     if(filter&&!filter.dataset.v11){
@@ -96,15 +96,16 @@
   }
 
   function refresh(){
-    installHoverOpen();
+    if(window.TwogetherDev?.active)return;
+
     enhanceWishlist();
     softenBudgetLanguage();
   }
 
   document.addEventListener('DOMContentLoaded',()=>{
     refresh();
-    const obs=new MutationObserver(()=>requestAnimationFrame(refresh));
-    obs.observe(document.body,{childList:true,subtree:true});
+    setInterval(refresh,900);
     document.addEventListener('twogether:finance-view',e=>{if(e.detail?.view==='wishlist')setTimeout(enhanceWishlist,0);});
   });
 })();
+

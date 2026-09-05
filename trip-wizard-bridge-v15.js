@@ -37,22 +37,7 @@
     });
   }
 
-  function post(action,payload){
-    return new Promise((resolve,reject)=>{
-      const a=actor();
-      if(!API_URL) return reject(new Error('Backend URL missing'));
-      if(!a) return reject(new Error('Choose Principessa or Principe first'));
-      const frame=$('iframe[name="backendFrame"]');
-      if(!frame) return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API_URL; form.target='backendFrame'; form.style.display='none';
-      Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{
-        const i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=v; form.appendChild(i);
-      });
-      document.body.appendChild(form); form.submit(); form.remove();
-      setTimeout(resolve,900);
-    });
-  }
+  function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
 
   async function getState(){
     const res=await jsonp({action:'state'});
@@ -179,7 +164,7 @@
       calc.className='bridge15-20';
       wrap.insertAdjacentElement('afterend',calc);
     }
-    const update=()=>{ calc.innerHTML=`20% = <strong>${money(n(input.value)*.20)}</strong>`; };
+    const update=()=>{ const html=`20% = <strong>${money(n(input.value)*.20)}</strong>`; if(calc.innerHTML!==html)calc.innerHTML=html; };
     if(input.dataset.bridge15Calc!=='1'){
       input.dataset.bridge15Calc='1';
       input.addEventListener('input',update);
@@ -224,3 +209,4 @@
 
   document.addEventListener('DOMContentLoaded',install);
 })();
+

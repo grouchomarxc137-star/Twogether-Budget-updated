@@ -65,22 +65,7 @@
     });
   }
 
-  function post(action,payload,name=actor()){
-    return new Promise((resolve,reject)=>{
-      if(!API_URL) return reject(new Error('Backend URL missing'));
-      if(!name) return reject(new Error('Choose your profile first'));
-      const frame=document.querySelector('iframe[name="backendFrame"]');
-      if(!frame) return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API_URL; form.target='backendFrame'; form.style.display='none';
-      const fields={action,actor:name,payload:JSON.stringify(payload||{})};
-      Object.entries(fields).forEach(([k,v])=>{
-        const input=document.createElement('input'); input.type='hidden'; input.name=k; input.value=v; form.appendChild(input);
-      });
-      document.body.appendChild(form); form.submit(); form.remove();
-      setTimeout(resolve,700);
-    });
-  }
+  function post(action,payload,name=actor()){return window.TwogetherAPI.post(action,payload,name);}
 
   async function refreshState(){
     if(refreshPromise) return refreshPromise;
@@ -90,17 +75,10 @@
         if(res?.ok){
           const rawPlans=Array.isArray(res.state?.plans)?res.state.plans:[];
           const rawTrips=Array.isArray(res.state?.trips)?res.state.trips:[];
-          const lonatoTrips=rawTrips.filter(isLonatoTrip);
-          sharedState={
-            version:Number(res.state?.version||0),
-            plans:rawPlans.filter(plan=>!isLonatoPlan(plan)),
-            trips:rawTrips.filter(trip=>!isLonatoTrip(trip))
-          };
+          sharedState={...res.state, plans:rawPlans, trips:rawTrips};
           renderBudgetPlans();
           decorateCoreWizard();
-          if(lonatoTrips.length&&!lonatoCleanupRunning&&lonatoCleanupAttempts<3){
-            setTimeout(()=>cleanupLonatoTrips(lonatoTrips),60);
-          }
+
         }
         return sharedState;
       }finally{
@@ -114,27 +92,6 @@
   function tripById(id){ return sharedState.trips.find(t=>t.id===id); }
   function tripForPlan(plan){ return plan?.linkedTripId ? tripById(plan.linkedTripId) : null; }
   function isLocked(trip){ return !!(trip?.confirmed?.Principessa && trip?.confirmed?.Principe); }
-  function isLonatoName(value){ return /lonato|loanto/i.test(String(value||'')); }
-  function tripCity(trip){ return trip?.submissions?.Principessa?.city || trip?.submissions?.Principe?.city || ''; }
-  function isLonatoTrip(trip){ return isLonatoName(tripCity(trip)); }
-  function isLonatoPlan(plan){ return isLonatoName(plan?.meta?.city); }
-
-  async function cleanupLonatoTrips(trips){
-    if(lonatoCleanupRunning || !trips?.length || lonatoCleanupAttempts>=3) return;
-    lonatoCleanupRunning=true; lonatoCleanupAttempts++;
-    try{
-      for(const trip of trips){
-        if(!trip?.id) continue;
-        await post('deleteTrip',{id:trip.id},'Principessa');
-        await new Promise(resolve=>setTimeout(resolve,180));
-      }
-    }catch{}
-    finally{
-      lonatoCleanupRunning=false;
-      setTimeout(()=>refreshState().catch(()=>{}),1400);
-    }
-  }
-
   function installStyles(){
     if($('#workflowV5Styles')) return;
     const style=document.createElement('style'); style.id='workflowV5Styles';
@@ -352,7 +309,7 @@
     const draft={otherNote:existing.otherNote||'',uncertain:{...(existing.uncertain||{})}};
     MONEY_FIELDS.forEach(key=>{draft[key]=existing[key]??'';});
     const hadSaved=hasPartial(existing);
-    activeFlow={type:'partial',planId,stage:'choose',key:'',draft,expanded:hadSaved,mode:'new',entryAmount:'',entryUncertain:false,pendingAmount:null,pendingUncertain:false,entryName:''};
+    activeFlow={type:'partial',planId,stage:'choose',key:'',draft,expanded:true,mode:'new',entryAmount:'',entryUncertain:false,pendingAmount:null,pendingUncertain:false,entryName:''};
     closeBudgetModal();
     document.querySelector('.tab[data-sheet="log"]')?.click();
     renderPartialActual();
@@ -397,9 +354,9 @@
     const core=['accom','travel'];
 
     if(f.stage==='choose'){
-      const partialOrder=['accom','travel','groceries','eat','fuel','tolls','other'];
-      const unlogged=partialOrder.filter(key=>!partialHasValue(f,key));
-      let selectable=f.expanded?unlogged:core.filter(key=>unlogged.includes(key));
+      const partialOrder=['travel','accom','fuel','groceries','eat','tolls','other'];
+      const unlogged=partialOrder.filter(key=>!partialHasValue(f,key) && plan.sharedExpenses?.[key]?.mode?.[otherActor(actor())]!=='full');
+      let selectable=unlogged;
       if(!selectable.length&&!f.expanded){f.expanded=true;selectable=unlogged;}
       const choices=selectable.map(key=>`<button class="trip-pick" type="button" data-v5-partial-key="${key}"><span class="pick-icon">${icons[key]||'＋'}</span><div><strong>${esc(MONEY_LABELS[key])}</strong><small>Add ${esc(MONEY_LABELS[key].toLowerCase())}</small></div></button>`).join('');
       const savedKeys=partialOrder.filter(key=>partialHasValue(f,key));
@@ -442,6 +399,10 @@
     }
 
     const key=f.key; const label=MONEY_LABELS[key];
+    if(['accom','travel'].includes(key)){
+      showOverlay('SHARED EXPENSE',48,label,'Record the total bill and your payment.','<div id="sharedHost"></div>');
+      return window.TwogetherShared.render({host:$('#sharedHost'),plan,key,onDone:(total,unknown)=>{f.mode='replace';f.entryAmount=total;f.entryUncertain=unknown;commitPartialEntry(f,'');}});
+    }
     const current=partialHasValue(f,key)?n(f.draft[key]):0;
     const value=f.entryAmount||'';
     const pot=key==='accom'?`<div id="v5JointPot" style="margin-top:10px;font-weight:800">20% = <strong>${money((f.mode==='add'?current+n(value):n(value))*.20)}</strong></div>`:'';
@@ -502,7 +463,7 @@
     base.push({key:'otherFlow',title:'Other expenses',type:'otherExpenses'});
     base.push({key:'paid',title:`How much did ${actor()} actually pay?`,type:'money',noUncertain:true});
     base.push({key:'review',title:'Ready to save your actual expenses?',type:'review'});
-    return base;
+    return base.filter(step=>{ const m=planById(activeFlow?.planId)?.sharedExpenses?.[step.key]; if(m?.mode?.[otherActor(actor())]==='full' && m.total!=='' && m.total!=null){ activeFlow.draft[step.key]=m.total; return false; } return true; });
   }
 
   function ensureActualOtherFlow(){
@@ -575,6 +536,10 @@
       $('[data-v5-back]')?.addEventListener('click',()=>{activeFlow.index--;renderActualFlow();});
       $('[data-v5-save-actual]')?.addEventListener('click',savePlanActual);
       return;
+    }
+    if(['accom','travel'].includes(step.key)){
+      showOverlay('SHARED EXPENSE',((activeFlow.index+1)/steps.length)*100,MONEY_LABELS[step.key],'Record the total bill and your payment.','<div id="sharedHost"></div>');
+      return window.TwogetherShared.render({host:$('#sharedHost'),plan,key:step.key,onDone:(total,unknown)=>{activeFlow.draft[step.key]=total;activeFlow.draft.uncertain[step.key]=unknown;activeFlow.index++;renderActualFlow();}});
     }
     if(step.type==='otherExpenses'){renderActualOtherExpenses(plan,steps,qCount,qNum);return;}
     const uncertain=!!activeFlow.draft?.uncertain?.[step.key];
@@ -695,10 +660,6 @@
       if(strong)strong.textContent=strong.textContent.replace(/^Fix your version/,'Match the differences');
       if(small)small.textContent='Only the answers that differ will be asked.';
     });
-    const heading=$('h2',body);
-    if(heading?.textContent.trim()==='What is your ideal total budget for this trip?'){
-      setTimeout(()=>body.querySelector('[data-skip-budget]')?.click(),0);
-    }
   }
 
   document.addEventListener('click',event=>{
@@ -755,5 +716,7 @@
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshState().catch(()=>{});});
   }
 
+  window.TwogetherWorkflow={refresh:refreshState, get state(){return sharedState;}, get flow(){return activeFlow;}, start:startActualChoice, budget:openBudgetOnly, match:startMatch, close:closeOverlay, render:()=>activeFlow?.type==='partial'?renderPartialActual():renderActualFlow()};
   document.addEventListener('DOMContentLoaded',init);
 })();
+

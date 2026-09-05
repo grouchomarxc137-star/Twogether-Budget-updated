@@ -44,15 +44,7 @@
     });
   }
 
-  function post(action,payload){
-    return new Promise((resolve,reject)=>{
-      const a=actor();if(!API_URL)return reject(new Error('Backend URL missing'));if(!a)return reject(new Error('Choose a profile first'));
-      const frame=$('iframe[name="backendFrame"]');if(!frame)return reject(new Error('Backend frame missing'));
-      const form=document.createElement('form');form.method='POST';form.action=API_URL;form.target='backendFrame';form.style.display='none';
-      Object.entries({action,actor:a,payload:JSON.stringify(payload||{})}).forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});
-      document.body.appendChild(form);form.submit();form.remove();setTimeout(resolve,850);
-    });
-  }
+  function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
 
   function isLocked(trip){return !!(trip?.confirmed?.Principessa&&trip?.confirmed?.Principe);}
   function tripMeta(trip){return trip?.submissions?.[trip?.createdBy]||trip?.submissions?.Principessa||trip?.submissions?.Principe||{};}
@@ -88,6 +80,7 @@
     target.click();
   }
   function openTrip(tripId){
+    if(window.TwogetherApp){window.TwogetherApp.open(tripId);return;}
     const target=$(`#tripGallery [data-open-trip="${cssEscape(tripId)}"]`);
     if(target){target.click();return;}
     toast('Could not open this trip yet','warn');
@@ -127,12 +120,12 @@
     const ownSub=trip?.submissions?.[a];
     const anySpent=spent.value>0;
     let status='Planned';
-    if(trip||ownPartial||anySpent)status='In progress';
+    if(trip||ownPartial||anySpent||Object.values(plan.sharedExpenses||{}).some(m=>m.mode?.Principessa||m.mode?.Principe))status='In progress';
     else if(!budget.complete)status='Waiting for both budgets';
     const budgetText=budget.complete?budget.label:(budget.value?`${budget.label} set so far`:'Not set');
     const spentText=spent.value?`${spent.approx?'~ ':''}${money(spent.value)}`:'€0.00';
     const canBudget=!ownPartial&&!ownSub;
-    const canActual=ownBudget!==''&&ownBudget!=null;
+    const canActual=true;
     const actualLabel=ownSub?'Edit expenses':ownPartial?'Continue expenses':'Add expenses';
     return `<article class="tw-current-card" data-current-plan="${esc(plan.id)}">
       <button class="tw-current-main" type="button" data-current-primary="${trip?.id?'trip':'actual'}">
@@ -141,9 +134,9 @@
         <div class="tw-current-numbers"><div><span>Total budget</span><strong>${esc(budgetText)}</strong></div><div><span>Trip so far</span><strong>${esc(spentText)}</strong></div></div>
       </button>
       <div class="tw-current-actions">
-        ${canBudget?`<button class="text-btn" type="button" data-current-budget>${ownBudget===''||ownBudget==null?'Add my budget':'Edit my budget'}</button>`:''}
+        ${true?`<button class="text-btn" type="button" data-current-budget>${ownBudget===''||ownBudget==null?'Add my budget':'Edit my budget'}</button>`:''}
         ${canActual?`<button class="btn ghost" type="button" data-current-actual>${esc(actualLabel)}</button>`:''}
-        ${trip?.id?'<button class="text-btn" type="button" data-current-open>Open</button>':''}
+        <button class="text-btn" type="button" data-current-open>Open trip</button>
       </div>
     </article>`;
   }
@@ -161,6 +154,7 @@
   }
 
   function renderCurrentTrips(){
+    if(window.TwogetherDev?.active)return;
     const section=ensureCurrentTripsShell(),root=$('#twCurrentTrips');if(!section||!root||!remoteState)return;
     const trips=Array.isArray(remoteState.trips)?remoteState.trips:[];
     const plans=Array.isArray(remoteState.plans)?remoteState.plans:[];
@@ -183,10 +177,10 @@
     $$('#twCurrentTrips [data-current-plan]').forEach(card=>{
       if(card.dataset.v12Wired==='1')return;card.dataset.v12Wired='1';
       const id=card.dataset.currentPlan;
-      $('[data-current-budget]',card)?.addEventListener('click',()=>clickPlanAction(id,'[data-v5-own-budget]'));
-      $('[data-current-actual]',card)?.addEventListener('click',()=>clickPlanAction(id,'[data-v5-actual]'));
-      $('[data-current-open]',card)?.addEventListener('click',()=>{const p=(remoteState?.plans||[]).find(x=>x.id===id);if(p?.linkedTripId)openTrip(p.linkedTripId);});
-      $('[data-current-primary]',card)?.addEventListener('click',()=>{const p=(remoteState?.plans||[]).find(x=>x.id===id);if(p?.linkedTripId)openTrip(p.linkedTripId);else clickPlanAction(id,'[data-v5-actual]');});
+      $('[data-current-budget]',card)?.addEventListener('click',()=>window.TwogetherWorkflow.budget(id));
+      $('[data-current-actual]',card)?.addEventListener('click',()=>window.TwogetherWorkflow.start(id));
+      $('[data-current-open]',card)?.addEventListener('click',()=>{const p=(remoteState?.plans||[]).find(x=>x.id===id);window.TwogetherOverview.open(p);});
+      $('[data-current-primary]',card)?.addEventListener('click',()=>{const p=(remoteState?.plans||[]).find(x=>x.id===id);window.TwogetherOverview.open(p);});
     });
     $$('#twCurrentTrips [data-current-trip]').forEach(card=>{
       if(card.dataset.v12Wired==='1')return;card.dataset.v12Wired='1';const id=card.dataset.currentTrip;
@@ -213,11 +207,13 @@
   }
 
   function switchActor(){
+    window.TwogetherDev?.exit();
     const next=otherActor();const choice=$(`.identity-choice[data-actor="${next}"]`);
     if(choice){choice.click();setTimeout(()=>{refreshRemote();syncBadge();},120);}
   }
 
   function syncBadge(){
+    if(document.body.classList.contains('dev-playground'))return;
     const badge=$('#loggedUserBadge');if(!badge)return;
     badge.title=`Switch to ${otherActor()}`;badge.setAttribute('role','button');badge.setAttribute('tabindex','0');badge.setAttribute('aria-label',`Logged in as ${actor()}. Switch to ${otherActor()}`);
   }
@@ -349,14 +345,16 @@
   }
 
   function scheduleRefresh(){
+    if(window.TwogetherDev?.active)return;
     if(refreshQueued)return;refreshQueued=true;requestAnimationFrame(()=>{refreshQueued=false;ensureQuickBudgetButton();ensureCurrentTripsShell();syncBadge();if(remoteState){renderCurrentTrips();filterTripStories();}if(devActive)decorateDevTargets();});
   }
 
   document.addEventListener('DOMContentLoaded',()=>{
-    ensureQuickBudgetButton();ensureCurrentTripsShell();installIdentitySwitch();installDevIntercept();installDragHandlers();ensureDevToolbar();
+    ensureQuickBudgetButton();ensureCurrentTripsShell();installIdentitySwitch();
     setTimeout(()=>{$('[data-tw-logout]')?.remove();syncBadge();refreshRemote();},200);
     setInterval(refreshRemote,5000);
-    new MutationObserver(scheduleRefresh).observe(document.body,{childList:true,subtree:true});
+    setInterval(scheduleRefresh,1000);
     document.addEventListener('twogether:finance-view',()=>setTimeout(()=>{scheduleRefresh();if(devActive)decorateDevTargets();},0));
   });
 })();
+
