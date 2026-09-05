@@ -38,13 +38,7 @@
     dialog.querySelector('[data-confirm]')?.addEventListener('click',async()=>{try{await window.TwogetherAPI.post('confirmTrip',{id:trip.id},document.body.dataset.actor);await refresh();draw(latest.plans.find(p=>p.id===plan.id)||plan);}catch(e){dialog.querySelector('[data-overview-error]').textContent=e.message;}});
     dialog.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>{const host=document.createElement('div');dialog.replaceChildren(host);window.TwogetherShared.render({host,plan,key:btn.dataset.payment,onDone:async()=>{await refresh();draw(latest.plans.find(p=>p.id===plan.id)||plan);}});const back=document.createElement('button');back.textContent='Back to overview';back.onclick=()=>draw(plan);dialog.appendChild(back);});
   }
-  function decorate(){if(!latest||window.TwogetherDev?.active)return;
-    for(const card of document.querySelectorAll('[data-current-plan],[data-current-trip]')){
-      const plan=latest.plans?.find(p=>p.id===card.dataset.currentPlan),trip=latest.trips?.find(t=>t.id===(plan?.linkedTripId||card.dataset.currentTrip));
-      const nums=card.querySelector('.tw-current-numbers');if(nums){const html=metrics(plan,trip);if(nums.innerHTML!==html)nums.innerHTML=html;}
-    }
-  }
-  async function refresh(){if(refreshing)return;refreshing=true;try{latest=await window.TwogetherAPI.state();decorate();}catch{}finally{refreshing=false;}}
+  async function refresh(){if(refreshing)return;refreshing=true;try{latest=await window.TwogetherAPI.state();}catch{}finally{refreshing=false;}}
   function navigation(){
     const wraps=[...document.querySelectorAll('.tw-nav-wrap')];let pinned=null,timer;
     function set(wrap){wraps.forEach(w=>{const show=w===wrap;w.classList.toggle('nav-visible',show);w.querySelector('[data-hub]')?.setAttribute('aria-expanded',String(show));});}
@@ -58,7 +52,7 @@
     const target=[...root.querySelectorAll('[data-next],[data-save],[data-wizard-next],[data-v5-next],[data-v5-partial-next],[data-v5-match-next],button')].find(b=>!b.disabled&&b.getClientRects().length&&/^(Next|Continue|Save)/i.test(b.textContent.trim()));
     if(target){e.preventDefault();e.stopImmediatePropagation();target.click();}
   },true);
-  document.addEventListener('DOMContentLoaded',()=>{navigation();refresh();setInterval(decorate,1100);setInterval(refresh,5000);});
+  document.addEventListener('DOMContentLoaded',()=>{navigation();refresh();setInterval(refresh,5000);});
   document.addEventListener('twogether:saved',()=>{refresh();window.TwogetherWorkflow.refresh().catch(()=>{});window.dispatchEvent(new Event('focus'));});
   window.TwogetherOverview={open,total,warnings,metrics};
 })();
