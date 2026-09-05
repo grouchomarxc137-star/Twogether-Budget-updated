@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const names=['Principessa','Principe'],keys=['travel','accom','fuel','groceries','eat','tolls','other'];
-  const labels={travel:'Flights / Train',accom:'Accommodation',fuel:'Fuel',groceries:'Groceries',eat:'Eating out',tolls:'Tolls / Parking',other:'Other'};
+  const labels={travel:'Flights / Train',accom:'Accommodation',fuel:'Fuel',groceries:'Groceries',eat:'Eating out',tolls:'Tolls / Parking',other:'Other',otherNote:'Note'};
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const has=v=>v!==''&&v!=null;
   const n=v=>Number(String(v??0).replace(',','.'))||0;
@@ -23,20 +23,28 @@
   }
   function close(){dialog?.remove();dialog=null;opened=null;}
   function open(plan){if(!plan)return;opened=plan.id;draw(plan);}
+  function paymentCard(plan,key,locked){const m=plan.sharedExpenses?.[key]||{};return `<section class="overview-payment"><strong>${labels[key]}</strong><p>Total: ${has(m.total)?money(m.total):'Not known'}${key==='accom'&&has(m.total)?` · 20% = ${money(n(m.total)*.2)}`:''}</p>${names.map(name=>`<p>${name}: ${has(m.paid?.[name])?money(m.paid[name]):'Not logged'}${m.mode?.[name]==='full'?' · fully paid':''}${m.mode?.[name]==='shared'?' · shared':''}</p>`).join('')}${locked?'':`<button data-payment="${key}" type="button">Edit my payment / total</button>`}</section>`;}
   function draw(plan){
     dialog?.remove();dialog=document.createElement('dialog');dialog.className='current-overview';
     const trip=latest?.trips?.find(t=>t.id===plan.linkedTripId),[a,b]=records(plan,trip),issues=warnings(plan,trip);
-    const fields=[...keys,'otherNote','location','city','start','end'];
+    const fields=[...keys,'otherNote'];
     const diff=fields.filter(key=>has(a[key])&&has(b[key])&&(keys.includes(key)?Math.abs(n(a[key])-n(b[key]))>.005:String(a[key]).trim()!==String(b[key]).trim()));
     const locked=names.every(name=>trip?.confirmed?.[name]);
-    dialog.innerHTML=`<button class="trip-close" data-overview-close aria-label="Close overview">×</button><h2>${esc(plan.meta?.city||'Current trip')}</h2><p>${esc(plan.meta?.start)} – ${esc(plan.meta?.end)}</p>${metrics(plan,trip)}<p>${locked?'Confirmed':diff.length?`${diff.length} differences to resolve`:'In progress — confirm when all details and payments are complete.'}</p>${issues.map(x=>`<p class="reconcile-warning">${esc(x)}</p>`).join('')}<div class="overview-table"><table><thead><tr><th>Expense / detail</th><th>Principessa</th><th>Principe</th></tr></thead><tbody>${fields.map(key=>`<tr class="${diff.includes(key)?'has-difference':''}"><th>${esc(labels[key]||key)}</th>${[a,b].map(r=>`<td>${has(r[key])?esc(keys.includes(key)?money(r[key]):r[key]):'Not logged'}${r.uncertain?.[key]?' · estimate':''}</td>`).join('')}</tr>`).join('')}</tbody></table></div><h3>Shared payments</h3>${['accom','travel'].map(key=>{const m=plan.sharedExpenses?.[key]||{};return `<section class="overview-payment"><strong>${labels[key]}</strong><p>Total: ${has(m.total)?money(m.total):'Not known'}${key==='accom'&&has(m.total)?` · 20% = ${money(n(m.total)*.2)}`:''}</p>${names.map(name=>`<p>${name}: ${has(m.paid?.[name])?money(m.paid[name]):'Not logged'}${m.mode?.[name]==='full'?' · fully paid':''}</p>`).join('')}${locked?'':`<button data-payment="${key}" type="button">Edit my payment / total</button>`}</section>`;}).join('')}<div class="v5-actions">${locked?'':'<button type="button" data-budget>Edit my budget</button><button type="button" data-expenses>Add / edit expenses</button>'}${trip&&!locked?'<button type="button" data-match>Match differences</button><button type="button" data-confirm>Confirm my version</button>':''}</div><p data-overview-error role="status"></p>`;
+    const stateText=locked?'Confirmed by both of you':diff.length?`${diff.length} difference${diff.length===1?'':'s'} still to resolve`:'In progress — confirm when all details and payments are complete.';
+    dialog.innerHTML=`<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell"><header class="overview-hero"><h2>${esc(plan.meta?.city||'Current trip')}</h2><p>${esc(plan.meta?.start)} – ${esc(plan.meta?.end)}</p>${metrics(plan,trip)}</header><div class="overview-scroll"><p class="overview-state">${esc(stateText)}</p>${issues.map(x=>`<p class="reconcile-warning">${esc(x)}</p>`).join('')}<div class="overview-table"><table><thead><tr><th>Expense / detail</th><th>Principessa</th><th>Principe</th><th>Match</th></tr></thead><tbody>${fields.map(key=>{const different=diff.includes(key);return `<tr class="${different?'has-difference':''}"><th>${esc(labels[key]||key)}</th>${[a,b].map(r=>`<td>${has(r[key])?esc(keys.includes(key)?money(r[key]):r[key]):'Not logged'}${r.uncertain?.[key]?' · estimate':''}</td>`).join('')}<td>${different?'Needs review':(has(a[key])&&has(b[key])?'Matched':'Waiting')}</td></tr>`;}).join('')}</tbody></table></div><h3 class="overview-shared-title">Shared payments</h3><div class="overview-payment-grid">${['accom','travel'].map(key=>paymentCard(plan,key,locked)).join('')}</div><div class="v5-actions">${locked?'':'<button type="button" data-budget>Edit my budget</button><button type="button" data-expenses>Add / edit expenses</button>'}${trip&&!locked?'<button type="button" data-match>Match differences</button><button type="button" data-confirm>Confirm my version</button>':''}</div><p data-overview-error role="status"></p></div></div>`;
     document.body.appendChild(dialog);dialog.showModal();dialog.addEventListener('cancel',close);
     dialog.querySelector('[data-overview-close]').onclick=close;
     dialog.querySelector('[data-budget]')?.addEventListener('click',()=>{close();window.TwogetherWorkflow.budget(plan.id);});
     dialog.querySelector('[data-expenses]')?.addEventListener('click',()=>{close();window.TwogetherWorkflow.start(plan.id);});
     dialog.querySelector('[data-match]')?.addEventListener('click',()=>{close();window.TwogetherWorkflow.match(trip.id);});
     dialog.querySelector('[data-confirm]')?.addEventListener('click',async()=>{try{await window.TwogetherAPI.post('confirmTrip',{id:trip.id},document.body.dataset.actor);await refresh();draw(latest.plans.find(p=>p.id===plan.id)||plan);}catch(e){dialog.querySelector('[data-overview-error]').textContent=e.message;}});
-    dialog.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>{const host=document.createElement('div');dialog.replaceChildren(host);window.TwogetherShared.render({host,plan,key:btn.dataset.payment,onDone:async()=>{await refresh();draw(latest.plans.find(p=>p.id===plan.id)||plan);}});const back=document.createElement('button');back.textContent='Back to overview';back.onclick=()=>draw(plan);dialog.appendChild(back);});
+    dialog.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>openPaymentEditor(plan,btn.dataset.payment));
+  }
+  function openPaymentEditor(plan,key){
+    if(!dialog)return;dialog.innerHTML='<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell"><div class="overview-scroll"><div data-payment-host></div><div class="v5-actions"><button type="button" data-payment-back>Back to overview</button></div></div></div>';
+    dialog.querySelector('[data-overview-close]').onclick=close;const host=dialog.querySelector('[data-payment-host]');
+    window.TwogetherShared.render({host,plan,key,onDone:async()=>{await refresh();draw(latest.plans.find(p=>p.id===plan.id)||plan);}});
+    dialog.querySelector('[data-payment-back]').onclick=()=>draw(plan);
   }
   async function refresh(){if(refreshing)return;refreshing=true;try{latest=await window.TwogetherAPI.state();}catch{}finally{refreshing=false;}}
   function navigation(){
