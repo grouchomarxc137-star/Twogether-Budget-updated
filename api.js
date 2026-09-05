@@ -12,7 +12,8 @@
   });}
   async function send(action,payload,actor){
     if(!['Principessa','Principe'].includes(actor))throw Error('Choose your profile first');
-    if(document.body.classList.contains('dev-playground'))throw Error('Leave DEV to save shared trip or finance data.');
+    const devMaintenance=['deleteTrip','deleteFinanceMonth','saveFinanceProfile'];
+    if(document.body.classList.contains('dev-playground')&&!devMaintenance.includes(action))throw Error('Leave DEV to save normal shared trip or finance changes. DEV only permits explicit maintenance deletes.');
     const current=await state();
     if(current.version<17)throw Error('Apps Script update required: deploy backend/Code.gs (v17) before saving.');
     return new Promise((resolve,reject)=>{
