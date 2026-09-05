@@ -1,0 +1,5 @@
+/* Keep the page-level heading and remove repeated inner headings/copy. */
+.finance-subview[data-fin-view="scenarios"] .finance-scenario-head>div{display:none}
+.finance-subview[data-fin-view="wishlist"] .wishlist-head>div{display:none}
+.finance-subview[data-fin-view="scenarios"] .finance-scenario-head,
+.finance-subview[data-fin-view="wishlist"] .wishlist-head{justify-content:flex-end;margin-bottom:14px}
