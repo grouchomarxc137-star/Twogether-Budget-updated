@@ -62,5 +62,5 @@
     document.addEventListener('twogether:wishlist-rendered',compactWishlist);
     document.addEventListener('twogether:finance-view',()=>setTimeout(compactWishlist,40));
   }
-  document.addEventListener('DOMContentLoaded',init);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
