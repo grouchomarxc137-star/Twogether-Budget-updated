@@ -15,7 +15,7 @@
     addCss('refine-v21.css?v=1','v21');
     addCss('refine-v21-media.css?v=1','v21Media');
     addCss('refine-v22.css?v=1','v22');
-    const loadDev=()=>addScript('dev-v22.js?v=1','v22Dev');
+    const loadDev=()=>addScript('dev-v22b.js?v=1','v22Dev');
     const loadUi=()=>addScript('refine-v22.js?v=1','v22Ui',loadDev);
     const loadTrip=()=>addScript('trip-v21.js?v=2','v21Trip',loadUi);
     addScript('refine-v20.js?v=2','v20',loadTrip);
