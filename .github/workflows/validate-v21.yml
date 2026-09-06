@@ -10,14 +10,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Syntax and asset checks
         run: |
-          node --check refine-v21.js
+          node --check trip-v21.js
+          node --check dev-v21.js
           node --check refine-v20.js
           node --check refine-v19.js
           node --check wishlist.js
           node --check api.js
           grep -q 'refine-v21.css?v=1' refine-v19.js
-          grep -q 'refine-v21.js?v=1' refine-v19.js
-          grep -q 'Ariana_-_Tunisia.jpg' refine-v21.js
+          grep -q 'trip-v21.js?v=1' refine-v19.js
+          grep -q 'dev-v21.js?v=1' refine-v19.js
+          grep -q 'Ariana_-_Tunisia.jpg' trip-v21.js
           node tests/validate.cjs
       - name: Backend regression
         run: node tests/backend.cjs
