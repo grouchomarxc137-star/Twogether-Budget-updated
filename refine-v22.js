@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-  let pinned=null,installed=false;
+  let pinned=null,installed=false,suppressHover=false,lastPointer=null;
   const closeTimers=new WeakMap(),fadeTimers=new WeakMap();
 
   function cancelTimers(w){
@@ -21,7 +21,7 @@
     $$('.tw-nav-wrap').forEach(w=>{if(w!==except)(fade?fadeClose(w):hardClose(w));});
   }
   function openWrap(w){
-    if(!w)return;cancelTimers(w);closeOthers(w,true);w.classList.remove('v22-fade','menu-open','nav-visible');w.classList.add('v22-open');setExpanded(w,true);
+    if(!w||suppressHover)return;cancelTimers(w);closeOthers(w,true);w.classList.remove('v22-fade','menu-open','nav-visible');w.classList.add('v22-open');setExpanded(w,true);
   }
   function scheduleClose(w){
     if(!w||pinned===w)return;cancelTimers(w);
@@ -30,36 +30,44 @@
   function unpinAndFadeAll(){
     pinned=null;$$('.tw-nav-wrap').forEach(fadeClose);
   }
+  function closeForScroll(){suppressHover=true;unpinAndFadeAll();}
   function installNavigation(){
     const wraps=$$('.tw-nav-wrap');if(!wraps.length)return;
     wraps.forEach(w=>{
       if(w.dataset.v22Nav==='2')return;w.dataset.v22Nav='2';
       const hub=w.querySelector('[data-hub]'),menu=w.querySelector('.tw-nav-menu');
       w.addEventListener('pointerenter',()=>{
-        cancelTimers(w);
+        cancelTimers(w);if(suppressHover)return;
         if(pinned&&pinned!==w){const old=pinned;pinned=null;fadeClose(old);}
         openWrap(w);
       });
       w.addEventListener('pointerleave',()=>scheduleClose(w));
-      menu?.addEventListener('pointerenter',()=>{cancelTimers(w);openWrap(w);});
+      menu?.addEventListener('pointerenter',()=>{cancelTimers(w);if(!suppressHover)openWrap(w);});
       menu?.addEventListener('pointerleave',()=>scheduleClose(w));
       hub?.addEventListener('click',()=>{
+        suppressHover=false;
         if(pinned===w){pinned=null;openWrap(w);scheduleClose(w);}
         else{
           const old=pinned;pinned=w;if(old&&old!==w)fadeClose(old);openWrap(w);
         }
       },true);
-      menu?.addEventListener('click',()=>unpinAndFadeAll());
+      menu?.addEventListener('click',()=>{suppressHover=false;unpinAndFadeAll();});
     });
     if(!installed){
       installed=true;
       let scrollQueued=false;
-      window.addEventListener('scroll',()=>{
+      const onScroll=()=>{
         if(scrollQueued)return;scrollQueued=true;
-        requestAnimationFrame(()=>{scrollQueued=false;unpinAndFadeAll();});
-      },{passive:true});
-      document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.tw-nav-wrap'))unpinAndFadeAll();},true);
-      document.addEventListener('keydown',e=>{if(e.key==='Escape')unpinAndFadeAll();},true);
+        requestAnimationFrame(()=>{scrollQueued=false;closeForScroll();});
+      };
+      window.addEventListener('scroll',onScroll,{passive:true});
+      window.addEventListener('wheel',closeForScroll,{passive:true,capture:true});
+      document.addEventListener('pointermove',e=>{
+        const moved=!lastPointer||Math.hypot(e.clientX-lastPointer.x,e.clientY-lastPointer.y)>2;lastPointer={x:e.clientX,y:e.clientY};
+        if(suppressHover&&moved){suppressHover=false;const w=e.target.closest?.('.tw-nav-wrap');if(w)openWrap(w);}
+      },{passive:true,capture:true});
+      document.addEventListener('pointerdown',e=>{suppressHover=false;if(!e.target.closest?.('.tw-nav-wrap'))unpinAndFadeAll();},true);
+      document.addEventListener('keydown',e=>{if(e.key==='Escape'){suppressHover=false;unpinAndFadeAll();}},true);
     }
   }
 
