@@ -17,9 +17,10 @@ jobs:
           node --check wishlist.js
           node --check api.js
           grep -q 'refine-v21.css?v=1' refine-v19.js
-          grep -q 'trip-v21.js?v=1' refine-v19.js
+          grep -q 'refine-v21-media.css?v=1' refine-v19.js
+          grep -q 'trip-v21.js?v=2' refine-v19.js
           grep -q 'dev-v21b.js?v=1' refine-v19.js
-          grep -q 'Ariana_-_Tunisia.jpg' trip-v21.js
+          grep -q 'Ariana_2_-_Tunisia.jpg' trip-v21.js
           node tests/validate.cjs
       - name: Backend regression
         run: node tests/backend.cjs
