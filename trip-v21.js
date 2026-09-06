@@ -1,0 +1,64 @@
+(() => {
+  'use strict';
+  const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+  const FLAGS={Italy:'1f1ee-1f1f9',Netherlands:'1f1f3-1f1f1',Tunisia:'1f1f9-1f1f3',Portugal:'1f1f5-1f1f9',Spain:'1f1ea-1f1f8',France:'1f1eb-1f1f7',Germany:'1f1e9-1f1ea',Belgium:'1f1e7-1f1ea','United Kingdom':'1f1ec-1f1e7'};
+  const cityImages={
+    ariana:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ariana_-_Tunisia.jpg/800px-Ariana_-_Tunisia.jpg',
+    amsterdam:'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82',
+    lonato:'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82',
+    lisbon:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82',
+    lisboa:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82',
+    porto:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82'
+  };
+  const countryImages={
+    Italy:'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82',
+    Netherlands:'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82',
+    Portugal:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82',
+    Tunisia:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ariana_-_Tunisia.jpg/800px-Ariana_-_Tunisia.jpg',
+    Spain:'https://images.unsplash.com/photo-1509840841025-9088ba78a826?auto=format&fit=crop&w=900&q=82',
+    France:'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=82',
+    Germany:'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=82',
+    Belgium:'https://images.unsplash.com/photo-1491557345352-5929e343eb89?auto=format&fit=crop&w=900&q=82'
+  };
+  const fallback='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=82';
+
+  function enhanceCards(){
+    $$('#twCurrentTrips .tw-current-card').forEach(card=>{
+      const art=$('.tw-trip-art',card); if(!art) return;
+      $('.tw-trip-monogram',art)?.remove();
+      const country=($('.trip-country',card)?.textContent||'').trim();
+      const city=( $('h3',card)?.textContent||'').trim().toLowerCase();
+      const image=cityImages[city]||countryImages[country]||fallback;
+      art.style.backgroundImage=`linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.20)),url("${image}")`;
+      if(city==='ariana'||country==='Tunisia') art.title='Ariana, Tunisia — DrFO.Jr.Tn / Wikimedia Commons (CC BY-SA 3.0)';
+      const flag=$('.tw-trip-emoji',art);
+      if(flag&&FLAGS[country]) flag.innerHTML=`<img alt="${country} flag" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${FLAGS[country]}.svg">`;
+    });
+  }
+
+  function compactWishlist(){
+    const root=$('#financeWishlist'),table=$('.wishlist-table',root); if(!root||!table) return;
+    let item=10,note=4;
+    $$('tbody tr',table).forEach(row=>{
+      item=Math.max(item,( $('.wishlist-item-name',row)?.textContent||'').trim().length);
+      const text=( $('.wishlist-note-text',row)?.textContent||'').trim().length;
+      const link=$('.wishlist-open-link',row)?9:0;
+      note=Math.max(note,text+link);
+    });
+    root.style.setProperty('--wish-item-ch',String(Math.min(34,Math.max(10,item+2))));
+    root.style.setProperty('--wish-note-ch',String(Math.min(48,Math.max(5,note+2))));
+  }
+
+  function init(){
+    enhanceCards(); compactWishlist();
+    setTimeout(()=>window.TwogetherV18?.refresh(false),0);
+    const trips=$('#twCurrentTrips');
+    if(trips) new MutationObserver(()=>requestAnimationFrame(enhanceCards)).observe(trips,{childList:true,subtree:true});
+    const wish=$('#financeWishlist');
+    if(wish) new MutationObserver(()=>requestAnimationFrame(compactWishlist)).observe(wish,{childList:true,subtree:true,characterData:true});
+    document.addEventListener('twogether:v18-rendered',enhanceCards);
+    document.addEventListener('twogether:wishlist-rendered',compactWishlist);
+    document.addEventListener('twogether:finance-view',()=>setTimeout(compactWishlist,40));
+  }
+  document.addEventListener('DOMContentLoaded',init);
+})();
