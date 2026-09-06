@@ -3,7 +3,7 @@
   const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const FLAGS={Italy:'1f1ee-1f1f9',Netherlands:'1f1f3-1f1f1',Tunisia:'1f1f9-1f1f3',Portugal:'1f1f5-1f1f9',Spain:'1f1ea-1f1f8',France:'1f1eb-1f1f7',Germany:'1f1e9-1f1ea',Belgium:'1f1e7-1f1ea','United Kingdom':'1f1ec-1f1e7'};
   const cityImages={
-    ariana:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ariana_-_Tunisia.jpg/800px-Ariana_-_Tunisia.jpg',
+    ariana:'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg',
     amsterdam:'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82',
     lonato:'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82',
     lisbon:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82',
@@ -14,7 +14,7 @@
     Italy:'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82',
     Netherlands:'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82',
     Portugal:'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82',
-    Tunisia:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Ariana_-_Tunisia.jpg/800px-Ariana_-_Tunisia.jpg',
+    Tunisia:'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg',
     Spain:'https://images.unsplash.com/photo-1509840841025-9088ba78a826?auto=format&fit=crop&w=900&q=82',
     France:'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=82',
     Germany:'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=82',
@@ -28,9 +28,11 @@
       $('.tw-trip-monogram',art)?.remove();
       const country=($('.trip-country',card)?.textContent||'').trim();
       const city=( $('h3',card)?.textContent||'').trim().toLowerCase();
+      card.dataset.v21City=city;
+      card.dataset.v21Country=country.toLowerCase();
       const image=cityImages[city]||countryImages[country]||fallback;
       art.style.backgroundImage=`linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.20)),url("${image}")`;
-      if(city==='ariana'||country==='Tunisia') art.title='Ariana, Tunisia — DrFO.Jr.Tn / Wikimedia Commons (CC BY-SA 3.0)';
+      if(city==='ariana'||country==='Tunisia') art.title='Ariana, Tunisia — Wikimedia Commons';
       const flag=$('.tw-trip-emoji',art);
       if(flag&&FLAGS[country]) flag.innerHTML=`<img alt="${country} flag" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${FLAGS[country]}.svg">`;
     });
