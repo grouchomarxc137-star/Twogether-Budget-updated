@@ -50,24 +50,22 @@
     const root=$('#financeWishlist'),table=root&&$('.wishlist-table',root);if(!table)return;
     const rows=$$('tbody tr',table);
     rows.forEach(tr=>{
-      const cells=[...tr.children];
-      if(!cells.length)return;
-      // v10 priority enhancement yields 5 cells; base wishlist has 4. Handle both.
+      const cells=[...tr.children];if(!cells.length)return;
       if(cells.length>=5){cells[0].classList.add('v22-wish-prio');cells[1].classList.add('v22-wish-item');cells[2].classList.add('v22-wish-note');cells[3].classList.add('v22-wish-price');cells[4].classList.add('v22-wish-edit');cleanPriorityMetadata(cells[2]);}
       else{cells[0]?.classList.add('v22-wish-item');cells[1]?.classList.add('v22-wish-note');cells[2]?.classList.add('v22-wish-price');cells[3]?.classList.add('v22-wish-edit');}
-      const note=tr.querySelector('.v22-wish-note');
-      if(note){const visible=(note.innerText||'').trim();note.classList.toggle('v22-empty',!visible);}
+      const note=tr.querySelector('.v22-wish-note');if(note){const visible=(note.innerText||'').trim();note.classList.toggle('v22-empty',!visible);}
     });
     table.dataset.v22Board='1';
   }
 
-  let scheduled=false;
+  let scheduled=false,observer=null;
   function enhance(){installNavigation();enhanceWishlist();}
   function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;enhance();});}
-  document.addEventListener('DOMContentLoaded',()=>{
+  function init(){
     enhance();
-    new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-prio']});
+    if(!observer){observer=new MutationObserver(schedule);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-prio']});}
     document.addEventListener('twogether:wishlist-rendered',()=>setTimeout(enhanceWishlist,0));
     document.addEventListener('twogether:finance-view',()=>setTimeout(enhanceWishlist,0));
-  });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
