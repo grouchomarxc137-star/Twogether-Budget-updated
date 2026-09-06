@@ -8,6 +8,8 @@
   let items = [];
   let backendVersion = 0;
   let loading = false;
+  let cachedProfile = null;
+  let cachedActor = '';
 
   const $ = (s,r=document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g,ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -47,7 +49,6 @@
   function normalizeWishlist(list){
     return Array.isArray(list)?list.map(x=>({id:x.id||uid(),name:String(x.name||''),price:x.price??'',note:String(x.note||''),createdAt:String(x.createdAt||'')})).filter(x=>x.name):[];
   }
-
 
   function wishlistNoteParts(value){
     const note=String(value||'').trim();
@@ -110,15 +111,23 @@
   async function saveWishlist(next,message){
     if(backendVersion<15)return toast('Wishlist saving needs backend v15 to be deployed','warn');
     const a=actor(); if(!a)return;
+    const previous=items;
+    items=normalizeWishlist(next);render();closeModal();toast('Saving…');
     try{
-      const res=await jsonp({action:'state'});
-      if(!res?.ok) throw new Error('Could not load latest finances');
-      const profile=JSON.parse(JSON.stringify(res.state?.financeProfiles?.[a]||{}));
+      let profile=(cachedActor===a&&cachedProfile)?JSON.parse(JSON.stringify(cachedProfile)):null;
+      if(!profile){
+        const res=await jsonp({action:'state'});
+        if(!res?.ok) throw new Error('Could not load latest finances');
+        profile=JSON.parse(JSON.stringify(res.state?.financeProfiles?.[a]||{}));
+      }
       profile.wishlist=next;
-      items=normalizeWishlist(next);render();closeModal();
+      cachedProfile=JSON.parse(JSON.stringify(profile));cachedActor=a;
       await post('saveFinanceProfile',{profile});
-      toast(message);setTimeout(loadState,1100);
-    }catch(err){toast(err.message||'Could not save wishlist','warn');}
+      toast(message);
+      setTimeout(loadState,250);
+    }catch(err){
+      items=previous;render();toast(err.message||'Could not save wishlist','warn');
+    }
   }
 
   async function loadState(){
@@ -126,7 +135,7 @@
     loading=true;
     try{
       const res=await jsonp({action:'state'});
-      if(res?.ok){backendVersion=Number(res.state?.version||0);items=normalizeWishlist(res.state?.financeProfiles?.[actor()]?.wishlist);render();}
+      if(res?.ok){const a=actor();backendVersion=Number(res.state?.version||0);cachedProfile=JSON.parse(JSON.stringify(res.state?.financeProfiles?.[a]||{}));cachedActor=a;items=normalizeWishlist(cachedProfile?.wishlist);render();}
     }catch{}
     finally{loading=false;}
   }
@@ -134,7 +143,7 @@
   function init(){
     ensureModal();render();
     document.addEventListener('twogether:finance-view',e=>{if(e.detail?.view==='wishlist'){render();loadState();}});
-    new MutationObserver(()=>{items=[];render();if($('#finances')?.classList.contains('active'))loadState();}).observe(document.body,{attributes:true,attributeFilter:['data-actor']});
+    new MutationObserver(()=>{items=[];cachedProfile=null;cachedActor='';render();if($('#finances')?.classList.contains('active'))loadState();}).observe(document.body,{attributes:true,attributeFilter:['data-actor']});
   }
 
   document.addEventListener('DOMContentLoaded',init);
