@@ -51,7 +51,7 @@
   }
 
   function wishlistNoteParts(value){
-    const note=String(value||'').trim();
+    const note=String(value||'').replace(/^\s*\[\[P[1-5]\]\]\s*/i,'').trim();
     if(!note)return {text:'',link:''};
     const match=note.match(/https?:\/\/\S+/i);
     if(!match)return {text:note,link:''};
