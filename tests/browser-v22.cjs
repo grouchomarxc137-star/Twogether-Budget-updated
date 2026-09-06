@@ -10,11 +10,11 @@ const {backend}=require('./backend.cjs');
   await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:''}));await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:r.request().url().endsWith('.css')?'text/css':'image/svg+xml',body:r.request().url().endsWith('.css')?'':'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="red"/></svg>'}));const px=Buffer.from('R0lGODlhAQABAAAAACw=','base64');await page.route('https://images.unsplash.com/**',r=>r.fulfill({contentType:'image/gif',body:px}));await page.route('https://upload.wikimedia.org/**',r=>r.fulfill({contentType:'image/gif',body:px}));
   await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.identity-choice[data-actor="Principessa"]').click();await page.waitForFunction(()=>!!window.TwogetherDevV22,{timeout:10000});await page.waitForSelector('.dev22c-divider-layer',{state:'attached',timeout:10000});
 
-  // Category navigation: click pins, scroll fades it, and hovering the other category replaces it.
+  // Category navigation: click pins, wheel/scroll fades it, and hovering the other category replaces it.
   const trips=page.locator('.tw-nav-wrap:has([data-hub="trips"])'),fin=page.locator('.tw-nav-wrap:has([data-hub="finances"])');
   await fin.hover();await page.waitForTimeout(80);assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),true);
   await page.locator('[data-hub="finances"]').click();await page.waitForTimeout(80);assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),true,'finance dropdown stays pinned after clicking the category');
-  await page.evaluate(()=>scrollTo(0,220));await page.waitForTimeout(190);assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),false,'scroll fades/closes a pinned dropdown');
+  await page.mouse.wheel(0,420);await page.waitForTimeout(210);assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),false,'scroll fades/closes a pinned dropdown');
   await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(180);await page.locator('[data-hub="finances"]').click();await page.waitForTimeout(70);assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),true);
   await trips.hover();await page.waitForTimeout(190);assert.equal(await trips.evaluate(e=>e.classList.contains('v22-open')),true,'Trips opens when hovered');assert.equal(await fin.evaluate(e=>e.classList.contains('v22-open')),false,'pinned finances fades when Trips is hovered');
 
