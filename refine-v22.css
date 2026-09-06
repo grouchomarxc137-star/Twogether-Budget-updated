@@ -1,0 +1,87 @@
+/* v22 — smoother hover menus, softer wishlist board, free-position DEV and annotation tools */
+:root{--v22-cream:#f7f2ea;--v22-card:#fffdf9;--v22-line:#e8ded2;--v22-muted:#7b7068;--v22-ink:#211d19;--v22-gold:#987226;--v22-dev:#9a4f58;--v22-dev-soft:#fff4f5}
+
+/* Hover menus: keep the path between tab and menu alive and ensure only one menu is visible. */
+.tw-nav-wrap{position:relative!important;padding-bottom:10px!important;margin-bottom:-10px!important;z-index:120!important}
+.tw-nav-menu{top:calc(100% - 1px)!important;margin:0!important;padding-top:8px!important;pointer-events:auto!important;z-index:140!important}
+.tw-nav-menu::before{content:""!important;position:absolute!important;left:-8px!important;right:-8px!important;top:-12px!important;height:22px!important;background:transparent!important}
+.tw-nav-wrap:not(.v22-open)>.tw-nav-menu{display:none!important}
+.tw-nav-wrap.v22-open>.tw-nav-menu{display:grid!important;gap:0!important;animation:v22MenuIn .12s ease-out both!important}
+.tw-nav-wrap.v22-fade>.tw-nav-menu{animation:v22MenuOut .12s ease-in both!important}
+@keyframes v22MenuIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes v22MenuOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-4px)}}
+
+/* Wishlist: replace the spreadsheet feel with compact, calm wish cards. */
+#financeWishlist .wishlist-wrap{width:min(920px,100%)!important;max-width:100%!important;margin:0!important}
+#financeWishlist .wishlist-head{width:100%!important;min-width:0!important;align-items:end!important;gap:14px!important;margin-bottom:16px!important}
+#financeWishlist .wishlist-table-wrap{display:block!important;width:100%!important;max-width:100%!important;overflow:visible!important;background:transparent!important;border:0!important;box-shadow:none!important}
+#financeWishlist .wishlist-table{display:block!important;width:100%!important;max-width:none!important;min-width:0!important;border:0!important;background:transparent!important;table-layout:auto!important}
+#financeWishlist .wishlist-table thead{display:none!important}
+#financeWishlist .wishlist-table tbody{display:grid!important;gap:10px!important;width:100%!important}
+#financeWishlist .wishlist-table tbody tr{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto auto!important;grid-template-areas:"prio item price edit" "prio note price edit"!important;align-items:center!important;gap:3px 14px!important;width:100%!important;min-height:70px!important;padding:13px 14px!important;box-sizing:border-box!important;border:1px solid var(--v22-line)!important;border-radius:16px!important;background:rgba(255,253,249,.96)!important;box-shadow:0 5px 18px rgba(64,46,28,.035)!important;transition:background .14s ease,border-color .14s ease,transform .14s ease,box-shadow .14s ease!important}
+#financeWishlist .wishlist-table tbody tr:hover{background:#fbf6ee!important;border-color:#ddd0bf!important;transform:translateY(-1px)!important;box-shadow:0 8px 22px rgba(64,46,28,.055)!important}
+#financeWishlist .wishlist-table tbody tr>td{display:block!important;width:auto!important;min-width:0!important;max-width:none!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-prio{grid-area:prio!important;align-self:start!important;padding-top:2px!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-item{grid-area:item!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-note{grid-area:note!important;color:var(--v22-muted)!important;font-size:12px!important;line-height:1.35!important;min-height:0!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-note.v22-empty{display:none!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-price{grid-area:price!important;text-align:right!important;white-space:nowrap!important;font-size:14px!important}
+#financeWishlist .wishlist-table tbody tr>td.v22-wish-edit{grid-area:edit!important;text-align:right!important}
+#financeWishlist .wishlist-item-name strong{display:block!important;font-size:16px!important;line-height:1.2!important;color:var(--v22-ink)!important;font-weight:650!important}
+#financeWishlist .wishlist-open-link{display:inline-flex!important;align-items:center!important;gap:4px!important;margin-left:0!important;color:#86631f!important;text-decoration:none!important;font-weight:600!important}
+#financeWishlist .wishlist-open-link:hover{text-decoration:underline!important}
+#financeWishlist .tw-prio-pill{display:inline-grid!important;place-items:center!important;min-width:34px!important;height:28px!important;padding:0 8px!important;border-radius:999px!important;background:#f2ece4!important;border:1px solid #e4d8c9!important;color:#695b50!important;font:700 10px/1 Inter,system-ui,sans-serif!important;letter-spacing:.05em!important}
+#financeWishlist tbody tr[data-prio="P1"] .tw-prio-pill{background:#fff0ef!important;border-color:#ebcfcb!important;color:#95514d!important}
+#financeWishlist tbody tr[data-prio="P2"] .tw-prio-pill{background:#fff7e9!important;border-color:#eddcc0!important;color:#8c6a2c!important}
+#financeWishlist tbody tr[data-prio="P4"] .tw-prio-pill,#financeWishlist tbody tr[data-prio="P5"] .tw-prio-pill{background:#f5f2ed!important;color:#7d756e!important}
+#financeWishlist .wishlist-edit-btn{border:0!important;background:transparent!important;padding:7px 8px!important;border-radius:9px!important;color:#77675f!important;cursor:pointer!important}
+#financeWishlist .wishlist-edit-btn:hover{background:#f1e9df!important;color:#433b36!important}
+#financeWishlist .wishlist-table tfoot{display:block!important;margin-top:12px!important}
+#financeWishlist .wishlist-table tfoot tr{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:18px!important;padding:10px 12px!important;border-top:1px solid var(--v22-line)!important;background:transparent!important}
+#financeWishlist .wishlist-table tfoot td{display:block!important;width:auto!important;padding:0!important;border:0!important;background:transparent!important}
+#financeWishlist .wishlist-table tfoot td:first-child{margin-right:auto!important}
+#financeWishlist .tw-prio-filter{margin-left:auto!important}
+
+/* DEV v22 hides all older DEV surfaces and adds a true visual-editor chrome. */
+body.dev-v22 .dev19-float,body.dev-v22 .dev19-inspector,body.dev-v22 .dev19-bottom,body.dev-v22 .dev-v18-tools,body.dev-v22 .dev-v18-editor,body.dev-v22 .dev-v18-strip,body.dev-v22 .dev21-inspector,body.dev-v22 .dev21-toolbar,body.dev-v22 .dev21-selection,body.dev-v22 .dev21-marquee,body.dev-v22 .dev21-context{display:none!important}
+body.dev-v22 #loggedUserBadge{background:var(--v22-dev)!important;color:#fff!important;border-color:var(--v22-dev)!important;box-shadow:0 0 0 3px rgba(154,79,88,.11)!important}
+body.dev-v22{cursor:default}
+
+.dev22-marquee{position:fixed;z-index:30020;pointer-events:none;border:1.5px solid rgba(154,79,88,.95);background:rgba(154,79,88,.08);border-radius:5px;box-shadow:0 0 0 1px rgba(255,255,255,.9) inset}
+.dev22-marquee[hidden],.dev22-selection[hidden],.dev22-context[hidden],.dev22-inspector[hidden],.dev22-canvas[hidden],.dev22-note-layer[hidden]{display:none!important}
+.dev22-selection{position:fixed;z-index:30015;pointer-events:none;border:2px solid rgba(154,79,88,.95);border-radius:8px;box-shadow:0 0 0 2px rgba(255,255,255,.82) inset}
+.dev22-selection-label{position:absolute;left:-2px;top:-30px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#8f4851;color:#fff;border-radius:8px;padding:5px 9px;font:650 11px/1.2 Inter,system-ui,sans-serif;box-shadow:0 5px 16px rgba(73,34,37,.18)}
+.dev22-move-handle{position:absolute;right:-2px;top:-33px;pointer-events:auto;border:1px solid #d8b7bb;background:#fff;border-radius:9px;padding:6px 9px;color:#7d4148;font:700 11px/1 Inter,system-ui,sans-serif;cursor:grab;box-shadow:0 5px 16px rgba(73,34,37,.13);user-select:none}
+.dev22-move-handle:active{cursor:grabbing}
+.dev22-resize-handle{position:absolute;width:12px;height:12px;border:2px solid #fff;background:#9a4f58;border-radius:50%;pointer-events:auto;box-shadow:0 1px 5px rgba(0,0,0,.2)}
+.dev22-resize-handle.se{right:-7px;bottom:-7px;cursor:nwse-resize}.dev22-resize-handle.sw{left:-7px;bottom:-7px;cursor:nesw-resize}.dev22-resize-handle.ne{right:-7px;top:-7px;cursor:nesw-resize}.dev22-resize-handle.nw{left:-7px;top:-7px;cursor:nwse-resize}
+.dev22-dragging{opacity:.82!important;pointer-events:none!important;box-shadow:0 26px 70px rgba(40,25,25,.24)!important;transition:none!important;transform:none!important;cursor:grabbing!important}
+.dev22-origin-ghost{position:absolute;pointer-events:none;border:1.5px dashed rgba(154,79,88,.45);background:rgba(154,79,88,.035);border-radius:10px;z-index:2}
+
+.dev22-context{position:fixed;z-index:30050;width:254px;padding:7px;background:rgba(255,254,252,.995);border:1px solid #dccfd0;border-radius:14px;box-shadow:0 20px 58px rgba(49,31,33,.22);backdrop-filter:blur(12px);font:13px Inter,system-ui,sans-serif}
+.dev22-context button{display:flex;width:100%;align-items:center;gap:10px;border:0;background:transparent;border-radius:9px;padding:9px 10px;text-align:left;cursor:pointer;color:#4d4240;font:inherit}.dev22-context button:hover{background:#fbf0f1}.dev22-context button.danger{color:#9b454f}.dev22-context hr{border:0;border-top:1px solid #eee3e4;margin:5px}
+.dev22-context .ctx-glyph{width:22px;text-align:center;color:#8a545a}
+
+.dev22-inspector{position:fixed;right:14px;top:82px;bottom:72px;z-index:30045;width:min(420px,calc(100vw - 28px));display:flex;flex-direction:column;background:rgba(255,254,252,.997);border:1px solid #dbcfd0;border-radius:18px;box-shadow:0 24px 74px rgba(46,31,31,.2);overflow:hidden;font-family:Inter,system-ui,sans-serif}
+.dev22-inspector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:15px 16px 12px;border-bottom:1px solid #eee3e4}.dev22-inspector-head h3{font:700 18px/1.15 Georgia,serif;margin:0}.dev22-inspector-head p{font-size:11px;color:#806e70;margin:4px 0 0;max-width:315px}.dev22-inspector-head button{border:0;background:transparent;font-size:19px;cursor:pointer;color:#71575c}
+.dev22-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:7px;background:#f8f0f1;border-bottom:1px solid #eadfe0}.dev22-tabs button{border:0;background:transparent;border-radius:8px;padding:7px 2px;font:650 10px Inter,system-ui,sans-serif;cursor:pointer;color:#806b6e}.dev22-tabs button.active{background:#fff;color:#4f4143;box-shadow:0 1px 7px rgba(45,31,31,.08)}
+.dev22-panel{overflow:auto;padding:13px 16px 20px}
+.dev22-group{padding:0 0 13px;margin:0 0 13px;border-bottom:1px solid #eee4e5}.dev22-group:last-child{border-bottom:0}.dev22-group h4{margin:0 0 9px;font-size:12px;color:#5f4d50}.dev22-group p{font-size:11px;line-height:1.5;color:#7d6e70}
+.dev22-field{display:grid;grid-template-columns:minmax(0,1fr) 162px;gap:10px;align-items:center;margin:7px 0;font-size:11px;color:#78676a}.dev22-field input,.dev22-field select,.dev22-field textarea{width:100%;box-sizing:border-box;border:1px solid #ded2d4;border-radius:8px;background:#fff;padding:7px 8px;font:12px Inter,system-ui,sans-serif;color:#40393a}.dev22-field textarea{grid-column:1/-1;min-height:72px;resize:vertical}.dev22-field input[type=color]{height:34px;padding:3px}
+.dev22-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.dev22-actions button{border:1px solid #ded1d3;background:#fff;border-radius:9px;padding:8px;cursor:pointer;font:650 11px Inter,system-ui,sans-serif;color:#654e52}.dev22-actions button:hover{background:#fbf3f4}.dev22-actions button.danger{color:#9b454f;border-color:#ebcccf;background:#fffafa}
+.dev22-icon-search{width:100%;border:1px solid #ded2d4;border-radius:9px;padding:8px 10px;font:12px Inter,system-ui,sans-serif;margin-bottom:9px}.dev22-icon-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;max-height:340px;overflow:auto}.dev22-icon-grid button{aspect-ratio:1;border:1px solid #e4d7d9;background:#fff;border-radius:10px;display:grid;place-items:center;cursor:pointer;font-size:20px;color:#625055}.dev22-icon-grid button:hover{background:#fbf2f3;border-color:#d5b6bb;transform:translateY(-1px)}.dev22-icon-grid .emoji{font-size:20px}.dev22-icon-grid small{display:none}
+
+.dev22-toolbar{position:fixed;right:14px;bottom:14px;z-index:30055;display:flex;align-items:center;gap:5px;padding:6px;border:1px solid #dacdd0;border-radius:13px;background:rgba(255,255,255,.985);box-shadow:0 12px 36px rgba(46,31,31,.16);font-family:Inter,system-ui,sans-serif}.dev22-toolbar button,.dev22-toolbar select,.dev22-toolbar input{border:0;background:transparent;border-radius:8px;padding:7px 9px;font:650 11px Inter,system-ui,sans-serif;color:#76494f}.dev22-toolbar button{cursor:pointer}.dev22-toolbar button:hover,.dev22-toolbar button.active{background:#faf0f1}.dev22-toolbar .dev22-exit{background:#95505a;color:#fff}.dev22-toolbar .dev22-exit:hover{background:#84434d}.dev22-toolbar .sep{width:1px;height:22px;background:#eadbdd;margin:0 2px}
+.dev22-toolbar input[type=color]{width:30px;height:28px;padding:2px}.dev22-toolbar select{border:1px solid #eadbdd;background:#fff}
+
+.dev22-canvas{position:absolute;left:0;top:0;z-index:29980;pointer-events:none}.dev22-canvas.draw-active{pointer-events:auto;cursor:crosshair}
+.dev22-note-layer{position:absolute;left:0;top:0;z-index:29990;pointer-events:none}.dev22-note{position:absolute;min-width:120px;min-height:56px;padding:9px 10px;border:1px solid rgba(154,79,88,.35);border-radius:10px;background:rgba(255,251,224,.92);box-shadow:0 6px 20px rgba(56,42,20,.09);font:13px/1.4 Inter,system-ui,sans-serif;color:#4d433d;pointer-events:auto;resize:both;overflow:auto}.dev22-note[contenteditable=true]{outline:2px solid rgba(154,79,88,.55)}
+.dev22-note-handle{position:absolute;right:4px;top:4px;border:0;background:rgba(255,255,255,.82);border-radius:6px;padding:2px 5px;cursor:move;color:#82535a;font-size:11px}
+.dev22-note-box-preview{position:absolute;z-index:30005;border:1.5px dashed rgba(154,79,88,.8);background:rgba(255,247,219,.35);pointer-events:none}
+
+body.dev-v22 [style*="--dev-separator-color"]>*,body.dev-v22 [style*="--dev-separator-color"] th,body.dev-v22 [style*="--dev-separator-color"] td{border-color:var(--dev-separator-color)!important;border-width:var(--dev-separator-width,1px)!important;border-style:var(--dev-separator-style,solid)!important}
+body.dev-v22 [style*="--dev-cell-padding"] th,body.dev-v22 [style*="--dev-cell-padding"] td{padding:var(--dev-cell-padding)!important}
+
+@media(max-width:780px){
+  #financeWishlist .wishlist-wrap{width:100%!important}#financeWishlist .wishlist-table tbody tr{grid-template-columns:auto 1fr auto!important;grid-template-areas:"prio item edit" "prio note edit" "prio price edit"!important}.dev22-inspector{left:10px;right:10px;width:auto;top:76px;bottom:76px}.dev22-tabs{grid-template-columns:repeat(3,1fr)}.dev22-icon-grid{grid-template-columns:repeat(5,1fr)}.dev22-toolbar{left:10px;right:10px;overflow-x:auto;justify-content:flex-start}
+}
