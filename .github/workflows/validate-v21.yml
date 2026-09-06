@@ -1,0 +1,30 @@
+name: Validate v21 DEV/trips/wishlist
+on:
+  push:
+    branches: [feature-v21-dev-selection-wishlist-tripcards]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and asset checks
+        run: |
+          node --check refine-v21.js
+          node --check refine-v20.js
+          node --check refine-v19.js
+          node --check wishlist.js
+          node --check api.js
+          grep -q 'refine-v21.css?v=1' refine-v19.js
+          grep -q 'refine-v21.js?v=1' refine-v19.js
+          grep -q 'Ariana_-_Tunisia.jpg' refine-v21.js
+          node tests/validate.cjs
+      - name: Backend regression
+        run: node tests/backend.cjs
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Browser regression
+        run: node tests/browser-v21.cjs
