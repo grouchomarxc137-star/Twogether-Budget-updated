@@ -64,7 +64,7 @@
     const parts=wishlistNoteParts(value);
     const text=parts.text?`<span class="wishlist-note-text">${esc(parts.text)}</span>`:'';
     const link=parts.link?`<a class="wishlist-open-link" href="${esc(parts.link)}" target="_blank" rel="noopener noreferrer">Open link ↗</a>`:'';
-    return text||link?`${text}${link}`:'<span class="wishlist-muted">—</span>';
+    return text||link?`${text}${link}`:'<span class="wishlist-note-empty" aria-label="No note"></span>';
   }
 
   function render(){
@@ -77,6 +77,7 @@
     root.innerHTML=`<div class="wishlist-wrap"><div class="wishlist-head"><div><h2>${esc(a)}’s wishlist</h2><p>Wishlist items are informational only and do not affect your budget, savings or net worth.</p></div><button class="btn primary" type="button" data-wish-add>+ Add wish</button></div><div class="wishlist-table-wrap"><table class="wishlist-table"><thead><tr><th>Item</th><th>Note / Link</th><th>Estimated price</th><th class="wishlist-edit-head">Edit</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total</strong><small>${items.length} ${items.length===1?'item':'items'}</small></td><td class="wishlist-price-cell"><strong>${priced.length?money(total):'—'}</strong></td><td></td></tr></tfoot></table></div></div>`;
     $('[data-wish-add]',root)?.addEventListener('click',()=>openModal(-1));
     root.querySelectorAll('[data-wish-index]').forEach(btn=>btn.addEventListener('click',()=>openModal(Number(btn.dataset.wishIndex))));
+    document.dispatchEvent(new CustomEvent('twogether:wishlist-rendered'));
   }
 
   function ensureModal(){
@@ -94,7 +95,8 @@
   function openModal(index){
     const item=index>=0?items[index]:null;
     showModal(`<span class="panel-kicker">WISHLIST</span><h2>${item?'Edit wish':'Add a wish'}</h2><p>Save something you may want later. The price is optional and never affects your finances until you actually buy it.</p><div class="wishlist-fields"><label>What do you want?<input id="wishName" value="${esc(item?.name||'')}" placeholder="e.g. New laptop"></label><label>Estimated price, optional<div class="finance-money mini"><span>€</span><input id="wishPrice" inputmode="decimal" value="${esc(String(item?.price??''))}" placeholder="0.00"></div></label><label class="full">Note, optional<textarea id="wishNote" rows="4" placeholder="Why you want it, model, size, link note...">${esc(item?.note||'')}</textarea></label></div><div class="finance-mini-actions">${item?'<button class="btn ghost" type="button" data-wish-delete>Delete</button>':'<span></span>'}<button class="btn primary" type="button" data-wish-save>Save wish</button></div>`);
-    $('[data-wish-save]')?.addEventListener('click',async()=>{
+    const saveBtn=$('[data-wish-save]');
+    const performSave=async()=>{
       const name=String($('#wishName')?.value||'').trim();
       const raw=String($('#wishPrice')?.value||'').trim();
       const note=String($('#wishNote')?.value||'').trim();
@@ -103,28 +105,41 @@
       const next=[...items];
       const row={id:item?.id||uid(),name,price:raw===''?'':n(raw),note,createdAt:item?.createdAt||new Date().toISOString()};
       if(index>=0)next[index]=row;else next.push(row);
-      await saveWishlist(next,'Wish saved');
+      saveWishlist(next,'Wish saved');
+    };
+    saveBtn?.addEventListener('click',performSave);
+    $('#wishlistMiniBody')?.addEventListener('keydown',e=>{
+      if(e.key!=='Enter'||e.isComposing)return;
+      if(e.target?.tagName==='TEXTAREA'&&!e.ctrlKey&&!e.metaKey)return;
+      if(e.shiftKey||e.altKey)return;
+      e.preventDefault();e.stopPropagation();saveBtn?.click();
     });
-    $('[data-wish-delete]')?.addEventListener('click',async()=>{const next=[...items];next.splice(index,1);await saveWishlist(next,'Wish removed');});
+    $('[data-wish-delete]')?.addEventListener('click',()=>{const next=[...items];next.splice(index,1);saveWishlist(next,'Wish removed');});
+    setTimeout(()=>$('#wishName')?.focus(),0);
   }
 
   async function saveWishlist(next,message){
-    if(backendVersion<15)return toast('Wishlist saving needs backend v15 to be deployed','warn');
     const a=actor(); if(!a)return;
     const previous=items;
     items=normalizeWishlist(next);render();closeModal();toast('Saving…');
     try{
       let profile=(cachedActor===a&&cachedProfile)?JSON.parse(JSON.stringify(cachedProfile)):null;
       if(!profile){
+        const cached=window.__TWOGETHER_CACHED_STATE__;
+        if(cached?.financeProfiles?.[a]){backendVersion=Number(cached.version||backendVersion||0);profile=JSON.parse(JSON.stringify(cached.financeProfiles[a]||{}));}
+      }
+      if(!profile){
         const res=await jsonp({action:'state'});
         if(!res?.ok) throw new Error('Could not load latest finances');
+        backendVersion=Number(res.state?.version||backendVersion||0);
         profile=JSON.parse(JSON.stringify(res.state?.financeProfiles?.[a]||{}));
       }
+      if(backendVersion&&backendVersion<15)throw new Error('Wishlist saving needs backend v15 or newer');
       profile.wishlist=next;
       cachedProfile=JSON.parse(JSON.stringify(profile));cachedActor=a;
       await post('saveFinanceProfile',{profile});
       toast(message);
-      setTimeout(loadState,250);
+      setTimeout(loadState,180);
     }catch(err){
       items=previous;render();toast(err.message||'Could not save wishlist','warn');
     }
@@ -140,12 +155,17 @@
     finally{loading=false;}
   }
 
+  function hydrateCache(){
+    const a=actor(),state=window.__TWOGETHER_CACHED_STATE__;if(!a||!state)return false;
+    backendVersion=Number(state.version||0);cachedProfile=JSON.parse(JSON.stringify(state.financeProfiles?.[a]||{}));cachedActor=a;items=normalizeWishlist(cachedProfile?.wishlist);return true;
+  }
+
   function init(){
-    ensureModal();render();
+    ensureModal();hydrateCache();render();
     document.addEventListener('twogether:finance-view',e=>{if(e.detail?.view==='wishlist'){render();loadState();}});
-    new MutationObserver(()=>{items=[];cachedProfile=null;cachedActor='';render();if($('#finances')?.classList.contains('active'))loadState();}).observe(document.body,{attributes:true,attributeFilter:['data-actor']});
+    document.addEventListener('twogether:state-refreshed',()=>{hydrateCache();render();});
+    new MutationObserver(()=>{items=[];cachedProfile=null;cachedActor='';hydrateCache();render();if($('#finances')?.classList.contains('active'))loadState();}).observe(document.body,{attributes:true,attributeFilter:['data-actor']});
   }
 
   document.addEventListener('DOMContentLoaded',init);
 })();
-
