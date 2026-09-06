@@ -2,13 +2,23 @@
   'use strict';
   const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
   const countryEmoji={Italy:'🇮🇹',Netherlands:'🇳🇱',Tunisia:'🇹🇳',Portugal:'🇵🇹',Spain:'🇪🇸',France:'🇫🇷',Germany:'🇩🇪',Belgium:'🇧🇪','United Kingdom':'🇬🇧',Other:'✦'};
+  function addCss(href,key){
+    if(document.querySelector(`link[href*="${href.split('?')[0]}"]`))return;
+    const l=document.createElement('link');l.rel='stylesheet';l.href=href;l.dataset[key]='1';document.head.appendChild(l);
+  }
+  function addScript(src,key,onload){
+    if(document.querySelector(`script[src*="${src.split('?')[0]}"]`)){onload?.();return;}
+    const s=document.createElement('script');s.src=src;s.defer=true;s.dataset[key]='1';if(onload)s.addEventListener('load',onload,{once:true});document.body.appendChild(s);
+  }
   function loadLayers(){
-    if(!document.querySelector('link[href*="refine-v20.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href='refine-v20.css?v=2';l.dataset.v20='1';document.head.appendChild(l);}
-    if(!document.querySelector('link[href*="refine-v21.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href='refine-v21.css?v=1';l.dataset.v21='1';document.head.appendChild(l);}
-    if(!document.querySelector('link[href*="refine-v21-media.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href='refine-v21-media.css?v=1';l.dataset.v21Media='1';document.head.appendChild(l);}
-    const loadDev=()=>{if(document.querySelector('script[src*="dev-v21b.js"]'))return;const s=document.createElement('script');s.src='dev-v21b.js?v=1';s.defer=true;s.dataset.v21Dev='1';document.body.appendChild(s);};
-    const loadTrip=()=>{if(document.querySelector('script[src*="trip-v21.js"]'))return loadDev();const s=document.createElement('script');s.src='trip-v21.js?v=2';s.defer=true;s.dataset.v21Trip='1';s.addEventListener('load',loadDev,{once:true});document.body.appendChild(s);};
-    if(!document.querySelector('script[src*="refine-v20.js"]')){const s=document.createElement('script');s.src='refine-v20.js?v=2';s.defer=true;s.dataset.v20='1';s.addEventListener('load',loadTrip,{once:true});document.body.appendChild(s);}else loadTrip();
+    addCss('refine-v20.css?v=2','v20');
+    addCss('refine-v21.css?v=1','v21');
+    addCss('refine-v21-media.css?v=1','v21Media');
+    addCss('refine-v22.css?v=1','v22');
+    const loadDev=()=>addScript('dev-v22.js?v=1','v22Dev');
+    const loadUi=()=>addScript('refine-v22.js?v=1','v22Ui',loadDev);
+    const loadTrip=()=>addScript('trip-v21.js?v=2','v21Trip',loadUi);
+    addScript('refine-v20.js?v=2','v20',loadTrip);
   }
   function enhanceCard(card){
     if(card.dataset.v19Aesthetic==='1')return;
