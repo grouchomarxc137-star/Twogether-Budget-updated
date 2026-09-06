@@ -13,7 +13,7 @@
   function remoteState(){return new Promise((resolve,reject)=>{
     const cb='__tw_api_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
     const timer=setTimeout(()=>done(new Error('Could not reach the shared data. Please retry.')),15000);
-    function done(err,data){clearTimeout(timer);delete window[cb];script.remove();if(err)return reject(err);remember(data);document.dispatchEvent(new CustomEvent('twogether:state-refreshed',{detail:{state:data}}));resolve(data);}
+    function done(err,data){clearTimeout(timer);delete window[cb];script.remove();if(err)return reject(err);remember(data);resolve(data);}
     window[cb]=r=>r?.ok?done(null,r.state):done(new Error(r?.error||'Sync failed'));
     script.onerror=()=>done(new Error('Could not reach the shared data.'));
     script.src=url+'?action=state&callback='+cb+'&_='+Date.now();document.head.appendChild(script);
