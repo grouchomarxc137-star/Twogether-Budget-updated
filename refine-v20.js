@@ -66,13 +66,19 @@
   function selector(el){if(!el)return'';if(el===document.body)return'body';if(el.id)return'#'+esc(el.id);for(const a of ['data-current-plan','data-current-trip','data-open-trip','data-fin-month','data-wish-index'])if(el.hasAttribute?.(a))return`[${a}="${esc(el.getAttribute(a))}"]`;const p=el.parentElement;if(!p)return'';const same=[...p.children].filter(x=>x.tagName===el.tagName);return`${selector(p)} > ${el.tagName.toLowerCase()}:nth-of-type(${same.indexOf(el)+1})`;}
   function snapshot(el){if(!base.has(el))base.set(el,el.getAttribute('style'));}
   function restoreExtras(){for(const [el,s] of base){if(!el.isConnected)continue;s==null?el.removeAttribute('style'):el.setAttribute('style',s);}base.clear();}
-  function applyExtras(){if(!window.TwogetherDevV18?.active)return;for(const [key,p] of Object.entries(extras)){let el;try{el=document.querySelector(key);}catch{}if(!el)continue;snapshot(el);Object.entries(p.style||{}).forEach(([k,v])=>el.style.setProperty(k,v));}}
+  function applyExtras(){if(!window.TwogetherDevV18?.active)return;for(const [key,p] of Object.entries(extras)){let el;try{el=document.querySelector(key);}catch{}if(!el)continue;snapshot(el);Object.entries(p.style||{}).forEach(([k,v])=>{if(k.startsWith('--dev20-'))return;el.style.setProperty(k,v);});}}
   function saveExtras(){localStorage.setItem(EXTRA_KEY,JSON.stringify(extras));}
   function setExtra(prop,val){const el=window.TwogetherDevV18?.selected;if(!el)return;const key=selector(el);if(!key)return;extras[key]=extras[key]||{style:{}};extras[key].style[prop]=val;saveExtras();restoreExtras();applyExtras();}
   function field(label,type,value,cb,opts=[]){const row=document.createElement('label');row.className='dev20-row';const s=document.createElement('span');s.textContent=label;row.appendChild(s);let i;if(type==='select'){i=document.createElement('select');opts.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;i.appendChild(o);});}else{i=document.createElement('input');i.type=type;}i.value=value??'';i.addEventListener(type==='range'?'input':'change',()=>cb(i.value));row.appendChild(i);return row;}
+  function augmentIcons(panel){
+    const iconSelect=[...panel.querySelectorAll('select')].find(s=>s.closest('.dev19-group')?.querySelector('h4')?.textContent?.includes('Icon'));
+    if(iconSelect&&!iconSelect.dataset.v20Icons){iconSelect.dataset.v20Icons='1';[
+      ['🏠','Home'],['✈️','Flight'],['🚆','Train'],['🏨','Hotel'],['🛏️','Bed'],['🍽️','Meal'],['🛒','Groceries'],['⛽','Fuel'],['🚗','Car'],['🅿️','Parking'],['🧾','Receipt'],['💳','Card'],['💶','Money'],['📊','Chart'],['📅','Calendar'],['📍','Location'],['🗺️','Map'],['🌍','World'],['⚙️','Settings'],['✎','Edit'],['⋯','More'],['🔒','Lock'],['🔓','Unlock'],['☆','Star outline'],['★','Star'],['✨','Sparkles'],['✓','Check'],['✕','Close'],['＋','Plus'],['−','Minus'],['‹','Left'],['›','Right'],['↑','Up'],['↓','Down'],['↗','Open']
+    ].forEach(([v,t])=>{if([...iconSelect.options].some(o=>o.value===v))return;const o=document.createElement('option');o.value=v;o.textContent=`${v} ${t}`;iconSelect.appendChild(o);});}
+  }
   function augmentDev(){
     if(!window.TwogetherDevV18?.active)return;const inspector=$('.dev19-inspector'),panel=inspector&&$('.dev19-panel',inspector),sel=window.TwogetherDevV18?.selected;if(!panel||!sel)return;
-    panel.querySelector('.dev20-advanced')?.remove();const cs=getComputedStyle(sel),key=selector(sel),p=extras[key]?.style||{};const box=document.createElement('section');box.className='dev20-advanced';box.innerHTML='<h4>Advanced controls</h4>';
+    augmentIcons(panel);const key=selector(sel);if(panel.querySelector(`.dev20-advanced[data-key="${CSS.escape(key)}"]`))return;panel.querySelector('.dev20-advanced')?.remove();const cs=getComputedStyle(sel),p=extras[key]?.style||{};const box=document.createElement('section');box.className='dev20-advanced';box.dataset.key=key;box.innerHTML='<h4>Advanced controls</h4>';
     box.append(field('Scale','number',p.scale||1,v=>{const n=Math.max(.1,Math.min(5,Number(v)||1));setExtra('scale',String(n));}));
     box.append(field('Rotate','number',parseFloat(p.rotate)||0,v=>setExtra('rotate',(Number(v)||0)+'deg')));
     box.append(field('Z-index','number',p['z-index']||cs.zIndex||0,v=>setExtra('z-index',String(Number(v)||0))));
@@ -84,23 +90,19 @@
     box.append(field('Blur','range',0,v=>setExtra('filter',Number(v)?`blur(${Number(v)}px)`:'none')));
     const actions=document.createElement('div');actions.className='dev20-actions';
     const b=(t,fn)=>{const x=document.createElement('button');x.type='button';x.textContent=t;x.onclick=fn;actions.appendChild(x);};
-    b('Select parent',()=>{const parent=sel.parentElement;if(parent){const old=window.TwogetherDevV18.selected;parent.dispatchEvent(new MouseEvent('pointerover',{bubbles:true}));parent.dispatchEvent(new MouseEvent('click',{bubbles:true,altKey:true}));}});
+    b('Select parent',()=>{const parent=sel.parentElement;if(parent){parent.dispatchEvent(new MouseEvent('pointerover',{bubbles:true}));parent.dispatchEvent(new MouseEvent('click',{bubbles:true,altKey:true}));}});
     b('Bring to front',()=>setExtra('z-index','999'));
-    b('Reset advanced',()=>{delete extras[key];saveExtras();restoreExtras();applyExtras();augmentDev();});
-    b('Copy CSS',async()=>{const txt=Object.entries({...p}).map(([k,v])=>`${k}: ${v};`).join('\n');try{await navigator.clipboard.writeText(txt);}catch{}});
+    b('Reset advanced',()=>{delete extras[key];saveExtras();restoreExtras();applyExtras();box.remove();setTimeout(augmentDev,0);});
+    b('Copy CSS',async()=>{const txt=Object.entries({...p}).filter(([k])=>!k.startsWith('--dev20-')).map(([k,v])=>`${k}: ${v};`).join('\n');try{await navigator.clipboard.writeText(txt);}catch{}});
     box.appendChild(actions);const help=document.createElement('p');help.className='dev20-shortcuts';help.textContent='Shortcuts: Alt+click selects directly · Ctrl/Cmd+Z undo · Ctrl/Cmd+Y redo · Arrow keys nudge 1px · Shift+Arrow nudges 10px.';box.appendChild(help);panel.appendChild(box);
-
-    const iconSelect=[...panel.querySelectorAll('select')].find(s=>s.closest('.dev19-group')?.querySelector('h4')?.textContent?.includes('Icon'));
-    if(iconSelect&&!iconSelect.dataset.v20Icons){iconSelect.dataset.v20Icons='1';[
-      ['🏠','Home'],['✈️','Flight'],['🚆','Train'],['🏨','Hotel'],['🛏️','Bed'],['🍽️','Meal'],['🛒','Groceries'],['⛽','Fuel'],['🚗','Car'],['🅿️','Parking'],['🧾','Receipt'],['💳','Card'],['💶','Money'],['📊','Chart'],['📅','Calendar'],['📍','Location'],['🗺️','Map'],['🌍','World'],['⚙️','Settings'],['✎','Edit'],['⋯','More'],['🔒','Lock'],['🔓','Unlock'],['☆','Star outline'],['★','Star'],['✨','Sparkles'],['✓','Check'],['✕','Close'],['＋','Plus'],['−','Minus'],['‹','Left'],['›','Right'],['↑','Up'],['↓','Down'],['↗','Open']
-    ].forEach(([v,t])=>{if([...iconSelect.options].some(o=>o.value===v))return;const o=document.createElement('option');o.value=v;o.textContent=`${v} ${t}`;iconSelect.appendChild(o);});}
   }
 
   document.addEventListener('keydown',e=>{
     if(!window.TwogetherDevV18?.active||!window.TwogetherDevV18?.selected||!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)||e.target.matches('input,textarea,select'))return;e.preventDefault();const step=e.shiftKey?10:1,el=window.TwogetherDevV18.selected,key=selector(el),p=extras[key]?.style||{};let x=Number(p['--dev20-x']||0),y=Number(p['--dev20-y']||0);if(e.key==='ArrowLeft')x-=step;if(e.key==='ArrowRight')x+=step;if(e.key==='ArrowUp')y-=step;if(e.key==='ArrowDown')y+=step;extras[key]=extras[key]||{style:{}};extras[key].style['--dev20-x']=x;extras[key].style['--dev20-y']=y;extras[key].style.transform=`translate(${x}px,${y}px)`;saveExtras();restoreExtras();applyExtras();
   },true);
 
-  const obs=new MutationObserver(()=>{enhanceTripMedia();fixNavigation();syncDevState();if(window.TwogetherDevV18?.active){applyExtras();augmentDev();}});
+  let scheduled=false;
+  const obs=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;enhanceTripMedia();fixNavigation();syncDevState();});});
   document.addEventListener('DOMContentLoaded',()=>{enhanceTripMedia();fixNavigation();syncDevState();obs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-actor']});});
   document.addEventListener('twogether:v18-rendered',()=>setTimeout(()=>{enhanceTripMedia();syncDevState();},0));
   document.addEventListener('twogether:dev-changed',()=>setTimeout(()=>{syncDevState();if(window.TwogetherDevV18?.active){applyExtras();augmentDev();}else restoreExtras();},0));
