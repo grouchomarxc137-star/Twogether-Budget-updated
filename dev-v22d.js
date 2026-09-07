@@ -96,11 +96,15 @@ function floatingSnapshot(){
 function insertAtOrigin(key,el){
   const o=origins[key];if(!o||!el?.isConnected)return;
   const parent=resolve(o.parentSelector);if(!parent)return;
+  if(Number.isFinite(o.index)){
+    const kids=[...parent.children].filter(x=>x!==el),idx=Math.max(0,Math.min(o.index,kids.length));
+    parent.insertBefore(el,kids[idx]||null);
+    return;
+  }
   const prev=o.prevSelector?resolve(o.prevSelector):null,next=o.nextSelector?resolve(o.nextSelector):null;
   if(next&&next.parentElement===parent&&next!==el){parent.insertBefore(el,next);return;}
   if(prev&&prev.parentElement===parent&&prev!==el){parent.insertBefore(el,prev.nextSibling);return;}
-  const kids=[...parent.children].filter(x=>x!==el),idx=Math.max(0,Math.min(Number.isFinite(o.index)?o.index:kids.length,kids.length));
-  parent.insertBefore(el,kids[idx]||null);
+  parent.appendChild(el);
 }
 function restoreExactOrder(snapshot){
   for(const [key,el] of snapshot)insertAtOrigin(key,el);
