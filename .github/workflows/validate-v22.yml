@@ -13,6 +13,7 @@ jobs:
           node --check dev-v22b.js
           node --check dev-v22c.js
           node --check dev-v22d.js
+          node --check dev-v22e.js
           node --check refine-v22.js
           node --check refine-v19.js
           node --check wishlist.js
@@ -22,6 +23,7 @@ jobs:
           grep -q 'dev-v22b.js?v=1' refine-v19.js
           grep -q 'dev-v22c.js?v=1' refine-v19.js
           grep -q 'dev-v22d.js?v=1' refine-v19.js
+          grep -q 'dev-v22e.js?v=1' refine-v19.js
           node tests/validate.cjs
       - name: Backend regression
         run: node tests/backend.cjs
