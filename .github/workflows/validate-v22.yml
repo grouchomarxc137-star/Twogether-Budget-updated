@@ -14,6 +14,7 @@ jobs:
           node --check dev-v22c.js
           node --check dev-v22d.js
           node --check dev-v22e.js
+          node --check dev-v22-observer.js
           node --check refine-v22.js
           node --check refine-v19.js
           node --check wishlist.js
@@ -21,7 +22,8 @@ jobs:
           grep -q 'refine-v22c.css?v=1' refine-v19.js
           grep -q 'refine-v22.js?v=2' refine-v19.js
           grep -q 'dev-v22b.js?v=1' refine-v19.js
-          grep -q 'dev-v22c.js?v=3' refine-v19.js
+          grep -q 'dev-v22-observer.js?v=2' refine-v19.js
+          grep -q 'dev-v22c.js?v=4' refine-v19.js
           grep -q 'dev-v22d.js?v=1' refine-v19.js
           grep -q 'dev-v22e.js?v=1' refine-v19.js
           node tests/validate.cjs
