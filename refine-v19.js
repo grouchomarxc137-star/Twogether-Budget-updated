@@ -16,12 +16,8 @@
     addCss('refine-v21-media.css?v=1','v21Media');
     addCss('refine-v22.css?v=1','v22');
     addCss('refine-v22c.css?v=1','v22c');
-    const loadDevEnter=()=>addScript('dev-v22e.js?v=1','v22DevEnter');
-    const loadDevOrder=()=>addScript('dev-v22d.js?v=1','v22DevOrder',loadDevEnter);
-    const loadDevFix=()=>addScript('dev-v22c.js?v=4','v22DevFix',loadDevOrder);
-    const loadDevObserver=()=>addScript('dev-v22-observer.js?v=2','v22DevObserver',loadDevFix);
-    const loadDev=()=>addScript('dev-v22b.js?v=1','v22Dev',loadDevObserver);
-    const loadUi=()=>addScript('refine-v22.js?v=2','v22Ui',loadDev);
+    /* DEV mode is intentionally paused. Its source files remain in GitHub for later reactivation. */
+    const loadUi=()=>addScript('refine-v22.js?v=2','v22Ui');
     const loadTrip=()=>addScript('trip-v21.js?v=2','v21Trip',loadUi);
     addScript('refine-v20.js?v=2','v20',loadTrip);
   }
