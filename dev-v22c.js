@@ -305,7 +305,12 @@ function install(){
   });
   window.addEventListener('scroll',scheduleDividers,{passive:true});window.addEventListener('resize',scheduleDividers,{passive:true});
   observer=new MutationObserver(records=>{
-    if(records.some(r=>r.target?.classList?.contains('dev22-selection')||r.target?.closest?.('.dev22-inspector')||r.type==='childList'))scheduleDividers();
+    const relevant=records.some(r=>{
+      const t=r.target;
+      if(t instanceof Element&&(t.matches?.('.dev22c-divider-layer')||t.closest?.('.dev22c-divider-layer')))return false;
+      return t?.classList?.contains('dev22-selection')||t?.closest?.('.dev22-inspector')||r.type==='childList';
+    });
+    if(relevant)scheduleDividers();
   });
   observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','class','hidden']});
   if(active())setTimeout(applyAll,0);
