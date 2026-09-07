@@ -1,0 +1,24 @@
+name: Validate shop v24 no DEV
+on:
+  push:
+    branches: [feature-shop-v24-no-dev]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and regression checks
+        run: |
+          node --check shop-v24.js
+          node --check refine-v19.js
+          node tests/validate.cjs
+          node tests/backend.cjs
+          node tests/shop-v24.cjs
+      - name: Browser smoke
+        env:
+          TWOGETHER_BROWSER: /usr/bin/google-chrome
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0 >/dev/null
+          node tests/browser-shop-v24.cjs
