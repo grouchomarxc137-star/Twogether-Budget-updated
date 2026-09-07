@@ -8,13 +8,14 @@ if(!Native)return;
 
 class TwogetherMutationObserver extends Native{
   constructor(callback){
-    const filterNext=!!window.__twV22FilterNextObserver;
-    if(filterNext)window.__twV22FilterNextObserver=false;
-    if(!filterNext){super(callback);return;}
+    const src=Function.prototype.toString.call(callback);
+    const isDividerObserver=src.includes('scheduleDividers')&&src.includes('dev22-selection');
+    if(!isDividerObserver){super(callback);return;}
     super((records,observer)=>{
       const kept=records.filter(r=>{
         const t=r.target;
-        return !(t instanceof Element&&(t.matches?.('.dev22c-divider-layer')||t.closest?.('.dev22c-divider-layer')));
+        if(!(t instanceof Element))return false;
+        return t.matches?.('.dev22-selection')||!!t.closest?.('.dev22-inspector');
       });
       if(kept.length)callback(kept,observer);
     });
