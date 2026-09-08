@@ -23,6 +23,7 @@ function installPackingCapture(){document.addEventListener('click',e=>{const b=e
 let storyObserver=null;
 function wireStoryObserver(){const root=$('#tripGallery');if(!root||storyObserver)return;storyObserver=new MutationObserver(()=>requestAnimationFrame(decorateTripStories));storyObserver.observe(root,{childList:true});}
 function refreshVisuals(){restoreMainCopy();decorateTripStories();syncPackingButtons();wireStoryObserver();}
-function init(){installPackingCapture();refreshVisuals();document.addEventListener('twogether:v18-rendered',()=>requestAnimationFrame(refreshVisuals));document.addEventListener('twogether:saved',()=>setTimeout(refreshVisuals,120));document.addEventListener('twogether:state-refreshed',()=>requestAnimationFrame(refreshVisuals));window.addEventListener('focus',refreshVisuals);setTimeout(refreshVisuals,350);setTimeout(refreshVisuals,1100);}
+function loadV29(){if(document.querySelector('script[src*=\"v29.js\"]'))return;const s=document.createElement('script');s.src='v29.js?v=1';s.defer=true;document.body.appendChild(s);}
+function init(){loadV29();installPackingCapture();refreshVisuals();document.addEventListener('twogether:v18-rendered',()=>requestAnimationFrame(refreshVisuals));document.addEventListener('twogether:saved',()=>setTimeout(refreshVisuals,120));document.addEventListener('twogether:state-refreshed',()=>requestAnimationFrame(refreshVisuals));window.addEventListener('focus',refreshVisuals);setTimeout(refreshVisuals,350);setTimeout(refreshVisuals,1100);}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
