@@ -97,8 +97,8 @@
 #twCurrentTripsSection.v27-current-side .tw-current-main{padding:0!important}
 #twCurrentTripsSection.v27-current-side .tw-current-card h3{font-size:24px!important;font-weight:500!important;margin:5px 0 2px!important}
 #twCurrentTripsSection.v27-current-side .tw-current-main>p{font-size:12.5px!important;line-height:1.4!important;margin:0 0 9px!important}
-#twCurrentTripsSection.v27-current-side .tw-current-numbers{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important;padding:7px 0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
-#twCurrentTripsSection.v27-current-side .tw-current-numbers>div{padding:6px 8px!important;border:0!important;min-width:0!important}
+#twCurrentTripsSection.v27-current-side .tw-current-numbers{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;padding:5px 0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
+#twCurrentTripsSection.v27-current-side .tw-current-numbers>div{padding:5px 6px!important;border:0!important;min-width:0!important}
 #twCurrentTripsSection.v27-current-side .tw-current-numbers>div:nth-child(odd){padding-left:0!important}
 #twCurrentTripsSection.v27-current-side .tw-current-numbers span{font-size:12px!important;line-height:1.25!important;color:var(--muted)!important;white-space:normal!important;letter-spacing:0!important;text-transform:none!important}
 #twCurrentTripsSection.v27-current-side .tw-current-numbers strong{font-size:16px!important;margin-top:2px!important}
