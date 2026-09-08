@@ -1,0 +1,27 @@
+name: Patch v28 Current Trip metrics
+on:
+  push:
+    branches: [feature-v28-balance-wishlist-layout-final2]
+    paths: ['.github/workflows/patch-v28-metrics.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put desktop budget metrics back on one compact row
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v28.css')
+          s=p.read_text()
+          s=s.replace('grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important;padding:7px 0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;background:transparent!important','grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;padding:5px 0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;background:transparent!important',1)
+          s=s.replace('padding:6px 8px!important;border:0!important;min-width:0!important','padding:5px 6px!important;border:0!important;min-width:0!important',1)
+          p.write_text(s)
+          PY
+          git config user.name 'GrimReaper29'
+          git config user.email 'anokasptnestle@gmail.com'
+          git add v28.css
+          git commit -m 'Compact Current Trip metrics into one desktop row'
+          git push
