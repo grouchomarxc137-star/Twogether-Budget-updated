@@ -1,0 +1,34 @@
+name: Validate v28 balance and Wishlist polish
+on:
+  push:
+    branches: [feature-v28-balance-wishlist-layout-final2]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and regression checks
+        run: |
+          node --check v27.js
+          node --check v28.js
+          node --check overview-v26.js
+          node --check approved-v18.js
+          node tests/validate.cjs
+          node tests/backend.cjs
+          node tests/game-v27.cjs
+          grep -q 'v28.css?v=1' index.html
+          grep -q 'v28.js?v=1' index.html
+          grep -q 'Log your most recent trip' index.html
+      - name: Install browser test dependency
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+      - name: Existing v27 browser regression
+        env:
+          TWOGETHER_BROWSER: /usr/bin/google-chrome
+        run: node tests/browser-v27.cjs
+      - name: v28 browser regression
+        env:
+          TWOGETHER_BROWSER: /usr/bin/google-chrome
+        run: node tests/browser-v28.cjs
