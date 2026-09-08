@@ -1,6 +1,7 @@
 /* v29 final containment/readability overrides. */
 #twCurrentTripsSection.v27-current-side .tw-current-numbers span{font-size:12px!important}
 #twCurrentTripsSection.v27-current-side .tw-current-actions button{font-size:12px!important}
+.current-overview{box-sizing:border-box!important;width:min(920px,calc(100vw - 28px))!important}
 
 /* Wishlist stays polished without growing into oversized cards. */
 #financeWishlist .v27-wish-card{min-height:205px!important;position:relative!important}
