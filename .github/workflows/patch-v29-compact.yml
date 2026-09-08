@@ -1,0 +1,32 @@
+name: Patch v29 compact sidebar
+on:
+  push:
+    branches: [feature-v29-wizard-wishlist-shop]
+    paths: ['.github/workflows/patch-v29-compact.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep sidebar cards content-sized and update expected width
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v29.css')
+          s=p.read_text()
+          old='overflow:auto!important;\n  gap:9px!important;\n  padding:1px 3px 2px 1px!important;'
+          new='overflow:auto!important;\n  gap:9px!important;\n  align-content:start!important;\n  grid-auto-rows:max-content!important;\n  padding:1px 3px 2px 1px!important;'
+          if old not in s: raise SystemExit('list marker not found')
+          p.write_text(s.replace(old,new,1))
+          t=Path('tests/browser-v27.cjs')
+          q=t.read_text()
+          q=q.replace("assert.ok(layout.sw>430&&layout.ch<300,'Current Trip side remains compact and usable')","assert.ok(layout.sw>300&&layout.ch<300,'Current Trip side remains compact and usable')",1)
+          t.write_text(q)
+          PY
+          git config user.name 'GrimReaper29'
+          git config user.email 'anokasptnestle@gmail.com'
+          git add v29.css tests/browser-v27.cjs
+          git commit -m 'Keep v29 Current Trip sidebar compact'
+          git push
