@@ -1,0 +1,14 @@
+/* v29 mobile containment: four main destinations remain usable without widening the page. */
+@media(max-width:680px){
+  .hub-tabs{max-width:100vw!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;overscroll-behavior-x:contain!important}
+  .hub-tabs::-webkit-scrollbar{display:none!important}
+  .hub-tabs .hub-tab{flex:0 0 auto!important;white-space:nowrap!important}
+  #financeWishlist,#financeWishlist .v27-wish-shell,#financeWishlist .v28-shop-layout,#financeWishlist .v28-collection,#financeWishlist .v27-wish-grid,#financeWishlist .v27-wish-card,#financeWishlist .v27-cart{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+  #financeWishlist .v27-wish-hero{padding:18px 16px!important;max-width:100%!important;box-sizing:border-box!important}
+  #financeWishlist .v27-wish-actions,#financeWishlist .v28-filter-row{flex-wrap:wrap!important;min-width:0!important}
+  #financeWishlist .v27-priority-filter{max-width:100%!important;min-width:0!important}
+  #financeWishlist .v27-wish-card-actions{flex-wrap:wrap!important}
+  #financeWishlist .v27-wish-card-actions button{min-width:0!important;max-width:100%!important}
+  #financeWishlist .v28-wish-title,#financeWishlist .v28-wish-note,#financeWishlist .v28-wish-readiness{min-width:0!important;overflow-wrap:anywhere!important}
+  #shopView,#shopView .v27-shop-shell,#shopView .v27-shop-hero,#shopView .v27-shop-grid,#shopView .v27-shop-item{min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
+}
