@@ -1,4 +1,8 @@
-/* v29 mobile containment: four main destinations remain usable without widening the page. */
+/* v29 final containment/readability overrides. */
+#twCurrentTripsSection.v27-current-side .tw-current-numbers span{font-size:12px!important}
+#twCurrentTripsSection.v27-current-side .tw-current-actions button{font-size:12px!important}
+
+/* Four main destinations remain usable without widening the page. */
 @media(max-width:680px){
   .hub-tabs{max-width:100vw!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;overscroll-behavior-x:contain!important}
   .hub-tabs::-webkit-scrollbar{display:none!important}
