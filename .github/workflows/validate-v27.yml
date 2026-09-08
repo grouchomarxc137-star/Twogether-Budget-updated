@@ -4,6 +4,17 @@ on:
     branches: [feature-v27-wishlist-twos-compare-impl]
     paths:
       - '.github/workflows/validate-v27.yml'
+      - 'v27.js'
+      - 'v27.css'
+      - 'trip-v21.js'
+      - 'overview-v26.js'
+      - 'refine-v19.js'
+      - 'refine-v22.js'
+      - 'wishlist.js'
+      - 'finances.js'
+      - 'backend/Code.gs'
+      - 'backend/Code-v17.gs'
+      - 'tests/**'
 permissions:
   contents: read
 jobs:
@@ -17,6 +28,7 @@ jobs:
           node --check overview-v26.js
           node --check refine-v19.js
           node --check refine-v22.js
+          node --check trip-v21.js
           node tests/validate.cjs
           node tests/backend.cjs
           node tests/game-v27.cjs
@@ -27,4 +39,3 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install --no-save playwright@1.55.0 >/dev/null
           node tests/browser-v27.cjs
-# rerun after browser wait fix
