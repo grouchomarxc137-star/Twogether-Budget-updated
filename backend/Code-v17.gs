@@ -973,7 +973,8 @@ function sanitizeFinanceWishlistItem_(item) {
 function sanitizeCompareRow_(item){return {id:cleanText_(item&&item.id,80)||Utilities.getUuid(),name:cleanText_(item&&item.name,120)||'Cost',amount:cleanMoney_(item&&item.amount)};}
 function sanitizeCompareLab_(value){
   const v=value&&typeof value==='object'?value:{};
-  return {id:cleanText_(v.id,80)||Utilities.getUuid(),titleA:cleanText_(v.titleA,120)||'Scenario A',titleB:cleanText_(v.titleB,120)||'Scenario B',rowsA:(Array.isArray(v.rowsA)?v.rowsA:[]).slice(0,30).map(sanitizeCompareRow_),rowsB:(Array.isArray(v.rowsB)?v.rowsB:[]).slice(0,30).map(sanitizeCompareRow_),updatedAt:new Date().toISOString()};
+  if(!Object.keys(v).length)return {};
+  return {id:cleanText_(v.id,80)||Utilities.getUuid(),titleA:cleanText_(v.titleA,120)||'Scenario A',titleB:cleanText_(v.titleB,120)||'Scenario B',rowsA:(Array.isArray(v.rowsA)?v.rowsA:[]).slice(0,30).map(sanitizeCompareRow_),rowsB:(Array.isArray(v.rowsB)?v.rowsB:[]).slice(0,30).map(sanitizeCompareRow_),updatedAt:cleanText_(v.updatedAt,40)||new Date().toISOString()};
 }
 
 function sanitizeFinanceProfile_(profile, actor) {

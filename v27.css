@@ -1,4 +1,5 @@
 /* v27 — compact trips, custom comparison lab, Twos Wishlist Shop and Lovis-only rewards */
+#twDevToggle,.dev-v18-tools,.dev-v18-editor,.dev-v18-strip,.dev19-float,.dev19-inspector,.dev19-bottom,.dev21-inspector,.dev21-toolbar,.dev21-selection,.dev21-marquee,.dev21-context,.dev22-toolbar,.dev22-inspector,.dev22-selection,.dev22-context,.dev22-canvas,.dev23-ui{display:none!important}
 :root{--v27-gold:#a77c2b;--v27-gold-soft:#f8edcf;--v27-line:#e6d9ca;--v27-ink:#211c18;--v27-muted:#7f7267;--v27-card:#fffdfa;--v27-green:#2f7c50;--v27-rose:#a86268}
 
 /* Current trips sit beside the wizard, with destination imagery becoming the card atmosphere. */
