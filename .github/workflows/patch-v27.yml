@@ -1,0 +1,25 @@
+name: Apply v27 integration patch
+on:
+  push:
+    branches: [feature-v27-wishlist-twos-compare-impl]
+    paths:
+      - '.github/workflows/patch-v27.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-v27-wishlist-twos-compare-impl
+      - name: Apply patch
+        run: python scripts/patch-v27.py
+      - name: Commit patch
+        run: |
+          git config user.name "GrimReaper29"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html api.js finances.js backend/Code.gs backend/Code-v17.gs
+          git diff --cached --quiet && exit 0
+          git commit -m "Implement v27 backend and runtime integration"
+          git push origin HEAD:feature-v27-wishlist-twos-compare-impl
