@@ -87,13 +87,14 @@
 #twCurrentTripsSection.v27-current-side .tw-current-list{gap:10px!important;max-height:650px!important;overflow:auto!important;padding:1px 2px 3px!important;scrollbar-width:thin!important}
 #twCurrentTripsSection.v27-current-side .tw-current-card{
   min-height:0!important;
-  padding:15px 16px 11px!important;
+  padding:12px 14px 9px!important;
   border-radius:18px!important;
   gap:0!important;
   background-image:linear-gradient(90deg,rgba(255,253,249,.98),rgba(255,253,249,.95) 54%,rgba(255,253,249,.70)),var(--v27-trip-bg)!important;
   background-size:cover!important;
   background-position:center!important;
 }
+#twCurrentTripsSection.v27-current-side .tw-current-main{padding:0!important}
 #twCurrentTripsSection.v27-current-side .tw-current-card h3{font-size:24px!important;font-weight:500!important;margin:5px 0 2px!important}
 #twCurrentTripsSection.v27-current-side .tw-current-main>p{font-size:12.5px!important;line-height:1.4!important;margin:0 0 9px!important}
 #twCurrentTripsSection.v27-current-side .tw-current-numbers{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important;padding:7px 0!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
