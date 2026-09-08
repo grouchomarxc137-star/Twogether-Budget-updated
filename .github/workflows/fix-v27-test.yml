@@ -10,22 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix case-insensitive Wishlist wallet assertion
+      - name: Fix Wishlist browser selectors
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('tests/browser-v27.cjs')
           s=p.read_text()
-          old="assert.match(await wish.innerText(),/Available Twos/);"
-          new="assert.match(await wish.innerText(),/Available Twos/i);"
-          if old not in s:
-              raise SystemExit('target assertion not found')
-          p.write_text(s.replace(old,new,1))
+          s=s.replace("wish.locator('[data-priority=\"1\"]')","wish.locator('.v27-priority-filter [data-priority=\"1\"]')")
+          s=s.replace("wish.locator('[data-priority=\"2\"]')","wish.locator('.v27-priority-filter [data-priority=\"2\"]')")
+          p.write_text(s)
           PY
       - name: Commit fix
         run: |
           git config user.name 'GrimReaper29'
           git config user.email 'actions@users.noreply.github.com'
           git add tests/browser-v27.cjs
-          git commit -m 'Fix v27 Wishlist wallet browser assertion'
+          git commit -m 'Fix v27 Wishlist priority browser selectors'
           git push
