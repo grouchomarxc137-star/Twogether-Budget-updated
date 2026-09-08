@@ -1,0 +1,24 @@
+name: Patch v26 backend
+on:
+  push:
+    branches: [feature-v26-twos-scoreboard-design]
+    paths: ['.github/workflows/patch-v26.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-v26-twos-scoreboard-design
+          fetch-depth: 0
+      - name: Patch backend
+        run: python3 scripts/patch-v26-backend.py
+      - name: Commit patched backend
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/Code.gs backend/Code-v17.gs
+          git diff --cached --quiet || git commit -m "Add shared Lovis/Twos game backend"
+          git push origin HEAD:feature-v26-twos-scoreboard-design
