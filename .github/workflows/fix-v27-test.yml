@@ -16,8 +16,7 @@ jobs:
           from pathlib import Path
           p=Path('tests/browser-v27.cjs')
           s=p.read_text()
-          s=s.replace("wish.locator('[data-priority=\"1\"]')","wish.locator('.v27-priority-filter [data-priority=\"1\"]')")
-          s=s.replace("wish.locator('[data-priority=\"2\"]')","wish.locator('.v27-priority-filter [data-priority=\"2\"]')")
+          s=s.replace("page.locator('#v27Modal [data-v27-close]')","page.locator('#v27Modal button[data-v27-close]')")
           p.write_text(s)
           PY
       - name: Commit fix
@@ -25,5 +24,5 @@ jobs:
           git config user.name 'GrimReaper29'
           git config user.email 'actions@users.noreply.github.com'
           git add tests/browser-v27.cjs
-          git commit -m 'Fix v27 Wishlist priority browser selectors'
+          git commit -m 'Fix v27 receipt close browser selector'
           git push
