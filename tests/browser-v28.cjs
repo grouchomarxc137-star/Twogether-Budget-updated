@@ -32,7 +32,7 @@ const {backend}=require('./backend.cjs');
  assert.equal((await page.locator('#log .hero-copy h1').innerText()).trim(),'Log your most recent trip');
  assert.match(await page.locator('#log .hero-copy .eyebrow').innerText(),/SHARED BETWEEN PRINCIPE AND PRINCIPESSA/);
  const geo=await page.evaluate(()=>{const w=document.querySelector('#wizardCard').getBoundingClientRect(),s=document.querySelector('#twCurrentTripsSection').getBoundingClientRect(),c=document.querySelector('#twCurrentTrips .tw-current-card').getBoundingClientRect();return {wizard:w.width,current:s.width,cardH:c.height,small:parseFloat(getComputedStyle(document.querySelector('#twCurrentTrips .tw-current-numbers span')).fontSize)};});
- assert.ok(geo.wizard>geo.current*1.3,'wizard gets roughly 60% and Current Trips about 40%');
+ console.log('V28_GEO',JSON.stringify(geo));assert.ok(geo.wizard>geo.current*1.3,'wizard gets roughly 60% and Current Trips about 40%');
  assert.ok(geo.cardH<240,'Current Trip cards stay compact');
  assert.ok(geo.small>=12,'small Current Trip labels are readable');
 
