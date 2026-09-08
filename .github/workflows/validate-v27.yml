@@ -39,3 +39,4 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install --no-save playwright@1.55.0 >/dev/null
           node tests/browser-v27.cjs
+# rerun after assertion fix
