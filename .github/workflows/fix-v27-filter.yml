@@ -1,0 +1,29 @@
+name: Fix v27 Wishlist filter
+on:
+  push:
+    branches: [feature-v27-wishlist-twos-compare-impl]
+    paths: ['.github/workflows/fix-v27-filter.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure hidden priority cards are actually hidden
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v27.css')
+          s=p.read_text()
+          rule='\n.v27-wish-card[hidden]{display:none!important}\n'
+          if '.v27-wish-card[hidden]' not in s:
+              p.write_text(s+rule)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name 'GrimReaper29'
+          git config user.email 'actions@users.noreply.github.com'
+          git add v27.css
+          git commit -m 'Fix v27 Wishlist priority filtering'
+          git push
