@@ -85,7 +85,7 @@
   function groupTone(value){ return groupMeta(value).tone; }
 
   function freshProfile(){
-    return {bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],updatedAt:'',updatedBy:''};
+    return {bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{},updatedAt:'',updatedBy:''};
   }
   function normalizeProfile(profile){
     const p = profile && typeof profile === 'object' ? profile : {};
@@ -99,6 +99,8 @@
         repayments:Array.isArray(x.repayments)?x.repayments.map(r=>({id:r.id||uid(),month:String(r.month||''),amount:r.amount??'',at:String(r.at||'')})):[]
       })):[],
       scenarios:Array.isArray(p.scenarios)?p.scenarios.map(x=>({id:x.id||uid(),name:String(x.name||''),upfront:x.upfront??'',monthly:x.monthly??''})):[],
+      wishlist:Array.isArray(p.wishlist)?JSON.parse(JSON.stringify(p.wishlist)):[],
+      compareLab:p.compareLab&&typeof p.compareLab==='object'?JSON.parse(JSON.stringify(p.compareLab)):{},
       updatedAt:p.updatedAt||'',updatedBy:p.updatedBy||''
     };
   }

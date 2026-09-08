@@ -6,13 +6,13 @@ const SHARED_EXPENSE_KEYS = ['accom','travel'];
 
 function defaultState_() {
   return {
-    version: 17,
+    version: 18,
     trips: [],
     plans: [],
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
-      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]},
-      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[]}
+      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}},
+      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}}
     },
     game: defaultGame_(),
     compare: {
@@ -33,7 +33,7 @@ function readState_() {
     const parsed = JSON.parse(raw);
     const base = defaultState_();
     const state = {
-      version: 17,
+      version: 18,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
       finances: sanitizeFinances_(parsed.finances),
@@ -56,8 +56,8 @@ function readState_() {
 
 function defaultGameProfile_() {
   return {
-    lovis:0, twos:0, purchases:[], theme:'default', lastSeenAt:'',
-    awards:{logs:[],tripConfirms:[],financeConfirms:[],expenses:[],daily:[],sessions:[]},
+    lovis:0, twos:0, twosModel:'budget-v27', purchases:[], theme:'default', lastSeenAt:'',
+    awards:{logs:[],tripConfirms:[],financeConfirms:[],expenses:[],compareSaves:[],compareCompletes:[],wishlistAdds:[],wishlistCheckouts:[],tripSettlements:[],financeSettlements:[]},
     packing:{}, planners:{}
   };
 }
@@ -84,15 +84,19 @@ function sanitizeGameProfile_(value) {
     const key=cleanText_(id,80),p=s.planners[id]||{}; if(!key)return;
     planners[key]={stay:cleanText_(p.stay,160),transport:cleanText_(p.transport,160),booking:cleanText_(p.booking,160),notes:cleanText_(p.notes,1200)};
   });
+  const v27 = String(s.twosModel||'') === 'budget-v27';
   return {
     lovis:Math.max(0, Number(s.lovis != null ? s.lovis : s.tokens) || 0),
-    twos:Math.max(0, Number(s.twos) || 0),
+    twos:v27 ? (Number(s.twos)||0) : 0,
+    twosModel:'budget-v27',
     purchases:gameStringList_(s.purchases,100),
     theme:['default','cozy','night'].indexOf(String(s.theme||''))>=0?String(s.theme):'default',
     lastSeenAt:cleanText_(s.lastSeenAt,40),
     awards:{
       logs:gameStringList_(awards.logs,500), tripConfirms:gameStringList_(awards.tripConfirms,300), financeConfirms:gameStringList_(awards.financeConfirms,300),
-      expenses:gameStringList_(awards.expenses,800), daily:gameStringList_(awards.daily,500), sessions:gameStringList_(awards.sessions,500)
+      expenses:gameStringList_(awards.expenses,800), compareSaves:gameStringList_(awards.compareSaves,400), compareCompletes:gameStringList_(awards.compareCompletes,300),
+      wishlistAdds:gameStringList_(awards.wishlistAdds,500), wishlistCheckouts:gameStringList_(awards.wishlistCheckouts,500),
+      tripSettlements:gameStringList_(awards.tripSettlements,400), financeSettlements:gameStringList_(awards.financeSettlements,400)
     }, packing:packing, planners:planners
   };
 }
@@ -109,10 +113,9 @@ function sanitizeGame_(value) {
 
 function mergeGameLists_(a,b,maxItems){return gameStringList_((a||[]).concat(b||[]),maxItems||500);}
 function gameCatalog_(){return {
-  'gold-heart':{currency:'lovis',cost:20},'cute-icons':{currency:'lovis',cost:30},'soft-sparkles':{currency:'twos',cost:800},
-  'trip-countdown':{currency:'lovis',cost:50},'theme-pack':{currency:'lovis',cost:60},'packing-list':{currency:'lovis',cost:70},
-  'flying-heart':{currency:'twos',cost:1200},'travel-passport':{currency:'lovis',cost:80},'flying-note':{currency:'twos',cost:2000},
-  'custom-dashboard':{currency:'lovis',cost:100},'trip-planner-plus':{currency:'lovis',cost:120},'world-map':{currency:'lovis',cost:150}
+  'date-night-jar':{currency:'lovis',cost:35},'flying-heart':{currency:'lovis',cost:40},'trip-countdown':{currency:'lovis',cost:50},
+  'flying-note':{currency:'lovis',cost:55},'theme-pack':{currency:'lovis',cost:60},'packing-list':{currency:'lovis',cost:70},
+  'travel-passport':{currency:'lovis',cost:80},'world-map':{currency:'lovis',cost:120}
 };}
 function gameResponse_(state, extra){return Object.assign({ok:true,game:sanitizeGame_(state.game)},extra||{});}
 
@@ -156,7 +159,7 @@ function migrateTrip_(trip) {
 }
 
 function saveState_(state) {
-  state.version = 17;
+  state.version = 18;
   state.updatedAt = new Date().toISOString();
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
@@ -181,7 +184,7 @@ function doGet(e) {
   const action = String(p.action || 'state').toLowerCase();
   const callback = String(p.callback || '');
   try {
-    if (action === 'ping') return output_({ok:true, version: 17, now:new Date().toISOString()}, callback);
+    if (action === 'ping') return output_({ok:true, version: 18, now:new Date().toISOString()}, callback);
     if (action === 'state') return output_({ok:true, state:readState_()}, callback);
     return output_({ok:false, error:'Unknown action'}, callback);
   } catch (err) {
@@ -454,13 +457,31 @@ function handlePost_(e) {
       }
       const warnings=reconciliationWarnings_(trip);
       if(warnings.length)throw new Error(warnings.join(' '));
+      const alreadyConfirmed = !!trip.confirmed[actor];
       trip.confirmed[actor] = true;
       trip.updatedAt = new Date().toISOString();
       trip.updatedBy = actor;
       state.trips[idx] = trip;
+      let twosDelta = 0;
+      if (!alreadyConfirmed) {
+        state.game = sanitizeGame_(state.game);
+        const pstate = state.game[actor];
+        const planForTrip = state.plans.map(sanitizePlan_).find(function(p){ return p.linkedTripId === trip.id; });
+        const budgetRaw = planForTrip && planForTrip.budgets && planForTrip.budgets[actor] !== '' ? planForTrip.budgets[actor] : trip.budget;
+        const actualRaw = trip.submissions[actor] && trip.submissions[actor].paid;
+        if (budgetRaw !== '' && actualRaw !== '' && isFinite(Number(budgetRaw)) && isFinite(Number(actualRaw))) {
+          const settleKey='trip:'+actor+':'+trip.id;
+          if (pstate.awards.tripSettlements.indexOf(settleKey) < 0) {
+            twosDelta = Math.round((Number(budgetRaw)-Number(actualRaw))*100)/100;
+            pstate.twos += twosDelta;
+            pstate.awards.tripSettlements.push(settleKey);
+          }
+        }
+        state.game[actor]=sanitizeGameProfile_(pstate);
+      }
       addAudit_(state, actor, 'confirmTrip', trip.id);
       saveState_(state);
-      return output_({ok:true});
+      return output_({ok:true,twosDelta:twosDelta,game:sanitizeGame_(state.game)});
     }
 
     if (action === 'updateTripBudget') {
@@ -541,8 +562,21 @@ function handlePost_(e) {
       if (idx >= 0) list[idx] = monthData; else list.push(monthData);
       list.sort((a,b) => String(a.month).localeCompare(String(b.month)));
       state.finances[actor] = list;
+      let twosDelta = 0;
+      if (monthData.finalized) {
+        state.game=sanitizeGame_(state.game);
+        const pstate=state.game[actor],settleKey='month:'+actor+':'+monthData.month;
+        if (pstate.awards.financeSettlements.indexOf(settleKey) < 0) {
+          const income=(monthData.incomes||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+          const outflow=(monthData.expenses||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0)+(monthData.extraSpends||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+          twosDelta=Math.round((income-outflow)*100)/100;
+          pstate.twos+=twosDelta;
+          pstate.awards.financeSettlements.push(settleKey);
+        }
+        state.game[actor]=sanitizeGameProfile_(pstate);
+      }
       saveState_(state);
-      return output_({ok:true, month:monthData.month});
+      return output_({ok:true, month:monthData.month,twosDelta:twosDelta,game:sanitizeGame_(state.game)});
     }
 
     if (action === 'deleteFinanceMonth') {
@@ -555,12 +589,52 @@ function handlePost_(e) {
 
     if (action === 'saveFinanceProfile') {
       state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
+      const before = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
       const profile = sanitizeFinanceProfile_(payload.profile || {}, actor);
       profile.updatedAt = new Date().toISOString();
       profile.updatedBy = actor;
+      state.game=sanitizeGame_(state.game);
+      const pstate=state.game[actor],oldIds=new Set((before.wishlist||[]).map(function(x){return x.id;}));
+      let wishlistAwarded=0;
+      (profile.wishlist||[]).forEach(function(item){
+        const key='wish:'+actor+':'+item.id;
+        if(!oldIds.has(item.id) && pstate.awards.wishlistAdds.indexOf(key)<0){pstate.awards.wishlistAdds.push(key);pstate.lovis+=3;wishlistAwarded+=3;}
+      });
+      state.game[actor]=sanitizeGameProfile_(pstate);
       state.financeProfiles[actor] = profile;
       saveState_(state);
-      return output_({ok:true});
+      return output_(gameResponse_(state,{wishlistAwarded:wishlistAwarded}));
+    }
+
+    if (action === 'wishlistCheckout') {
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);state.game=sanitizeGame_(state.game);
+      const ids=(Array.isArray(payload.ids)?payload.ids:[]).slice(0,20).map(function(x){return cleanText_(x,80);}).filter(Boolean);
+      const profile=sanitizeFinanceProfile_(state.financeProfiles[actor]||{},actor),now=new Date().toISOString();
+      const selected=(profile.wishlist||[]).filter(function(x){return ids.indexOf(x.id)>=0&&!x.unlockedAt&&x.price!=='';});
+      if(!selected.length)throw new Error('Add a priced Wishlist item to the cart first');
+      const total=Math.round(selected.reduce(function(sum,x){return sum+Number(x.price||0);},0)*100)/100,pstate=state.game[actor];
+      if(Number(pstate.twos)<total)throw new Error('You need '+(total-Number(pstate.twos)).toFixed(2)+' more Twos');
+      pstate.twos-=total;
+      const selectedIds=new Set(selected.map(function(x){return x.id;}));
+      profile.wishlist=profile.wishlist.map(function(x){if(selectedIds.has(x.id)){x.unlockedAt=now;x.unlockedBy=actor;}return x;});
+      const checkoutKey='checkout:'+actor+':'+selected.map(function(x){return x.id;}).sort().join('|');
+      if(pstate.awards.wishlistCheckouts.indexOf(checkoutKey)<0){pstate.awards.wishlistCheckouts.push(checkoutKey);pstate.lovis+=5;}
+      state.game[actor]=sanitizeGameProfile_(pstate);state.financeProfiles[actor]=sanitizeFinanceProfile_(profile,actor);saveState_(state);
+      return output_(gameResponse_(state,{spentTwos:total,profile:state.financeProfiles[actor]}));
+    }
+
+    if (action === 'saveCompareLab') {
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);state.game=sanitizeGame_(state.game);
+      const profile=sanitizeFinanceProfile_(state.financeProfiles[actor]||{},actor),lab=sanitizeCompareLab_(payload.lab||{}),side=String(payload.side||'').toUpperCase();
+      if(!lab.id||(['A','B'].indexOf(side)<0))throw new Error('Invalid comparison');
+      profile.compareLab=lab;profile.updatedAt=new Date().toISOString();profile.updatedBy=actor;
+      const pstate=state.game[actor],saveKey='compare:'+actor+':'+lab.id+':'+side;let awarded=0,compareCompleteAwarded=false;
+      if(pstate.awards.compareSaves.indexOf(saveKey)<0){pstate.awards.compareSaves.push(saveKey);pstate.lovis+=4;awarded+=4;}
+      const complete=(lab.rowsA||[]).some(function(x){return x.amount!=='';})&&(lab.rowsB||[]).some(function(x){return x.amount!=='';});
+      const completeKey='compare-complete:'+actor+':'+lab.id;
+      if(complete&&pstate.awards.compareCompletes.indexOf(completeKey)<0){pstate.awards.compareCompletes.push(completeKey);pstate.lovis+=6;awarded+=6;compareCompleteAwarded=true;}
+      state.game[actor]=sanitizeGameProfile_(pstate);state.financeProfiles[actor]=sanitizeFinanceProfile_(profile,actor);saveState_(state);
+      return output_(gameResponse_(state,{awarded:awarded,compareCompleteAwarded:compareCompleteAwarded,compareLab:lab}));
     }
 
     if (action === 'updateCompare') {
@@ -580,7 +654,7 @@ function handlePost_(e) {
       state.game = sanitizeGame_(state.game);
       const current = state.game[actor], incoming = sanitizeGameProfile_(payload.local || {});
       current.lovis = Math.max(current.lovis, incoming.lovis);
-      current.twos = Math.max(current.twos, incoming.twos);
+      current.twos = Number(current.twos) || 0;
       current.purchases = mergeGameLists_(current.purchases, incoming.purchases, 100);
       Object.keys(current.awards).forEach(function(k){ current.awards[k]=mergeGameLists_(current.awards[k], incoming.awards[k], k==='expenses'?800:500); });
       current.packing = Object.assign({}, incoming.packing || {}, current.packing || {});
@@ -593,7 +667,7 @@ function handlePost_(e) {
 
     if (action === 'shopAward') {
       state.game = sanitizeGame_(state.game);
-      const rules={log:{bucket:'logs',currency:'lovis',amount:5},tripConfirm:{bucket:'tripConfirms',currency:'lovis',amount:10},financeConfirm:{bucket:'financeConfirms',currency:'lovis',amount:15},expense:{bucket:'expenses',currency:'twos',amount:100},daily:{bucket:'daily',currency:'twos',amount:200},session:{bucket:'sessions',currency:'twos',amount:400}};
+      const rules={log:{bucket:'logs',currency:'lovis',amount:5},tripConfirm:{bucket:'tripConfirms',currency:'lovis',amount:10},financeConfirm:{bucket:'financeConfirms',currency:'lovis',amount:15},expense:{bucket:'expenses',currency:'lovis',amount:2}};
       const kind=cleanText_(payload.kind,30),key=cleanText_(payload.key,180),rule=rules[kind];
       if(!rule||!key)throw new Error('Invalid shop reward');
       const pstate=state.game[actor]; let awarded=0;
@@ -884,13 +958,22 @@ function sanitizeFinanceScenario_(item) {
 }
 
 function sanitizeFinanceWishlistItem_(item) {
+  const priority=Math.min(5,Math.max(1,Number(item&&item.priority)||3));
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     name: cleanText_(item && item.name, 160),
     price: cleanMoney_(item && item.price),
-    note: cleanText_(item && item.note, 300),
-    createdAt: cleanText_(item && item.createdAt, 40)
+    note: cleanText_(item && item.note, 500),
+    priority: priority,
+    createdAt: cleanText_(item && item.createdAt, 40),
+    unlockedAt: cleanText_(item && item.unlockedAt, 40),
+    unlockedBy: cleanActor_(item && item.unlockedBy)==='Unknown'?'':cleanActor_(item && item.unlockedBy)
   };
+}
+function sanitizeCompareRow_(item){return {id:cleanText_(item&&item.id,80)||Utilities.getUuid(),name:cleanText_(item&&item.name,120)||'Cost',amount:cleanMoney_(item&&item.amount)};}
+function sanitizeCompareLab_(value){
+  const v=value&&typeof value==='object'?value:{};
+  return {id:cleanText_(v.id,80)||Utilities.getUuid(),titleA:cleanText_(v.titleA,120)||'Scenario A',titleB:cleanText_(v.titleB,120)||'Scenario B',rowsA:(Array.isArray(v.rowsA)?v.rowsA:[]).slice(0,30).map(sanitizeCompareRow_),rowsB:(Array.isArray(v.rowsB)?v.rowsB:[]).slice(0,30).map(sanitizeCompareRow_),updatedAt:new Date().toISOString()};
 }
 
 function sanitizeFinanceProfile_(profile, actor) {
@@ -902,6 +985,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     receivables: Array.isArray(source.receivables) ? source.receivables.slice(0,60).map(sanitizeFinanceReceivable_).filter(x => x.person && x.reason && x.principal !== '') : [],
     scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
     wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
+    compareLab: source.compareLab && typeof source.compareLab === 'object' ? sanitizeCompareLab_(source.compareLab) : {},
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
   };

@@ -34,7 +34,7 @@
     const devMaintenance=['deleteTrip','deleteFinanceMonth','saveFinanceProfile'];
     if(document.body.classList.contains('dev-playground')&&!devMaintenance.includes(action))throw Error('Leave DEV to save normal shared trip or finance changes. DEV only permits explicit maintenance deletes.');
     const current=await remoteState();
-    if(current.version<17)throw Error('Apps Script update required: deploy backend/Code.gs (v17) before saving.');
+    if(current.version<18)throw Error('Apps Script update required: deploy backend/Code.gs (v18) before saving.');
     return new Promise((resolve,reject)=>{
       const requestId=crypto.randomUUID(),frame=document.createElement('iframe'),form=document.createElement('form');
       frame.name='tw_save_'+requestId;frame.hidden=true;frame.title='Saving shared data';document.body.appendChild(frame);
