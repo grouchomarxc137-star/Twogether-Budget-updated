@@ -1,0 +1,32 @@
+name: Probe v27 backend readiness
+on:
+  push:
+    branches: [feature-v27-wishlist-twos-compare-impl]
+    paths: ['.github/workflows/probe-backend-v27.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe live backend
+        run: |
+          URL=$(sed -n "s/.*appsScriptUrl: '\([^']*\)'.*/\1/p" config.js)
+          echo "Backend URL configured: $([ -n \"$URL\" ] && echo yes || echo no)"
+          curl -fsSL --max-time 30 "$URL?action=ping" | head -c 1000
+          echo
+      - name: Check possible deploy credential availability
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          for n in CLASPRC_JSON CLASP_TOKEN GOOGLE_SERVICE_ACCOUNT APPS_SCRIPT_ID SCRIPT_ID GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REFRESH_TOKEN; do
+            if [ -n "${!n}" ]; then echo "$n=set"; else echo "$n=missing"; fi
+          done
