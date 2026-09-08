@@ -49,7 +49,7 @@ await cards.nth(1).locator('.v27-scenario-title').fill('Drive + Airbnb');await c
 assert.match(await page.locator('#v27CompareVerdict').innerText(),/Train \+ Hotel is cheaper/i);assert.match(await page.locator('#v27CompareVerdict').innerText(),/€30\.00/);let game=await page.evaluate(()=>window.TwogetherV27.getState().profile);assert.ok(game.lovis>=17,'Wishlist seed + comparison rewards create Lovis');
 
 // Wishlist is a Twos-based product/cart experience, not a table. Priority filtering and fake checkout work.
-await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());await page.locator('#finances.active').waitFor();const wish=page.locator('#financeWishlist');await wish.waitFor();await page.waitForFunction(()=>document.querySelectorAll('#financeWishlist .v27-wish-card').length>0,{timeout:5000});assert.equal(await wish.locator('table').count(),0);assert.match(await wish.innerText(),/Available Twos/i);assert.match(await wish.innerText(),/Weekend bag/);
+await page.evaluate(()=>document.querySelector('#wishlistHub').click());await page.locator('#finances.active').waitFor();const wish=page.locator('#financeWishlist');await wish.waitFor();await page.waitForFunction(()=>document.querySelectorAll('#financeWishlist .v27-wish-card').length>0,{timeout:5000});assert.equal(await wish.locator('table').count(),0);assert.match(await wish.innerText(),/Available Twos/i);assert.match(await wish.innerText(),/Weekend bag/);
 await wish.locator('.v27-priority-filter [data-priority="1"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),0,'priority filter hides other priorities');await wish.locator('.v27-priority-filter [data-priority="2"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),1);
 await wish.locator('[data-cart-toggle="wish-bag"]').click();assert.match(await wish.innerText(),/Ready to unlock/);await wish.locator('[data-checkout]').click();await page.locator('#v27Modal:not([hidden]) .v27-receipt').waitFor({timeout:5000});assert.match(await page.locator('.v27-receipt').innerText(),/You earned this/);await page.locator('#v27Modal button[data-v27-close]').click();await page.waitForTimeout(350);await page.evaluate(()=>window.TwogetherV27.refresh(true));await page.waitForTimeout(350);assert.match(await wish.innerText(),/Earned/);game=await page.evaluate(()=>window.TwogetherV27.getState().profile);assert.equal(game.twos,60,'€40 wishlist checkout uses 40 of the seeded 100 Twos');
 
@@ -71,7 +71,7 @@ assert.ok(await wish.locator('[data-checkout]').isDisabled(),'unaffordable baske
 assert.match(await wish.locator('.v27-cart-plan').innerText(),/260 Twos to go/);
 await page.evaluate(()=>window.TwogetherV27.refresh(true));assert.equal(await wish.locator('.v27-wish-card:visible').count(),1);
 await page.reload();await page.waitForFunction(()=>window.TwogetherV27?.getState().wishes.length===6);
-await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+await page.evaluate(()=>document.querySelector('#wishlistHub').click());
 assert.match(await wish.locator('.v27-cart-items').innerText(),/camera/,'basket survives reload');
 await wish.locator('button[data-priority="all"]').click();
 assert.equal(await wish.locator('.v27-wish-card[data-priority="5"] [data-cart-toggle]').count(),0,'unpriced wishes cannot enter the basket');
@@ -93,7 +93,7 @@ await page.evaluate(()=>window.TwogetherAPI.post=window.__v28Post);await page.lo
 for(const width of [390,768,1024]){
  await page.setViewportSize({width,height:900});
  for(const view of ['wishlist','log']){
-  await page.evaluate(view=>view==='log'?document.querySelector('[data-sheet="log"]').click():document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click(),view);
+  await page.evaluate(view=>view==='log'?document.querySelector('[data-sheet="log"]').click():document.querySelector('#wishlistHub').click(),view);
   await page.waitForTimeout(120);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),view+' fits at '+width);
   if(width===390)if(process.env.TWOGETHER_SCREENSHOTS)await page.screenshot({path:'../'+view+'-mobile.png',fullPage:true});
@@ -107,13 +107,13 @@ await shop.locator('[data-test-start]').click();await page.waitForTimeout(120);a
 
 // Test basket and preview checkout cannot change real purchases, profile or partner.
 const beforeTest=JSON.stringify(b.state()),realCart=await page.evaluate(()=>localStorage.getItem('twogether_v27_cart:Principessa'));
-await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+await page.evaluate(()=>document.querySelector('#wishlistHub').click());
 assert.equal(await wish.locator('.v27-cart-items').count(),0,'test basket starts separately');
 await wish.locator('[data-cart-toggle="wish-camera"]').click();await wish.locator('[data-checkout]').click();await page.locator('.v27-receipt').waitFor();
 assert.equal(JSON.stringify(b.state()),beforeTest,'test checkout does not write backend state');
 assert.equal(await page.evaluate(()=>localStorage.getItem('twogether_v27_cart:Principessa')),realCart,'real cart stays untouched');
 await page.locator('#v27Modal button[data-v27-close]').click();await wish.locator('[data-wish-view="earned"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),2);
-await page.locator('#shopHub').click();await shop.locator('[data-test-end]').click();await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+await page.locator('#shopHub').click();await shop.locator('[data-test-end]').click();await page.evaluate(()=>document.querySelector('#wishlistHub').click());
 assert.match(await wish.locator('.v27-cart-items').innerText(),/camera/,'real basket returns after test');
 // Switching actor never exposes the previous actor's cart or wishes.
 await page.evaluate(()=>{localStorage.setItem('twogether_actor_v1','Principe');document.body.dataset.actor='Principe';});await page.waitForFunction(()=>document.querySelector('#financeWishlist .v27-wish-hero p')?.textContent.includes('Principe’s'));

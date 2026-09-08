@@ -56,7 +56,7 @@ const {backend}=require('./backend.cjs');
  assert.ok(b.state().game.Principessa.packing[current.planId]?.some(x=>x.text==='Phone charger'),'packing reward saves an item for the current trip');
  await page.locator('#v27Modal button[data-v27-close]').click();
 
- await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());await page.waitForFunction(()=>document.querySelectorAll('#financeWishlist .v27-wish-card').length===3,{timeout:5000});
+ await page.evaluate(()=>document.querySelector('#wishlistHub').click());await page.waitForFunction(()=>document.querySelectorAll('#financeWishlist .v27-wish-card').length===3,{timeout:5000});
  const wish=await page.evaluate(()=>{const grid=document.querySelector('#financeWishlist .v27-wish-grid'),card=grid.querySelector('.v27-wish-card'),small=card.querySelector('.v28-wish-readiness');return {cols:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,h:card.getBoundingClientRect().height,title:parseFloat(getComputedStyle(card.querySelector('h3')).fontSize),small:parseFloat(getComputedStyle(small).fontSize),overflow:document.documentElement.scrollWidth-innerWidth};});
  assert.ok(wish.cols>=3,'Wishlist uses a compact three-column boutique on wide screens');assert.ok(wish.h<250,'Wishlist cards are smaller');assert.ok(wish.title<=24&&wish.small>=12,'Wishlist hierarchy is balanced and small text readable');assert.ok(wish.overflow<=1,'Wishlist does not create page-wide horizontal overflow');
  assert.deepEqual(errors,[]);console.log('Browser v28 balance/readability/history/packing/Wishlist checks passed.');
