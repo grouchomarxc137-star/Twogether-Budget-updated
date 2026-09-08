@@ -53,10 +53,72 @@ await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subvie
 await wish.locator('.v27-priority-filter [data-priority="1"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),0,'priority filter hides other priorities');await wish.locator('.v27-priority-filter [data-priority="2"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),1);
 await wish.locator('[data-cart-toggle="wish-bag"]').click();assert.match(await wish.innerText(),/Ready to unlock/);await wish.locator('[data-checkout]').click();await page.locator('#v27Modal:not([hidden]) .v27-receipt').waitFor({timeout:5000});assert.match(await page.locator('.v27-receipt').innerText(),/You earned this/);await page.locator('#v27Modal button[data-v27-close]').click();await page.waitForTimeout(350);await page.evaluate(()=>window.TwogetherV27.refresh(true));await page.waitForTimeout(350);assert.match(await wish.innerText(),/Earned/);game=await page.evaluate(()=>window.TwogetherV27.getState().profile);assert.equal(game.twos,60,'€40 wishlist checkout uses 40 of the seeded 100 Twos');
 
+// v28: stable filtering, retained basket, negative balances, editor errors and responsive layouts.
+await wish.locator('button[data-priority="all"]').click();
+const profileSeed=JSON.parse(JSON.stringify(b.state().financeProfiles.Principessa));
+profileSeed.wishlist.push(
+ {id:'wish-camera',name:'A camera for our weekends',price:320,priority:1,note:'For all the places we have yet to see.'},
+ {id:'wish-dinner',name:'Dinner by the water',price:55,priority:2,note:'A little evening, just us.'},
+ {id:'wish-blanket',name:'A softer Sunday',price:35,priority:3,note:'The linen throw for slow mornings.'},
+ {id:'wish-free',name:'A free afternoon together',price:0,priority:4,note:''},
+ {id:'wish-no-price',name:'Someday, a record player',price:'',priority:5,note:''});
+b.post('saveFinanceProfile',{profile:profileSeed},'Principessa');
+await page.evaluate(()=>window.TwogetherV27.refresh(true));
+await wish.locator('button[data-priority="1"]').click();await wish.locator('[data-cart-toggle="wish-camera"]').click();
+assert.equal(await wish.locator('.v27-wish-card:visible').count(),1,'adding to basket retains the active priority');
+assert.equal(await wish.locator('button[data-priority="1"]').getAttribute('aria-pressed'),'true');
+assert.ok(await wish.locator('[data-checkout]').isDisabled(),'unaffordable basket cannot check out');
+assert.match(await wish.locator('.v27-cart-plan').innerText(),/260 Twos to go/);
+await page.evaluate(()=>window.TwogetherV27.refresh(true));assert.equal(await wish.locator('.v27-wish-card:visible').count(),1);
+await page.reload();await page.waitForFunction(()=>window.TwogetherV27?.getState().wishes.length===6);
+await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+assert.match(await wish.locator('.v27-cart-items').innerText(),/camera/,'basket survives reload');
+await wish.locator('button[data-priority="all"]').click();
+assert.equal(await wish.locator('.v27-wish-card[data-priority="5"] [data-cart-toggle]').count(),0,'unpriced wishes cannot enter the basket');
+if(process.env.TWOGETHER_SCREENSHOTS)await page.screenshot({path:'../wishlist-desktop.png',fullPage:true});
+await wish.locator('[data-wish-view="earned"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),1,'earned item is in its own collection');
+await wish.locator('[data-wish-view="wishes"]').click();
+// A negative Two balance adds the deficit to the saving target.
+const negative=b.state();negative.game.Principessa.twos=-25;b.seed(negative);await page.evaluate(()=>window.TwogetherV27.refresh(true));
+assert.match(await wish.locator('.v27-cart-plan').innerText(),/345 Twos to go/);assert.ok(await wish.locator('[data-checkout]').isDisabled());
+negative.game.Principessa.twos=60;b.seed(negative);await page.evaluate(()=>window.TwogetherV27.refresh(true));
+// Rejected saves stay open with the draft intact; invalid prices do not write.
+await wish.locator('[data-wish-add]').click();await page.locator('#v27WishName').fill('A new little wish');await page.locator('#v27WishPrice').fill('-5');
+await page.locator('[data-wish-save]').click();assert.ok(await page.locator('#v27Modal:not([hidden])').isVisible());assert.equal(b.state().financeProfiles.Principessa.wishlist.length,6);
+await page.locator('#v27WishPrice').fill('15');
+await page.evaluate(()=>{window.__v28Post=window.TwogetherAPI.post;window.TwogetherAPI.post=async(action,...args)=>{if(action==='saveFinanceProfile')throw new Error('Test save failure');return window.__v28Post(action,...args);};});
+await page.locator('[data-wish-save]').click();await page.waitForTimeout(250);assert.ok(await page.locator('#v27Modal:not([hidden])').isVisible());assert.equal(await page.locator('#v27WishName').inputValue(),'A new little wish');
+await page.evaluate(()=>window.TwogetherAPI.post=window.__v28Post);await page.locator('[data-wish-save]').click();await page.locator('#v27Modal').waitFor({state:'hidden'});assert.equal(b.state().financeProfiles.Principessa.wishlist.length,7,'wish creation persists');
+// No page-wide overflow at narrow mobile, tablet or text enlargement equivalent width.
+for(const width of [390,768,1024]){
+ await page.setViewportSize({width,height:900});
+ for(const view of ['wishlist','log']){
+  await page.evaluate(view=>view==='log'?document.querySelector('[data-sheet="log"]').click():document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click(),view);
+  await page.waitForTimeout(120);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),view+' fits at '+width);
+  if(width===390)if(process.env.TWOGETHER_SCREENSHOTS)await page.screenshot({path:'../'+view+'-mobile.png',fullPage:true});
+ }
+}
+await page.setViewportSize({width:1440,height:1000});if(process.env.TWOGETHER_SCREENSHOTS)await page.screenshot({path:'../home-desktop.png',fullPage:true});
+
 // Shop is Lovis-only for purchases, removed filler rewards stay gone, and improved map/theme rewards are present.
 await page.locator('#shopHub').click();const shop=page.locator('#shopView.active');await shop.waitFor();const shopText=await shop.innerText();assert.match(shopText,/Lovis only/);assert.doesNotMatch(shopText,/Golden Heart|Cute Icon Pack|Soft Sparkles|Trip Planner\+|Custom Home Dashboard/);assert.match(shopText,/Cozy \+ Night Atelier/);assert.match(shopText,/Twogether World Map/);assert.match(shopText,/Date Night Jar/);assert.match(shopText,/Lovis race/);assert.equal(await shop.locator('.v27-test').count(),1);
 await shop.locator('[data-test-start]').click();await page.waitForTimeout(120);await shop.locator('[data-test-all]').click();await page.waitForTimeout(180);assert.equal(await shop.locator('.v27-world svg').count(),1,'World Map renders as a map graphic');assert.equal(await shop.locator('.v27-theme-switch').count(),1,'improved theme controls appear in preview');
 
-assert.deepEqual(errors,[]);console.log('Browser v27: compact trip workspace/backgrounds, overview readability/20%, monthly density, compare lab, Twos Wishlist cart, Lovis Shop and test previews passed.');
+// Test basket and preview checkout cannot change real purchases, profile or partner.
+const beforeTest=JSON.stringify(b.state()),realCart=await page.evaluate(()=>localStorage.getItem('twogether_v27_cart:Principessa'));
+await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+assert.equal(await wish.locator('.v27-cart-items').count(),0,'test basket starts separately');
+await wish.locator('[data-cart-toggle="wish-camera"]').click();await wish.locator('[data-checkout]').click();await page.locator('.v27-receipt').waitFor();
+assert.equal(JSON.stringify(b.state()),beforeTest,'test checkout does not write backend state');
+assert.equal(await page.evaluate(()=>localStorage.getItem('twogether_v27_cart:Principessa')),realCart,'real cart stays untouched');
+await page.locator('#v27Modal button[data-v27-close]').click();await wish.locator('[data-wish-view="earned"]').click();assert.equal(await wish.locator('.v27-wish-card:visible').count(),2);
+await page.locator('#shopHub').click();await shop.locator('[data-test-end]').click();await page.evaluate(()=>document.querySelector('.finance-subnav [data-fin-subview="wishlist"]').click());
+assert.match(await wish.locator('.v27-cart-items').innerText(),/camera/,'real basket returns after test');
+// Switching actor never exposes the previous actor's cart or wishes.
+await page.evaluate(()=>{localStorage.setItem('twogether_actor_v1','Principe');document.body.dataset.actor='Principe';});await page.waitForFunction(()=>document.querySelector('#financeWishlist .v27-wish-hero p')?.textContent.includes('Principe’s'));
+assert.equal(await wish.locator('.v27-wish-card').count(),0);assert.equal(await wish.locator('.v27-cart-items').count(),0);
+assert.deepEqual(errors,[]);console.log('Browser v28: trip/payment regression, responsive boutique, persistent filters/cart, failed saves, signed Twos, and isolated test checkout passed.');
 await browser.close();server.close();
 })().catch(e=>{console.error(e);process.exit(1);});
+
