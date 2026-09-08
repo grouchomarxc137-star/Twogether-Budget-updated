@@ -61,6 +61,8 @@
   max-height:none!important;
   overflow:auto!important;
   gap:9px!important;
+  align-content:start!important;
+  grid-auto-rows:max-content!important;
   padding:1px 3px 2px 1px!important;
 }
 #twCurrentTripsSection.v27-current-side .tw-current-card{
