@@ -1,0 +1,27 @@
+name: Validate v30 design refinement
+on:
+  push:
+    branches:
+      - feature-v30-design-refine
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and regression checks
+        run: |
+          node --check v29.js
+          node tests/validate.cjs
+          node tests/backend.cjs
+          node tests/game-v27.cjs
+          grep -q 'v30.css?v=1' index.html
+          grep -q 'v29.js?v=3' index.html
+      - name: Install browser test dependency
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Existing v28 browser regression
+        run: node tests/browser-v28.cjs
+      - name: v30 browser refinement regression
+        run: node tests/browser-v30.cjs
