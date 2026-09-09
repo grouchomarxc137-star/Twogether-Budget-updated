@@ -791,6 +791,12 @@
       const suffix=detail?`: ${esc(detail)}`:place?` · ${esc(place)}`:'';
       return `<div class="activity-item"><span class="avatar-mini">${esc(String(a.actor||'?').slice(0,1))}</span><div><strong>${esc(a.actor||'Unknown')}</strong> ${esc(action)}${suffix}<small>${formatTime(a.at)}</small></div></div>`;
     }).join('');
+    const card=root.closest('.activity-card');
+    if(card){
+      card.classList.add('activity-fresh');
+      clearTimeout(card._activityFadeTimer);
+      card._activityFadeTimer=setTimeout(()=>card.classList.remove('activity-fresh'),3500);
+    }
   }
 
   function formatTime(value){

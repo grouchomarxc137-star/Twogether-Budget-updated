@@ -268,3 +268,46 @@ body,body *,#financeWishlist *,#log *,#v27Modal *,#twCurrentTripsSection *,#shop
 #twCurrentTripsSection.v27-current-side .tw-current-top .trip-country,#twCurrentTripsSection.v27-current-side .tw-current-numbers span,#twCurrentTripsSection.v27-current-side .tw-current-actions button{font-size:12px!important;}
 #log .lower-grid.single-activity{position:fixed!important;right:18px!important;bottom:18px!important;z-index:75!important;width:min(330px,calc(100vw - 36px))!important;margin:0!important;}#log .lower-grid.single-activity .activity-card{padding:12px 14px!important;border-radius:16px!important;box-shadow:0 14px 34px rgba(60,45,35,.14)!important;max-height:230px!important;overflow:auto!important;}#log .lower-grid.single-activity .panel-head{margin-bottom:6px!important;}#log .lower-grid.single-activity .panel-head h2{font-size:21px!important;}#log .lower-grid.single-activity .activity-item{padding:7px 2px!important;}#log .lower-grid.single-activity .activity-item div{font-size:14px!important;}
 .shared-entry{padding-top:10px!important;}.shared-entry [data-unknown],.shared-entry [data-back]{border:1px solid #d8c7b5!important;background:#f8f1e5!important;color:var(--ink)!important;border-radius:12px!important;padding:10px 13px!important;font:inherit!important;cursor:pointer!important;}.shared-entry [data-unknown]:hover,.shared-entry [data-back]:hover{background:#f1e4c9!important;border-color:#c9a969!important;}.finance-mini-fields .finance-money{padding-left:14px!important;overflow:hidden!important;}.finance-mini-fields .finance-money span{padding:0!important;border:0!important;line-height:1!important;}.finance-mini-fields .finance-money input{border:0!important;box-shadow:none!important;outline:0!important;}@media(max-width:620px){#log .lower-grid.single-activity{right:12px!important;bottom:12px!important;width:min(330px,calc(100vw - 24px))!important;}}
+
+
+/* Correction pass — active typography, compact activity overlay, and responsive trip reading. */
+html,body,button,input,select,textarea,table,th,td,#app,#app *{font-family:'Crimson Pro',serif!important;}
+
+/* Keep meaningful supporting copy readable without changing the primary visual hierarchy. */
+#twCurrentTripsSection.v27-current-side .tw-current-head p,
+#twCurrentTripsSection.v27-current-side .tw-current-head>[data-v18-new-trip],
+#twCurrentTripsSection.v27-current-side .tw-current-main>p,
+#twCurrentTripsSection.v27-current-side .tw-current-numbers span,
+#twCurrentTripsSection.v27-current-side .tw-current-actions button,
+#tripGallery .trip-story-card p,
+#tripGallery .trip-story-card .trip-card-bottom,
+#financeWishlist .v29-wish-values span,
+#financeWishlist .v28-wish-note,
+#financeWishlist .v29-wish-progress>div,
+#financeWishlist .v28-wish-readiness,
+#shopView .v27-shop-hero p,
+#shopView .v27-shop-item p,
+#shopView .v27-shop-item.owned::after,
+#log .lower-grid.single-activity .activity-item div,
+#log .lower-grid.single-activity .activity-item small{font-size:13px!important;}
+
+/* Let comparison content use the available table width instead of fixed column and minimum-width constraints. */
+.current-overview{width:min(1180px,calc(100vw - 28px))!important;}
+.current-overview .overview-table{overflow:visible!important;}
+.current-overview .overview-table table{width:100%!important;min-width:0!important;table-layout:auto!important;}
+.current-overview .overview-table th,.current-overview .overview-table td{width:auto!important;min-width:0!important;white-space:normal!important;}
+
+/* Preserve photo clarity while keeping text legible over the left side of both trip card groups. */
+#twCurrentTripsSection.v27-current-side .tw-current-card,
+#tripGallery .trip-story-card{background-image:linear-gradient(90deg,rgba(255,253,249,.98) 0%,rgba(255,253,249,.88) 34%,rgba(255,253,249,.48) 64%,rgba(255,253,249,.10) 100%),var(--v27-trip-bg)!important;}
+
+@media(min-width:901px){
+  #log .hero-copy h1{white-space:nowrap!important;}
+  #log .trip-gallery-section{width:calc(100% - 40px)!important;max-width:1420px!important;margin-left:auto!important;margin-right:auto!important;}
+}
+
+/* Activity remains available, but it stays out of the way until it is useful. */
+#log .lower-grid.single-activity .activity-card{background:rgba(255,253,249,.78)!important;border-color:rgba(210,194,174,.42)!important;box-shadow:0 8px 22px rgba(60,45,35,.08)!important;opacity:.42!important;transition:opacity .28s ease,box-shadow .28s ease,background .28s ease!important;}
+#log .lower-grid.single-activity .activity-card:hover,
+#log .lower-grid.single-activity .activity-card:focus-within,
+#log .lower-grid.single-activity .activity-card.activity-fresh{opacity:1!important;background:rgba(255,253,249,.96)!important;box-shadow:0 14px 34px rgba(60,45,35,.14)!important;}
