@@ -782,10 +782,14 @@
       const place=t ? (tripMeta(t).city||locationLabel(tripMeta(t))) : '';
       const labels={
         addSubmission:'added a trip version',updateSubmission:'edited a trip version',confirmTrip:'confirmed a trip',
-        updateTripBudget:'updated a trip budget',updateCompare:'updated the comparison',deleteTrip:'deleted a trip'
+        updateTripBudget:'updated a trip budget',updateCompare:'updated the comparison',deleteTrip:'deleted a trip',
+        saveSharedExpense:'saved shared expense',savePlanPartial:'saved trip expense',savePlanSubmission:'saved trip expenses',
+        saveSubmission:'saved a trip version',saveFinanceMonth:'saved monthly finances'
       };
-      const action=labels[a.action]||String(a.action||'made a change');
-      return `<div class="activity-item"><span class="avatar-mini">${esc(String(a.actor||'?').slice(0,1))}</span><div><strong>${esc(a.actor||'Unknown')}</strong> ${esc(action)}${place?` · ${esc(place)}`:''}<small>${formatTime(a.at)}</small></div></div>`;
+      const raw=String(a.action||'');const [actionKey,...actionDetail]=raw.split(':');
+      const action=labels[actionKey]||raw||'made a change';const detail=actionDetail.join(':');
+      const suffix=detail?`: ${esc(detail)}`:place?` · ${esc(place)}`:'';
+      return `<div class="activity-item"><span class="avatar-mini">${esc(String(a.actor||'?').slice(0,1))}</span><div><strong>${esc(a.actor||'Unknown')}</strong> ${esc(action)}${suffix}<small>${formatTime(a.at)}</small></div></div>`;
     }).join('');
   }
 
