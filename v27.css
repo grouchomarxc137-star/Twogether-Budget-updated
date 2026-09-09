@@ -110,7 +110,7 @@ body.v27-theme-night{--v28-paper:#2c2725;--v28-ink:#f1e8df;--v28-muted:#c7b9ae;-
 #twCurrentTripsSection.v27-current-side .tw-current-head p{font-size:14px!important;line-height:1.4!important;}
 #twCurrentTripsSection.v27-current-side .tw-current-head>[data-v18-new-trip]{font-size:14px!important;white-space:nowrap!important;min-height:42px!important;}
 #twCurrentTripsSection.v27-current-side .tw-current-list{max-height:none!important;overflow:visible!important;gap:16px!important;}
-#twCurrentTripsSection.v27-current-side .tw-current-card{padding:20px 22px 14px!important;min-height:0!important;border-radius:18px!important;border:1px solid var(--v28-line)!important;background-image:linear-gradient(90deg,rgba(255,253,249,.98),rgba(255,253,249,.96) 52%,rgba(255,253,249,.70)),var(--v27-trip-bg)!important;box-shadow:0 6px 20px #39312606!important;}
+#twCurrentTripsSection.v27-current-side .tw-current-card{padding:20px 22px 14px!important;min-height:0!important;border-radius:18px!important;border:1px solid var(--v28-line)!important;background-image:linear-gradient(90deg,rgba(255,253,249,.86),rgba(255,253,249,.76) 48%,rgba(255,253,249,.48)),var(--v27-trip-bg)!important;box-shadow:0 6px 20px #39312606!important;}
 #twCurrentTripsSection.v27-current-side .tw-current-card h3{font-size:30px!important;font-weight:400!important;margin:8px 0 4px!important;}
 #twCurrentTripsSection.v27-current-side .tw-current-top .trip-country,#twCurrentTripsSection.v27-current-side .tw-current-status{font-size:12px!important;}
 #twCurrentTripsSection.v27-current-side .tw-current-main>p{font-size:14px!important;line-height:1.4!important;margin:0 0 15px!important;}
@@ -125,7 +125,7 @@ body.v27-theme-night{--v28-paper:#2c2725;--v28-ink:#f1e8df;--v28-muted:#c7b9ae;-
 #log .section-heading p,#log .tw-story-empty span,#log .tw-current-empty span{font-size:14px!important;line-height:1.5!important;}
 #log .tw-current-empty{padding:36px 24px!important;border:1px dashed var(--v28-line)!important;border-radius:18px!important;background:var(--v28-paper)!important;}
 #log .trip-gallery .gallery-empty{padding:24px!important;min-height:0!important;}
-.current-overview .overview-table th,.current-overview .overview-table td{font-size:14px!important;padding:10px 12px!important;line-height:1.4!important;}
+.current-overview .overview-table{overflow-x:hidden!important}.current-overview .overview-table table{table-layout:fixed!important;width:100%!important}.current-overview .overview-table th,.current-overview .overview-table td{font-size:14px!important;padding:7px 8px!important;line-height:1.4!important;overflow-wrap:anywhere!important;}
 .current-overview .overview-table th:last-child{width:12%!important;}
 .current-overview .overview-metrics strong{font-size:21px!important;}
 .current-overview .overview-metrics span,.current-overview .overview-payment p,.current-overview .overview-payment small{font-size:14px!important;}
