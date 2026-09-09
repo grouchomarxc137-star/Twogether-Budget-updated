@@ -97,10 +97,36 @@ function decorateWishlist(){
 }
 function queueWishlist(){if(wishQueued)return;wishQueued=true;requestAnimationFrame(decorateWishlist);}
 
+function calmShopCopy(root){
+  const hero=$('.v27-shop-hero',root);
+  if(hero){
+    const title=$('h1',hero);if(title)title.textContent='Gentle rewards for the little things we do together.';
+    const copy=$('p',hero);if(copy)copy.textContent='Earn Lovis by logging, comparing, confirming and reaching Wishlist goals together.';
+    const wallet=$('.v27-wallet',hero);
+    if(wallet){
+      const twosLabel=$$('span',wallet).find(el=>el.textContent.trim()==='Twos');
+      if(twosLabel){
+        const amount=twosLabel.nextElementSibling;
+        const note=amount?.nextElementSibling;
+        twosLabel.remove();amount?.remove();note?.remove();
+      }
+    }
+  }
+  const score=$('.v27-score',root);
+  if(score){
+    const title=$('h2',score);if(title)title.textContent='Our Lovis journey';
+    $$('.v27-score-row',score).forEach(row=>{
+      const detail=$('span',row);if(detail)detail.textContent=detail.textContent.split('·')[0].trim();
+    });
+    const note=$('p',score);if(note)note.textContent='Every little action moves your Lovis journey forward.';
+  }
+}
+
 function decorateShop(){
   shopQueued=false;
   const root=$('#shopView');if(!root)return;
   root.classList.add('v29-shop');
+  calmShopCopy(root);
   const hero=$('.v27-shop-hero',root);
   if(hero&&!$('.v29-shop-ribbon',hero)){
     const ribbon=document.createElement('div');ribbon.className='v29-shop-ribbon';ribbon.textContent='♡ little rewards for the things you do together ✦';hero.appendChild(ribbon);
