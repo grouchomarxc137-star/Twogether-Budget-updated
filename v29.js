@@ -97,11 +97,12 @@ function decorateWishlist(){
 }
 function queueWishlist(){if(wishQueued)return;wishQueued=true;requestAnimationFrame(decorateWishlist);}
 
+function setTextIfChanged(el,text){if(el&&el.textContent!==text)el.textContent=text;}
 function calmShopCopy(root){
   const hero=$('.v27-shop-hero',root);
   if(hero){
-    const title=$('h1',hero);if(title)title.textContent='Gentle rewards for the little things we do together.';
-    const copy=$('p',hero);if(copy)copy.textContent='Earn Lovis by logging, comparing, confirming and reaching Wishlist goals together.';
+    setTextIfChanged($('h1',hero),'Gentle rewards for the little things we do together.');
+    setTextIfChanged($('p',hero),'Earn Lovis by logging, comparing, confirming and reaching Wishlist goals together.');
     const wallet=$('.v27-wallet',hero);
     if(wallet){
       const twosLabel=$$('span',wallet).find(el=>el.textContent.trim()==='Twos');
@@ -114,11 +115,11 @@ function calmShopCopy(root){
   }
   const score=$('.v27-score',root);
   if(score){
-    const title=$('h2',score);if(title)title.textContent='Our Lovis journey';
+    setTextIfChanged($('h2',score),'Our Lovis journey');
     $$('.v27-score-row',score).forEach(row=>{
-      const detail=$('span',row);if(detail)detail.textContent=detail.textContent.split('·')[0].trim();
+      const detail=$('span',row);if(detail){const next=detail.textContent.split('·')[0].trim();setTextIfChanged(detail,next);}
     });
-    const note=$('p',score);if(note)note.textContent='Every little action moves your Lovis journey forward.';
+    setTextIfChanged($('p',score),'Every little action moves your Lovis journey forward.');
   }
 }
 
