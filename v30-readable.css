@@ -1,4 +1,11 @@
 /* v30 readability overrides — intentionally last in the active cascade. */
+html body #app#app,
+html body #app#app *,
+html body #app#app *::before,
+html body #app#app *::after{
+  font-family:'Crimson Pro',serif!important;
+}
+
 #twCurrentTripsSection.v27-current-side .tw-current-head p,
 #twCurrentTripsSection.v27-current-side .tw-current-head>[data-v18-new-trip],
 #twCurrentTripsSection.v27-current-side .tw-current-main>p,
@@ -16,11 +23,4 @@
 #log .lower-grid.single-activity .activity-item small{
   font-size:13px!important;
   line-height:1.36!important;
-}
-
-#financeWishlist,
-#financeWishlist *,
-#shopView,
-#shopView *{
-  font-family:'Crimson Pro',serif!important;
 }
