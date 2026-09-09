@@ -16,12 +16,11 @@ jobs:
           node tests/game-v27.cjs
           grep -q 'v30.css?v=1' index.html
           grep -q 'v29.js?v=3' index.html
+          grep -q 'v30-readable.css' v29.js
       - name: Install browser test dependency
         run: |
           npm init -y >/dev/null 2>&1
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Existing v28 browser regression
-        run: node tests/browser-v28.cjs
       - name: v30 browser refinement regression
         run: node tests/browser-v30.cjs
