@@ -4,8 +4,12 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 let wishObserver=null,shopObserver=null,wishQueued=false,shopQueued=false;
 
 function ensureCss(){
-  if(document.querySelector('link[href*="v29.css"]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='v29.css?v=1';document.head.appendChild(l);
+  if(!document.querySelector('link[href*="v29.css"]')){
+    const l=document.createElement('link');l.rel='stylesheet';l.href='v29.css?v=1';document.head.appendChild(l);
+  }
+  if(!document.querySelector('link[href*="v30-readable.css"]')){
+    const l=document.createElement('link');l.rel='stylesheet';l.href='v30-readable.css?v=1';document.head.appendChild(l);
+  }
 }
 
 function installWishlistHub(){
