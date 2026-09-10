@@ -3,6 +3,8 @@ html body dialog.current-overview button,
 html body dialog.current-overview .v5-actions button,
 html body dialog.current-overview .overview-payment button,
 html body dialog.current-overview .btn,
-html body dialog.current-overview .text-btn{
+html body dialog.current-overview .text-btn,
+html body dialog.current-overview .overview-match,
+html body dialog.current-overview .overview-match i{
   font-size:12px!important;
 }
