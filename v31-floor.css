@@ -1,4 +1,7 @@
 /* v31 text-floor corrections loaded after all visual layers. */
+html body .eyebrow,
+html body .panel-kicker,
+html body .shop-token-badge,
 html body dialog.current-overview button,
 html body dialog.current-overview .v5-actions button,
 html body dialog.current-overview .overview-payment button,
@@ -18,6 +21,7 @@ html body #shopView .v27-test span,
 html body #shopView .v27-test small,
 html body #shopView .v27-test button,
 html body #shopView .v27-section-title small,
+html body #shopView .v27-social p,
 html body #shopView .v27-social button,
 html body #v27CompareLab .v27-scenario-foot button,
 html body #v27CompareLab .v27-scenario-foot span{
