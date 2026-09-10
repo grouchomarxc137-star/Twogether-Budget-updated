@@ -1,0 +1,411 @@
+/* v31 — visual polish, readable trip details and touch-first mobile behaviour. */
+
+/* Keep the visible type system consistent, including dynamic dialogs and Wishlist headings. */
+html,body,button,input,select,textarea,table,th,td,
+#app,#app *,dialog,dialog *,#v27Modal,#v27Modal *,#workflowBudgetModal,#workflowBudgetModal *{
+  font-family:'Crimson Pro',serif!important;
+}
+#financeWishlist .v27-wish-hero h1,
+#financeWishlist .v27-wish-card h3,
+#financeWishlist .v27-cart h2,
+#financeWishlist .v27-cart h3,
+#financeWishlist .v28-wish-title,
+#financeWishlist .v28-wish-title *,
+#financeWishlist button,
+#financeWishlist input,
+#financeWishlist select,
+#financeWishlist textarea{
+  font-family:'Crimson Pro',serif!important;
+}
+
+/* 12px is the hard floor for readable text. */
+body small,
+.budget-plan-status,
+.budget-locked-note,
+.trip-budget-item>span,
+.review-budget-check span,
+.confirmed-donut-center span,
+.overview-metrics span,
+.current-overview .overview-match i,
+.current-overview .overview-table thead th,
+.current-overview .overview-table tbody th,
+#monthly table.overview-table th,
+#shopView .v27-shop-item.owned::after,
+.tw-current-status,
+.tw-current-numbers span,
+.v5-step,
+.v5-reference span,
+.v5-field label{
+  font-size:12px!important;
+}
+.current-overview .overview-table th,
+.current-overview .overview-table td,
+.current-overview .overview-payment span,
+.current-overview .overview-payment small,
+.current-overview .overview-title-copy>p{
+  font-size:13px!important;
+  line-height:1.35!important;
+}
+
+/* Activity — still available, but no longer a large opaque card floating over the page. */
+#log .lower-grid.single-activity{
+  width:min(292px,calc(100vw - 28px))!important;
+  right:14px!important;
+  bottom:14px!important;
+}
+#log .lower-grid.single-activity .activity-card{
+  padding:10px 12px!important;
+  max-height:190px!important;
+  overflow:auto!important;
+  border:1px solid rgba(220,205,186,.56)!important;
+  border-radius:15px!important;
+  background:rgba(255,253,249,.76)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+  backdrop-filter:blur(12px)!important;
+  box-shadow:0 9px 24px rgba(57,43,32,.09)!important;
+  opacity:.9!important;
+}
+#log .lower-grid.single-activity .activity-card:hover,
+#log .lower-grid.single-activity .activity-card:focus-within,
+#log .lower-grid.single-activity .activity-card.activity-fresh{
+  opacity:.97!important;
+  background:rgba(255,253,249,.88)!important;
+}
+#log .lower-grid.single-activity .panel-head{margin-bottom:5px!important;}
+#log .lower-grid.single-activity .panel-head h2{font-size:20px!important;margin:2px 0 0!important;}
+#log .lower-grid.single-activity .activity-item{padding:7px 0!important;gap:8px!important;}
+
+/* Current Trip — make Open trip a proper frosted action instead of text on top of a photo. */
+#twCurrentTripsSection .tw-current-actions [data-current-open]{
+  color:#3c3128!important;
+  background:rgba(255,252,246,.88)!important;
+  border:1px solid rgba(193,157,99,.55)!important;
+  border-radius:10px!important;
+  padding:6px 10px!important;
+  min-height:32px!important;
+  font-weight:650!important;
+  text-decoration:none!important;
+  text-shadow:none!important;
+  -webkit-backdrop-filter:blur(9px)!important;
+  backdrop-filter:blur(9px)!important;
+  box-shadow:0 4px 12px rgba(58,42,27,.12)!important;
+}
+#twCurrentTripsSection .tw-current-actions [data-current-open]:hover,
+#twCurrentTripsSection .tw-current-actions [data-current-open]:focus-visible{
+  background:rgba(255,250,240,.98)!important;
+  border-color:#b98d45!important;
+  transform:translateY(-1px);
+}
+
+/* Open Trip — use the available desktop canvas and keep the comparison table entirely in-frame. */
+dialog.current-overview{
+  box-sizing:border-box!important;
+  width:min(1180px,calc(100vw - 32px))!important;
+  max-width:none!important;
+  max-height:calc(100dvh - 28px)!important;
+  padding:20px 24px 18px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+}
+.current-overview .overview-head{margin-bottom:12px!important;}
+.current-overview .overview-metrics{margin:10px 0 12px!important;}
+.current-overview .overview-metrics>div{padding:9px 12px!important;}
+.current-overview .overview-table{
+  width:100%!important;
+  margin:10px 0 14px!important;
+  overflow:visible!important;
+}
+.current-overview .overview-table table{
+  width:100%!important;
+  min-width:0!important;
+  table-layout:fixed!important;
+  border-collapse:collapse!important;
+  font-family:'Crimson Pro',serif!important;
+}
+.current-overview .overview-table th,
+.current-overview .overview-table td{
+  padding:7px 9px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  font-family:'Crimson Pro',serif!important;
+}
+.current-overview .overview-table th:nth-child(1),
+.current-overview .overview-table td:nth-child(1){width:32%!important;}
+.current-overview .overview-table th:nth-child(2),
+.current-overview .overview-table td:nth-child(2),
+.current-overview .overview-table th:nth-child(3),
+.current-overview .overview-table td:nth-child(3){width:27%!important;}
+.current-overview .overview-table th:nth-child(4),
+.current-overview .overview-table td:nth-child(4){width:14%!important;min-width:0!important;}
+.current-overview .overview-shared-title{margin-top:14px!important;}
+.current-overview .overview-shared-grid{gap:12px!important;}
+.current-overview .overview-payment{padding-top:12px!important;padding-bottom:12px!important;}
+
+/* Balances & loans — reference-inspired icon tiles plus the small 'us' footer. */
+[data-fin-view="balances"] .finance-current-grid{align-items:stretch!important;}
+[data-fin-view="balances"] .finance-current-card{padding-top:20px!important;}
+[data-fin-view="balances"] .finance-current-card::after{display:none!important;}
+[data-fin-view="balances"] .finance-current-title{
+  padding-left:66px!important;
+  min-height:54px!important;
+  align-items:start!important;
+}
+[data-fin-view="balances"] .v31-fin-icon{
+  position:absolute;
+  left:18px;
+  top:18px;
+  z-index:3;
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:15px;
+  color:#9b6f28;
+  background:linear-gradient(145deg,#fff5df,#f5ead1);
+  border:1px solid #ead8b7;
+}
+[data-fin-view="balances"] .finance-current-card:nth-child(2) .v31-fin-icon,
+[data-fin-view="balances"] .finance-current-card:nth-child(4) .v31-fin-icon{
+  color:#5d8051;
+  background:linear-gradient(145deg,#f1f6eb,#e7efdf);
+  border-color:#dbe6d2;
+}
+[data-fin-view="balances"] .v31-fin-icon svg{width:27px;height:27px;display:block;}
+[data-fin-view="balances"] .v31-fin-icon path,
+[data-fin-view="balances"] .v31-fin-icon rect,
+[data-fin-view="balances"] .v31-fin-icon circle,
+[data-fin-view="balances"] .v31-fin-icon line,
+[data-fin-view="balances"] .v31-fin-icon polyline{
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+[data-fin-view="balances"] .v31-finance-love-note{
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);
+  align-items:center;
+  gap:24px;
+  margin-top:18px;
+  padding:17px 22px;
+  border:1px solid #eadbcd;
+  border-radius:20px;
+  background:linear-gradient(100deg,#fffaf4,#fbf3ec 62%,#f8f6ec);
+  box-shadow:0 6px 18px rgba(63,44,28,.035);
+}
+[data-fin-view="balances"] .v31-finance-love-note .eyebrow{color:#aa772c!important;}
+[data-fin-view="balances"] .v31-finance-love-note h3{font-size:23px;margin:2px 0 3px;}
+[data-fin-view="balances"] .v31-finance-love-note p{margin:0;color:var(--muted);font-size:14px;}
+[data-fin-view="balances"] .v31-birds{
+  min-height:82px;
+  display:grid;
+  place-items:center;
+  color:#bb8f61;
+}
+[data-fin-view="balances"] .v31-birds svg{width:min(300px,100%);height:86px;overflow:visible;}
+[data-fin-view="balances"] .v31-birds path,
+[data-fin-view="balances"] .v31-birds circle{
+  fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+}
+[data-fin-view="balances"] .v31-birds .fill{fill:rgba(196,145,99,.17);stroke:none;}
+[data-fin-view="balances"] .v31-birds-note{font-style:italic;text-align:center;color:#97765d;font-size:13px;margin-top:-8px;}
+
+/* Lovis journey — turn two bars into one shared path with little milestones. */
+#shopView .v27-score.v31-journey{
+  position:relative!important;
+  overflow:hidden!important;
+  padding:18px 22px 16px!important;
+  background:linear-gradient(105deg,#fffefa,#fbf7ef 58%,#f4f5eb)!important;
+}
+#shopView .v27-score.v31-journey .v27-score-row{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  overflow:hidden!important;
+  clip:rect(0 0 0 0)!important;
+  white-space:nowrap!important;
+}
+#shopView .v31-journey-path{
+  display:grid;
+  grid-template-columns:120px minmax(0,1fr) 110px;
+  align-items:center;
+  gap:16px;
+  margin-top:10px;
+  min-height:116px;
+}
+#shopView .v31-journey-person{text-align:center;position:relative;z-index:2;}
+#shopView .v31-journey-avatar{
+  width:52px;height:52px;margin:0 auto 5px;display:grid;place-items:center;
+  border-radius:50%;font-size:22px!important;border:1px solid #e1cfb4;
+  background:linear-gradient(145deg,#f8e8db,#fff7ef);color:#9b6b32;
+  box-shadow:0 5px 14px rgba(92,63,34,.07);
+}
+#shopView .v31-journey-person:last-child .v31-journey-avatar{background:linear-gradient(145deg,#eef2ea,#f8faf4);color:#657d60;}
+#shopView .v31-journey-person strong{display:block;font-size:15px;}
+#shopView .v31-journey-person small{display:block;font-size:12px!important;color:var(--muted);margin-top:1px;}
+#shopView .v31-journey-route{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  align-items:center;
+  min-height:88px;
+}
+#shopView .v31-journey-route::before{
+  content:'';position:absolute;left:2%;right:2%;top:39px;border-top:2px dashed #d6b985;opacity:.85;
+}
+#shopView .v31-milestone{position:relative;z-index:1;text-align:center;display:grid;justify-items:center;gap:5px;}
+#shopView .v31-milestone i{
+  width:39px;height:39px;display:grid;place-items:center;border-radius:50%;
+  background:#fffdf9;border:1px solid #d9c6a8;color:#9c743b;font-style:normal;font-size:17px!important;
+  box-shadow:0 3px 9px rgba(80,55,31,.05);
+}
+#shopView .v31-milestone span{font-size:12px!important;line-height:1.15;max-width:82px;}
+#shopView .v27-score.v31-journey>p{text-align:right;margin:4px 0 0!important;font-style:italic;color:#8c7460!important;}
+
+/* Rewards — shorter list area with an interactive side companion like the reference. */
+#shopView .v31-rewards-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 290px;
+  gap:16px;
+  align-items:start;
+}
+#shopView .v31-reward-main{min-width:0;}
+#shopView .v31-reward-main>.v27-section-title{margin-top:0!important;}
+#shopView .v31-reward-main .v27-shop-grid{gap:7px!important;}
+#shopView .v31-reward-main .v27-shop-item,
+#shopView .v31-reward-main .v27-shop-item:nth-child(3n+2),
+#shopView .v31-reward-main .v27-shop-item:nth-child(3n){
+  min-height:70px!important;
+  padding:8px 11px!important;
+  grid-template-columns:42px minmax(0,1fr) auto!important;
+  gap:10px!important;
+}
+#shopView .v31-reward-main .v27-shop-icon{width:38px!important;height:38px!important;font-size:18px!important;}
+#shopView .v31-reward-main .v27-shop-item>div:nth-child(2){grid-template-columns:auto minmax(130px,.65fr) minmax(170px,1.25fr)!important;gap:9px!important;}
+#shopView .v31-reward-main .v27-shop-item h3{font-size:18px!important;}
+#shopView .v31-reward-side{display:grid;gap:12px;position:sticky;top:14px;}
+#shopView .v31-lovis-side,
+#shopView .v31-surprise-side{
+  border:1px solid #e4d8ca;border-radius:18px;padding:16px;background:linear-gradient(145deg,#fffefa,#faf6ef);
+  box-shadow:0 5px 16px rgba(62,45,31,.035);
+}
+#shopView .v31-lovis-title{display:flex;align-items:center;gap:7px;font-weight:700;font-size:16px;}
+#shopView .v31-lovis-title i{font-style:normal;color:#9e7433;font-size:19px!important;}
+#shopView .v31-lovis-ring{
+  --p:0;
+  width:112px;height:112px;border-radius:50%;margin:13px auto 11px;padding:8px;
+  background:conic-gradient(#b48743 calc(var(--p)*1%),#eee8df 0);
+}
+#shopView .v31-lovis-ring>div{
+  width:100%;height:100%;border-radius:50%;display:grid;place-items:center;text-align:center;
+  background:#fffefa;border:1px solid #eee4d7;
+}
+#shopView .v31-lovis-ring strong{display:block;font-size:27px;line-height:1;}
+#shopView .v31-lovis-ring small{font-size:12px!important;color:var(--muted);}
+#shopView .v31-next-reward{text-align:center;color:#806b58;font-size:13px;line-height:1.35;}
+#shopView .v31-surprise-side{background:linear-gradient(145deg,#fff9f4,#f8f1eb);}
+#shopView .v31-surprise-side h3{font-size:20px;margin:0 0 4px;}
+#shopView .v31-surprise-side p{font-size:13px;margin:0 0 12px;color:var(--muted);}
+#shopView [data-v31-surprise]{width:100%;border:1px solid #c79d5c;background:linear-gradient(135deg,#d2ab67,#aa7d39);color:white;border-radius:999px;padding:9px 12px;font:inherit;font-weight:650;cursor:pointer;}
+#shopView .v31-surprise-pick{outline:2px solid rgba(184,137,68,.55)!important;box-shadow:0 0 0 5px rgba(204,171,116,.12),0 9px 22px rgba(62,45,31,.08)!important;}
+
+/* Touch-first mobile layout. The real subnav becomes a visible horizontal strip; hover menus disappear. */
+@media(max-width:760px){
+  html,body{max-width:100%;overflow-x:hidden!important;}
+  body{touch-action:manipulation;}
+  .main{padding-left:13px!important;padding-right:13px!important;}
+  .topbar{padding-left:13px!important;padding-right:13px!important;}
+  .brand-sub{display:none!important;}
+  .hub-tabs{padding-left:8px!important;padding-right:8px!important;gap:5px!important;max-width:100vw!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;-webkit-overflow-scrolling:touch;}
+  .hub-tabs::-webkit-scrollbar{display:none!important;}
+  .hub-tabs .hub-tab{flex:0 0 auto!important;white-space:nowrap!important;min-height:42px!important;padding:9px 13px!important;}
+  .tw-nav-wrap{flex:0 0 auto!important;padding:0!important;margin:0!important;position:static!important;}
+  .tw-nav-wrap .tw-nav-menu{display:none!important;}
+  #tripSubnav:not(.hidden),#financeSubnav:not(.hidden){
+    display:flex!important;
+    width:100%!important;
+    max-width:100vw!important;
+    gap:6px!important;
+    padding:7px 10px 9px!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    flex-wrap:nowrap!important;
+    scrollbar-width:none!important;
+    -webkit-overflow-scrolling:touch;
+    background:rgba(255,253,249,.95)!important;
+    border-bottom:1px solid var(--line)!important;
+  }
+  #tripSubnav::-webkit-scrollbar,#financeSubnav::-webkit-scrollbar{display:none!important;}
+  #tripSubnav.hidden,#financeSubnav.hidden{display:none!important;}
+  #tripSubnav .tab,#financeSubnav .tab{flex:0 0 auto!important;white-space:nowrap!important;min-height:38px!important;padding:8px 12px!important;}
+
+  #log .hero-grid.v27-trip-workspace{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:auto!important;height:auto!important;gap:14px!important;}
+  #wizardCard,#twCurrentTripsSection.v27-current-side{width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;}
+  #wizardCard{min-height:500px!important;}
+  #twCurrentTripsSection.v27-current-side{padding:14px!important;overflow:visible!important;}
+  #twCurrentTripsSection .tw-current-list{max-height:none!important;overflow:visible!important;}
+  #twCurrentTripsSection .tw-current-card{min-width:0!important;max-width:100%!important;}
+  #twCurrentTripsSection .tw-current-actions{display:flex!important;flex-wrap:wrap!important;gap:7px!important;}
+  #twCurrentTripsSection .tw-current-actions button{flex:1 1 auto!important;min-width:92px!important;}
+
+  #log .lower-grid.single-activity{position:static!important;width:100%!important;max-width:100%!important;margin:18px 0 0!important;}
+  #log .lower-grid.single-activity .activity-card{max-height:230px!important;opacity:1!important;background:rgba(255,253,249,.82)!important;}
+
+  dialog.current-overview{
+    width:calc(100vw - 16px)!important;
+    max-width:calc(100vw - 16px)!important;
+    max-height:calc(100dvh - 16px)!important;
+    padding:14px 12px!important;
+    border-radius:17px!important;
+  }
+  .current-overview .overview-title-copy h2{font-size:30px!important;}
+  .current-overview .overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  .current-overview .overview-table th,.current-overview .overview-table td{padding:7px 5px!important;font-size:12px!important;line-height:1.25!important;}
+  .current-overview .overview-table th:nth-child(1),.current-overview .overview-table td:nth-child(1){width:31%!important;}
+  .current-overview .overview-table th:nth-child(2),.current-overview .overview-table td:nth-child(2),.current-overview .overview-table th:nth-child(3),.current-overview .overview-table td:nth-child(3){width:27%!important;}
+  .current-overview .overview-table th:nth-child(4),.current-overview .overview-table td:nth-child(4){width:15%!important;}
+  .current-overview .overview-shared-grid{grid-template-columns:1fr!important;}
+
+  .finance-page,.finance-subview,#financeCurrent,#financeWishlist,#shopView{min-width:0!important;max-width:100%!important;}
+  .finance-summary,.finance-current-grid,.finance-grid,.finance-scenario-grid{grid-template-columns:1fr!important;}
+  [data-fin-view="balances"] .finance-current-card{min-height:0!important;}
+  [data-fin-view="balances"] .v31-finance-love-note{grid-template-columns:1fr!important;text-align:left;padding:16px!important;}
+  [data-fin-view="balances"] .v31-birds{min-height:65px;}
+  [data-fin-view="balances"] .v31-birds-note{text-align:left;margin-top:-2px;}
+
+  #financeWishlist .v27-wish-grid{grid-template-columns:1fr!important;}
+  #financeWishlist .v27-wish-card{min-height:0!important;}
+  #financeWishlist .v27-cart{position:static!important;top:auto!important;}
+
+  #shopView .v27-shop-shell{width:100%!important;max-width:100%!important;padding-left:0!important;padding-right:0!important;}
+  #shopView .v27-shop-hero{padding:18px 15px!important;}
+  #shopView .v27-shop-hero>div{min-width:0!important;}
+  #shopView .v27-wallet{min-width:0!important;width:100%!important;}
+  #shopView .v31-journey-path{grid-template-columns:76px minmax(0,1fr) 72px!important;gap:7px!important;min-height:106px!important;}
+  #shopView .v31-journey-avatar{width:43px;height:43px;font-size:18px!important;}
+  #shopView .v31-journey-route{gap:5px!important;}
+  #shopView .v31-milestone i{width:32px;height:32px;font-size:14px!important;}
+  #shopView .v31-milestone span{font-size:12px!important;max-width:60px;}
+  #shopView .v31-rewards-layout{grid-template-columns:1fr!important;}
+  #shopView .v31-reward-side{position:static!important;grid-template-columns:1fr 1fr!important;grid-row:1;}
+  #shopView .v31-lovis-ring{width:92px;height:92px;}
+  #shopView .v31-reward-main .v27-shop-item,
+  #shopView .v31-reward-main .v27-shop-item:nth-child(3n+2),
+  #shopView .v31-reward-main .v27-shop-item:nth-child(3n){grid-template-columns:38px minmax(0,1fr)!important;align-items:start!important;}
+  #shopView .v31-reward-main .v27-shop-item>div:nth-child(2){grid-template-columns:1fr!important;gap:2px!important;}
+  #shopView .v31-reward-main .v27-shop-item>button{grid-column:1/-1!important;width:100%!important;}
+}
+
+@media(max-width:430px){
+  .main{padding-left:10px!important;padding-right:10px!important;}
+  #shopView .v31-reward-side{grid-template-columns:1fr!important;}
+  #shopView .v31-journey-path{grid-template-columns:1fr!important;gap:10px!important;}
+  #shopView .v31-journey-route{order:2;min-height:78px!important;}
+  #shopView .v31-journey-person:first-child{order:1;}
+  #shopView .v31-journey-person:last-child{order:3;}
+  #shopView .v31-journey-route::before{top:31px;}
+}
