@@ -6,6 +6,8 @@ html body dialog.current-overview .btn,
 html body dialog.current-overview .text-btn,
 html body dialog.current-overview .overview-match,
 html body dialog.current-overview .overview-match i,
-html body #financeWishlist .v28-view-tabs span{
+html body #financeWishlist .v28-view-tabs span,
+html body #shopView .v27-test span,
+html body #shopView .v27-test small{
   font-size:12px!important;
 }
