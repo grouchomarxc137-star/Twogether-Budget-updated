@@ -1,0 +1,91 @@
+/* v32 — stable Shop polish, compact activity and touch-safe mobile navigation. */
+
+/* Keep the two-item Activity corner light and small instead of covering trip cards. */
+#log .lower-grid.single-activity .activity-card,
+#log .lower-grid.single-activity #activityList{
+  overflow:hidden!important;
+}
+#log .lower-grid.single-activity #activityList .activity-item:nth-child(n+3){
+  display:none!important;
+}
+@media(min-width:761px){
+  #log .lower-grid.single-activity{
+    width:min(226px,calc(100vw - 20px))!important;
+    right:10px!important;
+    bottom:10px!important;
+  }
+  #log .lower-grid.single-activity .activity-card{
+    max-height:none!important;
+    padding:8px 9px!important;
+    border-color:rgba(205,186,161,.30)!important;
+    background:rgba(255,253,249,.45)!important;
+    -webkit-backdrop-filter:blur(9px)!important;
+    backdrop-filter:blur(9px)!important;
+    box-shadow:0 5px 14px rgba(57,43,32,.055)!important;
+    opacity:.72!important;
+  }
+  #log .lower-grid.single-activity .activity-card:hover,
+  #log .lower-grid.single-activity .activity-card:focus-within,
+  #log .lower-grid.single-activity .activity-card.activity-fresh{
+    opacity:.98!important;
+    background:rgba(255,253,249,.82)!important;
+  }
+  #log .lower-grid.single-activity .panel-head{margin-bottom:2px!important;}
+  #log .lower-grid.single-activity .panel-head h2{font-size:17px!important;line-height:1.05!important;margin:1px 0 0!important;}
+  #log .lower-grid.single-activity .panel-kicker{font-size:12px!important;}
+  #log .lower-grid.single-activity .activity-item{padding:5px 0!important;gap:6px!important;}
+  #log .lower-grid.single-activity .activity-item div{font-size:12px!important;line-height:1.22!important;}
+  #log .lower-grid.single-activity .activity-item small{font-size:12px!important;line-height:1.15!important;margin-top:2px!important;}
+  #log .lower-grid.single-activity .avatar-mini{width:24px!important;height:24px!important;min-width:24px!important;border-radius:9px!important;font-size:12px!important;}
+}
+
+/* Investment title requested as a single short line. */
+[data-fin-view="balances"] .finance-current-card:last-child .finance-current-title h3{
+  white-space:nowrap!important;
+  font-size:20px!important;
+  line-height:1.08!important;
+}
+[data-fin-view="balances"] .v31-birds svg{width:min(320px,100%)!important;height:92px!important;}
+[data-fin-view="balances"] .v31-birds .v32-bird-eye{fill:currentColor!important;stroke:none!important;}
+[data-fin-view="balances"] .v31-birds .v32-bird-heart{fill:rgba(196,145,99,.20)!important;stroke:currentColor!important;stroke-width:1.2!important;}
+
+/* The v31 Shop composition stays visually stable while its data refreshes. */
+#shopView.v32-shop-stable .v31-rewards-layout,
+#shopView.v32-shop-stable .v31-journey-path{
+  opacity:1!important;
+}
+
+/* Mobile: make the primary hubs and their real subcategories direct touch targets. */
+@media(max-width:760px){
+  .hub-tabs{
+    position:relative!important;
+    z-index:60!important;
+    touch-action:pan-x!important;
+  }
+  .hub-tabs .tw-nav-wrap,
+  .hub-tabs .hub-tab{
+    pointer-events:auto!important;
+  }
+  .hub-tabs .hub-tab{
+    touch-action:manipulation!important;
+  }
+  .tw-nav-wrap .tw-nav-menu{display:none!important;pointer-events:none!important;}
+  #tripSubnav:not(.hidden),
+  #financeSubnav:not(.hidden){
+    position:relative!important;
+    top:auto!important;
+    z-index:55!important;
+    pointer-events:auto!important;
+    touch-action:pan-x!important;
+  }
+  #tripSubnav .tab,
+  #financeSubnav .tab{
+    pointer-events:auto!important;
+    touch-action:manipulation!important;
+  }
+  #log .lower-grid.single-activity .activity-card{
+    max-height:none!important;
+    overflow:hidden!important;
+  }
+  #log .lower-grid.single-activity #activityList{overflow:hidden!important;}
+}
