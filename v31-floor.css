@@ -5,6 +5,7 @@ html body dialog.current-overview .overview-payment button,
 html body dialog.current-overview .btn,
 html body dialog.current-overview .text-btn,
 html body dialog.current-overview .overview-match,
-html body dialog.current-overview .overview-match i{
+html body dialog.current-overview .overview-match i,
+html body #financeWishlist .v28-view-tabs span{
   font-size:12px!important;
 }
