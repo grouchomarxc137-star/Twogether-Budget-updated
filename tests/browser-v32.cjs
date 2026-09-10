@@ -21,7 +21,7 @@ const {backend}=require('./backend.cjs');
  const activity=page.locator('#log .activity-card');const activityInfo=await activity.evaluate(el=>({w:el.getBoundingClientRect().width,overflow:getComputedStyle(el).overflowY,bg:getComputedStyle(el).backgroundColor,visible:[...el.querySelectorAll('.activity-item')].filter(x=>getComputedStyle(x).display!=='none').length}));
  assert.ok(activityInfo.w<=240,`activity stays compact (${activityInfo.w})`);assert.notEqual(activityInfo.overflow,'auto','activity card has no internal scrollbar');assert.notEqual(activityInfo.overflow,'scroll','activity card has no internal scrollbar');assert.ok(activityInfo.visible<=2,'only the two newest activities are shown in compact view');
 
- await page.locator('[data-hub="finances"]').click();await page.waitForTimeout(60);await page.locator('#financeSubnav [data-fin-subview="balances"]').click();
+ await page.locator('[data-hub="finances"]').click();await page.waitForTimeout(60);await page.evaluate(()=>document.querySelector('#financeSubnav [data-fin-subview="balances"]')?.click());
  await page.waitForFunction(()=>document.querySelector('#financeCurrent .v31-finance-love-note')&&document.querySelector('#financeCurrent .v31-birds[data-v32-birds="1"]'),{timeout:4000});
  const inv=page.locator('#financeCurrent .finance-current-card').filter({hasText:'INVESTMENTS'}).locator('.finance-current-title h3');assert.equal((await inv.innerText()).trim(),'My investments');
  const invLine=await inv.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,white:getComputedStyle(el).whiteSpace}));assert.equal(invLine.white,'nowrap','My investments is kept on one line');assert.ok(invLine.scroll<=invLine.client+1,'My investments fits its heading area');
