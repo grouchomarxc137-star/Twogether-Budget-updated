@@ -1,0 +1,6 @@
+/* v31 text-floor corrections loaded after all visual layers. */
+.current-overview button,
+.current-overview .btn,
+.current-overview .text-btn{
+  font-size:12px!important;
+}
