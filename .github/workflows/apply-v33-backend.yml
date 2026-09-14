@@ -27,7 +27,7 @@ jobs:
         run: python scripts/apply-v33-backend.py
       - name: Verify backend copies
         run: |
-          node --check backend/Code.gs
+          node -e "const fs=require('fs'),vm=require('vm');new vm.Script(fs.readFileSync('backend/Code.gs','utf8'))"
           cmp backend/Code.gs backend/Code-v17.gs
           grep -q "saveAccommodationExpense" backend/Code.gs
           grep -q "saveFinancePlanning" backend/Code.gs
