@@ -26,10 +26,10 @@ jobs:
           grep -q 'v33.js?v=1' index.html
           grep -q '\*.webmanifest \*.svg' .github/workflows/pages.yml
           ! grep -q 'setInterval(()=>refreshState(false),5000)' approved-v18.js
-      - name: Commit shell patch
+      - name: Commit shell patch except workflow file
         run: |
           git config user.name "GrimReaper29"
           git config user.email "actions@users.noreply.github.com"
-          git add index.html .github/workflows/pages.yml approved-v18.js backend/Code.gs backend/Code-v17.gs
-          git commit -m "Wire PWA assets and reduce legacy polling"
+          git add index.html approved-v18.js backend/Code.gs backend/Code-v17.gs
+          git commit -m "Wire PWA shell and reduce legacy polling"
           git push origin HEAD:feature-v33-pwa-jar-finance-checklists
