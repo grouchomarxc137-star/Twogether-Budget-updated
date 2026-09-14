@@ -39,3 +39,5 @@ jobs:
         run: node tests/browser-v32.cjs
       - name: v33 browser regression
         run: node tests/browser-v33.cjs
+
+# final-head-validation
