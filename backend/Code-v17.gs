@@ -698,7 +698,14 @@ function handlePost_(e) {
       let idx = list.findIndex(function(x){ return x.month === month; });
       let record = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : sanitizeFinanceMonth_({month:month}, actor);
       if (record.finalized) throw new Error('This month is final and locked');
+      const previousPlanning = sanitizeFinancePlanning_(record.planning || {});
       const planning = sanitizeFinancePlanning_(payload.planning || {});
+      const nextNames = planning.items.map(function(x){ return String(x.name || '').trim().toLowerCase(); });
+      previousPlanning.items.filter(function(x){ return x.custom === true && nextNames.indexOf(String(x.name || '').trim().toLowerCase()) < 0; }).forEach(function(item){
+        const removed = String(item.name || '').trim().toLowerCase();
+        record.incomes = (record.incomes || []).filter(function(x){ return String(x.name || '').trim().toLowerCase() !== removed; });
+        record.expenses = (record.expenses || []).filter(function(x){ return String(x.name || '').trim().toLowerCase() !== removed; });
+      });
       record.planning = planning;
       planning.items.forEach(function(item){
         const name = String(item.name || '').trim(); if (!name) return;
