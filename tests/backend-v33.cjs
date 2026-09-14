@@ -42,6 +42,11 @@ function run(){
   assert.equal(r.ok,true);assert.equal(r.planning.openingSavings,6094.61);const insurance=r.planning.items.find(x=>x.name==='Insurance');assert.equal(insurance.reserveMonthly,50);assert.equal(insurance.actual,'');
   const month=b.state().finances.Principe.find(x=>x.month==='2026-09');assert.equal(month.incomes.find(x=>x.name==='Salary').amount,1255);assert.equal(month.expenses.find(x=>x.name==='Rent').amount,575);assert.equal(month.expenses.some(x=>x.name==='Insurance'),false,'yearly reserve is not falsely stored as Actual expense');
 
+  let custom=b.post('saveFinancePlanning',{month:'2026-10',planning:{openingSavings:1000,items:[{id:'dentist',name:'Dentist',kind:'expense',group:'other',planner:100,actual:100,frequency:'one-time',paymentTiming:'',notes:'',custom:true}]}},'Principe');
+  assert.equal(custom.ok,true);assert.equal(b.state().finances.Principe.find(x=>x.month==='2026-10').expenses.find(x=>x.name==='Dentist').amount,100);
+  custom=b.post('saveFinancePlanning',{month:'2026-10',planning:{openingSavings:1000,items:[]}},'Principe');
+  assert.equal(custom.ok,true);assert.equal(b.state().finances.Principe.find(x=>x.month==='2026-10').expenses.some(x=>x.name==='Dentist'),false,'deleting a custom planner row also removes its synced Actual row');
+
   console.log('v33 backend: Shared Jar, accommodation repayment, trip prep and Planner/Actual reserve checks passed.');
 }
 if(require.main===module)run();
