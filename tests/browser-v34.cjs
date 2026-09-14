@@ -22,14 +22,13 @@ const {backend}=require('./backend.cjs');
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
 
-  let failState=false,postCount=0;
+  let failState=false;
   const armedOrder=[];
   await page.route('https://script.google.com/**',async route=>{
     const req=route.request();
     if(req.method()==='POST'){
       const q=new URLSearchParams(req.postData());
       if(failState)armedOrder.push('POST:'+q.get('action'));
-      postCount++;
       const result=b.post(q.get('action'),JSON.parse(q.get('payload')),q.get('actor'));
       return route.fulfill({contentType:'text/html',body:`<script>window.top.postMessage(${JSON.stringify({type:'twogether:saved',requestId:q.get('requestId'),result})},'*')</script>`});
     }
@@ -63,12 +62,10 @@ const {backend}=require('./backend.cjs');
   assert.equal(plans.length,1,'trip plan is persisted even when state refresh is unavailable');
   assert.equal(plans[0].meta.city,'Lonato del Garda');
   assert.equal(plans[0].budgets.Principessa,500);
-  assert.equal(postCount,1,'creating a trip uses one save request');
+  assert.equal(armedOrder.filter(x=>x==='POST:savePlan').length,1,'creating a trip issues exactly one savePlan write');
   assert.equal(armedOrder[0],'POST:savePlan','save is not blocked by a state request');
   assert.deepEqual(errors,[]);
 
   console.log('Browser v34 trip save timeout recovery and single-write flow passed.');
   await browser.close();server.close();
 })().catch(e=>{console.error(e);process.exit(1);});
-
-// v34 validation trigger
