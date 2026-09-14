@@ -30,7 +30,7 @@ jobs:
       - name: Prepare public files
         run: |
           mkdir public
-          cp *.html *.js *.css public/
+          cp *.html *.js *.css *.webmanifest *.svg public/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
