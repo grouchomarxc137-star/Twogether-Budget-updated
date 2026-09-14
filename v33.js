@@ -80,7 +80,7 @@ function renderPlanner(){
   const view=$('[data-fin-view="monthly"]');if(!view)return;
   let root=$('#v33FinancePlanner',view);if(!root){root=document.createElement('section');root.id='v33FinancePlanner';root.className='v33-planner';view.appendChild(root);}
   if(!actor()){root.innerHTML='';return;}
-  let planning=root._planning&&root.dataset.month===plannerMonth?root._planning:initialPlanning(plannerMonth);root._planning=planning;root.dataset.month=plannerMonth;
+  const activeActor=actor();let planning=root._planning&&root.dataset.month===plannerMonth&&root.dataset.actor===activeActor?root._planning:initialPlanning(plannerMonth);root._planning=planning;root.dataset.month=plannerMonth;root.dataset.actor=activeActor;
   const finalized=!!financeRecord(plannerMonth)?.finalized;
   const grouped={};planning.items.forEach(x=>(grouped[expenseCategory(x)]||(grouped[expenseCategory(x)]=[])).push(x));
   const order=['Income','Fixed expenses','Subscriptions','Variable expenses','Yearly expenses','Other'];
