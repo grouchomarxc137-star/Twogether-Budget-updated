@@ -1,0 +1,32 @@
+name: Apply v33 planning metadata fix
+on:
+  push:
+    branches: [feature-v33-pwa-jar-finance-checklists]
+    paths: [.github/workflows/apply-v33-custom-flag.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-v33-pwa-jar-finance-checklists
+      - name: Preserve custom expense marker
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          old="return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240)};"
+          new="return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240),custom:s.custom===true};"
+          for name in ['backend/Code.gs','backend/Code-v17.gs']:
+            p=Path(name);s=p.read_text()
+            if old not in s: raise SystemExit(name+' missing custom marker anchor')
+            p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit metadata fix
+        run: |
+          git config user.name "GrimReaper29"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/Code.gs backend/Code-v17.gs
+          git commit -m "Preserve custom finance expense metadata"
+          git push origin HEAD:feature-v33-pwa-jar-finance-checklists
