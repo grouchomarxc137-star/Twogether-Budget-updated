@@ -12,23 +12,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feature-v33-pwa-jar-finance-checklists
-      - name: Preserve custom expense marker
+      - name: Remove deleted custom items from Actual records
         run: |
           python - <<'PY'
           from pathlib import Path
-          old="return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240)};"
-          new="return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240),custom:s.custom===true};"
+          old="""      const planning = sanitizeFinancePlanning_(payload.planning || {});\n      record.planning = planning;\n      planning.items.forEach(function(item){"""
+          new="""      const previousPlanning = sanitizeFinancePlanning_(record.planning || {});\n      const planning = sanitizeFinancePlanning_(payload.planning || {});\n      const nextNames = planning.items.map(function(x){ return String(x.name || '').trim().toLowerCase(); });\n      previousPlanning.items.filter(function(x){ return x.custom === true && nextNames.indexOf(String(x.name || '').trim().toLowerCase()) < 0; }).forEach(function(item){\n        const removed = String(item.name || '').trim().toLowerCase();\n        record.incomes = (record.incomes || []).filter(function(x){ return String(x.name || '').trim().toLowerCase() !== removed; });\n        record.expenses = (record.expenses || []).filter(function(x){ return String(x.name || '').trim().toLowerCase() !== removed; });\n      });\n      record.planning = planning;\n      planning.items.forEach(function(item){"""
           for name in ['backend/Code.gs','backend/Code-v17.gs']:
             p=Path(name);s=p.read_text()
-            if old not in s: raise SystemExit(name+' missing custom marker anchor')
+            if old not in s: raise SystemExit(name+' missing planning cleanup anchor')
             p.write_text(s.replace(old,new,1))
           PY
-      - name: Verify and commit metadata fix
+      - name: Verify and commit planning cleanup
         run: |
           cmp backend/Code.gs backend/Code-v17.gs
-          grep -q "custom:s.custom===true" backend/Code.gs
+          grep -q "previousPlanning.items.filter" backend/Code.gs
           git config user.name "GrimReaper29"
           git config user.email "actions@users.noreply.github.com"
           git add backend/Code.gs backend/Code-v17.gs
-          git commit -m "Preserve custom finance expense metadata"
+          git commit -m "Remove deleted custom Actual finance rows"
           git push origin HEAD:feature-v33-pwa-jar-finance-checklists
