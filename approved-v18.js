@@ -237,7 +237,8 @@
 
   document.addEventListener('DOMContentLoaded',()=>{
     ensureNavigation();ensureSessionControls();installSessionEvents();simplifyStaticCopy();ensureCurrentTrips();installEnhancers();enhanceTripChoices();enhancePartialPicker();enhanceWishlist();enhanceWishlistModal();
-    setTimeout(()=>refreshState(true),180);setInterval(()=>refreshState(false),5000);
+    setTimeout(()=>refreshState(true),180);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshState(false);});
     document.addEventListener('twogether:saved',()=>setTimeout(()=>refreshState(false),120));document.addEventListener('twogether:finance-view',()=>setTimeout(()=>{enhanceWishlist();enhanceWishlistModal();},40));
     window.addEventListener('focus',()=>refreshState(false),{passive:true});
   });
