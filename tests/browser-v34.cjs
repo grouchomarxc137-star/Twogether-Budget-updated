@@ -70,3 +70,5 @@ const {backend}=require('./backend.cjs');
   console.log('Browser v34 trip save timeout recovery and single-write flow passed.');
   await browser.close();server.close();
 })().catch(e=>{console.error(e);process.exit(1);});
+
+// v34 validation trigger
