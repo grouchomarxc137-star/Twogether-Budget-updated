@@ -2,8 +2,6 @@
   'use strict';
 
   const $ = (s, r=document) => r.querySelector(s);
-  const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
-  const API_URL = String(CONFIG.appsScriptUrl || '').trim();
   const ACTOR_KEY = 'twogether_actor_v1';
 
   let meta = {};
@@ -21,30 +19,7 @@
   }
 
   function heading(){ return $('#wizardBody h2')?.textContent?.trim() || ''; }
-
-  function jsonp(params={}){
-    return new Promise((resolve,reject)=>{
-      if(!API_URL) return reject(new Error('Backend URL missing'));
-      const cb='__tw_bridge15_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const script=document.createElement('script');
-      const timer=setTimeout(()=>done(new Error('Sync timed out')),10000);
-      function done(err,data){ clearTimeout(timer); try{delete window[cb];}catch{} script.remove(); err?reject(err):resolve(data); }
-      window[cb]=data=>done(null,data);
-      const q=new URLSearchParams({...params,callback:cb,_:String(Date.now())});
-      script.src=API_URL+(API_URL.includes('?')?'&':'?')+q.toString();
-      script.onerror=()=>done(new Error('Could not reach backend'));
-      document.head.appendChild(script);
-    });
-  }
-
   function post(action,payload){return window.TwogetherAPI.post(action,payload,actor());}
-
-  async function getState(){
-    const res=await jsonp({action:'state'});
-    if(!res?.ok) throw new Error(res?.error || 'Could not load trip data');
-    return res.state || {};
-  }
-
   function resetMeta(){ meta={}; }
 
   function captureCurrent(){
@@ -81,22 +56,17 @@
 
     creating=true;
     const body=$('#wizardBody');
-    if(body) body.innerHTML='<div class="bridge15-saving"><strong>Saving your current trip…</strong><span>One moment.</span></div>';
+    if(body) body.innerHTML='<div class="bridge15-saving"><strong>Saving your trip…</strong><span>This should only take a moment.</span></div>';
 
     try{
-      const before=await getState();
-      const beforeIds=new Set((before.plans||[]).map(p=>p.id));
-      await post('savePlan',{meta:m,budget:String(budget)});
+      const result=await post('savePlan',{meta:m,budget:String(budget)});
+      if(!result?.planId) throw new Error('The trip could not be confirmed as saved. Please retry once.');
 
-      let created=null;
-      for(let i=0;i<10 && !created;i++){
-        await sleep(i===0?650:350);
-        const s=await getState();
-        created=(s.plans||[]).find(p=>!beforeIds.has(p.id) && p.createdBy===a && p?.meta?.city===m.city && p?.meta?.start===m.start && p?.meta?.end===m.end) || null;
-      }
-      if(!created) throw new Error('The trip was saved, but Twogether could not open it yet. Refresh once and try again.');
-
+      const created={id:result.planId,meta:m,createdBy:a};
       showScope(created);
+
+      // Refresh once in the background so Current Trips catches up, but never block a successful save on a state reload.
+      Promise.resolve(window.TwogetherWorkflow?.refresh?.()).catch(()=>{});
       window.dispatchEvent(new Event('focus'));
     }catch(err){
       toast(err.message || 'Could not save the trip','warn');
@@ -133,20 +103,20 @@
   }
 
   async function launchPlanExpenses(planId,mode){
-    window.dispatchEvent(new Event('focus'));
-    let actual=null;
-    for(let i=0;i<36 && !actual;i++){
-      actual=$(`#budgetPlanGrid [data-v5-plan="${window.CSS?.escape?CSS.escape(planId):planId}"] [data-v5-actual]`);
-      if(!actual) await sleep(140);
+    try{ await window.TwogetherWorkflow?.refresh?.(); }catch{}
+
+    if(window.TwogetherWorkflow?.start){
+      window.TwogetherWorkflow.start(planId);
+    }else{
+      const actual=$(`#budgetPlanGrid [data-v5-plan="${window.CSS?.escape?CSS.escape(planId):planId}"] [data-v5-actual]`);
+      if(actual) actual.click();
     }
-    if(!actual){ toast('The trip is saved. Use Add expenses under Current Trips.','warn'); return; }
-    actual.click();
 
     const wanted=mode==='some'?'partial':'full';
-    for(let i=0;i<30;i++){
-      await sleep(100);
+    for(let i=0;i<16;i++){
       const btn=$(`[data-v5-actual-mode="${wanted}"]`);
       if(btn){ btn.click(); return; }
+      await sleep(80);
     }
     toast('The trip is saved. Open it from Current Trips to add expenses.','warn');
   }
@@ -209,4 +179,3 @@
 
   document.addEventListener('DOMContentLoaded',install);
 })();
-
