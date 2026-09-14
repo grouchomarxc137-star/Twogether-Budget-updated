@@ -1,0 +1,37 @@
+name: Validate current v34 runtime
+on:
+  push:
+    branches:
+      - feature-v34-timeout-cleanup
+    paths-ignore:
+      - '.github/workflows/validate-v34.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Current syntax and backend checks
+        run: |
+          node --check api.js
+          node --check trip-wizard-bridge-v15.js
+          node --check service-worker.js
+          node --check v33.js
+          node tests/validate.cjs
+          node tests/backend.cjs
+          node tests/backend-v33.cjs
+          cmp backend/Code.gs backend/Code-v17.gs
+          grep -q 'api.js?v=19' index.html
+          grep -q 'trip-wizard-bridge-v15.js?v=19' index.html
+          grep -q "twogether-v34" service-worker.js
+          ! test -f .github/workflows/validate-v18.yml
+          grep -q 'Prepare only current runtime files' .github/workflows/pages.yml
+          ! grep -q 'cp \*.html \*.js \*.css' .github/workflows/pages.yml
+      - name: Install browser test dependency
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Current v33 feature regression
+        run: node tests/browser-v33.cjs
+      - name: v34 trip save regression
+        run: node tests/browser-v34.cjs
