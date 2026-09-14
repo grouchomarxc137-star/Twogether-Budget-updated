@@ -1034,7 +1034,7 @@ function sanitizeFinancePlanningItem_(item){
   const allowed=['medical','subscriptions','rent','transport','groceries','extra','savings','investments','other']; let group=String(s.group||'other'); if(allowed.indexOf(group)<0)group='other';
   const planner=cleanMoney_(s.planner),actual=cleanMoney_(s.actual); let reserveMonthly='';
   if(frequency==='yearly'&&paymentTiming==='later'&&planner!=='')reserveMonthly=money2_(Number(planner)/12);
-  return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240)};
+  return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240),custom:s.custom===true};
 }
 function sanitizeFinancePlanning_(value){const s=value&&typeof value==='object'?value:{};return {items:(Array.isArray(s.items)?s.items:[]).slice(0,120).map(sanitizeFinancePlanningItem_).filter(function(x){return !!x.name;}),openingSavings:cleanMoney_(s.openingSavings),updatedAt:cleanText_(s.updatedAt,40)};}
 
