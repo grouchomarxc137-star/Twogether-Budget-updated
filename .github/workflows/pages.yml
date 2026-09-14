@@ -1,4 +1,4 @@
-name: Deploy static site to Pages
+name: Deploy Twogether to Pages
 
 on:
   push:
@@ -23,14 +23,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Validate assets and backend
-        run: node tests/validate.cjs
-      - name: Test payment and confirmation rules
-        run: node tests/backend.cjs
-      - name: Prepare public files
+
+      - name: Validate current runtime
         run: |
+          node --check api.js
+          node --check trip-wizard-bridge-v15.js
+          node --check service-worker.js
+          node tests/validate.cjs
+          node tests/backend.cjs
+          node tests/backend-v33.cjs
+          cmp backend/Code.gs backend/Code-v17.gs
+
+      - name: Prepare only current runtime files
+        run: |
+          set -euo pipefail
           mkdir public
-          cp *.html *.js *.css *.webmanifest *.svg public/
+          files=(
+            index.html manifest.webmanifest app-icon.svg service-worker.js
+            config.js api.js fast-start.js app.js workflow.js ui.js finances.js navigation.js shared.js trip-wizard-bridge-v15.js
+            approved-v18.js refine-v19.js overview-v26.js v27.js v28.js v29.js v31.js v32.js v33.js
+            styles.css live.css finance.css navigation.css wishlist.css approved-v18.css refine-v19.css
+            v27.css v28.css v29.css v29-mobile.css v30.css v31.css v31-floor.css v32.css v33.css
+          )
+          for file in "${files[@]}"; do
+            test -f "$file"
+            cp "$file" public/
+          done
+          echo "Publishing ${#files[@]} allowlisted runtime files."
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
