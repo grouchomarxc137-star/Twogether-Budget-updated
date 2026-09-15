@@ -37,7 +37,6 @@ function tripMeta(t) { return t?.submissions?.[t?.createdBy] || t?.submissions?.
 function locationLabel(m) { return m?.location === 'Other' ? (m.otherLocation || 'Other') : (m?.location || '—'); }
 
 function simplifyStaticCopy() {
-  const hero = $('#log .hero-copy'); if (hero) { const p = $('p', hero); if (p) p.textContent = ''; }
   const compare = $('#compare .page-heading'); if (compare) { const eyebrow = $('.eyebrow', compare); if (eyebrow) eyebrow.textContent = ''; const p = $('p', compare); if (p) p.textContent = 'Compare your current costs with possible next steps.'; }
   const storyHeading = $('#log .trip-gallery-section .section-heading'); if (storyHeading) { $('.panel-kicker', storyHeading)?.replaceChildren(document.createTextNode('CONFIRMED')); const h = $('h2', storyHeading); if (h) h.textContent = 'Trip stories'; const p = $('p', storyHeading); if (p) p.textContent = 'Only trips confirmed by both of you appear here.'; }
 }
@@ -106,6 +105,19 @@ function filterTripStories() {
   $$('[data-open-trip]', root).forEach((card) => { const yes = locked.has(card.dataset.openTrip); card.classList.toggle('tw-v18-hidden', !yes); if (yes) shown++; });
   root.querySelector('.tw-story-empty')?.remove();
   if (!shown) { const e = document.createElement('div'); e.className = 'empty-state gallery-empty tw-story-empty'; e.innerHTML = '<strong>No confirmed trips yet</strong><span>Completed trips move here after both of you confirm them.</span>'; root.appendChild(e); }
+}
+
+// Background images for confirmed Trip Story cards in #tripGallery -- a
+// separate gallery from the Current Trips cards enhanceCardPhotos() already
+// decorates above. Ported from v28.js's decorateTripStories().
+function decorateTripStories() {
+  const root = $('#tripGallery'); if (!root) return;
+  $$('.trip-story-card', root).forEach((card) => {
+    const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
+    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    card.style.setProperty('--v28-story-bg', `url("${image}")`);
+    card.dataset.v28Background = '1';
+  });
 }
 
 export async function refreshState(force = false) {
@@ -200,14 +212,14 @@ function enhanceCardMedia() { ensureCardArt(); enhanceCardPhotos(); }
 
 function installEnhancers() {
   const card = $('#wizardCard'); if (card) { overlayObserver = new MutationObserver(() => requestAnimationFrame(() => { enhanceTripChoices(); enhancePartialPicker(); })); overlayObserver.observe(card, { childList: true, subtree: true }); }
-  const gallery = $('#tripGallery'); if (gallery) { storyObserver = new MutationObserver(() => requestAnimationFrame(filterTripStories)); storyObserver.observe(gallery, { childList: true, subtree: true }); }
+  const gallery = $('#tripGallery'); if (gallery) { storyObserver = new MutationObserver(() => requestAnimationFrame(() => { filterTripStories(); decorateTripStories(); })); storyObserver.observe(gallery, { childList: true, subtree: true }); }
   const tripModal = $('#tripModalBody'); if (tripModal) new MutationObserver(() => requestAnimationFrame(enhanceTripModal)).observe(tripModal, { childList: true, subtree: true });
 }
 
 export function initCurrentTrips() {
   simplifyStaticCopy(); ensureCurrentTrips(); installEnhancers(); enhanceTripChoices(); enhancePartialPicker();
-  enhanceCardMedia();
-  document.addEventListener('twogether:v18-rendered', () => requestAnimationFrame(enhanceCardMedia));
+  enhanceCardMedia(); decorateTripStories();
+  document.addEventListener('twogether:v18-rendered', () => requestAnimationFrame(() => { enhanceCardMedia(); decorateTripStories(); }));
   setTimeout(() => refreshState(true), 180);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshState(false); });
   document.addEventListener('twogether:saved', () => setTimeout(() => refreshState(false), 120));
