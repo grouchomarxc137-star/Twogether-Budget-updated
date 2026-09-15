@@ -167,11 +167,16 @@
   import { initNavigation } from '/src/app/navigation.js';
   document.addEventListener('DOMContentLoaded', initNavigation);
 </script>
-<script src="shared.js?v=18" defer></script>
-<script src="trip-wizard-bridge-v15.js?v=19" defer></script>
+<script type="module">
+  import { installWizardBridge } from '/src/trips/wizard-bridge.js';
+  document.addEventListener('DOMContentLoaded', installWizardBridge);
+</script>
 <script src="approved-v18.js?v=2" defer></script>
 <script src="refine-v19.js?v=2" defer></script>
-<script src="overview-v26.js?v=1" defer></script>
+<script type="module">
+  import { initOverviewDialog } from '/src/trips/overview-dialog.js';
+  initOverviewDialog();
+</script>
 <script type="module" src="/src/shop/boot.js"></script>
 <script src="v28.js?v=1" defer></script>
 <script src="v29.js?v=3" defer></script>

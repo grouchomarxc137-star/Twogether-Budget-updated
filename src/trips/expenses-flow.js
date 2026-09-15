@@ -17,6 +17,7 @@ import {
   locationLabel, showOverlay, closeOverlay, closeBudgetModal, partialSummary, hasPartial,
 } from './budget-state.js';
 import { renderBudgetPlans } from './budget-plans.js';
+import { renderShared } from './shared-expenses.js';
 
 // ---- Full "actual expenses" wizard ----
 
@@ -143,7 +144,7 @@ function renderActualFlow() {
   }
   if (['accom', 'travel'].includes(step.key)) {
     showOverlay('SHARED EXPENSE', ((f.index + 1) / steps.length) * 100, MONEY_LABELS[step.key], 'Record the total bill and your payment.', '<div id="sharedHost"></div>');
-    return window.TwogetherShared.render({ host: $('#sharedHost'), plan, key: step.key, onDone: (total, unknown) => { f.draft[step.key] = total; f.draft.uncertain[step.key] = unknown; f.index++; renderActualFlow(); } });
+    return renderShared({ host: $('#sharedHost'), plan, key: step.key, onDone: (total, unknown) => { f.draft[step.key] = total; f.draft.uncertain[step.key] = unknown; f.index++; renderActualFlow(); } });
   }
   if (step.type === 'otherExpenses') { renderActualOtherExpenses(plan, steps, qCount, qNum); return; }
   const uncertain = !!f.draft?.uncertain?.[step.key];
@@ -275,7 +276,7 @@ function renderPartialActual() {
   const key = f.key; const label = MONEY_LABELS[key];
   if (['accom', 'travel'].includes(key)) {
     showOverlay('SHARED EXPENSE', 48, label, 'Record the total bill and your payment.', '<div id="sharedHost"></div>');
-    return window.TwogetherShared.render({ host: $('#sharedHost'), plan, key, onDone: (total, unknown) => { f.mode = 'replace'; f.entryAmount = total; f.entryUncertain = unknown; commitPartialEntry(f, ''); } });
+    return renderShared({ host: $('#sharedHost'), plan, key, onDone: (total, unknown) => { f.mode = 'replace'; f.entryAmount = total; f.entryUncertain = unknown; commitPartialEntry(f, ''); } });
   }
   const current = partialHasValue(f, key) ? n(f.draft[key]) : 0;
   const value = f.entryAmount || '';
