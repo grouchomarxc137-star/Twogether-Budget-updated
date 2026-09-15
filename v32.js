@@ -2,7 +2,6 @@
 'use strict';
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 let shopObserver=null,financeObserver=null,repairingShop=false,balanceTimer=null;
-const mobile=()=>window.matchMedia?.('(max-width: 760px)')?.matches||false;
 
 function numberFrom(text){
   const match=String(text||'').replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
@@ -111,36 +110,8 @@ function observeBalances(){
   financeObserver.observe(root,{childList:true});fixBalances();queueBalanceFix(70);
 }
 
-/* On phones bypass the legacy hover/pinned-menu path and open the real subviews immediately. */
-function activateMobileHub(name){
-  const trip=$('[data-hub="trips"]'),fin=$('[data-hub="finances"]');
-  if(name==='trips'){
-    trip?.classList.add('active');fin?.classList.remove('active');$('#wishlistHub')?.classList.remove('active');$('#shopHub')?.classList.remove('active');
-    $('#tripSubnav')?.classList.remove('hidden');$('#financeSubnav')?.classList.add('hidden');
-    let last='log';try{last=localStorage.getItem('twogether_trip_subview_v1')||'log';}catch{}
-    if(!['log','monthly','compare'].includes(last))last='log';
-    const target=$(`#tripSubnav .tab[data-sheet="${last}"]`)||$('#tripSubnav .tab[data-sheet="log"]');
-    if(target)target.click();
-    else{$$('.sheet').forEach(x=>x.classList.toggle('active',x.id==='log'));}
-    return;
-  }
-  trip?.classList.remove('active');fin?.classList.add('active');$('#wishlistHub')?.classList.remove('active');$('#shopHub')?.classList.remove('active');
-  $('#tripSubnav')?.classList.add('hidden');$('#financeSubnav')?.classList.remove('hidden');
-  let last='overview';try{last=localStorage.getItem('twogether_fin_subview_v1')||'overview';}catch{}
-  if(!['overview','monthly','balances','scenarios'].includes(last))last='overview';
-  const target=$(`#financeSubnav [data-fin-subview="${last}"]`)||$('#financeSubnav [data-fin-subview="overview"]');
-  if(target)target.click();
-  else{$$('.sheet').forEach(x=>x.classList.toggle('active',x.id==='finances'));}
-}
-function mobileHubClick(e){
-  if(!mobile())return;
-  const hub=e.target.closest?.('[data-hub="trips"],[data-hub="finances"]');if(!hub)return;
-  e.preventDefault();e.stopImmediatePropagation();activateMobileHub(hub.dataset.hub);
-}
-
 function init(){
   observeShop();observeBalances();repairShop();fixBalances();
-  document.addEventListener('click',mobileHubClick,true);
   document.addEventListener('click',e=>{if(e.target.closest?.('#shopHub'))showShopImmediately();},true);
   document.addEventListener('twogether:finance-view',e=>{if(e.detail?.view==='balances'){fixBalances();queueBalanceFix(80);}});
   document.addEventListener('twogether:state-refreshed',()=>{repairShop();fixBalances();});

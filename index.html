@@ -163,7 +163,10 @@
 <script src="workflow.js?v=18" defer></script>
 <script src="ui.js?v=18" defer></script>
 <script src="finances.js?v=18" defer></script>
-<script src="navigation.js?v=18" defer></script>
+<script type="module">
+  import { initNavigation } from '/src/app/navigation.js';
+  document.addEventListener('DOMContentLoaded', initNavigation);
+</script>
 <script src="shared.js?v=18" defer></script>
 <script src="trip-wizard-bridge-v15.js?v=19" defer></script>
 <script src="approved-v18.js?v=2" defer></script>
