@@ -1,9 +1,0 @@
-/* v25 — softer Current Trip budget stats and lightweight rendering hints */
-.tw-current-card .tw-current-numbers{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;width:100%!important;margin:2px 0 0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;overflow:visible!important;box-shadow:none!important}
-.tw-current-card .tw-current-numbers>div{position:relative!important;display:flex!important;flex-direction:column!important;justify-content:center!important;min-height:58px!important;padding:10px 11px!important;border:1px solid #eadfd1!important;border-radius:12px!important;background:linear-gradient(180deg,#fffdf9,#faf6ef)!important;box-shadow:0 3px 10px rgba(69,48,28,.025)!important}
-.tw-current-card .tw-current-numbers>div:nth-child(3){background:linear-gradient(180deg,#fffaf0,#fbf3df)!important;border-color:#e9d7ab!important}
-.tw-current-card .tw-current-numbers>div:nth-child(4){background:linear-gradient(180deg,#fff8f7,#fbf0ee)!important;border-color:#ead5d2!important}
-.tw-current-card .tw-current-numbers span{display:block!important;margin:0 0 5px!important;font-size:8px!important;line-height:1.2!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#897b6e!important;white-space:normal!important}
-.tw-current-card .tw-current-numbers strong{display:block!important;font-size:14px!important;line-height:1.15!important;color:#2d2823!important;overflow-wrap:anywhere!important}
-.tw-current-card{contain:layout paint style!important}.tw-current-card .tw-trip-art{contain:layout paint!important}.tw-current-card img{content-visibility:auto}
-@media(max-width:480px){.tw-current-card .tw-current-numbers{grid-template-columns:1fr 1fr!important;gap:7px!important}.tw-current-card .tw-current-numbers>div{min-height:54px!important;padding:9px!important}}

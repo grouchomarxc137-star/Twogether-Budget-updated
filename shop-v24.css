@@ -1,3 +1,0 @@
-/* Legacy entry point for the v25 Lovis Shop. DEV mode remains paused. */
-@import url('shop-v25.css?v=1');
-#twDevToggle,.dev-v18-tools,.dev-v18-editor,.dev-v18-strip,.dev19-float,.dev19-inspector,.dev19-bottom,.dev21-inspector,.dev21-toolbar,.dev21-selection,.dev21-marquee,.dev21-context,.dev22-toolbar,.dev22-inspector,.dev22-selection,.dev22-context,.dev22-canvas,.dev23-ui{display:none!important}

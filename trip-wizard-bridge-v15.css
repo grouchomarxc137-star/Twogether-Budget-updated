@@ -1,8 +1,0 @@
-.bridge15-20{margin:10px 0 0;font-size:15px;font-weight:600;color:var(--ink)}
-.bridge15-20 strong{font-weight:800}
-.bridge15-saving{display:grid;gap:6px;place-items:center;min-height:220px;color:var(--muted);text-align:center}
-.bridge15-saving strong{font-family:Georgia,serif;font-size:28px;font-weight:500;color:var(--ink)}
-.bridge15-scope-stage>p{margin-bottom:20px}
-.bridge15-scope{display:grid;gap:12px}
-.bridge15-scope .trip-pick{width:100%}
-@media(max-width:760px){.bridge15-saving{min-height:160px}.bridge15-saving strong{font-size:24px}}
