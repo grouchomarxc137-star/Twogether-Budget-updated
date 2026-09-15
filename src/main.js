@@ -1,5 +1,9 @@
-// New module entry point. Grows as more of the app migrates out of the
-// legacy global scripts (still loaded by index.html) and into src/.
+// Module entry point. Grows as more of the app migrates out of the legacy
+// global scripts (still loaded by index.html) and into src/. Position-
+// sensitive pieces (navigation, the shop suite) boot from their own
+// <script type="module"> tags at their original document position instead
+// of here, since this file loads last -- see src/app/navigation.js and
+// src/shop/boot.js for why that ordering matters.
 import { installPwa } from './app/pwa.js';
 
 installPwa();
