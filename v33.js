@@ -5,7 +5,7 @@ const ACTORS=['Principessa','Principe'];
 const PACKING_DEFAULTS=['Toothbrushes','Slippers','Hair brush','Shampoo','Conditioner','Shower gel','Dishwasher detergent'];
 const REMINDER_DEFAULTS=["Don't forget to put fuel","Don't forget to ask mom to make work sandwich","Don't forget to take pictures of the Airbnb when you arrive"];
 const MONTHS=Array.from({length:12},(_,i)=>`2026-${String(i+1).padStart(2,'0')}`);
-let appState=null, plannerMonth='2026-09', prepPlanId='', deferredInstall=null;
+let appState=null, plannerMonth='2026-09', prepPlanId='';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`v33_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 const num=v=>{const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0;};
@@ -18,16 +18,6 @@ function currentState(){return appState||window.__TWOGETHER_CACHED_STATE__||null
 function planById(id){return currentState()?.plans?.find(p=>p.id===id)||null;}
 function financeRecord(month){return currentState()?.finances?.[actor()]?.find(r=>r.month===month)||null;}
 function profile(){return currentState()?.financeProfiles?.[actor()]||{};}
-
-/* PWA shell: installability and native notification permission only; no third-party push service. */
-function installPwa(){
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
-  const top=$('.top-actions');if(!top)return;
-  let notify=$('#v33Notify');if(!notify&&'Notification' in window){notify=document.createElement('button');notify.id='v33Notify';notify.type='button';notify.className='v33-app-action';top.prepend(notify);syncNotificationButton();notify.addEventListener('click',async()=>{if(Notification.permission==='default')await Notification.requestPermission();syncNotificationButton();});}
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;let b=$('#v33Install');if(!b){b=document.createElement('button');b.id='v33Install';b.type='button';b.className='v33-app-action';b.textContent='Install app';top.prepend(b);b.addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;b.remove();});}});
-  window.addEventListener('appinstalled',()=>{$('#v33Install')?.remove();deferredInstall=null;});
-}
-function syncNotificationButton(){const b=$('#v33Notify');if(!b)return;const p=Notification.permission;b.textContent=p==='granted'?'Notifications on':p==='denied'?'Notifications blocked':'Enable notifications';b.classList.toggle('is-on',p==='granted');}
 
 /* Shared Jar appears in balances for both profiles. */
 function renderSharedJar(){
@@ -140,6 +130,6 @@ function attachEvents(){
   document.addEventListener('twogether:saved',async()=>{await freshState();renderSharedJar();decorateCurrentTrips();});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')freshState().then(()=>{renderSharedJar();decorateCurrentTrips();});});
 }
-async function init(){installPwa();ensurePrepModal();attachEvents();await freshState();renderSharedJar();decorateCurrentTrips();if($('[data-fin-view="monthly"].active'))renderPlanner();document.dispatchEvent(new CustomEvent('twogether:v33-ready'));}
+async function init(){ensurePrepModal();attachEvents();await freshState();renderSharedJar();decorateCurrentTrips();if($('[data-fin-view="monthly"].active'))renderPlanner();document.dispatchEvent(new CustomEvent('twogether:v33-ready'));}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
