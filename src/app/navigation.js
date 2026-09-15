@@ -94,11 +94,34 @@ function activateMobileHub(name) {
   else $$('.sheet').forEach((x) => x.classList.toggle('active', x.id === 'finances'));
 }
 
+// The desktop hover/pinned dropdown menu wrapping each hub button.
+// Extracted from approved-v18.js's ensureNavigation(). Originally ran
+// later (approved-v18.js loaded after this file), but only touches
+// always-present static markup (.hub-tabs, [data-hub]), same as the rest
+// of this module -- calling it from initNavigation() instead of
+// separately is safe and avoids a second entry point for the same file.
+function ensureNavigation() {
+  if ($('.tw-v18-nav-wrap')) return;
+  const hub = $('.hub-tabs'); if (!hub) return;
+  const defs = [
+    { key: 'trips', items: [['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
+    { key: 'finances', items: [['Overview', () => $('.finance-subnav [data-fin-subview="overview"]')], ['Monthly finances', () => $('.finance-subnav [data-fin-subview="monthly"]')], ['Balances & loans', () => $('.finance-subnav [data-fin-subview="balances"]')], ['Test scenarios', () => $('.finance-subnav [data-fin-subview="scenarios"]')]] },
+  ];
+  defs.forEach((def) => {
+    const main = $(`[data-hub="${def.key}"]`, hub); if (!main) return;
+    const wrap = document.createElement('div'); wrap.className = 'tw-nav-wrap tw-v18-nav-wrap'; main.parentNode.insertBefore(wrap, main); wrap.appendChild(main); main.setAttribute('aria-haspopup', 'menu'); main.setAttribute('aria-expanded', 'false');
+    const menu = document.createElement('div'); menu.className = 'tw-nav-menu'; menu.setAttribute('role', 'menu');
+    def.items.forEach(([label, getTarget]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('role', 'menuitem'); b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); getTarget()?.click(); }); menu.appendChild(b); });
+    wrap.appendChild(menu);
+  });
+}
+
 export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
   if (!tripHub || !financeHub) return;
 
+  ensureNavigation();
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {

@@ -171,7 +171,14 @@
   import { installWizardBridge } from '/src/trips/wizard-bridge.js';
   document.addEventListener('DOMContentLoaded', installWizardBridge);
 </script>
-<script src="approved-v18.js?v=2" defer></script>
+<script type="module">
+  import { initSessionSwitch } from '/src/app/session-switch.js';
+  import { initCurrentTrips } from '/src/trips/current-trips.js';
+  document.addEventListener('DOMContentLoaded', () => {
+    initSessionSwitch();
+    initCurrentTrips();
+  });
+</script>
 <script src="refine-v19.js?v=2" defer></script>
 <script type="module">
   import { initOverviewDialog } from '/src/trips/overview-dialog.js';
