@@ -173,7 +173,10 @@
 <script src="fast-start.js?v=18"></script>
 <script type="module" src="/src/trips/boot.js"></script>
 <script type="module" src="/src/trips/budget-boot.js"></script>
-<script src="ui.js?v=18" defer></script>
+<script type="module">
+  import { initUiDecorators } from '/src/trips/ui-decorators.js';
+  document.addEventListener('DOMContentLoaded', initUiDecorators);
+</script>
 <script src="finances.js?v=18" defer></script>
 <script type="module">
   import { initNavigation } from '/src/app/navigation.js';
