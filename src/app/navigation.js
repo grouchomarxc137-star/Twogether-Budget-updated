@@ -116,12 +116,55 @@ function ensureNavigation() {
   });
 }
 
+// Pin/hover/fade refinement on top of ensureNavigation()'s dropdown --
+// click to pin a menu open, close on scroll/outside-click, fade
+// transitions. Extracted from refine-v22.js (the final version in the
+// original dynamic-loader chain; refine-v20.js's earlier, cruder
+// fixNavigation()/unpinTracked() attempt at the same idea is superseded
+// by this one and not ported). Dropped: refine-v22.js's enhanceWishlist()/
+// cleanPriorityMetadata() -- same confirmed-dead .wishlist-table targeting
+// as approved-v18.js's wishlist enhancers.
+let pinned = null, navInstalled = false, suppressHover = false, lastPointer = null;
+const closeTimers = new WeakMap(), fadeTimers = new WeakMap();
+function cancelTimers(w) { const a = closeTimers.get(w), b = fadeTimers.get(w); if (a) clearTimeout(a); if (b) clearTimeout(b); closeTimers.delete(w); fadeTimers.delete(w); }
+function setExpanded(w, on) { w?.querySelector('[data-hub]')?.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+function hardClose(w) { if (!w) return; cancelTimers(w); w.classList.remove('v22-open', 'v22-fade', 'menu-open', 'nav-visible'); setExpanded(w, false); }
+function fadeClose(w) { if (!w) return; cancelTimers(w); setExpanded(w, false); if (!w.classList.contains('v22-open')) return hardClose(w); w.classList.add('v22-fade'); const t = setTimeout(() => { w.classList.remove('v22-open', 'v22-fade', 'menu-open', 'nav-visible'); fadeTimers.delete(w); }, 135); fadeTimers.set(w, t); }
+function closeOthers(except, fade = true) { $$('.tw-nav-wrap').forEach((w) => { if (w !== except) (fade ? fadeClose(w) : hardClose(w)); }); }
+function openWrap(w) { if (!w || suppressHover) return; cancelTimers(w); closeOthers(w, true); w.classList.remove('v22-fade', 'menu-open', 'nav-visible'); w.classList.add('v22-open'); setExpanded(w, true); }
+function scheduleClose(w) { if (!w || pinned === w) return; cancelTimers(w); const t = setTimeout(() => { if (pinned !== w) fadeClose(w); closeTimers.delete(w); }, 170); closeTimers.set(w, t); }
+function unpinAndFadeAll() { pinned = null; $$('.tw-nav-wrap').forEach(fadeClose); }
+function closeForScroll() { suppressHover = true; unpinAndFadeAll(); }
+function installDropdownRefinement() {
+  const wraps = $$('.tw-nav-wrap'); if (!wraps.length) return;
+  wraps.forEach((w) => {
+    if (w.dataset.v22Nav === '3') return; w.dataset.v22Nav = '3';
+    const hub = w.querySelector('[data-hub]'), menu = w.querySelector('.tw-nav-menu');
+    w.addEventListener('pointerenter', () => { cancelTimers(w); if (suppressHover) return; if (pinned && pinned !== w) { const old = pinned; pinned = null; fadeClose(old); } openWrap(w); });
+    w.addEventListener('pointerleave', () => scheduleClose(w));
+    menu?.addEventListener('pointerenter', () => { cancelTimers(w); if (!suppressHover) openWrap(w); });
+    menu?.addEventListener('pointerleave', () => scheduleClose(w));
+    hub?.addEventListener('click', () => { suppressHover = false; if (pinned === w) { pinned = null; openWrap(w); scheduleClose(w); } else { const old = pinned; pinned = w; if (old && old !== w) fadeClose(old); openWrap(w); } }, true);
+    menu?.addEventListener('click', () => { suppressHover = false; unpinAndFadeAll(); });
+  });
+  if (navInstalled) return; navInstalled = true;
+  let scrollQueued = false;
+  const onScroll = () => { if (scrollQueued) return; scrollQueued = true; requestAnimationFrame(() => { scrollQueued = false; closeForScroll(); }); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('wheel', closeForScroll, { passive: true, capture: true });
+  document.addEventListener('pointermove', (e) => { const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2; lastPointer = { x: e.clientX, y: e.clientY }; if (suppressHover && moved) { suppressHover = false; const w = e.target.closest?.('.tw-nav-wrap'); if (w) openWrap(w); } }, { passive: true, capture: true });
+  document.addEventListener('pointerdown', (e) => { suppressHover = false; if (!e.target.closest?.('.tw-nav-wrap')) unpinAndFadeAll(); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { suppressHover = false; unpinAndFadeAll(); } }, true);
+}
+
 export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
   if (!tripHub || !financeHub) return;
 
   ensureNavigation();
+  installDropdownRefinement();
+  document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {

@@ -152,6 +152,52 @@ function enhanceTripModal() {
   if (delta != null && Math.abs(delta) > 0.01) { const box = document.createElement('div'); box.className = 'tw-trip-warning'; box.innerHTML = `<strong>Payment totals do not match the trip expenses</strong>${money(total)} of expenses are recorded, but ${money(paidTotal)} is assigned as paid. Difference: ${money(Math.abs(delta))}.`; const target = root.querySelector('.trip-budget-comparison') || root.querySelector('.budget-check') || anchor; target?.parentNode?.insertBefore(box, target?.nextSibling || null); }
 }
 
+// Card art (monogram/emoji placeholder, then a real destination photo).
+// Extracted from refine-v19.js (creates the base .tw-trip-art structure)
+// and trip-v21.js (the final word on enhancing it -- loads after
+// refine-v19.js in the original dynamic-loader chain, so its output wins).
+// Ported together since trip-v21's enhanceCards() only works on the
+// .tw-trip-art element refine-v19's enhanceCard() creates first.
+// Dropped: refine-v20.js's enhanceTripMedia() (an earlier, cruder version
+// of the same card-image idea that trip-v21.js's version already
+// supersedes in the original load order) and refine-v20.js's entire
+// dev-tooling panel (gated behind window.TwogetherDevV18, confirmed never
+// defined by any loaded file -- same dead reference as the Dev toggle in
+// app/session-switch.js).
+const COUNTRY_EMOJI = { Italy: '🇮🇹', Netherlands: '🇳🇱', Tunisia: '🇹🇳', Portugal: '🇵🇹', Spain: '🇪🇸', France: '🇫🇷', Germany: '🇩🇪', Belgium: '🇧🇪', 'United Kingdom': '🇬🇧', Other: '✦' };
+function enhanceCardArt(card) {
+  if (card.dataset.v19Aesthetic === '1') return;
+  const main = $('.tw-current-main', card); if (!main) return;
+  const country = $('.trip-country', card)?.textContent?.trim() || 'Trip', city = $('h3', card)?.textContent?.trim() || 'Trip';
+  const art = document.createElement('div'); art.className = 'tw-trip-art'; art.setAttribute('aria-hidden', 'true');
+  art.innerHTML = `<span class="tw-trip-emoji">${COUNTRY_EMOJI[country] || '✦'}</span><span class="tw-trip-monogram">${(city[0] || 'T').toUpperCase()}</span>`;
+  card.insertBefore(art, main);
+  const status = $('.tw-current-status', card);
+  if (status) { const text = status.textContent.toLowerCase(); status.dataset.status = text.includes('progress') ? 'progress' : 'planned'; }
+  card.dataset.v19Aesthetic = '1';
+}
+function ensureCardArt() { $$('#twCurrentTrips .tw-current-card').forEach(enhanceCardArt); }
+
+const FLAGS = { Italy: '1f1ee-1f1f9', Netherlands: '1f1f3-1f1f1', Tunisia: '1f1f9-1f1f3', Portugal: '1f1f5-1f1f9', Spain: '1f1ea-1f1f8', France: '1f1eb-1f1f7', Germany: '1f1e9-1f1ea', Belgium: '1f1e7-1f1ea', 'United Kingdom': '1f1ec-1f1e7' };
+const CITY_IMAGES = { ariana: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', amsterdam: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', lonato: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', lisbon: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', lisboa: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', porto: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82' };
+const COUNTRY_IMAGES = { Italy: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', Netherlands: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', Portugal: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', Tunisia: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', Spain: 'https://images.unsplash.com/photo-1509840841025-9088ba78a826?auto=format&fit=crop&w=900&q=82', France: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=82', Germany: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=82', Belgium: 'https://images.unsplash.com/photo-1491557345352-5929e343eb89?auto=format&fit=crop&w=900&q=82' };
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=82';
+function enhanceCardPhotos() {
+  $$('#twCurrentTrips .tw-current-card').forEach((card) => {
+    const art = $('.tw-trip-art', card); if (!art) return;
+    $('.tw-trip-monogram', art)?.remove();
+    const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
+    card.dataset.v21City = city; card.dataset.v21Country = country.toLowerCase();
+    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    const bg = `linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.20)),url("${image}")`;
+    art.style.backgroundImage = bg; card.style.setProperty('--v27-trip-bg', bg); card.dataset.v27Background = '1';
+    if (city === 'ariana' || country === 'Tunisia') art.title = 'Ariana, Tunisia — Wikimedia Commons';
+    const flag = $('.tw-trip-emoji', art);
+    if (flag && FLAGS[country] && !flag.querySelector('img')) flag.innerHTML = `<img alt="${country} flag" loading="lazy" decoding="async" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${FLAGS[country]}.svg">`;
+  });
+}
+function enhanceCardMedia() { ensureCardArt(); enhanceCardPhotos(); }
+
 function installEnhancers() {
   const card = $('#wizardCard'); if (card) { overlayObserver = new MutationObserver(() => requestAnimationFrame(() => { enhanceTripChoices(); enhancePartialPicker(); })); overlayObserver.observe(card, { childList: true, subtree: true }); }
   const gallery = $('#tripGallery'); if (gallery) { storyObserver = new MutationObserver(() => requestAnimationFrame(filterTripStories)); storyObserver.observe(gallery, { childList: true, subtree: true }); }
@@ -160,6 +206,8 @@ function installEnhancers() {
 
 export function initCurrentTrips() {
   simplifyStaticCopy(); ensureCurrentTrips(); installEnhancers(); enhanceTripChoices(); enhancePartialPicker();
+  enhanceCardMedia();
+  document.addEventListener('twogether:v18-rendered', () => requestAnimationFrame(enhanceCardMedia));
   setTimeout(() => refreshState(true), 180);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshState(false); });
   document.addEventListener('twogether:saved', () => setTimeout(() => refreshState(false), 120));
