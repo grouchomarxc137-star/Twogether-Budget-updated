@@ -53,6 +53,17 @@ function lastFinanceView() {
   try { return localStorage.getItem(FIN_VIEW_KEY) || 'overview'; } catch { return 'overview'; }
 }
 
+// Moved from app.js's bindStatic(): the foundational "show this one .sheet,
+// highlight this one .tab" toggle that everything else (including this
+// file's own setHub/activateTrip/activateFinanceView) ultimately triggers
+// by calling .click() on the right element. Also called directly by
+// trips/wizard.js for programmatic navigation (e.g. jumping to the Log
+// sheet when editing a trip from its modal).
+export function openSheet(id) {
+  $$('.tab').forEach((x) => x.classList.toggle('active', x.dataset.sheet === id));
+  $$('.sheet').forEach((x) => x.classList.toggle('active', x.id === id));
+}
+
 // On phones the hover/pinned dropdown menu (added by approved-v18.js) isn't
 // reachable by touch, so tapping a hub button needs to jump straight into
 // its last-used subview instead of relying on the dropdown. Ported verbatim
@@ -87,6 +98,8 @@ export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
   if (!tripHub || !financeHub) return;
+
+  $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {
     if (isMobile()) { activateMobileHub('trips'); return; }
