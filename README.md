@@ -10,10 +10,26 @@ A shared budgeting website for trips and individual monthly finances.
 - Personal monthly finances for Principessa and Principe
 - Savings, bank balances, loans/paybacks, investments and purchase test scenarios
 
-## GitHub Pages
+## Run locally
 
-The site is deployed from `main` using the GitHub Pages workflow in `.github/workflows/pages.yml`.
+Install both the website and database dependencies once:
 
-Live site: `https://grimreaper29.github.io/Twogether-Budget/`
+```sh
+npm install
+npm --prefix server install
+```
 
-The entry point is `index.html`.
+Then start the complete local app with one command:
+
+```sh
+npm run dev
+```
+
+This starts both the website and its database server. Open `http://localhost:5180`, and press `Ctrl+C` when you want to stop both. The SQLite database is created automatically at `server/data/twogether.db` and starts empty.
+
+## Project structure
+
+- `src/` contains the website features.
+- `api.js` is the browser connection to the local database server.
+- `server/` contains the Node.js API and SQLite database code.
+- `config.js` contains the local server address.

@@ -1,4 +1,0 @@
-/* Activity feed should only display the two most recent changes. */
-#activityList .activity-item:nth-child(n+3){
-  display:none;
-}

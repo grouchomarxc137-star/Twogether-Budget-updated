@@ -9,8 +9,6 @@ import { esc, n, money, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 
-const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
-const API_URL = String(CONFIG.appsScriptUrl || '').trim();
 const MONTHS = [
   ['2026-01', 'Jan 2026'], ['2026-02', 'Feb 2026'], ['2026-03', 'Mar 2026'], ['2026-04', 'Apr 2026'],
   ['2026-05', 'May 2026'], ['2026-06', 'Jun 2026'], ['2026-07', 'Jul 2026'], ['2026-08', 'Aug 2026'],
@@ -98,23 +96,6 @@ function normalizeProfile(profileData) {
 function profile() {
   const a = actor();
   return a ? normalizeProfile(financeState.financeProfiles?.[a]) : freshProfile();
-}
-
-function jsonp(params = {}) {
-  return new Promise((resolve, reject) => {
-    if (!API_URL) return reject(new Error('Backend URL missing'));
-    const cb = '__twogether_fin_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-    const timer = setTimeout(() => done(new Error('Sync timed out')), 10000);
-    function done(err, data) {
-      clearTimeout(timer); try { delete window[cb]; } catch {} script.remove(); err ? reject(err) : resolve(data);
-    }
-    window[cb] = (data) => done(null, data);
-    const q = new URLSearchParams({ ...params, callback: cb, _: String(Date.now()) });
-    script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + q.toString();
-    script.onerror = () => done(new Error('Could not reach Apps Script'));
-    document.head.appendChild(script);
-  });
 }
 
 function post(action, payload) { return window.TwogetherAPI.post(action, payload, actor()); }
@@ -235,17 +216,17 @@ async function loadState() {
   if (loading || !actor()) return;
   loading = true;
   try {
-    const res = await jsonp({ action: 'state' });
-    if (res?.ok) {
+    const state = await window.TwogetherAPI.remoteState();
+    if (state) {
       financeState = {
-        version: Number(res.state?.version || 0),
+        version: Number(state?.version || 0),
         finances: {
-          Principessa: (Array.isArray(res.state?.finances?.Principessa) ? res.state.finances.Principessa : []).map(normalizeFinanceRecord),
-          Principe: (Array.isArray(res.state?.finances?.Principe) ? res.state.finances.Principe : []).map(normalizeFinanceRecord),
+          Principessa: (Array.isArray(state?.finances?.Principessa) ? state.finances.Principessa : []).map(normalizeFinanceRecord),
+          Principe: (Array.isArray(state?.finances?.Principe) ? state.finances.Principe : []).map(normalizeFinanceRecord),
         },
         financeProfiles: {
-          Principessa: normalizeProfile(res.state?.financeProfiles?.Principessa),
-          Principe: normalizeProfile(res.state?.financeProfiles?.Principe),
+          Principessa: normalizeProfile(state?.financeProfiles?.Principessa),
+          Principe: normalizeProfile(state?.financeProfiles?.Principe),
         },
       };
       renderPage();

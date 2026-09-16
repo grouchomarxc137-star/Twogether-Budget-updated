@@ -205,7 +205,7 @@ export function renderActivity() {
     const place = t ? (tripMeta(t).city || locationLabel(tripMeta(t))) : '';
     const labels = {
       addSubmission: 'added a trip version', updateSubmission: 'edited a trip version', confirmTrip: 'confirmed a trip',
-      updateTripBudget: 'updated a trip budget', updateCompare: 'updated the comparison', deleteTrip: 'deleted a trip',
+      updateCompare: 'updated the comparison',
       saveSharedExpense: 'saved shared expense', savePlanPartial: 'saved trip expense', savePlanSubmission: 'saved trip expenses',
       saveSubmission: 'saved a trip version', saveFinanceMonth: 'saved monthly finances',
     };

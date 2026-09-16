@@ -46,7 +46,7 @@ function calmShopCopy(root) {
     $$('.v27-score-row', score).forEach((row) => { const detail = $('span', row); if (detail) setText(detail, detail.textContent.split('·')[0].trim()); });
     setText($('p', score), 'Every little action moves your Lovis journey forward.');
   }
-  if (!$('.v29-shop-ribbon', hero)) {
+  if (hero && !$('.v29-shop-ribbon', hero)) {
     const ribbon = document.createElement('div'); ribbon.className = 'v29-shop-ribbon'; ribbon.textContent = '♡ little rewards for the things you do together ✦';
     hero?.appendChild(ribbon);
   }

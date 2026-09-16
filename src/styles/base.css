@@ -1001,10 +1001,6 @@ th:first-child,td:first-child {
   color:var(--muted);
 }
 
-.backend-frame {
-  display:none;
-}
-
 .toast {
   position:fixed;
   right:22px;
@@ -4178,4 +4174,3 @@ html body #app#app *::before,
 html body #app#app *::after {
   font-family:'Crimson Pro',serif!important;
 }
-

@@ -7,8 +7,6 @@
 import { esc, n, money, fmtDate } from '../lib/format.js';
 import { actor, otherActor } from '../lib/session.js';
 
-const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
-const API_URL = String(CONFIG.appsScriptUrl || '').trim();
 export const MONEY_FIELDS = ['accom', 'groceries', 'eat', 'travel', 'fuel', 'tolls', 'other'];
 export const MONEY_LABELS = {
   accom: 'Accommodation', groceries: 'Groceries', eat: 'Eating out',
@@ -47,26 +45,6 @@ export function locationLabel(meta) {
   return meta?.location === 'Other' ? (meta.otherLocation || 'Other') : (meta?.location || '—');
 }
 
-function jsonp(params = {}) {
-  return new Promise((resolve, reject) => {
-    if (!API_URL) return reject(new Error('Backend URL missing'));
-    const cb = '__twogether_v5_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-    const timer = setTimeout(() => done(new Error('Sync timed out')), 10000);
-    function done(err, data) {
-      clearTimeout(timer);
-      try { delete window[cb]; } catch {}
-      script.remove();
-      err ? reject(err) : resolve(data);
-    }
-    window[cb] = (data) => done(null, data);
-    const q = new URLSearchParams({ ...params, callback: cb, _: String(Date.now()) });
-    script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + q.toString();
-    script.onerror = () => done(new Error('Could not reach Apps Script'));
-    document.head.appendChild(script);
-  });
-}
-
 export function post(action, payload, name = actor()) {
   return window.TwogetherAPI.post(action, payload, name);
 }
@@ -80,13 +58,11 @@ export async function refreshState() {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     try {
-      const res = await jsonp({ action: 'state' });
-      if (res?.ok) {
-        const rawPlans = Array.isArray(res.state?.plans) ? res.state.plans : [];
-        const rawTrips = Array.isArray(res.state?.trips) ? res.state.trips : [];
-        sharedState = { ...res.state, plans: rawPlans, trips: rawTrips };
-        document.dispatchEvent(new CustomEvent('twogether:budget-refreshed'));
-      }
+      const state = await window.TwogetherAPI.remoteState();
+      const rawPlans = Array.isArray(state?.plans) ? state.plans : [];
+      const rawTrips = Array.isArray(state?.trips) ? state.trips : [];
+      sharedState = { ...state, plans: rawPlans, trips: rawTrips };
+      document.dispatchEvent(new CustomEvent('twogether:budget-refreshed'));
       return sharedState;
     } finally {
       refreshPromise = null;

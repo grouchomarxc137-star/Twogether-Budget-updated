@@ -6,8 +6,6 @@
 // rather than expanding scope further; worth a future cleanup pass.
 import { DEFAULT_COMPARE } from './data.js';
 
-const CONFIG = window.TOGETHER_BUDGET_CONFIG || {};
-const API_URL = String(CONFIG.appsScriptUrl || '').trim();
 export const SYNC_MS = 3500;
 
 let state = normalizeState({});
@@ -39,26 +37,6 @@ export function normalizeState(s) {
   };
 }
 
-function jsonp(params = {}) {
-  return new Promise((resolve, reject) => {
-    if (!API_URL) return reject(new Error('Backend URL missing'));
-    const cb = '__twogether_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-    const timer = setTimeout(() => done(new Error('Sync timed out')), 12000);
-    function done(err, data) {
-      clearTimeout(timer);
-      try { delete window[cb]; } catch {}
-      script.remove();
-      err ? reject(err) : resolve(data);
-    }
-    window[cb] = (data) => done(null, data);
-    const q = new URLSearchParams({ ...params, callback: cb, _: Date.now().toString() });
-    script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + q.toString();
-    script.onerror = () => done(new Error('Could not reach Apps Script'));
-    document.head.appendChild(script);
-  });
-}
-
 export async function postAction(action, payload, actor) {
   const result = await window.TwogetherAPI.post(action, payload, actor);
   await syncNow(true);
@@ -66,19 +44,17 @@ export async function postAction(action, payload, actor) {
 }
 
 export async function syncNow(showErrors = false) {
-  if (!API_URL || syncBusy) return;
+  if (syncBusy) return;
   syncBusy = true;
   try {
-    const res = await jsonp({ action: 'state' });
-    if (!res?.ok) throw new Error(res?.error || 'Sync failed');
-    const next = normalizeState(res.state);
+    const next = normalizeState(await window.TwogetherAPI.remoteState());
     const stamp = next.updatedAt || JSON.stringify({ trips: next.trips, compare: next.compare, audit: next.audit });
     backendV3 = next.version >= 3;
     const notice = document.querySelector('#backendUpgrade');
     if (notice) {
       notice.classList.toggle('hidden', backendV3);
       if (!backendV3) {
-        notice.innerHTML = '<strong>Backend update needed.</strong><span>Redeploy the latest <code>backend/Code.gs</code> to enable editing/confirmation and trip budgets.</span>';
+        notice.innerHTML = '<strong>Backend update needed.</strong><span>Start the current local database server to enable editing, confirmation and trip budgets.</span>';
       }
     }
 
