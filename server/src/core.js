@@ -1,8 +1,17 @@
-import { randomUUID } from 'node:crypto';
-
 let stateStore = null;
 
-const Utilities = { getUuid: () => randomUUID() };
+function randomUuid_() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+const Utilities = { getUuid: randomUuid_ };
 const MAX_AUDIT = 2;
 const ACTORS = ['Principessa', 'Principe'];
 const MONEY_FIELDS = ['accom','groceries','eat','travel','fuel','tolls','other'];
@@ -1214,7 +1223,7 @@ function reconciliationWarnings_(trip) {
   return warnings;
 }
 
-const SUPPORTED_ACTIONS = new Set([
+export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveSharedExpense', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'saveFinanceMonth', 'saveFinancePlanning',

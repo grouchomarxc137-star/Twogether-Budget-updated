@@ -54,6 +54,8 @@ button,input {
 
 .app {
   min-height:100vh;
+  visibility:hidden;
+  opacity:0;
 }
 
 .top-actions {

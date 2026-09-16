@@ -6,11 +6,6 @@
   const ACTORS = ['Principessa', 'Principe'];
   const app = document.getElementById('app');
 
-  if (app) {
-    app.style.visibility = 'hidden';
-    app.style.opacity = '0';
-  }
-
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     const cachedState = raw ? JSON.parse(raw) : null;
@@ -33,7 +28,7 @@
   } catch {}
 
   function revealApp() {
-    if (!app) return;
+    if (!app || document.body.dataset.authenticated !== 'true') return;
     app.style.transition = 'opacity .12s ease';
     app.style.visibility = 'visible';
     app.style.opacity = '1';
