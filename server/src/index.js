@@ -18,12 +18,26 @@ const database = openDatabase(databasePath);
 configureStateStore(database.store);
 
 const app = express();
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    return callback(new Error('Origin is not allowed'));
-  },
-}));
+// Vite's build always marks the module script and stylesheet tags
+// `crossorigin`, which makes browsers send an Origin header even for
+// same-origin requests -- so in production (this server serving both the
+// app and the API from one origin), the app's own requests must always be
+// allowed regardless of ALLOWED_ORIGIN. That env var only matters for local
+// dev, where the frontend (Vite, :5180) and this API (:4310) really are
+// different origins.
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin;
+  let sameOrigin = false;
+  if (requestOrigin) {
+    try { sameOrigin = new URL(requestOrigin).host === req.headers.host; } catch {}
+  }
+  cors({
+    origin(origin, callback) {
+      if (!origin || sameOrigin || allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error('Origin is not allowed'));
+    },
+  })(req, res, next);
+});
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/ping', (_req, res) => {
