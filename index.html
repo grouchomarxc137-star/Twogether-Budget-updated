@@ -29,7 +29,7 @@
 <div class="app" id="app">
   <header class="topbar">
     <div class="brand-wrap"><div class="brand-mark" id="brandMark">♡</div><div><div class="brand">Twogether</div><div class="brand-sub">shared trip budget</div></div></div>
-    <div class="top-actions"><button id="firebaseSignOut" class="v33-app-action hidden" type="button">Sign out</button><span id="loggedUserBadge" class="who-badge hidden" aria-live="polite"></span></div>
+    <div class="top-actions"><span id="loggedUserBadge" class="who-badge hidden" aria-live="polite"></span></div>
   </header>
 
   <nav class="hub-tabs" aria-label="Main areas">
@@ -152,25 +152,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </div>
 
-<div class="firebase-auth-gate show" id="firebaseAuthGate" aria-hidden="false">
-  <div class="firebase-auth-backdrop"></div>
-  <div class="firebase-auth-card" role="dialog" aria-modal="true" aria-labelledby="firebaseAuthTitle">
-    <div class="identity-heart">♡</div>
-    <span class="eyebrow">PRIVATE SHARED BUDGET</span>
-    <h2 id="firebaseAuthTitle">Sign in to Twogether</h2>
-    <p>Use your Firebase email and password. Your Principessa or Principe profile is selected separately after sign-in.</p>
-    <form id="firebaseAuthForm" class="firebase-auth-form">
-      <label for="firebaseEmail">Email</label>
-      <input id="firebaseEmail" name="email" type="email" autocomplete="username" required>
-      <label for="firebasePassword">Password</label>
-      <input id="firebasePassword" name="password" type="password" autocomplete="current-password" required>
-      <button class="btn primary big" type="submit">Sign in</button>
-      <p id="firebaseAuthMessage" class="firebase-auth-message" role="status" aria-live="polite"></p>
-    </form>
-  </div>
-</div>
-
-<script type="module" src="/api.js?v=21"></script>
+<script type="module" src="/api.js?v=22"></script>
 <script type="module" src="/fast-start.js?v=20"></script>
 <script type="module" src="/src/trips/boot.js"></script>
 <script type="module" src="/src/trips/budget-boot.js"></script>

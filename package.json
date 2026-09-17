@@ -4,16 +4,15 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.js",
+    "dev:frontend": "vite",
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/firebase-migration.test.js",
-    "migrate:firestore": "node scripts/migrate-sqlite-to-firestore.js"
+    "test": "npm --prefix server test"
   },
   "devDependencies": {
     "vite": "^8.3.0"
-  },
-  "dependencies": {
-    "firebase": "^12.19.0"
   }
 }

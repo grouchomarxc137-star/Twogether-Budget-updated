@@ -28,7 +28,7 @@
   } catch {}
 
   function revealApp() {
-    if (!app || document.body.dataset.authenticated !== 'true') return;
+    if (!app) return;
     app.style.transition = 'opacity .12s ease';
     app.style.visibility = 'visible';
     app.style.opacity = '1';

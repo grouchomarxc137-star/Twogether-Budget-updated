@@ -1,54 +1,47 @@
 # Twogether Budget
 
-A shared budgeting website for trips and individual monthly finances. The deployed app is fully static: Firebase Authentication protects access and Cloud Firestore stores the shared state.
+A shared budgeting site for trips and individual monthly finances. The backend is a small Node.js + Express API backed by SQLite (`server/`), which also serves the built frontend in production — one process, one deployment.
+
+There is no authentication. This is a private, unlisted app shared between two people; anyone with the URL and knowledge of the two profile names (`Principessa`/`Principe`) can act as either. If that ever stops being acceptable, add a gate in front of it rather than reintroducing this decision lightly.
 
 ## Architecture
 
-The UI continues to use `TwogetherAPI.state()`, `TwogetherAPI.remoteState()`, and `TwogetherAPI.post(action, payload, actor)`. `api.js` implements that contract with Firebase. Each action is applied by the existing centralized action engine inside a Firestore transaction, preventing Principessa and Principe from silently overwriting one another.
-
-The shared state is stored in the `twogether/shared-state` Firestore document. The application identity (`Principessa` or `Principe`) remains separate from the authenticated Firebase account.
+- `src/` — the frontend: every feature reads/writes shared state through `window.TwogetherAPI.{state, remoteState, post}`, set up by root `api.js`.
+- `api.js` — implements that contract with plain `fetch()` calls to `/api/state` (read) and `/api/action` (write). In dev it points at `http://localhost:4310` (the local API server); in the production build it's same-origin.
+- `server/` — the API: `server/src/core.js` holds all the business logic (validation, the shared-jar/trip-confirmation/award rules) as a pure, storage-agnostic module; `server/src/db/` stores state in SQLite; `server/src/index.js` is the Express app exposing `GET /api/state`, `GET /api/ping`, `POST /api/action`, and (in production) serves the built `dist/` frontend too.
 
 ## Run locally
 
 ```sh
 npm install
+npm --prefix server install
 npm run dev
 ```
 
-Open `http://localhost:5180`. The Node/Express server is not required. Add `localhost` to Firebase Authentication's authorized domains if it is not already present.
+`npm run dev` starts the Vite dev server (frontend, hot reload, `:5180`) and the API server (`:4310`) together. Open `http://localhost:5180`.
 
-Run the local checks and production build with:
+To run just one side: `npm run dev:frontend` (Vite only) or `npm run server:dev` (API only, auto-restarts on change).
+
+Run the test suite (exercises the action engine against a real temporary SQLite database):
 
 ```sh
 npm test
-npm run build
-npm run preview
 ```
 
-## Firebase setup
+## Deploying (Railway)
 
-1. Publish `firestore.rules` in Firebase Console → Firestore Database → Rules.
-2. Keep Email/Password enabled in Firebase Console → Authentication → Sign-in method.
-3. Add the GitHub Pages hostname (for example, `your-name.github.io`) in Authentication → Settings → Authorized domains.
-4. In the GitHub repository, open Settings → Pages and select **GitHub Actions** as the source. The included workflow tests, builds, and deploys `dist/` after a push to `main`. Firebase Hosting is not used.
+This repo is set up to deploy as **one Railway service** that builds the frontend and serves it alongside the API from a single process.
 
-The Firebase web configuration in `config.js` is intentionally public. Do not add user passwords or service-account credentials to the repository.
+1. Create a Railway project from this GitHub repo. `railway.json` at the repo root tells Railway how to build (`npm ci && npm run build && npm --prefix server ci`) and start (`npm --prefix server start`) it — no manual configuration needed for that part.
+2. Attach a **persistent Volume** to the service (e.g. mounted at `/data`) so the SQLite database survives redeploys, and set the env var `DATABASE_PATH=/data/twogether.db`. Without this, every redeploy starts with an empty database.
+3. Optionally set `ALLOWED_ORIGIN` if you ever run the frontend from a different origin than the API (defaults cover local dev only). Not needed for the single-service setup above, since everything is same-origin in production.
+4. Railway assigns a public URL once deployed — that's the whole app, frontend and API together.
 
-## One-time SQLite data migration
-
-The old backend remains isolated under `server/` only for verification and optional data migration. To copy `server/data/twogether.db` into an empty Firestore document, run:
-
-```sh
-npm --prefix server install
-FIREBASE_EMAIL='your-account@example.com' FIREBASE_PASSWORD='your-password' npm run migrate:firestore
-```
-
-The migration refuses to overwrite Firestore when it already contains user data. `-- --force` enables intentional replacement and should be used with care.
+Pushing to `main` (with Railway's GitHub integration enabled and auto-deploy on) rebuilds and redeploys automatically. This also means any tool with commit access to the repo — including an AI coding assistant working from a chat interface — can ship changes just by pushing; no separate deploy step.
 
 ## Project structure
 
-- `src/` contains the website features and Firestore state adapter.
-- `api.js` preserves the frontend API contract and handles Firebase Auth/Firestore.
-- `config.js` contains the public Firebase web configuration.
-- `firestore.rules` restricts the shared document to authenticated users.
-- `server/` is the isolated legacy Express/SQLite implementation; it is not used at runtime.
+- `src/` — frontend features, organized by category (`trips/`, `finances/`, `wishlist/`, `shop/`, `app/`, `lib/`).
+- `api.js` — the frontend's API client (fetch-based).
+- `server/` — the Node/Express/SQLite backend; has its own `package.json` and runs as its own process.
+- `railway.json` — Railway build/deploy configuration for the combined single-service setup.

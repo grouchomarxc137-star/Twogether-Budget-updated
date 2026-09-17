@@ -1,4 +1,4 @@
-const CACHE = 'twogether-firebase-v1';
+const CACHE = 'twogether-v1';
 const FALLBACK = './index.html';
 
 self.addEventListener('install', (event) => {

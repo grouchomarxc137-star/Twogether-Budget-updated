@@ -7,6 +7,7 @@ import { openDatabase } from './db/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const databasePath = resolve(process.env.DATABASE_PATH || resolve(here, '../data/twogether.db'));
+const distPath = resolve(here, '../../dist');
 const port = Number(process.env.PORT) || 4310;
 const allowedOrigins = new Set(
   String(process.env.ALLOWED_ORIGIN || 'http://localhost:5180,http://127.0.0.1:5180')
@@ -28,6 +29,12 @@ app.use(express.json({ limit: '1mb' }));
 app.get('/api/ping', (_req, res) => {
   res.json({ ok: true, version: 18, now: new Date().toISOString() });
 });
+
+// Serves the built frontend (npm run build -> dist/) so one process can
+// answer both the app and the API in production. In local dev, run the
+// frontend separately with `npm run dev` (Vite, hot reload) instead --
+// scripts/dev.js runs both this server and Vite together.
+app.use(express.static(distPath));
 
 app.get('/api/state', (_req, res) => {
   try {

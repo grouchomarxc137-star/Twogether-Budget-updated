@@ -5,11 +5,12 @@ const useProcessGroups = process.platform !== 'win32';
 const children = [];
 let stopping = false;
 
-function start(args) {
+function start(args, extraEnv = {}) {
   const child = spawn(npm, args, {
     cwd: process.cwd(),
     stdio: 'inherit',
     detached: useProcessGroups,
+    env: { ...process.env, ...extraEnv },
   });
   children.push(child);
   child.on('error', (error) => {
@@ -41,5 +42,9 @@ function stop(exitCode = 0) {
 process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
-start(['--prefix', 'server', 'run', 'dev']);
+// A stray ambient PORT env var (some hosting/tooling sets one expecting a
+// single dev server) would otherwise leak into both children and collide
+// with Vite's fixed port -- pin the API server's port explicitly here so
+// running both together is never at the mercy of the parent environment.
+start(['--prefix', 'server', 'run', 'dev'], { PORT: '4310' });
 start(['run', 'dev:frontend']);
