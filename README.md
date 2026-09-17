@@ -1,8 +1,5 @@
 # Twogether Budget
 
-<!-- push-test: verifying git push access, safe to ignore/remove -->
-
-
 A shared budgeting site for trips and individual monthly finances. The backend is a small Node.js + Express API backed by SQLite (`server/`), which also serves the built frontend in production — one process, one deployment.
 
 There is no authentication. This is a private, unlisted app shared between two people; anyone with the URL and knowledge of the two profile names (`Principessa`/`Principe`) can act as either. If that ever stops being acceptable, add a gate in front of it rather than reintroducing this decision lightly.
