@@ -1,3 +1,4 @@
+<!-- push-test: verifying git push access, safe to ignore/remove -->
 # Twogether Budget
 
 A shared budgeting site for trips and individual monthly finances. The backend is a small Node.js + Express API backed by SQLite (`server/`), which also serves the built frontend in production — one process, one deployment.
