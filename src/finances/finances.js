@@ -812,7 +812,6 @@ function renderReview() {
 
 async function confirmExistingMonth(rec) {
   if (!rec || rec.finalized === true) return;
-  if (financeState.version < 10) return toast('Final locking needs the latest backend deployment', 'warn');
   const d = cloneRecord(rec); d.finalized = true; d.finalizedAt = new Date().toISOString();
   try {
     await post('saveFinanceMonth', { monthData: d });
@@ -826,7 +825,6 @@ async function confirmExistingMonth(rec) {
 async function saveMonth(finalize = false) {
   if (!flow) return;
   const d = cloneRecord(flow.data); if (!d.month) return toast('Choose a month first', 'warn');
-  if (finalize && financeState.version < 10) return toast('Final locking needs the latest backend deployment', 'warn');
   d.finalized = !!finalize; d.finalizedAt = finalize ? new Date().toISOString() : '';
   const btn = $(finalize ? '[data-fin-finalize]' : '[data-fin-save-draft]'); if (btn) btn.disabled = true;
   try {
