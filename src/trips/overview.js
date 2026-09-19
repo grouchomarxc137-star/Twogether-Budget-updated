@@ -200,7 +200,7 @@ let lastActivityKey = '';
 export function renderActivity() {
   const root = $('#activityList');
   if (!root) return;
-  const card = root.closest('.activity-card');
+  const card = root.closest('.activity-whisper');
   const state = getState();
   const latest = [...(state.audit || [])].slice(-1)[0] || null;
 
