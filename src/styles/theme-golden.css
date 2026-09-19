@@ -1,0 +1,1002 @@
+/*
+  Twogether golden visual system
+  ------------------------------
+  Visual-only override layer. It intentionally loads last so the existing
+  feature architecture and behaviour remain untouched.
+*/
+
+:root {
+  --tw-paper:#fff9ea;
+  --tw-surface:#fffdf7;
+  --tw-surface-strong:#fff7df;
+  --tw-sun:#f5c842;
+  --tw-marigold:#e9a51b;
+  --tw-orange:#e56a1f;
+  --tw-orange-deep:#a94715;
+  --tw-cacao:#39271e;
+  --tw-cacao-soft:#604a3c;
+  --tw-line:#ead4b5;
+  --tw-line-strong:#d8b77d;
+  --tw-success:#5f7e4a;
+  --tw-success-soft:#eef4df;
+  --tw-danger:#a74632;
+  --tw-danger-soft:#fff0e8;
+
+  --bg:var(--tw-paper);
+  --card:var(--tw-surface);
+  --ink:var(--tw-cacao);
+  --text:var(--tw-cacao);
+  --muted:#7c6859;
+  --line:var(--tw-line);
+  --accent:var(--tw-orange);
+  --accent-dark:var(--tw-orange-deep);
+  --accent-soft:#fff0c7;
+  --rose:var(--tw-orange);
+  --rose-soft:#fff1dc;
+  --sage:var(--tw-success);
+  --sage-soft:var(--tw-success-soft);
+  --gold:var(--tw-marigold);
+  --gold-soft:#fff2c7;
+  --danger:var(--tw-danger);
+  --danger-soft:var(--tw-danger-soft);
+  --blue:#6f8191;
+  --shadow:0 22px 58px rgba(107,67,21,.11);
+  --shadow-sm:0 8px 22px rgba(107,67,21,.08);
+
+  --v27-gold:var(--tw-marigold);
+  --v27-gold-soft:#fff2c7;
+  --v27-line:var(--tw-line);
+  --v27-ink:var(--tw-cacao);
+  --v27-muted:#7c6859;
+  --v27-card:var(--tw-surface);
+  --v27-green:var(--tw-success);
+  --v27-rose:var(--tw-orange);
+}
+
+html {
+  background:var(--tw-paper);
+  accent-color:var(--tw-orange);
+}
+
+body,
+body.principessa,
+body.principe {
+  background:var(--tw-paper)!important;
+  color:var(--tw-cacao);
+  font-family:"Manrope",ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  line-height:1.52;
+}
+
+body::before {
+  content:"";
+  position:fixed;
+  inset:0 0 auto 0;
+  height:4px;
+  background:var(--tw-orange);
+  z-index:9999;
+  pointer-events:none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family:inherit;
+}
+
+h1,h2,h3,h4,
+.brand,
+.page-heading h1,
+.hero-copy h1,
+.question-stage h2,
+.trip-story-card h3,
+.review-total strong,
+.finance-hero h1,
+.finance-subpage-heading h1,
+.identity-card h2,
+.current-overview>h2,
+#shopView .v27-shop-hero h1,
+.v27-shop-hero h1,
+.v27-wish-hero h2 {
+  font-family:"Bricolage Grotesque","Manrope",sans-serif!important;
+  letter-spacing:-.035em;
+}
+
+p {
+  max-width:78ch;
+}
+
+::selection {
+  background:#ffe18a;
+  color:var(--tw-cacao);
+}
+
+:focus-visible {
+  outline:3px solid rgba(229,106,31,.48)!important;
+  outline-offset:3px!important;
+}
+
+/* App shell: the memorable visual moment is the sun-yellow header. */
+.topbar {
+  min-height:76px;
+  padding:15px 26px!important;
+  background:var(--tw-sun)!important;
+  border-bottom:0!important;
+  box-shadow:inset 0 -4px 0 var(--tw-orange);
+  backdrop-filter:none!important;
+}
+
+.brand-wrap {
+  gap:12px;
+}
+
+.brand-mark {
+  width:42px!important;
+  height:42px!important;
+  border-radius:50% 50% 50% 13px!important;
+  background:var(--tw-cacao)!important;
+  color:#ffd967!important;
+  box-shadow:none!important;
+}
+
+.brand {
+  color:var(--tw-cacao);
+  font-size:26px!important;
+  font-weight:700!important;
+}
+
+.brand-sub {
+  margin-top:2px!important;
+  color:#67431f!important;
+  font-family:"Manrope",sans-serif!important;
+  font-size:11px!important;
+  font-weight:700;
+  letter-spacing:.02em!important;
+  text-transform:none!important;
+}
+
+.who-badge {
+  border:1px solid rgba(57,39,30,.18);
+  background:rgba(255,253,247,.6)!important;
+  color:var(--tw-cacao)!important;
+  box-shadow:none;
+}
+
+.hub-tabs {
+  position:relative!important;
+  top:auto!important;
+  padding:8px 24px 0!important;
+  gap:26px!important;
+  background:rgba(255,249,234,.96)!important;
+  border-bottom:1px solid var(--tw-line)!important;
+  backdrop-filter:blur(10px);
+  box-shadow:none!important;
+}
+
+.hub-tab {
+  position:relative;
+  padding:13px 2px 12px!important;
+  border:0!important;
+  border-radius:0!important;
+  color:#8b7563!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  font-weight:750!important;
+}
+
+.hub-tab::after {
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:3px;
+  background:transparent;
+  border-radius:3px 3px 0 0;
+}
+
+.hub-tab.active {
+  color:var(--tw-cacao)!important;
+}
+
+.hub-tab.active::after {
+  background:var(--tw-orange);
+}
+
+.tabs,
+.trip-subnav,
+.finance-subnav {
+  top:0!important;
+  padding:6px 24px 8px!important;
+  gap:6px!important;
+  background:rgba(255,249,234,.96)!important;
+  border-bottom:1px solid var(--tw-line)!important;
+  box-shadow:none!important;
+}
+
+.tab {
+  padding:8px 11px!important;
+  border-radius:10px 10px 3px 10px!important;
+  color:#816e5f!important;
+  font-size:13px;
+}
+
+.tab.active {
+  background:#ffe9a3!important;
+  color:var(--tw-cacao)!important;
+  box-shadow:none!important;
+}
+
+.tw-nav-menu {
+  padding:8px!important;
+  background:var(--tw-surface)!important;
+  border:1px solid var(--tw-line-strong)!important;
+  border-radius:16px 16px 5px 16px!important;
+  box-shadow:0 18px 42px rgba(86,52,18,.15)!important;
+}
+
+.tw-nav-menu button {
+  border-radius:10px 10px 3px 10px!important;
+}
+
+.tw-nav-menu button:hover,
+.tw-nav-menu button:focus-visible {
+  background:#fff0c7!important;
+}
+
+/* Layout: left-aligned, roomy, and less dashboard-like. */
+.main {
+  max-width:1380px!important;
+  padding:38px 30px 72px!important;
+}
+
+.page-heading,
+.finance-subpage-heading,
+.finance-hero {
+  max-width:980px;
+}
+
+.page-heading h1,
+.finance-subpage-heading h1,
+.finance-hero h1 {
+  margin:.3rem 0 .55rem!important;
+  color:var(--tw-cacao)!important;
+  font-size:clamp(38px,5vw,62px)!important;
+  line-height:.98!important;
+}
+
+.page-heading p,
+.finance-subpage-heading p,
+.finance-hero p {
+  color:var(--muted)!important;
+  font-size:15px!important;
+  line-height:1.65!important;
+}
+
+.eyebrow,
+.panel-kicker,
+.wizard-step,
+.trip-country,
+.finance-kpi span,
+.v27-wallet span,
+.v27-test span,
+.v27-twos-wallet span {
+  color:#9a5a18!important;
+  letter-spacing:.015em!important;
+  text-transform:none!important;
+  font-weight:750!important;
+}
+
+#log .hero-grid {
+  max-width:1120px!important;
+  margin:26px auto 0!important;
+}
+
+#log .hero-copy {
+  max-width:820px!important;
+  margin:0 0 24px!important;
+  padding:0!important;
+  text-align:left!important;
+}
+
+#log .hero-copy h1 {
+  max-width:780px!important;
+  margin:.2rem 0 0!important;
+  color:var(--tw-cacao)!important;
+  font-size:clamp(44px,6vw,72px)!important;
+  line-height:.94!important;
+}
+
+/* Structural surfaces use a clipped lower-left corner instead of one radius everywhere. */
+.wizard-card,
+.identity-card,
+.trip-modal-card,
+.current-overview {
+  background:var(--tw-surface)!important;
+  border:1px solid var(--tw-line)!important;
+  border-top:4px solid var(--tw-marigold)!important;
+  border-radius:28px 28px 8px 28px!important;
+  box-shadow:var(--shadow)!important;
+}
+
+.table-card,
+.wishlist-table-wrap,
+.finance-month-panel,
+.v27-cart,
+#v27CompareLab {
+  background:var(--tw-surface)!important;
+  border:1px solid var(--tw-line)!important;
+  border-radius:20px 20px 6px 20px!important;
+  box-shadow:0 10px 28px rgba(104,66,24,.07)!important;
+}
+
+.panel,
+.compare-card,
+.trip-story-card,
+.finance-current-card,
+.wishlist-card,
+.v27-shop-item,
+.v27-score,
+.v27-social,
+.v27-shop-extra {
+  background:var(--tw-surface)!important;
+  border-color:var(--tw-line)!important;
+  border-radius:18px 18px 6px 18px!important;
+  box-shadow:0 7px 20px rgba(104,66,24,.06)!important;
+}
+
+/* Buttons are tactile without floating or excessive motion. */
+.btn,
+.soft-btn,
+.choice,
+.certainty,
+.identity-choice,
+.v27-social button,
+.v27-shop-extra button,
+.v27-test button,
+.v27-shop-item button,
+.v27-wish-card-actions button {
+  border-color:var(--tw-line-strong)!important;
+  border-radius:12px 12px 4px 12px!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+
+.btn,
+.soft-btn {
+  background:#fff1c8!important;
+  color:var(--tw-cacao)!important;
+}
+
+.btn.primary {
+  background:var(--tw-orange)!important;
+  border-color:var(--tw-orange)!important;
+  color:#fffdf7!important;
+  box-shadow:inset 0 -3px 0 rgba(92,34,7,.16)!important;
+}
+
+.btn:hover,
+.soft-btn:hover,
+.choice:hover,
+.identity-choice:hover {
+  transform:none!important;
+}
+
+.btn.primary:hover {
+  background:#d85d18!important;
+}
+
+.btn:active,
+.choice:active,
+.identity-choice:active {
+  transform:translateY(1px)!important;
+}
+
+.btn.ghost,
+.text-btn {
+  color:#835f41!important;
+}
+
+.choice,
+.identity-choice {
+  background:#fffdf7!important;
+}
+
+.choice:hover,
+.identity-choice:hover {
+  background:#fff0c7!important;
+  border-color:#dca83f!important;
+}
+
+.field-wrap,
+.money-input-wrap,
+.wishlist-fields input,
+.wishlist-fields textarea,
+.v27-wish-fields input,
+.v27-wish-fields select,
+.v27-wish-fields textarea,
+.v27-wish-fields label>div {
+  background:#fffefb!important;
+  border-color:#ddc29a!important;
+  border-radius:13px 13px 4px 13px!important;
+}
+
+.big-input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline:none;
+}
+
+.field-wrap:focus-within,
+.money-input-wrap:focus-within,
+.wishlist-fields input:focus,
+.wishlist-fields textarea:focus {
+  border-color:var(--tw-orange)!important;
+  box-shadow:0 0 0 3px rgba(229,106,31,.13)!important;
+}
+
+.question-icon {
+  background:#ffe6a0!important;
+  color:#9b4d12!important;
+  border-radius:16px 16px 5px 16px!important;
+}
+
+.wizard-progress {
+  height:6px!important;
+  background:#f3e4c7!important;
+}
+
+.wizard-progress span {
+  background:linear-gradient(90deg,var(--tw-sun),var(--tw-orange))!important;
+}
+
+.question-stage h2 {
+  color:var(--tw-cacao)!important;
+  font-weight:650!important;
+}
+
+.review-total,
+.review-total.estimate-total {
+  background:var(--tw-cacao)!important;
+  color:#fff8e9!important;
+  border-radius:18px 18px 5px 18px!important;
+}
+
+.review-grid>div,
+.review-grid>div.uncertain-review {
+  background:#fff4d6!important;
+  border:1px solid #f0ddb8;
+}
+
+/* Monthly overview reads as a ledger, not a card collection. */
+.kpis,
+.finance-summary {
+  gap:0!important;
+  overflow:hidden;
+  background:var(--tw-surface);
+  border:1px solid var(--tw-line);
+  border-radius:20px 20px 6px 20px;
+  box-shadow:0 8px 24px rgba(104,66,24,.06);
+}
+
+.kpi,
+.finance-kpi {
+  background:transparent!important;
+  border:0!important;
+  border-right:1px solid var(--tw-line)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+
+.kpi:last-child,
+.finance-kpi:last-of-type {
+  border-right:0!important;
+}
+
+.accent-kpi,
+.finance-kpi.good,
+.finance-kpi.wealth {
+  background:#fff4cd!important;
+}
+
+.finance-kpi.bad {
+  background:var(--tw-danger-soft)!important;
+}
+
+.finance-house-goal {
+  border:0!important;
+  border-top:1px solid var(--tw-line)!important;
+  border-radius:0!important;
+  background:#fff2c7!important;
+  box-shadow:none!important;
+}
+
+.finance-house-goal::after {
+  color:rgba(169,71,21,.13)!important;
+}
+
+.finance-house-goal-icon {
+  background:#fff9e8!important;
+  border-color:#ddb76f!important;
+  box-shadow:none!important;
+}
+
+.finance-house-goal-icon small {
+  background:var(--tw-orange)!important;
+  color:#fff!important;
+  border-color:#fff2c7!important;
+}
+
+.finance-house-goal-percent strong,
+.finance-house-goal-money strong {
+  color:var(--tw-orange-deep)!important;
+}
+
+.finance-house-goal-track {
+  background:#e8d5a8!important;
+}
+
+.finance-house-goal-track>span {
+  background:linear-gradient(90deg,var(--tw-sun),var(--tw-orange))!important;
+}
+
+.finance-house-goal-track>i {
+  color:var(--tw-orange-deep)!important;
+  border-color:#d8a343!important;
+  background:#fffaf0!important;
+}
+
+/* Finance pages: one visual language, restrained status colors. */
+.finance-grid {
+  gap:20px!important;
+}
+
+.finance-month {
+  border-color:var(--tw-line)!important;
+  background:#fffdf7!important;
+  border-radius:14px 14px 4px 14px!important;
+  box-shadow:none!important;
+}
+
+.finance-month:hover {
+  border-color:#d8a84e!important;
+  background:#fff8e8!important;
+}
+
+.finance-month.current {
+  border-color:var(--tw-orange)!important;
+  box-shadow:inset 0 0 0 1px var(--tw-orange)!important;
+}
+
+.finance-month.status-draft {
+  background:#fff1c8!important;
+  border-color:#e4bd68!important;
+}
+
+.finance-month.status-final {
+  background:var(--tw-success-soft)!important;
+  border-color:#cbd7aa!important;
+}
+
+.finance-current-card,
+[data-fin-view="balances"] .finance-current-card,
+[data-fin-view="balances"] .finance-current-card.tone-wealth,
+[data-fin-view="balances"] .finance-current-card.tone-receivable {
+  background:var(--tw-surface)!important;
+  border:1px solid var(--tw-line)!important;
+  box-shadow:none!important;
+}
+
+[data-fin-view="balances"] .finance-current-card::before {
+  background:var(--tw-marigold)!important;
+}
+
+.finance-current-row:hover {
+  background:#fff5d8!important;
+}
+
+.finance-current-title>strong,
+.finance-current-metrics .positive strong,
+.finance-positive strong {
+  color:#6a7e42!important;
+}
+
+.finance-current-metrics .negative strong,
+.finance-negative strong {
+  color:var(--tw-danger)!important;
+}
+
+/* Tables: warm ledger header, quiet rows. */
+.overview-table,
+.wishlist-table {
+  background:var(--tw-surface)!important;
+}
+
+.overview-table thead th,
+.wishlist-table th {
+  background:#f7d86d!important;
+  color:#533315!important;
+  border-bottom:1px solid #d7ad44!important;
+  text-transform:none!important;
+  letter-spacing:.01em!important;
+  font-weight:800!important;
+}
+
+.overview-table thead th:first-child {
+  background:#efbd38!important;
+  color:#4b2f15!important;
+  box-shadow:none!important;
+}
+
+.overview-table tbody td:first-child {
+  background:#fff3ca!important;
+  color:var(--tw-cacao)!important;
+  box-shadow:none!important;
+}
+
+.overview-table tbody tr:hover td,
+.wishlist-table tbody tr:hover,
+#financeWishlist .wishlist-table tbody tr:hover {
+  background:#fff6dc!important;
+}
+
+.overview-table tbody tr:hover td:first-child {
+  background:#ffe9a5!important;
+  box-shadow:none!important;
+}
+
+/* Trips */
+.trip-story-card {
+  border-left:4px solid var(--tw-marigold)!important;
+  transition:border-color .14s ease,background-color .14s ease!important;
+}
+
+.trip-story-card:hover {
+  transform:none!important;
+  border-left-color:var(--tw-orange)!important;
+  background:#fff9e9!important;
+  box-shadow:0 7px 20px rgba(104,66,24,.08)!important;
+}
+
+.trip-country,
+.trip-status {
+  text-transform:none!important;
+  letter-spacing:.01em!important;
+}
+
+.trip-status {
+  background:#fff0c7!important;
+  color:#8f551c!important;
+}
+
+.compare-zone-title {
+  color:#8f551c!important;
+}
+
+.compare-card {
+  border-top:3px solid var(--tw-marigold)!important;
+}
+
+.compare-card.highlight-card {
+  background:#fff0c7!important;
+  border-color:#deb34e!important;
+}
+
+.confirmed-donut::after {
+  background:var(--tw-surface)!important;
+}
+
+/* Wishlist */
+.wishlist-card {
+  border-left:3px solid #efbd38!important;
+}
+
+.wishlist-card:hover {
+  transform:none!important;
+  background:#fff9e9!important;
+}
+
+.wishlist-open-link {
+  color:var(--tw-orange-deep)!important;
+}
+
+.v27-wish-hero {
+  background:#fff1c8!important;
+  border-color:#e2bd67!important;
+  border-radius:24px 24px 7px 24px!important;
+}
+
+.v27-twos-wallet {
+  background:#fff8e5!important;
+  border-color:#dfbd72!important;
+}
+
+.v27-priority-filter button {
+  border-color:var(--tw-line-strong)!important;
+  background:#fffdf7!important;
+}
+
+.v27-priority-filter button.active {
+  background:var(--tw-sun)!important;
+  border-color:#d8a32a!important;
+  color:#513112!important;
+}
+
+.v27-wish-card,
+.v27-wish-card.earned,
+.v27-cart {
+  background:var(--tw-surface)!important;
+  border-color:var(--tw-line)!important;
+  box-shadow:none!important;
+}
+
+.v27-wish-card {
+  border-left:3px solid var(--tw-marigold)!important;
+}
+
+.v27-wish-top span {
+  background:#fff0c7!important;
+  color:#8d5318!important;
+}
+
+/* Shop: remove the alternating pastel-card effect and make gold the system. */
+#shopView .v27-shop-shell {
+  color:var(--tw-cacao)!important;
+}
+
+#shopView .v27-shop-hero,
+.v27-shop-hero {
+  background:var(--tw-sun)!important;
+  border:1px solid #d69e18!important;
+  border-radius:28px 28px 8px 28px!important;
+  box-shadow:0 12px 30px rgba(119,74,12,.12)!important;
+}
+
+#shopView .v27-shop-hero::before {
+  color:rgba(92,54,11,.12)!important;
+}
+
+#shopView .v27-shop-hero p,
+.v27-shop-hero p {
+  color:#6e481d!important;
+}
+
+.v27-wallet {
+  background:#fff8df!important;
+  border-color:#c99222!important;
+}
+
+.v27-wallet span,
+.v27-wallet small {
+  color:#7a521e!important;
+}
+
+.v27-wallet strong {
+  color:#6e3d0d!important;
+}
+
+#shopView .v27-score,
+#shopView .v27-social,
+#shopView .v27-shop-extra,
+#shopView #v27CompareLab {
+  background:var(--tw-surface)!important;
+  border-color:var(--tw-line)!important;
+}
+
+#shopView .v27-social {
+  border-left:4px solid var(--tw-orange)!important;
+}
+
+#shopView .v27-shop-item,
+#shopView .v27-shop-item:nth-child(3n+2),
+#shopView .v27-shop-item:nth-child(3n),
+#shopView .v31-reward-main .v27-shop-item,
+#shopView .v31-reward-main .v27-shop-item:nth-child(3n+2),
+#shopView .v31-reward-main .v27-shop-item:nth-child(3n) {
+  background:var(--tw-surface)!important;
+  border:1px solid var(--tw-line)!important;
+  border-left:3px solid var(--tw-marigold)!important;
+  box-shadow:none!important;
+}
+
+#shopView .v27-shop-item:hover {
+  transform:none!important;
+  background:#fff8e7!important;
+  border-left-color:var(--tw-orange)!important;
+}
+
+#shopView .v27-shop-icon {
+  background:#fff0c7!important;
+  color:#8d4f16!important;
+  border-color:#e1bd6f!important;
+}
+
+#shopView .v27-shop-item>button {
+  background:#fff0c7!important;
+  border-color:#dca94c!important;
+  color:#714416!important;
+}
+
+#shopView .v27-shop-item.owned::after {
+  color:#607843!important;
+}
+
+.v27-score-track {
+  background:#f0e0b9!important;
+}
+
+.v27-score-track i {
+  background:linear-gradient(90deg,var(--tw-sun),var(--tw-orange))!important;
+}
+
+.v27-test {
+  background:#fff6dc!important;
+  border-color:#ddad4c!important;
+}
+
+.v27-reward-strip {
+  background:#fff0c7!important;
+  border-color:#dfba63!important;
+}
+
+.v27-reward-strip span,
+.v27-reward-strip b {
+  color:#734415!important;
+}
+
+/* Keep the existing unlockable night theme functional, translated into gold. */
+.v27-theme-night #shopView .v27-shop-hero,
+.v27-theme-night .v27-shop-hero {
+  background:#3a2b23!important;
+  border-color:#806235!important;
+  color:#fff0c7!important;
+}
+
+.v27-theme-night #shopView .v27-shop-hero p,
+.v27-theme-night .v27-shop-hero p {
+  color:#d8c29c!important;
+}
+
+.v27-theme-night #shopView .v27-score,
+.v27-theme-night #shopView .v27-social,
+.v27-theme-night #shopView .v27-shop-extra,
+.v27-theme-night #shopView #v27CompareLab,
+.v27-theme-night #shopView .v27-shop-item,
+.v27-theme-night .v27-wish-card,
+.v27-theme-night .v27-cart {
+  background:#30251f!important;
+  border-color:#5a493d!important;
+  color:#f8ead0!important;
+}
+
+/* Identity + dialogs */
+.identity-backdrop,
+.trip-modal-backdrop {
+  background:rgba(57,39,30,.48)!important;
+}
+
+.identity-heart {
+  background:#ffe49a!important;
+  color:var(--tw-orange-deep)!important;
+  border-radius:18px 18px 5px 18px!important;
+}
+
+.identity-choice>span {
+  color:var(--tw-orange)!important;
+}
+
+/* Activity remains whisper-like, not a card. */
+.activity-whisper {
+  color:#7d4310!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.8);
+}
+
+.activity-whisper-heart {
+  color:var(--tw-orange)!important;
+}
+
+.activity-whisper.activity-fresh:hover .activity-item strong {
+  color:var(--tw-orange-deep)!important;
+}
+
+/* Feedback */
+.toast {
+  background:var(--tw-cacao)!important;
+  color:#fff3d1!important;
+  border-color:#73533f!important;
+  box-shadow:0 14px 36px rgba(57,39,30,.2)!important;
+}
+
+.inline-warning,
+.estimate-note,
+.setup-notice {
+  background:#fff1c8!important;
+  color:#79501c!important;
+  border-color:#e3bf72!important;
+}
+
+.connection[data-tone="ok"] {
+  background:var(--tw-success-soft)!important;
+  color:#526c3f!important;
+}
+
+.connection[data-tone="warn"],
+.connection[data-tone="sync"] {
+  background:#fff0c7!important;
+  color:#80501a!important;
+}
+
+/* Responsive */
+@media(max-width:900px) {
+  .main {
+    padding:28px 18px 56px!important;
+  }
+
+  .finance-summary,
+  .kpis {
+    border-radius:18px 18px 6px 18px;
+  }
+
+  .finance-kpi,
+  .kpi {
+    border-right:0!important;
+    border-bottom:1px solid var(--tw-line)!important;
+  }
+}
+
+@media(max-width:720px) {
+  .topbar {
+    min-height:66px;
+    padding:12px 14px!important;
+  }
+
+  .brand {
+    font-size:23px!important;
+  }
+
+  .hub-tabs {
+    gap:18px!important;
+    padding-left:14px!important;
+    padding-right:14px!important;
+  }
+
+  .tabs,
+  .trip-subnav,
+  .finance-subnav {
+    padding-left:14px!important;
+    padding-right:14px!important;
+  }
+
+  .main {
+    padding:24px 14px 46px!important;
+  }
+
+  #log .hero-copy {
+    margin-bottom:18px!important;
+  }
+
+  .page-heading h1,
+  .finance-subpage-heading h1,
+  .finance-hero h1 {
+    font-size:clamp(36px,11vw,50px)!important;
+  }
+
+  .wizard-card,
+  .identity-card,
+  .trip-modal-card,
+  .current-overview {
+    border-radius:22px 22px 7px 22px!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior:auto!important;
+    transition-duration:.01ms!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}
