@@ -72,6 +72,7 @@ const FINANCE_RULES = {
       { group: 'variable', name: 'Groceries', amount: 17.33 },
       { group: 'variable', name: 'Personal', amount: 100 },
       { group: 'variable', name: 'Airbnb', amount: 142 },
+      { group: 'savings', name: 'Save up', amount: 200 },
     ],
   },
 };
@@ -173,7 +174,7 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     copy.extraBudget = '';
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
   }
-  copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ id: x.id || uid(), source: ['creditcard', 'savings', 'main'].includes(String(x.source || '')) ? String(x.source) : '', amount: n(x.amount) })).filter((x) => x.source && x.amount > 0) : [];
+  copy.extraSpends = rules.extraTracking && Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ id: x.id || uid(), source: ['creditcard', 'savings', 'main'].includes(String(x.source || '')) ? String(x.source) : '', amount: n(x.amount) })).filter((x) => x.source && x.amount > 0) : [];
   if (!copy.extraSpends.length) {
     const legacySource = ['creditcard', 'savings', 'main'].includes(String(copy.extraOverspendSource || '')) ? String(copy.extraOverspendSource) : '';
     const legacyAmount = hasValue(copy.extraOverspendAmount) ? Math.max(0, n(copy.extraOverspendAmount)) : 0;
