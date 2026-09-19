@@ -1056,6 +1056,37 @@ function sanitizeFinanceScenario_(item) {
   };
 }
 
+function sanitizeRecurringIncome_(item) {
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    name: cleanText_(item && item.name, 100),
+    amount: cleanMoney_(item && item.amount)
+  };
+}
+
+function sanitizeRecurringExpense_(item) {
+  const allowed = ['fixed','medical','subscriptions','rent','transport','groceries','variable','extra','savings','investments','other'];
+  let group = String(item && item.group || 'other');
+  if (group === 'health') group = 'medical';
+  if (group === 'living') group = 'rent';
+  if (allowed.indexOf(group) < 0) group = 'other';
+  return {
+    id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
+    group: group,
+    name: cleanText_(item && item.name, 100),
+    amount: cleanMoney_(item && item.amount)
+  };
+}
+
+function sanitizeFinanceRecurring_(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    custom: source.custom === true,
+    incomes: Array.isArray(source.incomes) ? source.incomes.slice(0,40).map(sanitizeRecurringIncome_).filter(function(x){ return x.name && x.amount !== ''; }) : [],
+    expenses: Array.isArray(source.expenses) ? source.expenses.slice(0,100).map(sanitizeRecurringExpense_).filter(function(x){ return x.name && x.amount !== ''; }) : []
+  };
+}
+
 function sanitizeFinanceWishlistItem_(item) {
   const priority=Math.min(5,Math.max(1,Number(item&&item.priority)||3));
   return {
@@ -1086,6 +1117,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
     wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
     compareLab: source.compareLab && typeof source.compareLab === 'object' ? sanitizeCompareLab_(source.compareLab) : {},
+    recurring: sanitizeFinanceRecurring_(source.recurring),
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
   };
