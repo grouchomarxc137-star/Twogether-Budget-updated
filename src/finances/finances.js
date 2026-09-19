@@ -46,6 +46,7 @@ const RECURRING_EXPENSES = [
 ];
 const CATEGORY_ORDER = ['medical', 'subscriptions', 'budgets', 'wealth', 'other'];
 const CATEGORY_LABELS = { medical: 'Medical', subscriptions: 'Subscriptions', budgets: 'Budgets', wealth: 'Savings / Investments', other: 'Other' };
+const HOUSE_GOAL_TARGET = 150000;
 
 let financeState = {
   version: 0,
@@ -242,6 +243,11 @@ function renderPage() {
   const summary = calc(latest || {});
   const ps = profileStats();
   const latestGl = latest ? investmentGL(latest) : null;
+  const housePercent = HOUSE_GOAL_TARGET > 0 ? Math.max(0, (ps.netWorth / HOUSE_GOAL_TARGET) * 100) : 0;
+  const houseProgress = Math.min(100, housePercent);
+  const houseMarker = Math.min(98, Math.max(2, houseProgress));
+  const housePercentLabel = housePercent.toFixed(1).replace(/\.0$/, '');
+  const houseRemaining = Math.max(0, HOUSE_GOAL_TARGET - ps.netWorth);
   const summaryRoot = $('#financeSummary');
   if (summaryRoot) {
     const statusClass = latest ? (latest.finalized ? 'status-final' : 'status-draft') : 'status-empty';
@@ -251,7 +257,24 @@ function renderPage() {
       <div class="finance-kpi"><span>Total outflow</span><strong>${money(summary.outflow)}</strong></div>
       <div class="finance-kpi ${summary.leftover < 0 ? 'bad' : summary.income ? 'good' : ''}"><span>${summary.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(summary.leftover))}</strong></div>
       <div class="finance-kpi wealth"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong><small>Available savings + your investments</small></div>
-      <div class="finance-kpi ${latestGl?.value < 0 ? 'bad' : latestGl?.value > 0 ? 'good' : ''}"><span>Investment G/L p/m</span><strong>${latestGl ? signedMoney(latestGl.value) : '—'}</strong><small>${latestGl ? `vs ${monthLabel(latestGl.previousMonth)}` : 'Log 2 months to compare'}</small></div>`;
+      <div class="finance-kpi ${latestGl?.value < 0 ? 'bad' : latestGl?.value > 0 ? 'good' : ''}"><span>Investment G/L p/m</span><strong>${latestGl ? signedMoney(latestGl.value) : '—'}</strong><small>${latestGl ? `vs ${monthLabel(latestGl.previousMonth)}` : 'Log 2 months to compare'}</small></div>
+      <article class="finance-house-goal" aria-label="House savings goal">
+        <div class="finance-house-goal-icon" aria-hidden="true"><span>🏡</span><small>♡</small></div>
+        <div class="finance-house-goal-body">
+          <div class="finance-house-goal-head">
+            <div><span class="panel-kicker">OUR DREAM HOME</span><h2>Closer to our own front door</h2></div>
+            <div class="finance-house-goal-percent"><strong>${housePercentLabel}%</strong><span>of the way there</span></div>
+          </div>
+          <div class="finance-house-goal-money"><strong>${money(ps.netWorth)}</strong><span>of ${money(HOUSE_GOAL_TARGET)}</span></div>
+          <div class="finance-house-goal-track" role="progressbar" aria-label="House goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${houseProgress.toFixed(1)}">
+            <span style="width:${houseProgress}%"></span><i style="left:${houseMarker}%" aria-hidden="true">♡</i>
+          </div>
+          <div class="finance-house-goal-foot">
+            <span>${houseRemaining > 0 ? `${money(houseRemaining)} to go` : 'Dream-home goal reached ♡'}</span>
+            <small>Saved up + investments update this automatically.</small>
+          </div>
+        </div>
+      </article>`;
   }
   renderCurrentPanel();
   renderScenarioPanel();
