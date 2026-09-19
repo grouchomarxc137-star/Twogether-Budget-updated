@@ -160,6 +160,62 @@ test('persists finance and wishlist data independently', () => {
   }
 });
 
+test('Principe Saved up spending is savings-only and adjusts the saved total by the edit delta', () => {
+  const context = setup();
+  try {
+    assert.equal(action(context.database, 'saveFinanceProfile', { profile: { savingsTotal: 1000 } }, 'Principe').ok, true);
+
+    const first = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [{ name: 'Salary', amount: 1550 }],
+        expenses: [{ group: 'rent', name: 'Rent', amount: 575 }],
+        extraSpends: [
+          { source: 'savings', amount: 120 },
+          { source: 'creditcard', amount: 50 },
+        ],
+        finalized: false,
+      },
+    }, 'Principe');
+    assert.equal(first.ok, true);
+    assert.equal(first.financeProfile.savingsTotal, 880);
+    assert.deepEqual(getState().finances.Principe[0].extraSpends.map((x) => x.source), ['savings']);
+
+    const edited = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [{ name: 'Salary', amount: 1550 }],
+        expenses: [{ group: 'rent', name: 'Rent', amount: 575 }],
+        extraSpends: [{ source: 'savings', amount: 70 }],
+        finalized: false,
+      },
+    }, 'Principe');
+    assert.equal(edited.ok, true);
+    assert.equal(edited.financeProfile.savingsTotal, 930);
+
+    const removed = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [{ name: 'Salary', amount: 1550 }],
+        expenses: [{ group: 'rent', name: 'Rent', amount: 575 }],
+        extraSpends: [],
+        finalized: false,
+      },
+    }, 'Principe');
+    assert.equal(removed.ok, true);
+    assert.equal(removed.financeProfile.savingsTotal, 1000);
+
+    const tooMuch = action(context.database, 'saveFinanceMonth', {
+      monthData: { month: '2026-10', incomes: [], expenses: [], extraSpends: [{ source: 'savings', amount: 1200 }], finalized: false },
+    }, 'Principe');
+    assert.equal(tooMuch.ok, false);
+    assert.match(tooMuch.error, /Saved up only has/);
+    assert.equal(getState().financeProfiles.Principe.savingsTotal, 1000);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('keeps saved data after the database is closed and reopened', () => {
   const directory = mkdtempSync(join(tmpdir(), 'twogether-reopen-'));
   const databasePath = join(directory, 'test.sqlite');

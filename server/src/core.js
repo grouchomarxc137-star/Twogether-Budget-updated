@@ -598,6 +598,24 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
       if (existing && existing.finalized) throw new Error('This month is final and locked');
       const now = new Date().toISOString();
+      if (actor === 'Principe') {
+        state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
+        const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
+        const savingsUsed = function(record) {
+          return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
+        };
+        const previousSavingsUsed = savingsUsed(existing);
+        const nextSavingsUsed = savingsUsed(monthData);
+        const savingsDelta = money2_(nextSavingsUsed - previousSavingsUsed);
+        if (Math.abs(savingsDelta) > .005) {
+          const currentSavings = financeProfile.savingsTotal === '' ? 0 : Number(financeProfile.savingsTotal || 0);
+          if (savingsDelta > currentSavings + .005) throw new Error('Saved up only has €' + currentSavings.toFixed(2) + ' available');
+          financeProfile.savingsTotal = money2_(Math.max(0, currentSavings - savingsDelta));
+          financeProfile.updatedAt = now;
+          financeProfile.updatedBy = actor;
+          state.financeProfiles[actor] = financeProfile;
+        }
+      }
       monthData.updatedAt = now;
       monthData.updatedBy = actor;
       monthData.finalized = monthData.finalized === true;
@@ -619,7 +637,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         state.game[actor]=sanitizeGameProfile_(pstate);
       }
       saveState_(state);
-      return output_({ok:true, month:monthData.month,twosDelta:twosDelta,game:sanitizeGame_(state.game)});
+      return output_({ok:true, month:monthData.month,twosDelta:twosDelta,game:sanitizeGame_(state.game),financeProfile:sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor)});
     }
 
 
@@ -967,10 +985,11 @@ function sanitizeFinanceMonth_(record, actor) {
   });
   if (usesExtraBudget && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget});
 
-  let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return x.source && x.amount !== '' && Number(x.amount) > 0; }) : [];
+  const allowedExtraSources = actor === 'Principe' ? ['savings'] : ['creditcard','savings','main'];
+  let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
   if (!extraSpends.length) {
     const legacySourceRaw = String(record && record.extraOverspendSource || '');
-    const legacySource = legacySourceRaw === 'creditcard' || legacySourceRaw === 'savings' || legacySourceRaw === 'main' ? legacySourceRaw : '';
+    const legacySource = allowedExtraSources.indexOf(legacySourceRaw) >= 0 ? legacySourceRaw : '';
     const legacyAmount = cleanMoney_(record && record.extraOverspendAmount);
     if (legacySource && legacyAmount !== '' && Number(legacyAmount) > 0) extraSpends.push({id:Utilities.getUuid(),source:legacySource,amount:legacyAmount});
   }

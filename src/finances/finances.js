@@ -30,6 +30,7 @@ const FINANCE_RULES = {
   Principessa: {
     extraBudget: 250,
     extraTracking: true,
+    savedUpExtraTracking: false,
     investmentTracking: true,
     recurringIncomes: [
       { name: 'Neways', amount: 2051 },
@@ -55,6 +56,7 @@ const FINANCE_RULES = {
   Principe: {
     extraBudget: null,
     extraTracking: false,
+    savedUpExtraTracking: true,
     investmentTracking: false,
     recurringIncomes: [
       { name: 'Salary', amount: 1550 },
@@ -124,6 +126,7 @@ function manualGroups() {
 function nextAfterExpensesStage() {
   const rules = financeRules();
   if (rules.extraTracking) return 'extraSpentAsk';
+  if (rules.savedUpExtraTracking) return 'savedUpSpentAsk';
   if (rules.investmentTracking) return 'investmentTotal';
   return 'review';
 }
@@ -203,9 +206,14 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     copy.extraBudget = '';
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
   }
-  copy.extraSpends = rules.extraTracking && Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ id: x.id || uid(), source: ['creditcard', 'savings', 'main'].includes(String(x.source || '')) ? String(x.source) : '', amount: n(x.amount) })).filter((x) => x.source && x.amount > 0) : [];
-  if (!copy.extraSpends.length) {
-    const legacySource = ['creditcard', 'savings', 'main'].includes(String(copy.extraOverspendSource || '')) ? String(copy.extraOverspendSource) : '';
+  const allowedExtraSources = rules.extraTracking ? ['creditcard', 'savings', 'main'] : (rules.savedUpExtraTracking ? ['savings'] : []);
+  copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => {
+    const sourceRaw = String(x.source || '');
+    return { id: x.id || uid(), source: allowedExtraSources.includes(sourceRaw) ? sourceRaw : '', amount: n(x.amount) };
+  }).filter((x) => x.source && x.amount > 0) : [];
+  if (!copy.extraSpends.length && allowedExtraSources.length) {
+    const legacySourceRaw = String(copy.extraOverspendSource || '');
+    const legacySource = allowedExtraSources.includes(legacySourceRaw) ? legacySourceRaw : '';
     const legacyAmount = hasValue(copy.extraOverspendAmount) ? Math.max(0, n(copy.extraOverspendAmount)) : 0;
     if (legacySource && legacyAmount > 0) copy.extraSpends.push({ id: uid(), source: legacySource, amount: legacyAmount });
   }
@@ -625,7 +633,7 @@ function cloneRecord(rec) {
   const rules = financeRules();
   const copy = normalizeFinanceRecord(rec, actor());
   copy.extraBudget = rules.extraTracking ? (hasValue(copy.extraBudget) ? n(copy.extraBudget) : rules.extraBudget) : '';
-  copy.extraSpends = rules.extraTracking && Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ ...x, id: x.id || uid() })) : [];
+  copy.extraSpends = (rules.extraTracking || rules.savedUpExtraTracking) && Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ ...x, id: x.id || uid() })) : [];
   copy.extraOverspendSource = copy.extraSpends[0]?.source || '';
   copy.extraOverspendAmount = copy.extraSpends.reduce((sum, x) => sum + n(x.amount), 0);
   copy.finalized = copy.finalized === true; if (!copy.finalizedAt) copy.finalizedAt = '';
@@ -680,7 +688,10 @@ function startRecurringMonth(month) {
 }
 function groupedExpenseHtml(items, removable = false, extraSpends = []) {
   const rows = (items || []).map((x, index) => ({ ...x, index, group: normalizeGroup(x.group), tone: groupTone(x.group), isExtraSpend: false }));
-  extraSpendSummary({ extraSpends }).forEach((x) => rows.push({ group: 'extra', tone: 'budgets', name: extraSourceLabel(x.source), amount: x.amount, isExtraSpend: true, extraSource: x.source, index: -1 }));
+  extraSpendSummary({ extraSpends }).forEach((x) => {
+    const savedUpOnly = actor() === 'Principe' && x.source === 'savings';
+    rows.push({ group: savedUpOnly ? 'savings' : 'extra', tone: savedUpOnly ? 'wealth' : 'budgets', name: extraSourceLabel(x.source), amount: x.amount, isExtraSpend: true, extraSource: x.source, index: -1 });
+  });
   const grouped = {};
   rows.forEach((x) => (grouped[x.tone] || (grouped[x.tone] = [])).push(x));
   return categoryOrder().filter((tone) => grouped[tone]?.length).map((tone) => {
@@ -738,6 +749,38 @@ function renderWizard() {
     body.innerHTML = wizardHtml(`Update ${source.name}`, 'Change only this month’s amount. The value you save becomes next month’s suggestion.', `<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
     bindBack(() => { flow.stage = 'recurringCheck'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); source.amount = n(v); flow.temp = {}; flow.recurringIndex = idx + 1; flow.stage = 'recurringCheck'; renderWizard(); });
+    return;
+  }
+
+  if (flow.stage === 'savedUpSpentAsk') {
+    setProgress('SAVED UP', 64);
+    const entry = (d.extraSpends || []).find((x) => x.source === 'savings') || null;
+    const saved = entry ? `<div class="finance-reference finance-tone-wealth"><span>Saved up used</span><strong>${money(entry.amount)}</strong></div>` : '';
+    body.innerHTML = wizardHtml('Did you use money from Saved up?', 'If yes, enter how much you used. That amount will be subtracted from Principe’s Saved up total when the month is saved.', `${saved}<div class="finance-choice-stack"><button class="finance-choice" data-fin-saved-up-yes><div><strong>Yes</strong><small>${entry ? 'Update the amount used.' : 'Enter the amount used from Saved up.'}</small></div><span>→</span></button><button class="finance-choice" data-fin-saved-up-no><div><strong>No</strong><small>${entry ? 'Remove the saved-up spending from this month.' : 'No money used from Saved up.'}</small></div><span>→</span></button></div>`);
+    $('[data-fin-saved-up-yes]')?.addEventListener('click', () => { flow.stage = 'savedUpSpentAmount'; renderWizard(); });
+    $('[data-fin-saved-up-no]')?.addEventListener('click', () => {
+      d.extraSpends = (d.extraSpends || []).filter((x) => x.source !== 'savings');
+      flow.stage = flow.extraReturn === 'review' ? 'review' : nextAfterExtraStage();
+      flow.extraReturn = '';
+      renderWizard();
+    });
+    return;
+  }
+
+  if (flow.stage === 'savedUpSpentAmount') {
+    setProgress('SAVED UP', 70);
+    const entry = (d.extraSpends || []).find((x) => x.source === 'savings') || null;
+    body.innerHTML = wizardHtml('How much did you use from Saved up?', 'Enter the amount Principe used from his saved-up money.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${entry ? esc(String(entry.amount)) : ''}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save</button></div>`);
+    bindBack(() => { flow.stage = 'savedUpSpentAsk'; renderWizard(); });
+    $('[data-fin-next]')?.addEventListener('click', () => {
+      const v = $('#finMoney')?.value || '';
+      if (v === '' || !Number.isFinite(Number(v.replace(',', '.'))) || n(v) <= 0) return toast('Enter a valid amount', 'warn');
+      d.extraSpends = (d.extraSpends || []).filter((x) => x.source !== 'savings');
+      d.extraSpends.push({ id: entry?.id || uid(), source: 'savings', amount: n(v) });
+      flow.stage = flow.extraReturn === 'review' ? 'review' : nextAfterExtraStage();
+      flow.extraReturn = '';
+      renderWizard();
+    });
     return;
   }
 
@@ -893,17 +936,23 @@ function renderReview() {
   const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
   const expenseRows = groupedExpenseHtml(d.expenses, true, d.extraSpends || []) || '<div class="finance-empty">No expenses added.</div>';
   const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
+  const savedUpSpent = rules.savedUpExtraTracking ? (d.extraSpends || []).filter((x) => x.source === 'savings').reduce((sum, x) => sum + n(x.amount), 0) : 0;
+  const savedUpLine = savedUpSpent > 0 ? `<div class="finance-carry-note">${money(savedUpSpent)} will be taken from Saved up when this month is saved.</div>` : '';
   const debtLine = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
   const investmentLines = rules.investmentTracking ? (c.investmentTotal == null ? '<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>' : `<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div>`) : '';
-  const extraActions = rules.extraTracking ? (c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>') : '';
+  const extraActions = rules.extraTracking
+    ? (c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>')
+    : rules.savedUpExtraTracking
+      ? (savedUpSpent > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit Saved up spending</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log Saved up spending</button>')
+      : '';
   const investmentSection = rules.investmentTracking ? `<div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div>` : '';
-  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
+  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${savedUpLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
   $$('[data-fin-remove-income]').forEach((btn) => btn.addEventListener('click', () => { d.incomes.splice(Number(btn.dataset.finRemoveIncome), 1); renderReview(); }));
   $$('[data-fin-edit-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editExpenseIndex: Number(btn.dataset.finEditExpense) }; flow.stage = 'editExistingExpense'; renderWizard(); }));
   $$('[data-fin-remove-expense]').forEach((btn) => btn.addEventListener('click', () => { d.expenses.splice(Number(btn.dataset.finRemoveExpense), 1); renderReview(); }));
   $('[data-fin-add-income]')?.addEventListener('click', () => { flow.stage = 'incomeSource'; renderWizard(); });
   $('[data-fin-add-expense]')?.addEventListener('click', () => { flow.stage = 'expenseGroup'; renderWizard(); });
-  $('[data-fin-edit-extra-spend]')?.addEventListener('click', () => { flow.extraReturn = 'review'; flow.stage = 'extraSpentAsk'; renderWizard(); });
+  $('[data-fin-edit-extra-spend]')?.addEventListener('click', () => { flow.extraReturn = 'review'; flow.stage = rules.savedUpExtraTracking ? 'savedUpSpentAsk' : 'extraSpentAsk'; renderWizard(); });
   $('[data-fin-edit-investments]')?.addEventListener('click', () => { flow.stage = 'investmentTotal'; renderWizard(); });
   $('[data-fin-cancel]')?.addEventListener('click', resetWizard);
   $('[data-fin-save-draft]')?.addEventListener('click', () => saveMonth(false));
@@ -914,7 +963,8 @@ async function confirmExistingMonth(rec) {
   if (!rec || rec.finalized === true) return;
   const d = cloneRecord(rec); d.finalized = true; d.finalizedAt = new Date().toISOString();
   try {
-    await post('saveFinanceMonth', { monthData: d });
+    const result = await post('saveFinanceMonth', { monthData: d });
+    if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
     const list = financeState.finances[actor()] || []; const idx = list.findIndex((x) => x.month === d.month);
     const saved = { ...d, updatedAt: new Date().toISOString(), updatedBy: actor() };
     if (idx >= 0) list[idx] = saved; else list.push(saved);
@@ -928,7 +978,8 @@ async function saveMonth(finalize = false) {
   d.finalized = !!finalize; d.finalizedAt = finalize ? new Date().toISOString() : '';
   const btn = $(finalize ? '[data-fin-finalize]' : '[data-fin-save-draft]'); if (btn) btn.disabled = true;
   try {
-    await post('saveFinanceMonth', { monthData: d });
+    const result = await post('saveFinanceMonth', { monthData: d });
+    if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
     const list = financeState.finances[actor()] || [];
     const idx = list.findIndex((x) => x.month === d.month);
     const saved = { ...d, updatedAt: new Date().toISOString(), updatedBy: actor() };
