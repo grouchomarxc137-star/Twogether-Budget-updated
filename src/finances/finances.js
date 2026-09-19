@@ -439,7 +439,8 @@ function renderPage() {
   $$('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectedMonth = btn.dataset.finMonth;
     const rec = recordFor(selectedMonth);
-    rec ? renderDetail(rec) : startMonth(selectedMonth, true);
+    if (rec) renderDetail(rec);
+    else { flow = null; renderWizard(); }
   }));
   const detail = $('#financeDetail'); if (detail && !recordFor(selectedMonth)) detail.innerHTML = '';
 }
@@ -699,6 +700,22 @@ function cloneRecord(rec) {
 }
 
 function startMonth(month = '2026-09', skipMonth = false) { const target = month || selectedMonth; if (skipMonth) { startRecurringMonth(target); return; } flow = { data: freshRecord(target), stage: 'month', temp: {} }; renderWizard(); }
+function startPartialMonth(month = selectedMonth) { const target = month || selectedMonth || '2026-09'; flow = { data: freshRecord(target), stage: 'partialMonth', temp: {}, partialMode: true }; renderWizard(); }
+function partialRecurringExpenses(month) {
+  return (seededRecord(month).expenses || []).filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
+}
+function partialExpenseIndex(d, candidate) {
+  const name = String(candidate?.name || '').trim().toLowerCase(), group = normalizeGroup(candidate?.group);
+  return (d.expenses || []).findIndex((x) => normalizeGroup(x.group) === group && String(x.name || '').trim().toLowerCase() === name);
+}
+function startPartialExpenses(month) {
+  const target = month || selectedMonth;
+  const existing = recordFor(target);
+  if (existing?.finalized === true) return toast('This month is final and locked', 'warn');
+  flow = { data: existing ? cloneRecord(existing) : freshRecord(target), stage: 'partialChoose', temp: {}, partialMode: true };
+  selectedMonth = target;
+  renderWizard();
+}
 function startEdit(rec) { if (rec?.finalized === true) return toast('This month is final and locked', 'warn'); flow = { data: cloneRecord(rec), stage: 'review', temp: {} }; renderWizard(); }
 function resetWizard() { flow = null; renderWizard(); }
 function setProgress(label, pct) { const step = $('#financeWizardStep'), bar = $('#financeWizardProgress'); if (step) step.textContent = label; if (bar) bar.style.width = Math.max(8, Math.min(100, pct)) + '%'; }
@@ -775,15 +792,65 @@ function renderWizard() {
   if (!flow) {
     setProgress('MONTHLY FINANCES', 8);
     const intro = actor() === 'Principe' ? 'Income, fixed expenses, subscriptions, variable expenses and savings.' : 'Income, colored expenses, €250 Extra budget, savings and investments.';
-    body.innerHTML = wizardHtml(`Track ${actor()}’s month`, 'One question at a time, just like trip logging.', `<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Start a monthly check-in</strong><small>${esc(intro)}</small></div><span>→</span></button></div>`);
-    $('[data-fin-start]')?.addEventListener('click', () => startMonth(selectedMonth, false)); return;
+    body.innerHTML = wizardHtml(`Track ${actor()}’s month`, 'Choose whether you want to do the whole check-in or only log a few expenses for now.', `<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Log everything now</strong><small>${esc(intro)}</small></div><span>✓</span></button><button class="finance-choice" type="button" data-fin-start-partial><div><strong>Log some expenses now</strong><small>Pick only the expenses that happened so far and save the month as a draft.</small></div><span>＋</span></button></div>`);
+    $('[data-fin-start]')?.addEventListener('click', () => startMonth(selectedMonth, false));
+    $('[data-fin-start-partial]')?.addEventListener('click', () => startPartialMonth(selectedMonth));
+    return;
   }
   const d = flow.data, t = flow.temp || {};
+
+  if (flow.stage === 'partialMonth') {
+    setProgress('PARTIAL EXPENSES', 12);
+    body.innerHTML = wizardHtml('Which month are you adding expenses to?', 'You can keep coming back to the same draft throughout the month.', `<select class="finance-select" id="finMonthSelect">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === d.month ? 'selected' : ''}>${l}</option>`).join('')}</select><div class="finance-actions"><button class="btn ghost" data-fin-back>Cancel</button><button class="btn primary big" data-fin-next>Choose expenses</button></div>`);
+    bindBack(resetWizard);
+    $('[data-fin-next]')?.addEventListener('click', () => { const chosen = $('#finMonthSelect')?.value || d.month; startPartialExpenses(chosen); });
+    return;
+  }
+
+  if (flow.stage === 'partialChoose') {
+    setProgress('PARTIAL EXPENSES', 24);
+    const candidates = partialRecurringExpenses(d.month);
+    const choices = candidates.map((item, index) => {
+      const loggedIndex = partialExpenseIndex(d, item), logged = loggedIndex >= 0 ? d.expenses[loggedIndex] : null;
+      const tone = groupTone(item.group);
+      const date = financeDateLabel(logged?.date || item.date);
+      const detail = logged ? `Logged ${money(logged.amount)}${date ? ` · ${date}` : ''} · tap to edit` : `${money(item.amount)}${date ? ` · ${date}` : ''}`;
+      return `<button class="finance-choice finance-tone-${tone}" type="button" data-fin-partial-expense="${index}"><div><strong>${esc(item.name)}</strong><small>${esc(detail)}</small></div><span>${logged ? '↻' : '＋'}</span></button>`;
+    }).join('');
+    const loggedCount = (d.expenses || []).length;
+    body.innerHTML = wizardHtml('What do you want to log?', 'Choose only the expense that happened now. You can save and add the rest later.', `${choices ? `<div class="finance-choice-stack">${choices}</div>` : '<div class="finance-empty">No recurring expenses are set up yet.</div>'}<div class="finance-choice-stack" style="margin-top:10px"><button class="finance-choice finance-tone-other" type="button" data-fin-partial-custom><div><strong>Another expense</strong><small>Add a one-off or custom expense.</small></div><span>＋</span></button></div>${loggedCount ? `<div class="finance-reference" style="margin-top:14px"><span>Saved in this draft</span><strong>${loggedCount} expense${loggedCount === 1 ? '' : 's'}</strong></div>` : ''}<div class="finance-actions"><button class="btn ghost" type="button" data-fin-cancel>Cancel</button><button class="btn primary big" type="button" data-fin-save-draft>Save for later</button></div>`);
+    $('[data-fin-partial-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { partialCandidateIndex: Number(btn.dataset.finPartialExpense) }; flow.stage = 'partialExpense'; renderWizard(); }));
+    $('[data-fin-partial-custom]')?.addEventListener('click', () => { flow.temp = {}; flow.stage = 'expenseGroup'; renderWizard(); });
+    $('[data-fin-cancel]')?.addEventListener('click', resetWizard);
+    $('[data-fin-save-draft]')?.addEventListener('click', () => saveMonth(false));
+    return;
+  }
+
+  if (flow.stage === 'partialExpense') {
+    const candidates = partialRecurringExpenses(d.month), candidate = candidates[Number(t.partialCandidateIndex)];
+    if (!candidate) { flow.temp = {}; flow.stage = 'partialChoose'; renderWizard(); return; }
+    const loggedIndex = partialExpenseIndex(d, candidate), logged = loggedIndex >= 0 ? d.expenses[loggedIndex] : null;
+    const bounds = financeDateBounds(d.month), suggestedDate = normalizeFinanceDate(logged?.date || candidate.date, d.month);
+    setProgress('PARTIAL EXPENSE', 36);
+    body.innerHTML = wizardHtml(`Log ${candidate.name}`, 'Confirm the amount and date for this expense. The date can be left blank.', `<div class="finance-reference finance-tone-${groupTone(candidate.group)}"><span>${esc(categoryLabel(groupTone(candidate.group)))}</span><strong>${esc(candidate.name)}</strong><small>${logged ? 'Already in this draft — saving will update it.' : 'Only this expense will be added.'}</small></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(logged?.amount ?? candidate.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(suggestedDate)}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>${logged ? 'Update expense' : 'Add expense'}</button></div>`);
+    bindBack(() => { flow.temp = {}; flow.stage = 'partialChoose'; renderWizard(); });
+    $('[data-fin-next]')?.addEventListener('click', () => {
+      const amount = $('#finMoney')?.value || '', rawDate = String($('#finItemDate')?.value || '').trim(), safeDate = normalizeFinanceDate(rawDate, d.month);
+      if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+      if (rawDate && !safeDate) return toast('Choose a date inside this month, or leave it blank', 'warn');
+      const next = { ...(logged || {}), group: candidate.group, name: candidate.name, amount: n(amount), usualDay: candidate.usualDay ?? logged?.usualDay ?? '', date: safeDate };
+      if (loggedIndex >= 0) d.expenses[loggedIndex] = next; else d.expenses.push(next);
+      flow.temp = {};
+      flow.stage = 'partialChoose';
+      renderWizard();
+    });
+    return;
+  }
 
   if (flow.stage === 'month') {
     setProgress('QUESTION 1', 10);
     body.innerHTML = wizardHtml('Which month are you logging?', 'Choose the month these numbers belong to.', `<select class="finance-select" id="finMonthSelect">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === d.month ? 'selected' : ''}>${l}</option>`).join('')}</select><div class="finance-actions"><button class="btn ghost" data-fin-back>Cancel</button><button class="btn primary big" data-fin-next>Next</button></div>`);
-    bindBack(resetWizard); $('[data-fin-next]')?.addEventListener('click', () => { const chosen = $('#finMonthSelect')?.value || d.month; startRecurringMonth(chosen); }); return;
+    bindBack(resetWizard); $('[data-fin-next]')?.addEventListener('click', () => { const chosen = $('#finMonthSelect')?.value || d.month; const existing = recordFor(chosen); existing ? startEdit(existing) : startRecurringMonth(chosen); }); return;
   }
 
   if (flow.stage === 'recurringCheck') {
@@ -1005,7 +1072,7 @@ function renderWizard() {
   if (flow.stage === 'expenseGroup') {
     setProgress('EXPENSES', 42);
     const groupHelp = actor() === 'Principe' ? 'Colors follow his categories: Fixed expenses, Subscriptions, Variable expenses, Savings and Other.' : 'Colors follow your spreadsheet groups: Medical, Subscriptions, Budgets, Savings/Investments and Other.';
-    body.innerHTML = wizardHtml(d.expenses.length ? 'What kind of expense are you adding?' : 'What did you spend or set aside?', groupHelp, `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-group-grid">${manualGroups().map((g) => `<button class="finance-choice finance-tone-${g.tone}" data-fin-group="${g.key}"><div><strong>${esc(g.label)}</strong><small>${g.example ? esc(g.example) : g.defaultName ? 'Name filled automatically' : ''}</small></div><span>→</span></button>`).join('')}</div>${d.expenses.length ? '<div class="finance-actions"><button class="btn ghost" data-fin-exp-done>Done with expenses</button></div>' : ''}`);
+    body.innerHTML = wizardHtml(d.expenses.length ? 'What kind of expense are you adding?' : 'What did you spend or set aside?', groupHelp, `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-group-grid">${manualGroups().map((g) => `<button class="finance-choice finance-tone-${g.tone}" data-fin-group="${g.key}"><div><strong>${esc(g.label)}</strong><small>${g.example ? esc(g.example) : g.defaultName ? 'Name filled automatically' : ''}</small></div><span>→</span></button>`).join('')}</div>${flow.partialMode ? '<div class="finance-actions"><button class="btn ghost" data-fin-partial-back>Back to specific expenses</button></div>' : d.expenses.length ? '<div class="finance-actions"><button class="btn ghost" data-fin-exp-done>Done with expenses</button></div>' : ''}`);
     $$('[data-fin-group]').forEach((btn) => btn.addEventListener('click', () => {
       const meta = groupMeta(btn.dataset.finGroup); flow.temp = { group: meta.key };
       if (meta.optionalName) { flow.temp.name = meta.defaultName; flow.stage = 'expenseOptionalName'; }
@@ -1013,7 +1080,9 @@ function renderWizard() {
       else flow.stage = 'expenseName';
       renderWizard();
     }));
-    $('[data-fin-exp-done]')?.addEventListener('click', () => { flow.stage = nextAfterExpensesStage(); renderWizard(); }); return;
+    $('[data-fin-exp-done]')?.addEventListener('click', () => { flow.stage = nextAfterExpensesStage(); renderWizard(); });
+    $('[data-fin-partial-back]')?.addEventListener('click', () => { flow.temp = {}; flow.stage = 'partialChoose'; renderWizard(); });
+    return;
   }
 
   if (flow.stage === 'expenseName') {
@@ -1040,7 +1109,7 @@ function renderWizard() {
 
   if (flow.stage === 'expenseDate') {
     const bounds = financeDateBounds(d.month);
-    const saveExpense = (date) => { d.expenses.push({ group: t.group, name: t.name, amount: n(t.amount), date }); flow.temp = {}; flow.stage = 'expenseMore'; renderWizard(); };
+    const saveExpense = (date) => { d.expenses.push({ group: t.group, name: t.name, amount: n(t.amount), date }); flow.temp = {}; flow.stage = flow.partialMode ? 'partialChoose' : 'expenseMore'; renderWizard(); };
     body.innerHTML = wizardHtml(`When was ${t.name} removed?`, 'The date is optional. Leave it blank if there is no useful date to track.', `<label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><div><button class="btn ghost" data-fin-skip>Skip date</button><button class="btn primary big" data-fin-next>Save expense</button></div></div>`);
     bindBack(() => { flow.stage = 'expenseAmount'; renderWizard(); });
     $('[data-fin-skip]')?.addEventListener('click', () => saveExpense(''));
