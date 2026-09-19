@@ -916,7 +916,7 @@ function sanitizeFinanceIncome_(item) {
 }
 
 function sanitizeFinanceExpense_(item) {
-  const allowed = ['medical','subscriptions','rent','transport','groceries','extra','savings','investments','other'];
+  const allowed = ['fixed','medical','subscriptions','rent','transport','groceries','variable','extra','savings','investments','other'];
   let group = String(item && item.group || '');
   if (group === 'health') group = 'medical';
   if (group === 'living') group = 'rent';
@@ -952,18 +952,20 @@ function sanitizeFinancePlanning_(value){const s=value&&typeof value==='object'?
 function sanitizeFinanceMonth_(record, actor) {
   const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
   let expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
+  const usesExtraBudget = actor !== 'Principe';
   const rawBudget = cleanMoney_(record && record.extraBudget);
-  const extraBudget = rawBudget === '' ? 250 : rawBudget;
+  const extraBudget = usesExtraBudget ? (rawBudget === '' ? 250 : rawBudget) : '';
   let foundFixedExtra = false;
   expenses = expenses.filter(function(x){
     if (x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') {
+      if (!usesExtraBudget) return false;
       if (foundFixedExtra) return false;
       foundFixedExtra = true;
       x.amount = extraBudget;
     }
     return true;
   });
-  if (!foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget});
+  if (usesExtraBudget && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget});
 
   let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return x.source && x.amount !== '' && Number(x.amount) > 0; }) : [];
   if (!extraSpends.length) {
