@@ -63,7 +63,7 @@ function renderPrep(move = null) {
   body.innerHTML = `<span class="panel-kicker">${esc(plan?.meta?.city || 'TRIP')}</span><h2>Prepare for trip</h2><p>Tick things off, edit them, or add your own. Completed items move neatly underneath.</p><section class="v33-prep-section"><h3>Packing / things to take</h3>${prepRows('packing', prep.packing)}</section><section class="v33-prep-section"><h3>Important trip reminders</h3>${prepRows('reminders', prep.reminders)}</section>${completedRows(prep)}<button class="btn primary v33-prep-save" type="button" data-prep-save>Save checklist</button>`;
   bindPrep();
   if (move?.id) requestAnimationFrame(() => {
-    const row = $('[data-prep-id]', modal).find((x) => x.dataset.prepId === move.id);
+    const row = $$('[data-prep-id]', modal).find((x) => x.dataset.prepId === move.id);
     if (!row) return;
     row.classList.add('just-arrived');
     setTimeout(() => row.classList.remove('just-arrived'), 480);
@@ -71,7 +71,7 @@ function renderPrep(move = null) {
 }
 function bindPrep() {
   const modal = $('#v33PrepModal'), prep = modal._prep;
-  $('[data-prep-id]', modal).forEach((row) => {
+  $$('[data-prep-id]', modal).forEach((row) => {
     const list = row.dataset.prepKind || row.closest('[data-prep-list]')?.dataset.prepList;
     const item = prep[list]?.find((x) => x.id === row.dataset.prepId);
     if (!item) return;
