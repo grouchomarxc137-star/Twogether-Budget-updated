@@ -94,6 +94,54 @@ let loading = false;
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const monthLabel = (m) => MONTHS.find((x) => x[0] === m)?.[1] || m;
 
+function normalizeRecurringDay(value) {
+  if (value === '' || value == null) return '';
+  const day = Number(value);
+  return Number.isInteger(day) && day >= 1 && day <= 31 ? day : '';
+}
+function ordinalDay(value) {
+  const day = normalizeRecurringDay(value);
+  if (day === '') return '';
+  const mod100 = day % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] || 'th');
+  return `${day}${suffix}`;
+}
+function daysInFinanceMonth(month) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
+  if (!match) return 31;
+  return new Date(Number(match[1]), Number(match[2]), 0).getDate();
+}
+function financeDateForDay(month, value) {
+  const day = normalizeRecurringDay(value);
+  if (day === '' || !/^\d{4}-\d{2}$/.test(String(month || ''))) return '';
+  const actualDay = Math.min(day, daysInFinanceMonth(month));
+  return `${month}-${String(actualDay).padStart(2, '0')}`;
+}
+function normalizeFinanceDate(value, month = '') {
+  const text = String(value || '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return '';
+  const year = Number(match[1]), monthNumber = Number(match[2]), day = Number(match[3]);
+  const date = new Date(Date.UTC(year, monthNumber - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== monthNumber - 1 || date.getUTCDate() !== day) return '';
+  if (month && !text.startsWith(`${month}-`)) return '';
+  return text;
+}
+function financeDateLabel(value) {
+  const safe = normalizeFinanceDate(value);
+  if (!safe) return '';
+  const [year, month, day] = safe.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+function financeDateMeta(value) {
+  const label = financeDateLabel(value);
+  return label ? `<small class="finance-item-date">${esc(label)}</small>` : '';
+}
+function financeDateBounds(month) {
+  const lastDay = String(daysInFinanceMonth(month)).padStart(2, '0');
+  return { min: `${month}-01`, max: `${month}-${lastDay}` };
+}
+
 function normalizeGroup(value) {
   const g = String(value || 'other');
   if (g === 'health') return 'medical';
@@ -136,8 +184,8 @@ function normalizeRecurringConfig(value) {
   const v = value && typeof value === 'object' ? value : {};
   return {
     custom: v.custom === true,
-    incomes: Array.isArray(v.incomes) ? v.incomes.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), amount: x.amount ?? '' })).filter((x) => x.name) : [],
-    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '' })).filter((x) => x.name) : [],
+    incomes: Array.isArray(v.incomes) ? v.incomes.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day) })).filter((x) => x.name) : [],
+    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day) })).filter((x) => x.name) : [],
   };
 }
 function freshProfile() {
@@ -171,10 +219,10 @@ function recurringDefaults() {
   const latest = [...ownMonths()].sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
   return {
     custom: false,
-    incomes: rules.recurringIncomes.map((x) => ({ id: uid(), name: x.name, amount: recurringValue(latest, 'income', x.name, x.amount) })),
+    incomes: rules.recurringIncomes.map((x) => ({ id: uid(), name: x.name, amount: recurringValue(latest, 'income', x.name, x.amount), day: normalizeRecurringDay(x.day) })),
     expenses: rules.recurringExpenses
       .filter((x) => normalizeGroup(x.group) !== 'extra')
-      .map((x) => ({ id: uid(), group: x.group, name: x.name, amount: recurringValue(latest, 'expense', x.name, x.amount) })),
+      .map((x) => ({ id: uid(), group: x.group, name: x.name, amount: recurringValue(latest, 'expense', x.name, x.amount), day: normalizeRecurringDay(x.day) })),
   };
 }
 function recurringConfig() {
@@ -194,14 +242,15 @@ function hasValue(v) { return v !== '' && v != null; }
 function normalizeFinanceRecord(rec, owner = actor()) {
   const copy = JSON.parse(JSON.stringify(rec || {}));
   const rules = financeRules(owner);
-  copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({ ...x, group: normalizeGroup(x.group) })) : [];
+  copy.incomes = Array.isArray(copy.incomes) ? copy.incomes.map((x) => ({ ...x, date: normalizeFinanceDate(x.date, copy.month) })) : [];
+  copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({ ...x, group: normalizeGroup(x.group), date: normalizeFinanceDate(x.date, copy.month) })) : [];
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
   if (rules.extraTracking) {
     const storedBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : (fixedExtras.length && hasValue(fixedExtras[0].amount) ? n(fixedExtras[0].amount) : rules.extraBudget);
     copy.extraBudget = storedBudget;
     copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
-    if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget });
-    copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') x.amount = storedBudget; });
+    if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget, date: '' });
+    copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') { x.amount = storedBudget; x.date = ''; } });
   } else {
     copy.extraBudget = '';
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
@@ -446,7 +495,9 @@ function renderScenarioPanel() {
 function recurringRow(kind, item, index) {
   const tone = kind === 'income' ? 'other' : groupTone(item.group);
   const sub = kind === 'income' ? 'Income' : (actor() === 'Principe' ? categoryLabel(tone) : groupLabel(item.group));
-  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(sub)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
+  const day = normalizeRecurringDay(item.day);
+  const timing = day === '' ? 'Date optional' : `Usually ${ordinalDay(day)}`;
+  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(sub)} · ${esc(timing)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
 }
 
 function openRecurringManager() {
@@ -479,17 +530,20 @@ function openRecurringEditor(kind, index) {
   const groups = recurringExpenseGroups();
   const selectedGroup = item?.group || groups[0]?.key || 'other';
   const groupField = isExpense ? `<label>Category<select id="finRecurringGroup">${groups.map((g) => `<option value="${g.key}" ${g.key === selectedGroup ? 'selected' : ''}>${esc(g.label)}</option>`).join('')}</select></label>` : '';
-  showMini(`<span class="panel-kicker">RECURRING ${isExpense ? 'OUTFLOW' : 'INCOME'}</span><h2>${item ? 'Edit recurring item' : 'Add recurring item'}</h2><p>This changes what is suggested in future monthly check-ins. It will not rewrite saved months.</p><div class="finance-mini-fields"><label>Name<input id="finRecurringName" value="${esc(item?.name || '')}" placeholder="${isExpense ? 'e.g. Spotify' : 'e.g. Salary'}"></label>${groupField}<label>Usual amount<div class="finance-money mini"><span>€</span><input id="finRecurringAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-recurring-delete>Remove</button>' : '<button class="btn ghost" type="button" data-fin-recurring-back>Back</button>'}<button class="btn primary" type="button" data-fin-recurring-save>Save</button></div>`);
+  showMini(`<span class="panel-kicker">RECURRING ${isExpense ? 'OUTFLOW' : 'INCOME'}</span><h2>${item ? 'Edit recurring item' : 'Add recurring item'}</h2><p>This changes what is suggested in future monthly check-ins. The usual day is optional and can still be changed for a specific month.</p><div class="finance-mini-fields"><label>Name<input id="finRecurringName" value="${esc(item?.name || '')}" placeholder="${isExpense ? 'e.g. Spotify' : 'e.g. Salary'}"></label>${groupField}<label>Usual amount<div class="finance-money mini"><span>€</span><input id="finRecurringAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label><label>Usual day of month <small>Optional · e.g. 30</small><input id="finRecurringDay" type="number" inputmode="numeric" min="1" max="31" value="${esc(String(item?.day ?? ''))}" placeholder="Day"></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-recurring-delete>Remove</button>' : '<button class="btn ghost" type="button" data-fin-recurring-back>Back</button>'}<button class="btn primary" type="button" data-fin-recurring-save>Save</button></div>`);
   $('[data-fin-recurring-back]')?.addEventListener('click', openRecurringManager);
   $('[data-fin-recurring-save]')?.addEventListener('click', async () => {
     const name = String($('#finRecurringName')?.value || '').trim();
     const amount = $('#finRecurringAmount')?.value || '';
+    const dayRaw = String($('#finRecurringDay')?.value || '').trim();
+    const day = normalizeRecurringDay(dayRaw);
     if (!name) return toast('Add a name first', 'warn');
     if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+    if (dayRaw && day === '') return toast('Choose a day from 1 to 31, or leave it blank', 'warn');
     const next = profile();
     const nextConfig = recurringConfig();
     nextConfig.custom = true;
-    const row = { id: item?.id || uid(), name, amount: n(amount) };
+    const row = { id: item?.id || uid(), name, amount: n(amount), day };
     if (isExpense) row.group = $('#finRecurringGroup')?.value || selectedGroup;
     const target = isExpense ? nextConfig.expenses : nextConfig.incomes;
     if (index >= 0) target[index] = row; else target.push(row);
@@ -527,7 +581,7 @@ function renderDetail(rec) {
   const rules = financeRules();
   const c = calc(rec), gl = rules.investmentTracking ? investmentGL(rec) : null, carry = extraCarryInfo(rec.month);
   const expenses = groupedExpenseHtml(rec.expenses || [], false, rec.extraSpends || []);
-  const incomes = (rec.incomes || []).map((x) => `<div class="finance-breakdown-row"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></div>`).join('');
+  const incomes = (rec.incomes || []).map((x) => `<div class="finance-breakdown-row"><span>${esc(x.name)}${financeDateMeta(x.date)}</span><strong>${money(x.amount)}</strong></div>`).join('');
   const extraStatus = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
   const debtStatus = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
   const investmentBlock = rules.investmentTracking && c.investmentTotal != null ? `<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div>` : '';
@@ -650,7 +704,7 @@ function resetWizard() { flow = null; renderWizard(); }
 function setProgress(label, pct) { const step = $('#financeWizardStep'), bar = $('#financeWizardProgress'); if (step) step.textContent = label; if (bar) bar.style.width = Math.max(8, Math.min(100, pct)) + '%'; }
 function wizardHtml(title, help, body) { return `<div class="finance-question"><h2>${esc(title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${body}</div>`; }
 function bindBack(next) { $('[data-fin-back]')?.addEventListener('click', next); }
-function listHtml(items, labelFn) { return items?.length ? `<div class="finance-list">${items.map((x) => `<div class="finance-list-row"><span>${esc(labelFn(x))}</span><strong>${money(x.amount)}</strong></div>`).join('')}</div>` : ''; }
+function listHtml(items, labelFn) { return items?.length ? `<div class="finance-list">${items.map((x) => `<div class="finance-list-row"><span>${esc(labelFn(x))}${financeDateMeta(x.date)}</span><strong>${money(x.amount)}</strong></div>`).join('')}</div>` : ''; }
 
 function latestPriorMonth(month) {
   return [...ownMonths()].filter((x) => String(x.month) < String(month)).sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
@@ -670,9 +724,15 @@ function seededRecord(month) {
     expenses: rules.recurringExpenses.filter((x) => normalizeGroup(x.group) !== 'extra'),
   };
   d.extraBudget = rules.extraTracking ? carry.budget : '';
-  d.incomes = setup.incomes.map((x) => ({ name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'income', x.name, x.amount) }));
-  d.expenses = setup.expenses.map((x) => ({ group: x.group, name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount) }));
-  if (rules.extraTracking) d.expenses.push({ group: 'extra', name: 'Extra', amount: carry.budget });
+  d.incomes = setup.incomes.map((x) => {
+    const usualDay = normalizeRecurringDay(x.day);
+    return { name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'income', x.name, x.amount), usualDay, date: financeDateForDay(month, usualDay) };
+  });
+  d.expenses = setup.expenses.map((x) => {
+    const usualDay = normalizeRecurringDay(x.day);
+    return { group: x.group, name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount), usualDay, date: financeDateForDay(month, usualDay) };
+  });
+  if (rules.extraTracking) d.expenses.push({ group: 'extra', name: 'Extra', amount: carry.budget, usualDay: '', date: '' });
   d.extraSpends = [];
   return d;
 }
@@ -703,7 +763,7 @@ function groupedExpenseHtml(items, removable = false, extraSpends = []) {
       const fixedExtra = !x.isExtraSpend && normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra';
       const rowClass = x.isExtraSpend ? ' finance-extra-spend-row' : fixedExtra && n(x.amount) < 250 ? ' finance-reduced-extra' : '';
       const controls = removable && !x.isExtraSpend ? ` <button class="text-btn" data-fin-edit-expense="${x.index}">Edit</button> <button class="text-btn" data-fin-remove-expense="${x.index}">×</button>` : '';
-      return `<div class="finance-category-item${rowClass}"><span>${esc(x.name || groupLabel(x.group))}</span><strong>${money(x.amount)}${controls}</strong></div>`;
+      return `<div class="finance-category-item${rowClass}"><span>${esc(x.name || groupLabel(x.group))}${financeDateMeta(x.date)}</span><strong>${money(x.amount)}${controls}</strong></div>`;
     }).join('');
     return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(categoryLabel(tone))}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
   }).join('');
@@ -736,11 +796,32 @@ function renderWizard() {
     const pct = 12 + Math.round(((idx + 1) / Math.max(1, queue.length)) * 48);
     setProgress(`CHECKING ${idx + 1} OF ${queue.length}`, pct);
     const carry = extraCarryInfo(d.month);
-    const help = isFixedExtra ? (n(d.extraBudget) < 250 ? `Your normal €250 Extra is reduced this month because you used extra money in ${monthLabel(carry.prevMonth)}.${carry.debt > 0 ? ` You still owe yourself ${money(carry.debt)} from last month.` : ''}` : 'This is your normal monthly Extra allocation. You do not need to itemize what the budget itself is spent on.') : `Recurring ${item.kind === 'income' ? 'income' : meta.label.toLowerCase()}. Confirm it if it is still correct, or edit only the amount.`;
+    const usualDay = normalizeRecurringDay(source.usualDay);
+    if (!isFixedExtra && usualDay !== '' && !normalizeFinanceDate(source.date, d.month)) source.date = financeDateForDay(d.month, usualDay);
+    const scheduledLabel = financeDateLabel(source.date);
+    const actionText = item.kind === 'income' ? 'added to your account' : 'removed from your account';
+    const bounds = financeDateBounds(d.month);
+    const help = isFixedExtra
+      ? (n(d.extraBudget) < 250 ? `Your normal €250 Extra is reduced this month because you used extra money in ${monthLabel(carry.prevMonth)}.${carry.debt > 0 ? ` You still owe yourself ${money(carry.debt)} from last month.` : ''}` : 'This is your normal monthly Extra allocation. You do not need to itemize what the budget itself is spent on.')
+      : usualDay !== ''
+        ? `Was ${source.name} ${actionText} on ${scheduledLabel}?`
+        : `No usual date is set for ${source.name}. Add the date for this month if you want, or leave it blank.`;
+    const dateField = !isFixedExtra && usualDay === '' ? `<label class="finance-date-field"><span>Actual date <small>Optional</small></span><input class="finance-input" id="finRecurringDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(source.date, d.month))}"></label>` : '';
     const editButton = isFixedExtra ? '' : `<button class="btn ghost" type="button" data-fin-recurring-edit>Edit</button>`;
     const extraClass = isFixedExtra && n(d.extraBudget) < 250 ? ' finance-extra-budget-reduced' : '';
-    body.innerHTML = wizardHtml(`${source.name} · ${money(source.amount)}?`, help, `<div class="finance-reference finance-tone-${meta.tone}${extraClass}"><span>${esc(meta.label)}</span><strong>${esc(source.name)}</strong><small>${isFixedExtra ? 'Monthly Extra budget' : 'Usual amount'} · ${money(source.amount)}</small></div><div class="finance-actions">${editButton}<button class="btn primary big" type="button" data-fin-recurring-confirm>Confirm</button></div>`);
-    $('[data-fin-recurring-confirm]')?.addEventListener('click', () => { flow.recurringIndex = idx + 1; renderWizard(); });
+    const timing = !isFixedExtra && scheduledLabel ? ` · ${scheduledLabel}` : '';
+    body.innerHTML = wizardHtml(`${source.name} · ${money(source.amount)}?`, help, `<div class="finance-reference finance-tone-${meta.tone}${extraClass}"><span>${esc(meta.label)}</span><strong>${esc(source.name)}</strong><small>${isFixedExtra ? 'Monthly Extra budget' : 'Usual amount'} · ${money(source.amount)}${timing}</small></div>${dateField}<div class="finance-actions">${editButton}<button class="btn primary big" type="button" data-fin-recurring-confirm>Confirm</button></div>`);
+    $('[data-fin-recurring-confirm]')?.addEventListener('click', () => {
+      const dateInput = $('#finRecurringDate');
+      if (dateInput) {
+        const raw = String(dateInput.value || '').trim();
+        const safe = normalizeFinanceDate(raw, d.month);
+        if (raw && !safe) return toast('Choose a date inside this month, or leave it blank', 'warn');
+        source.date = safe;
+      }
+      flow.recurringIndex = idx + 1;
+      renderWizard();
+    });
     $('[data-fin-recurring-edit]')?.addEventListener('click', () => { flow.temp = { recurringItem: item }; flow.stage = 'recurringEdit'; renderWizard(); });
     return;
   }
@@ -748,10 +829,23 @@ function renderWizard() {
   if (flow.stage === 'recurringEdit') {
     const item = t.recurringItem, source = recurringSource(item, d), idx = Number(flow.recurringIndex || 0);
     if (!item || !source) { flow.stage = 'recurringCheck'; renderWizard(); return; }
+    const bounds = financeDateBounds(d.month);
     setProgress(`EDITING ${idx + 1} OF ${(flow.recurringQueue || []).length}`, 20 + Math.round(((idx + 1) / Math.max(1, (flow.recurringQueue || []).length)) * 40));
-    body.innerHTML = wizardHtml(`Update ${source.name}`, 'Change only this month’s amount. The value you save becomes next month’s suggestion.', `<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
+    body.innerHTML = wizardHtml(`Update ${source.name}`, 'Change this month’s amount or actual date. The recurring default stays unchanged.', `<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Actual date <small>Optional</small></span><input class="finance-input" id="finRecurringDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(source.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
     bindBack(() => { flow.stage = 'recurringCheck'; renderWizard(); });
-    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); source.amount = n(v); flow.temp = {}; flow.recurringIndex = idx + 1; flow.stage = 'recurringCheck'; renderWizard(); });
+    $('[data-fin-next]')?.addEventListener('click', () => {
+      const v = $('#finMoney')?.value || '';
+      const rawDate = String($('#finRecurringDate')?.value || '').trim();
+      const safeDate = normalizeFinanceDate(rawDate, d.month);
+      if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+      if (rawDate && !safeDate) return toast('Choose a date inside this month, or leave it blank', 'warn');
+      source.amount = n(v);
+      source.date = safeDate;
+      flow.temp = {};
+      flow.recurringIndex = idx + 1;
+      flow.stage = 'recurringCheck';
+      renderWizard();
+    });
     return;
   }
 
@@ -845,7 +939,17 @@ function renderWizard() {
     setProgress('INCOME', 27);
     body.innerHTML = wizardHtml(`How much came from ${t.name}?`, 'Enter the amount you actually received.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { flow.stage = 'incomeSource'; renderWizard(); });
-    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); d.incomes.push({ name: t.name, amount: n(v) }); flow.temp = {}; flow.stage = 'incomeMore'; renderWizard(); }); return;
+    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); t.amount = n(v); flow.stage = 'incomeDate'; renderWizard(); }); return;
+  }
+
+  if (flow.stage === 'incomeDate') {
+    const bounds = financeDateBounds(d.month);
+    const saveIncome = (date) => { d.incomes.push({ name: t.name, amount: n(t.amount), date }); flow.temp = {}; flow.stage = 'incomeMore'; renderWizard(); };
+    body.innerHTML = wizardHtml(`When was ${t.name} added?`, 'The date is optional. Leave it blank if there is no useful date to track.', `<label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><div><button class="btn ghost" data-fin-skip>Skip date</button><button class="btn primary big" data-fin-next>Save income</button></div></div>`);
+    bindBack(() => { flow.stage = 'incomeAmount'; renderWizard(); });
+    $('[data-fin-skip]')?.addEventListener('click', () => saveIncome(''));
+    $('[data-fin-next]')?.addEventListener('click', () => { const raw = String($('#finItemDate')?.value || '').trim(); const safe = normalizeFinanceDate(raw, d.month); if (raw && !safe) return toast('Choose a date inside this month, or leave it blank', 'warn'); saveIncome(safe); });
+    return;
   }
 
   if (flow.stage === 'incomeMore') {
@@ -854,13 +958,47 @@ function renderWizard() {
     $('[data-fin-yes]')?.addEventListener('click', () => { flow.stage = 'incomeSource'; renderWizard(); }); $('[data-fin-no]')?.addEventListener('click', () => { flow.stage = 'expenseGroup'; renderWizard(); }); return;
   }
 
+  if (flow.stage === 'editExistingIncome') {
+    const idx = Number(t.editIncomeIndex), item = d.incomes?.[idx];
+    if (!item) { flow.temp = {}; flow.stage = 'review'; renderWizard(); return; }
+    const bounds = financeDateBounds(d.month);
+    setProgress('EDIT INCOME', 34);
+    body.innerHTML = wizardHtml(`Edit ${item.name}`, 'Update the amount or date for this saved draft income.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    bindBack(() => { flow.temp = {}; flow.stage = 'review'; renderWizard(); });
+    $('[data-fin-next]')?.addEventListener('click', () => {
+      const v = $('#finMoney')?.value || '';
+      const raw = String($('#finItemDate')?.value || '').trim();
+      const safe = normalizeFinanceDate(raw, d.month);
+      if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+      if (raw && !safe) return toast('Choose a date inside this month, or leave it blank', 'warn');
+      item.amount = n(v);
+      item.date = safe;
+      flow.temp = {};
+      flow.stage = 'review';
+      renderWizard();
+    });
+    return;
+  }
+
   if (flow.stage === 'editExistingExpense') {
     const idx = Number(t.editExpenseIndex), item = d.expenses?.[idx];
     if (!item) { flow.temp = {}; flow.stage = 'review'; renderWizard(); return; }
+    const bounds = financeDateBounds(d.month);
     setProgress('EDIT EXPENSE', 58);
-    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. You can keep changing it until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(categoryLabel(groupTone(item.group)))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. Amount and date stay editable until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(categoryLabel(groupTone(item.group)))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = 'review'; renderWizard(); });
-    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); item.amount = n(v); flow.temp = {}; flow.stage = 'review'; renderWizard(); });
+    $('[data-fin-next]')?.addEventListener('click', () => {
+      const v = $('#finMoney')?.value || '';
+      const raw = String($('#finItemDate')?.value || '').trim();
+      const safe = normalizeFinanceDate(raw, d.month);
+      if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+      if (raw && !safe) return toast('Choose a date inside this month, or leave it blank', 'warn');
+      item.amount = n(v);
+      item.date = safe;
+      flow.temp = {};
+      flow.stage = 'review';
+      renderWizard();
+    });
     return;
   }
 
@@ -897,7 +1035,17 @@ function renderWizard() {
     const meta = groupMeta(t.group); setProgress('EXPENSES', 56);
     body.innerHTML = wizardHtml(`How much was ${t.name}?`, meta.key === 'extra' ? `This counts toward your ${money(hasValue(d.extraBudget) ? d.extraBudget : 250)} monthly Extra budget.` : 'Enter the amount for this month.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { if (meta.optionalName) flow.stage = 'expenseOptionalName'; else if (meta.defaultName) flow.stage = 'expenseGroup'; else flow.stage = 'expenseName'; renderWizard(); });
-    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); d.expenses.push({ group: t.group, name: t.name, amount: n(v) }); flow.temp = {}; flow.stage = 'expenseMore'; renderWizard(); }); return;
+    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); t.amount = n(v); flow.stage = 'expenseDate'; renderWizard(); }); return;
+  }
+
+  if (flow.stage === 'expenseDate') {
+    const bounds = financeDateBounds(d.month);
+    const saveExpense = (date) => { d.expenses.push({ group: t.group, name: t.name, amount: n(t.amount), date }); flow.temp = {}; flow.stage = 'expenseMore'; renderWizard(); };
+    body.innerHTML = wizardHtml(`When was ${t.name} removed?`, 'The date is optional. Leave it blank if there is no useful date to track.', `<label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><div><button class="btn ghost" data-fin-skip>Skip date</button><button class="btn primary big" data-fin-next>Save expense</button></div></div>`);
+    bindBack(() => { flow.stage = 'expenseAmount'; renderWizard(); });
+    $('[data-fin-skip]')?.addEventListener('click', () => saveExpense(''));
+    $('[data-fin-next]')?.addEventListener('click', () => { const raw = String($('#finItemDate')?.value || '').trim(); const safe = normalizeFinanceDate(raw, d.month); if (raw && !safe) return toast('Choose a date inside this month, or leave it blank', 'warn'); saveExpense(safe); });
+    return;
   }
 
   if (flow.stage === 'expenseMore') {
@@ -936,7 +1084,7 @@ function renderReview() {
   const body = $('#financeWizardBody'); if (!body || !flow) return;
   const rules = financeRules();
   const d = flow.data, c = calc(d), gl = rules.investmentTracking ? investmentGL(d) : null, carry = extraCarryInfo(d.month); setProgress('REVIEW', 100);
-  const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
+  const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}${financeDateMeta(x.date)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-edit-income="${i}">Edit</button> <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
   const expenseRows = groupedExpenseHtml(d.expenses, true, d.extraSpends || []) || '<div class="finance-empty">No expenses added.</div>';
   const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
   const savedUpSpent = rules.savedUpExtraTracking ? (d.extraSpends || []).filter((x) => x.source === 'savings').reduce((sum, x) => sum + n(x.amount), 0) : 0;
@@ -950,6 +1098,7 @@ function renderReview() {
       : '';
   const investmentSection = rules.investmentTracking ? `<div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div>` : '';
   body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${savedUpLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
+  $$('[data-fin-edit-income]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editIncomeIndex: Number(btn.dataset.finEditIncome) }; flow.stage = 'editExistingIncome'; renderWizard(); }));
   $$('[data-fin-remove-income]').forEach((btn) => btn.addEventListener('click', () => { d.incomes.splice(Number(btn.dataset.finRemoveIncome), 1); renderReview(); }));
   $$('[data-fin-edit-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editExpenseIndex: Number(btn.dataset.finEditExpense) }; flow.stage = 'editExistingExpense'; renderWizard(); }));
   $$('[data-fin-remove-expense]').forEach((btn) => btn.addEventListener('click', () => { d.expenses.splice(Number(btn.dataset.finRemoveExpense), 1); renderReview(); }));

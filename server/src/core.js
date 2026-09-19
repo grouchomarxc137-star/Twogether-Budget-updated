@@ -929,8 +929,23 @@ function isTripLocked_(trip) {
   return !!(trip && trip.confirmed && trip.confirmed.Principessa && trip.confirmed.Principe);
 }
 
+function cleanFinanceDate_(value) {
+  const text = cleanText_(value, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return '';
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? text : '';
+}
+
+function cleanRecurringDay_(value) {
+  if (value === '' || value == null) return '';
+  const day = Number(value);
+  return Number.isInteger(day) && day >= 1 && day <= 31 ? day : '';
+}
+
 function sanitizeFinanceIncome_(item) {
-  return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
+  return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
 }
 
 function sanitizeFinanceExpense_(item) {
@@ -939,7 +954,7 @@ function sanitizeFinanceExpense_(item) {
   if (group === 'health') group = 'medical';
   if (group === 'living') group = 'rent';
   if (allowed.indexOf(group) < 0) group = 'other';
-  return {group:group, name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount)};
+  return {group:group, name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
 }
 
 function sanitizeFinanceReserved_(item) {
@@ -968,8 +983,13 @@ function sanitizeFinancePlanningItem_(item){
 function sanitizeFinancePlanning_(value){const s=value&&typeof value==='object'?value:{};return {items:(Array.isArray(s.items)?s.items:[]).slice(0,120).map(sanitizeFinancePlanningItem_).filter(function(x){return !!x.name;}),openingSavings:cleanMoney_(s.openingSavings),updatedAt:cleanText_(s.updatedAt,40)};}
 
 function sanitizeFinanceMonth_(record, actor) {
+  const month = cleanText_(record && record.month, 10);
   const incomes = Array.isArray(record && record.incomes) ? record.incomes.slice(0,40).map(sanitizeFinanceIncome_).filter(x => x.name && x.amount !== '') : [];
   let expenses = Array.isArray(record && record.expenses) ? record.expenses.slice(0,100).map(sanitizeFinanceExpense_).filter(x => x.name && x.amount !== '') : [];
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    incomes.forEach(function(x){ if (x.date && x.date.slice(0,7) !== month) x.date = ''; });
+    expenses.forEach(function(x){ if (x.date && x.date.slice(0,7) !== month) x.date = ''; });
+  }
   const usesExtraBudget = actor !== 'Principe';
   const rawBudget = cleanMoney_(record && record.extraBudget);
   const extraBudget = usesExtraBudget ? (rawBudget === '' ? 250 : rawBudget) : '';
@@ -980,10 +1000,11 @@ function sanitizeFinanceMonth_(record, actor) {
       if (foundFixedExtra) return false;
       foundFixedExtra = true;
       x.amount = extraBudget;
+      x.date = '';
     }
     return true;
   });
-  if (usesExtraBudget && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget});
+  if (usesExtraBudget && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget, date:''});
 
   const allowedExtraSources = actor === 'Principe' ? ['savings'] : ['creditcard','savings','main'];
   let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
@@ -995,7 +1016,7 @@ function sanitizeFinanceMonth_(record, actor) {
   }
   const legacyTotal = extraSpends.reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
   return {
-    month: cleanText_(record && record.month, 10),
+    month: month,
     incomes: incomes,
     expenses: expenses,
     extraBudget: extraBudget,
@@ -1079,7 +1100,8 @@ function sanitizeRecurringIncome_(item) {
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     name: cleanText_(item && item.name, 100),
-    amount: cleanMoney_(item && item.amount)
+    amount: cleanMoney_(item && item.amount),
+    day: cleanRecurringDay_(item && item.day)
   };
 }
 
@@ -1093,7 +1115,8 @@ function sanitizeRecurringExpense_(item) {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     group: group,
     name: cleanText_(item && item.name, 100),
-    amount: cleanMoney_(item && item.amount)
+    amount: cleanMoney_(item && item.amount),
+    day: cleanRecurringDay_(item && item.day)
   };
 }
 

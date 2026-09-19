@@ -216,6 +216,48 @@ test('Principe Saved up spending is savings-only and adjusts the saved total by 
   }
 });
 
+test('keeps optional finance dates and recurring usual days', () => {
+  const context = setup();
+  try {
+    const profileResult = action(context.database, 'saveFinanceProfile', {
+      profile: {
+        recurring: {
+          custom: true,
+          incomes: [{ id: 'income-salary', name: 'Salary', amount: 1550, day: 24 }],
+          expenses: [
+            { id: 'expense-phone', group: 'subscriptions', name: 'Odido', amount: 30, day: 30 },
+            { id: 'expense-flex', group: 'other', name: 'Flexible', amount: 12, day: 40 },
+          ],
+        },
+      },
+    });
+    assert.equal(profileResult.ok, true);
+
+    const monthResult = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [{ name: 'Salary', amount: 1550, date: '2026-09-24' }],
+        expenses: [
+          { group: 'subscriptions', name: 'Odido', amount: 30, date: '2026-09-30' },
+          { group: 'other', name: 'Wrong month', amount: 5, date: '2026-10-01' },
+        ],
+        finalized: false,
+      },
+    });
+    assert.equal(monthResult.ok, true);
+
+    const state = getState();
+    assert.equal(state.financeProfiles.Principessa.recurring.incomes[0].day, 24);
+    assert.equal(state.financeProfiles.Principessa.recurring.expenses[0].day, 30);
+    assert.equal(state.financeProfiles.Principessa.recurring.expenses[1].day, '');
+    assert.equal(state.finances.Principessa[0].incomes[0].date, '2026-09-24');
+    assert.equal(state.finances.Principessa[0].expenses.find((x) => x.name === 'Odido').date, '2026-09-30');
+    assert.equal(state.finances.Principessa[0].expenses.find((x) => x.name === 'Wrong month').date, '');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('keeps saved data after the database is closed and reopened', () => {
   const directory = mkdtempSync(join(tmpdir(), 'twogether-reopen-'));
   const databasePath = join(directory, 'test.sqlite');
