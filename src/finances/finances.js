@@ -819,7 +819,7 @@ function renderWizard() {
     }).join('');
     const loggedCount = (d.expenses || []).length;
     body.innerHTML = wizardHtml('What do you want to log?', 'Choose only the expense that happened now. You can save and add the rest later.', `${choices ? `<div class="finance-choice-stack">${choices}</div>` : '<div class="finance-empty">No recurring expenses are set up yet.</div>'}<div class="finance-choice-stack" style="margin-top:10px"><button class="finance-choice finance-tone-other" type="button" data-fin-partial-custom><div><strong>Another expense</strong><small>Add a one-off or custom expense.</small></div><span>＋</span></button></div>${loggedCount ? `<div class="finance-reference" style="margin-top:14px"><span>Saved in this draft</span><strong>${loggedCount} expense${loggedCount === 1 ? '' : 's'}</strong></div>` : ''}<div class="finance-actions"><button class="btn ghost" type="button" data-fin-cancel>Cancel</button><button class="btn primary big" type="button" data-fin-save-draft>Save for later</button></div>`);
-    $('[data-fin-partial-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { partialCandidateIndex: Number(btn.dataset.finPartialExpense) }; flow.stage = 'partialExpense'; renderWizard(); }));
+    $$('[data-fin-partial-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { partialCandidateIndex: Number(btn.dataset.finPartialExpense) }; flow.stage = 'partialExpense'; renderWizard(); }));
     $('[data-fin-partial-custom]')?.addEventListener('click', () => { flow.temp = {}; flow.stage = 'expenseGroup'; renderWizard(); });
     $('[data-fin-cancel]')?.addEventListener('click', resetWizard);
     $('[data-fin-save-draft]')?.addEventListener('click', () => saveMonth(false));
