@@ -15,37 +15,68 @@ const MONTHS = [
   ['2026-09', 'Sep 2026'], ['2026-10', 'Oct 2026'], ['2026-11', 'Nov 2026'], ['2026-12', 'Dec 2026'],
 ];
 const GROUPS = [
+  { key: 'fixed', label: 'Fixed expenses', example: 'e.g. Rent', tone: 'fixed', named: true },
   { key: 'medical', label: 'Medical', example: 'e.g. Zorgverzekering', tone: 'medical', named: true },
   { key: 'subscriptions', label: 'Subscriptions', example: 'e.g. Spotify', tone: 'subscriptions', named: true },
   { key: 'rent', label: 'Rent', defaultName: 'Rent', tone: 'subscriptions' },
   { key: 'groceries', label: 'Groceries', defaultName: 'Groceries', tone: 'budgets' },
+  { key: 'variable', label: 'Variable expenses', example: 'e.g. Fuel', tone: 'budgets', named: true },
   { key: 'extra', label: 'Extra', defaultName: 'Extra', tone: 'budgets', optionalName: true, manual: false },
   { key: 'savings', label: 'Save up', defaultName: 'Save up', tone: 'wealth' },
   { key: 'investments', label: 'Investments', defaultName: 'Investments', tone: 'wealth' },
   { key: 'other', label: 'Other', example: 'e.g. Gift', tone: 'other', named: true },
 ];
-const RECURRING_INCOMES = [
-  { name: 'Neways', amount: 2051 },
-  { name: 'Belastingdienst', amount: 129 },
-];
-const RECURRING_EXPENSES = [
-  { group: 'medical', name: 'Zorgverzekering', amount: 158 },
-  { group: 'medical', name: 'Liability Insurance', amount: 4 },
-  { group: 'rent', name: 'Rent', amount: 50 },
-  { group: 'subscriptions', name: 'Chatgpt Plus', amount: 23 },
-  { group: 'subscriptions', name: 'Sportcity', amount: 28 },
-  { group: 'subscriptions', name: 'Spotify', amount: 8.5 },
-  { group: 'subscriptions', name: 'iCloud', amount: 3 },
-  { group: 'subscriptions', name: 'NS', amount: 100 },
-  { group: 'subscriptions', name: 'Oranje Pakketje', amount: 4 },
-  { group: 'subscriptions', name: 'Odido', amount: 30 },
-  { group: 'groceries', name: 'Groceries', amount: 255 },
-  { group: 'extra', name: 'Extra', amount: 250 },
-  { group: 'investments', name: 'Investments', amount: 550 },
-  { group: 'savings', name: 'Save up', amount: 500 },
-];
-const CATEGORY_ORDER = ['medical', 'subscriptions', 'budgets', 'wealth', 'other'];
-const CATEGORY_LABELS = { medical: 'Medical', subscriptions: 'Subscriptions', budgets: 'Budgets', wealth: 'Savings / Investments', other: 'Other' };
+const FINANCE_RULES = {
+  Principessa: {
+    extraBudget: 250,
+    extraTracking: true,
+    investmentTracking: true,
+    recurringIncomes: [
+      { name: 'Neways', amount: 2051 },
+      { name: 'Belastingdienst', amount: 129 },
+    ],
+    recurringExpenses: [
+      { group: 'medical', name: 'Zorgverzekering', amount: 158 },
+      { group: 'medical', name: 'Liability Insurance', amount: 4 },
+      { group: 'rent', name: 'Rent', amount: 50 },
+      { group: 'subscriptions', name: 'Chatgpt Plus', amount: 23 },
+      { group: 'subscriptions', name: 'Sportcity', amount: 28 },
+      { group: 'subscriptions', name: 'Spotify', amount: 8.5 },
+      { group: 'subscriptions', name: 'iCloud', amount: 3 },
+      { group: 'subscriptions', name: 'NS', amount: 100 },
+      { group: 'subscriptions', name: 'Oranje Pakketje', amount: 4 },
+      { group: 'subscriptions', name: 'Odido', amount: 30 },
+      { group: 'groceries', name: 'Groceries', amount: 255 },
+      { group: 'extra', name: 'Extra', amount: 250 },
+      { group: 'investments', name: 'Investments', amount: 550 },
+      { group: 'savings', name: 'Save up', amount: 500 },
+    ],
+  },
+  Principe: {
+    extraBudget: null,
+    extraTracking: false,
+    investmentTracking: false,
+    recurringIncomes: [
+      { name: 'Salary', amount: 1550 },
+    ],
+    recurringExpenses: [
+      { group: 'fixed', name: 'Rent', amount: 575 },
+      { group: 'fixed', name: 'Ryanair part 3', amount: 47.58 },
+      { group: 'subscriptions', name: 'Iliad', amount: 9.99 },
+      { group: 'subscriptions', name: 'Spotify', amount: 16.99 },
+      { group: 'subscriptions', name: 'ChatGPT Plus', amount: 23 },
+      { group: 'subscriptions', name: 'Railway Hosting', amount: 5 },
+      { group: 'subscriptions', name: 'Claude', amount: 21.96 },
+      { group: 'subscriptions', name: 'Amazon Prime', amount: 1.99 },
+      { group: 'variable', name: 'Fuel', amount: 300 },
+      { group: 'variable', name: 'Groceries', amount: 17.33 },
+      { group: 'variable', name: 'Personal', amount: 100 },
+      { group: 'variable', name: 'Airbnb', amount: 142 },
+    ],
+  },
+};
+const CATEGORY_ORDER = ['fixed', 'medical', 'subscriptions', 'budgets', 'wealth', 'other'];
+const CATEGORY_LABELS = { fixed: 'Fixed expenses', medical: 'Medical', subscriptions: 'Subscriptions', budgets: 'Budgets', wealth: 'Savings / Investments', other: 'Other' };
 const HOUSE_GOAL_TARGET = 150000;
 
 let financeState = {
@@ -73,6 +104,29 @@ function groupMeta(value) {
 }
 function groupLabel(value) { return groupMeta(value).label; }
 function groupTone(value) { return groupMeta(value).tone; }
+function financeRules(owner = actor()) { return FINANCE_RULES[owner] || FINANCE_RULES.Principessa; }
+function categoryLabel(tone) {
+  if (actor() === 'Principe' && tone === 'budgets') return 'Variable expenses';
+  if (actor() === 'Principe' && tone === 'wealth') return 'Savings';
+  return CATEGORY_LABELS[tone] || tone;
+}
+function categoryOrder() {
+  return actor() === 'Principe'
+    ? ['fixed', 'subscriptions', 'budgets', 'wealth', 'medical', 'other']
+    : CATEGORY_ORDER;
+}
+function manualGroups() {
+  if (actor() !== 'Principe') return GROUPS.filter((g) => g.manual !== false && !['fixed', 'variable'].includes(g.key));
+  const allowed = new Set(['fixed', 'subscriptions', 'variable', 'savings', 'other']);
+  return GROUPS.filter((g) => g.manual !== false && allowed.has(g.key));
+}
+function nextAfterExpensesStage() {
+  const rules = financeRules();
+  if (rules.extraTracking) return 'extraSpentAsk';
+  if (rules.investmentTracking) return 'investmentTotal';
+  return 'review';
+}
+function nextAfterExtraStage() { return financeRules().investmentTracking ? 'investmentTotal' : 'review'; }
 
 function freshProfile() {
   return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, updatedAt: '', updatedBy: '' };
@@ -104,15 +158,21 @@ function post(action, payload) { return window.TwogetherAPI.post(action, payload
 function ownMonths() { return financeState.finances?.[actor()] || []; }
 function recordFor(month) { return ownMonths().find((x) => x.month === month) || null; }
 function hasValue(v) { return v !== '' && v != null; }
-function normalizeFinanceRecord(rec) {
+function normalizeFinanceRecord(rec, owner = actor()) {
   const copy = JSON.parse(JSON.stringify(rec || {}));
+  const rules = financeRules(owner);
   copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({ ...x, group: normalizeGroup(x.group) })) : [];
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
-  const storedBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : (fixedExtras.length && hasValue(fixedExtras[0].amount) ? n(fixedExtras[0].amount) : 250);
-  copy.extraBudget = storedBudget;
-  copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
-  if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget });
-  copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') x.amount = storedBudget; });
+  if (rules.extraTracking) {
+    const storedBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : (fixedExtras.length && hasValue(fixedExtras[0].amount) ? n(fixedExtras[0].amount) : rules.extraBudget);
+    copy.extraBudget = storedBudget;
+    copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
+    if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget });
+    copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') x.amount = storedBudget; });
+  } else {
+    copy.extraBudget = '';
+    copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
+  }
   copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ id: x.id || uid(), source: ['creditcard', 'savings', 'main'].includes(String(x.source || '')) ? String(x.source) : '', amount: n(x.amount) })).filter((x) => x.source && x.amount > 0) : [];
   if (!copy.extraSpends.length) {
     const legacySource = ['creditcard', 'savings', 'main'].includes(String(copy.extraOverspendSource || '')) ? String(copy.extraOverspendSource) : '';
@@ -142,12 +202,14 @@ function previousMonthKey(month) {
 function extraSpendsTotal(rec) { return (rec?.extraSpends || []).reduce((sum, x) => sum + n(x.amount), 0); }
 
 function extraCarryInfo(month) {
+  const rules = financeRules();
+  if (!rules.extraTracking) return { prevMonth: previousMonthKey(month), over: 0, budget: 0, debt: 0 };
   const prevMonth = previousMonthKey(month), prev = prevMonth ? recordFor(prevMonth) : null;
   const over = prev ? extraSpendsTotal(prev) : 0;
   return {
     prevMonth,
     over,
-    budget: over > 0 ? Math.max(100, 250 - Math.min(150, over)) : 250,
+    budget: over > 0 ? Math.max(100, rules.extraBudget - Math.min(150, over)) : rules.extraBudget,
     debt: Math.max(0, over - 150),
   };
 }
@@ -171,7 +233,7 @@ function calc(rec) {
   const outflow = normalOutflow + extraOverspendAmount;
   const savings = expenses.filter((x) => normalizeGroup(x.group) === 'savings').reduce((sum, x) => sum + n(x.amount), 0);
   const investmentContribution = expenses.filter((x) => normalizeGroup(x.group) === 'investments').reduce((sum, x) => sum + n(x.amount), 0);
-  const extraBudget = hasValue(rec?.extraBudget) ? n(rec.extraBudget) : 250;
+  const extraBudget = hasValue(rec?.extraBudget) ? n(rec.extraBudget) : (financeRules().extraBudget || 0);
   const extraSpent = extraBudget + extraOverspendAmount;
   const extraDelta = -extraOverspendAmount;
   const leftover = income - outflow;
@@ -222,8 +284,8 @@ async function loadState() {
       financeState = {
         version: Number(state?.version || 0),
         finances: {
-          Principessa: (Array.isArray(state?.finances?.Principessa) ? state.finances.Principessa : []).map(normalizeFinanceRecord),
-          Principe: (Array.isArray(state?.finances?.Principe) ? state.finances.Principe : []).map(normalizeFinanceRecord),
+          Principessa: (Array.isArray(state?.finances?.Principessa) ? state.finances.Principessa : []).map((x) => normalizeFinanceRecord(x, 'Principessa')),
+          Principe: (Array.isArray(state?.finances?.Principe) ? state.finances.Principe : []).map((x) => normalizeFinanceRecord(x, 'Principe')),
         },
         financeProfiles: {
           Principessa: normalizeProfile(state?.financeProfiles?.Principessa),
@@ -358,12 +420,13 @@ function openScenarioModal(index) {
 
 function renderDetail(rec) {
   const root = $('#financeDetail'); if (!root) return;
-  const c = calc(rec), gl = investmentGL(rec), carry = extraCarryInfo(rec.month);
+  const rules = financeRules();
+  const c = calc(rec), gl = rules.investmentTracking ? investmentGL(rec) : null, carry = extraCarryInfo(rec.month);
   const expenses = groupedExpenseHtml(rec.expenses || [], false, rec.extraSpends || []);
   const incomes = (rec.incomes || []).map((x) => `<div class="finance-breakdown-row"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></div>`).join('');
-  const extraStatus = c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
-  const debtStatus = carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
-  const investmentBlock = c.investmentTotal != null ? `<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div>` : '';
+  const extraStatus = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
+  const debtStatus = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
+  const investmentBlock = rules.investmentTracking && c.investmentTotal != null ? `<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div>` : '';
   root.innerHTML = `<div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h3>${esc(monthLabel(rec.month))}</h3></div>${rec.finalized ? '<span class="finance-final-badge">Locked</span>' : '<div class="finance-detail-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'}</div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${debtStatus}${incomes ? `<div class="finance-review-section"><h3>Income</h3>${incomes}</div>` : ''}${expenses ? `<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>` : ''}${investmentBlock}`;
   $('[data-fin-edit]', root)?.addEventListener('click', () => startEdit(rec));
   $('[data-fin-finalize-existing]', root)?.addEventListener('click', () => confirmExistingMonth(rec));
@@ -460,11 +523,15 @@ function openLoanRepayment(index) {
   $('[data-fin-mini-save]')?.addEventListener('click', () => { const amount = $('#finMiniRepayAmount')?.value || '', month = $('#finMiniRepayMonth')?.value || selectedMonth; if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || n(amount) <= 0) return toast('Enter a valid repayment', 'warn'); if (n(amount) > remaining) return toast('Repayment is higher than the amount still owed', 'warn'); const next = profile(); next.receivables[index].repayments = [...(next.receivables[index].repayments || []), { id: uid(), month, amount: n(amount), at: new Date().toISOString() }]; next.savingsTotal = n(next.savingsTotal) + n(amount); saveProfile(next, `Repayment saved · ${money(amount)} added to savings`); });
 }
 
-function freshRecord(month) { return { month, incomes: [], expenses: [], extraBudget: 250, extraSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', finalized: false, finalizedAt: '' }; }
+function freshRecord(month) {
+  const rules = financeRules();
+  return { month, incomes: [], expenses: [], extraBudget: rules.extraTracking ? rules.extraBudget : '', extraSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', finalized: false, finalizedAt: '' };
+}
 function cloneRecord(rec) {
-  const copy = normalizeFinanceRecord(rec);
-  copy.extraBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : 250;
-  copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ ...x, id: x.id || uid() })) : [];
+  const rules = financeRules();
+  const copy = normalizeFinanceRecord(rec, actor());
+  copy.extraBudget = rules.extraTracking ? (hasValue(copy.extraBudget) ? n(copy.extraBudget) : rules.extraBudget) : '';
+  copy.extraSpends = rules.extraTracking && Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => ({ ...x, id: x.id || uid() })) : [];
   copy.extraOverspendSource = copy.extraSpends[0]?.source || '';
   copy.extraOverspendAmount = copy.extraSpends.reduce((sum, x) => sum + n(x.amount), 0);
   copy.finalized = copy.finalized === true; if (!copy.finalizedAt) copy.finalizedAt = '';
@@ -490,10 +557,10 @@ function recurringValue(previous, kind, name, fallback) {
   return match && hasValue(match.amount) ? n(match.amount) : fallback;
 }
 function seededRecord(month) {
-  const previous = latestPriorMonth(month), d = freshRecord(month), carry = extraCarryInfo(month);
-  d.extraBudget = carry.budget;
-  d.incomes = RECURRING_INCOMES.map((x) => ({ name: x.name, amount: recurringValue(previous, 'income', x.name, x.amount) }));
-  d.expenses = RECURRING_EXPENSES.map((x) => ({ group: x.group, name: x.name, amount: x.group === 'extra' ? carry.budget : recurringValue(previous, 'expense', x.name, x.amount) }));
+  const rules = financeRules(), previous = latestPriorMonth(month), d = freshRecord(month), carry = extraCarryInfo(month);
+  d.extraBudget = rules.extraTracking ? carry.budget : '';
+  d.incomes = rules.recurringIncomes.map((x) => ({ name: x.name, amount: recurringValue(previous, 'income', x.name, x.amount) }));
+  d.expenses = rules.recurringExpenses.map((x) => ({ group: x.group, name: x.name, amount: x.group === 'extra' ? carry.budget : recurringValue(previous, 'expense', x.name, x.amount) }));
   d.extraSpends = [];
   return d;
 }
@@ -515,7 +582,7 @@ function groupedExpenseHtml(items, removable = false, extraSpends = []) {
   extraSpendSummary({ extraSpends }).forEach((x) => rows.push({ group: 'extra', tone: 'budgets', name: extraSourceLabel(x.source), amount: x.amount, isExtraSpend: true, extraSource: x.source, index: -1 }));
   const grouped = {};
   rows.forEach((x) => (grouped[x.tone] || (grouped[x.tone] = [])).push(x));
-  return CATEGORY_ORDER.filter((tone) => grouped[tone]?.length).map((tone) => {
+  return categoryOrder().filter((tone) => grouped[tone]?.length).map((tone) => {
     const group = grouped[tone], total = group.reduce((sum, x) => sum + n(x.amount), 0);
     const itemRows = group.map((x) => {
       const fixedExtra = !x.isExtraSpend && normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra';
@@ -523,7 +590,7 @@ function groupedExpenseHtml(items, removable = false, extraSpends = []) {
       const controls = removable && !x.isExtraSpend ? ` <button class="text-btn" data-fin-edit-expense="${x.index}">Edit</button> <button class="text-btn" data-fin-remove-expense="${x.index}">×</button>` : '';
       return `<div class="finance-category-item${rowClass}"><span>${esc(x.name || groupLabel(x.group))}</span><strong>${money(x.amount)}${controls}</strong></div>`;
     }).join('');
-    return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(CATEGORY_LABELS[tone] || tone)}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
+    return `<div class="finance-category-bubble finance-tone-${tone}"><div class="finance-category-head"><strong>${esc(categoryLabel(tone))}</strong><span>${money(total)}</span></div>${itemRows}</div>`;
   }).join('');
 }
 
@@ -532,7 +599,8 @@ function renderWizard() {
   if (!actor()) { setProgress('PERSONAL FINANCES', 8); body.innerHTML = wizardHtml('Choose your profile first', 'Your monthly finances are kept separately for Principessa and Principe.', ''); return; }
   if (!flow) {
     setProgress('MONTHLY FINANCES', 8);
-    body.innerHTML = wizardHtml(`Track ${actor()}’s month`, 'One question at a time, just like trip logging.', `<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Start a monthly check-in</strong><small>Income, colored expenses, €250 Extra budget, savings and investments.</small></div><span>→</span></button></div>`);
+    const intro = actor() === 'Principe' ? 'Income, fixed expenses, subscriptions, variable expenses and savings.' : 'Income, colored expenses, €250 Extra budget, savings and investments.';
+    body.innerHTML = wizardHtml(`Track ${actor()}’s month`, 'One question at a time, just like trip logging.', `<div class="finance-choice-stack"><button class="finance-choice" type="button" data-fin-start><div><strong>Start a monthly check-in</strong><small>${esc(intro)}</small></div><span>→</span></button></div>`);
     $('[data-fin-start]')?.addEventListener('click', () => startMonth(selectedMonth, false)); return;
   }
   const d = flow.data, t = flow.temp || {};
@@ -545,11 +613,11 @@ function renderWizard() {
 
   if (flow.stage === 'recurringCheck') {
     const queue = flow.recurringQueue || buildRecurringQueue(d), idx = Number(flow.recurringIndex || 0);
-    if (idx >= queue.length) { flow.stage = 'extraSpentAsk'; renderWizard(); return; }
+    if (idx >= queue.length) { flow.stage = nextAfterExpensesStage(); renderWizard(); return; }
     const item = queue[idx], source = recurringSource(item, d);
     if (!source) { flow.recurringIndex = idx + 1; renderWizard(); return; }
     const isFixedExtra = item.kind === 'expense' && normalizeGroup(source.group) === 'extra' && String(source.name || '').trim().toLowerCase() === 'extra';
-    const meta = item.kind === 'income' ? { label: 'Income', tone: 'other' } : { label: CATEGORY_LABELS[groupTone(source.group)] || groupLabel(source.group), tone: groupTone(source.group) };
+    const meta = item.kind === 'income' ? { label: 'Income', tone: 'other' } : { label: categoryLabel(groupTone(source.group)), tone: groupTone(source.group) };
     const pct = 12 + Math.round(((idx + 1) / Math.max(1, queue.length)) * 48);
     setProgress(`CHECKING ${idx + 1} OF ${queue.length}`, pct);
     const carry = extraCarryInfo(d.month);
@@ -580,7 +648,7 @@ function renderWizard() {
     $$('[data-fin-extra-edit]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { extraEditIndex: Number(btn.dataset.finExtraEdit) }; flow.stage = 'extraEditAmount'; renderWizard(); }));
     $$('[data-fin-extra-remove]').forEach((btn) => btn.addEventListener('click', () => { d.extraSpends.splice(Number(btn.dataset.finExtraRemove), 1); renderWizard(); }));
     $('[data-fin-extra-yes]')?.addEventListener('click', () => { flow.stage = 'extraSourceAsk'; renderWizard(); });
-    $('[data-fin-extra-no]')?.addEventListener('click', () => { flow.stage = flow.extraReturn === 'review' ? 'review' : 'investmentTotal'; flow.extraReturn = ''; renderWizard(); });
+    $('[data-fin-extra-no]')?.addEventListener('click', () => { flow.stage = flow.extraReturn === 'review' ? 'review' : nextAfterExtraStage(); flow.extraReturn = ''; renderWizard(); });
     return;
   }
 
@@ -605,7 +673,7 @@ function renderWizard() {
     const total = extraSpendsTotal(d);
     body.innerHTML = wizardHtml('Any more extra money spent?', 'You can keep adding extra spending from a different or the same source.', `<div class="finance-reference finance-tone-budgets"><span>Extra money logged so far</span><strong>${money(total)}</strong></div><div class="finance-choice-stack"><button class="finance-choice" data-fin-extra-more><div><strong>Yes, add another</strong></div><span>＋</span></button><button class="finance-choice" data-fin-extra-done><div><strong>No, continue</strong></div><span>→</span></button></div>`);
     $('[data-fin-extra-more]')?.addEventListener('click', () => { flow.stage = 'extraSourceAsk'; renderWizard(); });
-    $('[data-fin-extra-done]')?.addEventListener('click', () => { flow.stage = flow.extraReturn === 'review' ? 'review' : 'investmentTotal'; flow.extraReturn = ''; renderWizard(); });
+    $('[data-fin-extra-done]')?.addEventListener('click', () => { flow.stage = flow.extraReturn === 'review' ? 'review' : nextAfterExtraStage(); flow.extraReturn = ''; renderWizard(); });
     return;
   }
 
@@ -643,7 +711,7 @@ function renderWizard() {
     const idx = Number(t.editExpenseIndex), item = d.expenses?.[idx];
     if (!item) { flow.temp = {}; flow.stage = 'review'; renderWizard(); return; }
     setProgress('EDIT EXPENSE', 58);
-    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. You can keep changing it until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(CATEGORY_LABELS[groupTone(item.group)] || groupLabel(item.group))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. You can keep changing it until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(categoryLabel(groupTone(item.group)))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = 'review'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); item.amount = n(v); flow.temp = {}; flow.stage = 'review'; renderWizard(); });
     return;
@@ -651,7 +719,8 @@ function renderWizard() {
 
   if (flow.stage === 'expenseGroup') {
     setProgress('EXPENSES', 42);
-    body.innerHTML = wizardHtml(d.expenses.length ? 'What kind of expense are you adding?' : 'What did you spend or set aside?', 'Colors follow your spreadsheet groups: Medical, Subscriptions, Budgets, Savings/Investments and Other.', `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-group-grid">${GROUPS.filter((g) => g.manual !== false).map((g) => `<button class="finance-choice finance-tone-${g.tone}" data-fin-group="${g.key}"><div><strong>${esc(g.label)}</strong><small>${g.example ? esc(g.example) : g.defaultName ? 'Name filled automatically' : ''}</small></div><span>→</span></button>`).join('')}</div>${d.expenses.length ? '<div class="finance-actions"><button class="btn ghost" data-fin-exp-done>Done with expenses</button></div>' : ''}`);
+    const groupHelp = actor() === 'Principe' ? 'Colors follow his categories: Fixed expenses, Subscriptions, Variable expenses, Savings and Other.' : 'Colors follow your spreadsheet groups: Medical, Subscriptions, Budgets, Savings/Investments and Other.';
+    body.innerHTML = wizardHtml(d.expenses.length ? 'What kind of expense are you adding?' : 'What did you spend or set aside?', groupHelp, `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-group-grid">${manualGroups().map((g) => `<button class="finance-choice finance-tone-${g.tone}" data-fin-group="${g.key}"><div><strong>${esc(g.label)}</strong><small>${g.example ? esc(g.example) : g.defaultName ? 'Name filled automatically' : ''}</small></div><span>→</span></button>`).join('')}</div>${d.expenses.length ? '<div class="finance-actions"><button class="btn ghost" data-fin-exp-done>Done with expenses</button></div>' : ''}`);
     $$('[data-fin-group]').forEach((btn) => btn.addEventListener('click', () => {
       const meta = groupMeta(btn.dataset.finGroup); flow.temp = { group: meta.key };
       if (meta.optionalName) { flow.temp.name = meta.defaultName; flow.stage = 'expenseOptionalName'; }
@@ -659,7 +728,7 @@ function renderWizard() {
       else flow.stage = 'expenseName';
       renderWizard();
     }));
-    $('[data-fin-exp-done]')?.addEventListener('click', () => { flow.stage = 'extraSpentAsk'; renderWizard(); }); return;
+    $('[data-fin-exp-done]')?.addEventListener('click', () => { flow.stage = nextAfterExpensesStage(); renderWizard(); }); return;
   }
 
   if (flow.stage === 'expenseName') {
@@ -686,8 +755,9 @@ function renderWizard() {
 
   if (flow.stage === 'expenseMore') {
     setProgress('EXPENSES', 60);
-    body.innerHTML = wizardHtml('Anything else this month?', 'Keep adding expenses, Save up or Investments until the month is complete.', `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-choice-stack"><button class="finance-choice" data-fin-yes><div><strong>Yes, add another</strong></div><span>＋</span></button><button class="finance-choice" data-fin-no><div><strong>No, continue</strong></div><span>→</span></button></div>`);
-    $('[data-fin-yes]')?.addEventListener('click', () => { flow.stage = 'expenseGroup'; renderWizard(); }); $('[data-fin-no]')?.addEventListener('click', () => { flow.stage = 'extraSpentAsk'; renderWizard(); }); return;
+    const moreHelp = actor() === 'Principe' ? 'Keep adding expenses or savings until the month is complete.' : 'Keep adding expenses, Save up or Investments until the month is complete.';
+    body.innerHTML = wizardHtml('Anything else this month?', moreHelp, `${listHtml(d.expenses, (x) => `${x.name} · ${groupLabel(x.group)}`)}<div class="finance-choice-stack"><button class="finance-choice" data-fin-yes><div><strong>Yes, add another</strong></div><span>＋</span></button><button class="finance-choice" data-fin-no><div><strong>No, continue</strong></div><span>→</span></button></div>`);
+    $('[data-fin-yes]')?.addEventListener('click', () => { flow.stage = 'expenseGroup'; renderWizard(); }); $('[data-fin-no]')?.addEventListener('click', () => { flow.stage = nextAfterExpensesStage(); renderWizard(); }); return;
   }
 
   if (flow.stage === 'extraBudget') {
@@ -717,13 +787,16 @@ function renderWizard() {
 
 function renderReview() {
   const body = $('#financeWizardBody'); if (!body || !flow) return;
-  const d = flow.data, c = calc(d), gl = investmentGL(d), carry = extraCarryInfo(d.month); setProgress('REVIEW', 100);
+  const rules = financeRules();
+  const d = flow.data, c = calc(d), gl = rules.investmentTracking ? investmentGL(d) : null, carry = extraCarryInfo(d.month); setProgress('REVIEW', 100);
   const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
   const expenseRows = groupedExpenseHtml(d.expenses, true, d.extraSpends || []) || '<div class="finance-empty">No expenses added.</div>';
-  const extraLine = c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
-  const debtLine = carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
-  const investmentLines = c.investmentTotal == null ? '<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>' : `<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div>`;
-  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>'}</div><div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div><div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
+  const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
+  const debtLine = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
+  const investmentLines = rules.investmentTracking ? (c.investmentTotal == null ? '<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>' : `<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div>`) : '';
+  const extraActions = rules.extraTracking ? (c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>') : '';
+  const investmentSection = rules.investmentTracking ? `<div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div>` : '';
+  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
   $$('[data-fin-remove-income]').forEach((btn) => btn.addEventListener('click', () => { d.incomes.splice(Number(btn.dataset.finRemoveIncome), 1); renderReview(); }));
   $$('[data-fin-edit-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editExpenseIndex: Number(btn.dataset.finEditExpense) }; flow.stage = 'editExistingExpense'; renderWizard(); }));
   $$('[data-fin-remove-expense]').forEach((btn) => btn.addEventListener('click', () => { d.expenses.splice(Number(btn.dataset.finRemoveExpense), 1); renderReview(); }));
