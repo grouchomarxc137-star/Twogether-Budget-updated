@@ -531,6 +531,11 @@
   margin-top:3px;
 }
 
+.finance-choice.finance-tone-fixed {
+  background:#f3e2dc;
+  border-color:#e3c7bc;
+}
+
 .finance-choice.finance-tone-medical {
   background:#e7eef7;
   border-color:#c9d8e9;
@@ -781,6 +786,11 @@
 
 .finance-breakdown-row span {
   color:var(--muted);
+}
+
+.finance-tone-fixed {
+  background:#f3e2dc!important;
+  border-color:#e3c7bc!important;
 }
 
 .finance-tone-medical {
