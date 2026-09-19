@@ -281,7 +281,7 @@ function renderCurrentPanel() {
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
     <div class="finance-current-grid">
-      <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Not included in net worth.</small></article>
+      <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Tap any bank to edit its balance. Not included in net worth.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
       <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owed}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Tap a loan to see original amount, repayment history and what is still left.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><strong>${money(inv.ownInvestments || 0)}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div><div><span>Sis</span><strong>${inv.investmentTotal == null ? '—' : money(inv.sisterInvestments)}</strong></div><div class="${gl?.value < 0 ? 'negative' : 'positive'}"><span>G/L p/m</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
@@ -364,6 +364,23 @@ async function saveProfile(next, message = 'Balances updated') {
   renderPage(); closeMini();
   try { await post('saveFinanceProfile', { profile: normalized }); toast(message); setTimeout(loadState, 1200); }
   catch (err) { toast(err.message || 'Could not save', 'warn'); }
+}
+
+function openSharedJarModal(balance) {
+  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><p>Change how much is currently in the shared account. Existing accommodation contributions stay linked and future 20% contributions will continue to update this balance.</p><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
+  $('[data-fin-mini-save]')?.addEventListener('click', async () => {
+    const amount = $('#finMiniAmount')?.value || '';
+    if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || Number(amount.replace(',', '.')) < 0) return toast('Enter a valid balance', 'warn');
+    const btn = $('[data-fin-mini-save]'); if (btn) btn.disabled = true;
+    try {
+      await post('updateSharedJarBalance', { balance: n(amount) });
+      closeMini();
+      toast('Shared Jar balance updated');
+    } catch (err) {
+      toast(err.message || 'Could not update Shared Jar', 'warn');
+      if (btn) btn.disabled = false;
+    }
+  });
 }
 
 function openBankModal(index) {
@@ -731,6 +748,7 @@ function init() {
   ensureMiniModal();
   tab.addEventListener('click', () => { renderWizard(); renderPage(); setTimeout(loadState, 50); });
   $('#restartFinanceWizard')?.addEventListener('click', resetWizard);
+  document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderWizard(); renderPage(); setTimeout(loadState, 40); } });
   obs.observe(document.body, { attributes: true, attributeFilter: ['data-actor'] });
   renderWizard(); renderPage();

@@ -101,6 +101,35 @@ test('handles the shared jar and repayment confirmation', () => {
   }
 });
 
+test('edits the Shared Jar balance without breaking accommodation deductions', () => {
+  const context = setup();
+  try {
+    const created = action(context.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Bergamo', start: '2026-11-10', end: '2026-11-12' },
+      budget: 400,
+    });
+    const first = action(context.database, 'saveAccommodationExpense', {
+      planId: created.planId, total: 500, useJar: true, paymentType: 'shared', paidUpfront: true,
+    });
+    assert.equal(first.sharedJar.balance, 770);
+    assert.equal(first.sharedJar.transactions.length, 1);
+
+    const edited = action(context.database, 'updateSharedJarBalance', { balance: 600 });
+    assert.equal(edited.ok, true);
+    assert.equal(edited.sharedJar.balance, 600);
+    assert.equal(edited.sharedJar.initialBalance, 700);
+    assert.equal(edited.sharedJar.transactions.length, 1);
+
+    const changedAccommodation = action(context.database, 'saveAccommodationExpense', {
+      planId: created.planId, total: 1000, useJar: true, paymentType: 'shared', paidUpfront: true,
+    });
+    assert.equal(changedAccommodation.sharedJar.balance, 500);
+    assert.equal(changedAccommodation.sharedJar.transactions[0].amount, 200);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('persists finance and wishlist data independently', () => {
   const context = setup();
   try {

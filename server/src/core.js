@@ -309,6 +309,18 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,sharedJar:state.sharedJar});
     }
 
+    if (action === 'updateSharedJarBalance') {
+      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      const balance = cleanMoney_(payload.balance);
+      if (balance === '') throw new Error('Enter a valid Shared Jar balance');
+      const used = state.sharedJar.transactions.reduce(function(sum, x){ return sum + Number(x.amount || 0); }, 0);
+      state.sharedJar.initialBalance = money2_(Number(balance) + used);
+      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      addAudit_(state, actor, 'updateSharedJarBalance', '');
+      saveState_(state);
+      return output_({ok:true, sharedJar:state.sharedJar});
+    }
+
     if (action === 'confirmAccommodationRepayment') {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
@@ -1224,7 +1236,7 @@ function reconciliationWarnings_(trip) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveAccommodationExpense', 'confirmAccommodationRepayment',
+  'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveSharedExpense', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'saveFinanceMonth', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',

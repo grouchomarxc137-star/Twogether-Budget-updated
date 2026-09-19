@@ -20,15 +20,20 @@ export function renderSharedJar() {
   const bankTotal = (profile()?.bankAccounts || []).reduce((sum, account) => sum + n(account?.balance), 0);
 
   let row = $('.v33-shared-jar-bank', cashCard);
-  if (!row) {
-    row = document.createElement('div');
-    row.className = 'finance-current-row v33-shared-jar-bank';
+  if (!row || row.tagName !== 'BUTTON') {
+    const nextRow = document.createElement('button');
+    nextRow.type = 'button';
+    nextRow.className = 'finance-current-row v33-shared-jar-bank';
+    nextRow.setAttribute('aria-label', 'Edit Shared Jar balance');
     const addBankButton = $('[data-fin-add-bank]', cashCard);
-    if (addBankButton) cashCard.insertBefore(row, addBankButton);
-    else cashCard.appendChild(row);
+    if (row) row.replaceWith(nextRow);
+    else if (addBankButton) cashCard.insertBefore(nextRow, addBankButton);
+    else cashCard.appendChild(nextRow);
+    row = nextRow;
   }
 
-  row.innerHTML = `<span>Shared Jar<small>Shared · ${used ? `${money(used)} used for accommodation` : 'ready for accommodation'}</small></span><strong>${money(jarBalance)}</strong>`;
+  row.innerHTML = `<span>Shared Jar<small>Shared · ${used ? `${money(used)} used for accommodation` : 'ready for accommodation'} · tap to edit</small></span><strong>${money(jarBalance)}</strong>`;
+  row.onclick = () => document.dispatchEvent(new CustomEvent('twogether:edit-shared-jar', { detail: { balance: jarBalance } }));
 
   const empty = $('.finance-current-empty', cashCard);
   if (empty) empty.remove();

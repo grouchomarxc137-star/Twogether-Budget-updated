@@ -1524,7 +1524,7 @@
 }
 
 [data-fin-view="balances"] .v33-shared-jar-bank {
-  cursor:default;
+  cursor:pointer;
   border-top:1px solid rgba(100,80,65,.1);
   background:linear-gradient(90deg,rgba(255,245,218,.48),rgba(255,253,249,.18));
 }

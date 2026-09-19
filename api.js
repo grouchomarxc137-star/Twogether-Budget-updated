@@ -37,7 +37,7 @@ async function state() {
 
 async function send(action, payload, actor) {
   if (!ACTORS.includes(actor)) throw new Error('Choose your profile first');
-  const devMaintenance = ['saveFinanceProfile'];
+  const devMaintenance = ['saveFinanceProfile', 'updateSharedJarBalance'];
   if (document.body.classList.contains('dev-playground') && !devMaintenance.includes(action)) {
     throw new Error('Leave DEV to save normal shared trip or finance changes. DEV only permits explicit maintenance deletes.');
   }
