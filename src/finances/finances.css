@@ -754,9 +754,19 @@
 }
 
 .finance-detail {
-  margin-top:16px;
-  border-top:1px solid var(--line);
-  padding-top:15px;
+  display:none;
+}
+
+.finance-month-detail-window .finance-detail-head {
+  padding-right:30px;
+}
+
+.finance-month-detail-window .finance-detail-head h2 {
+  margin:5px 0 0;
+}
+
+.finance-month-detail-window .finance-review-section:last-child {
+  padding-bottom:2px;
 }
 
 .finance-detail-head {

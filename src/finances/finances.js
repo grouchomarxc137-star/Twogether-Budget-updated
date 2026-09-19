@@ -521,7 +521,9 @@ function openScenarioModal(index) {
 }
 
 function renderDetail(rec) {
-  const root = $('#financeDetail'); if (!root) return;
+  if (!rec) return;
+  const legacyRoot = $('#financeDetail');
+  if (legacyRoot) legacyRoot.innerHTML = '';
   const rules = financeRules();
   const c = calc(rec), gl = rules.investmentTracking ? investmentGL(rec) : null, carry = extraCarryInfo(rec.month);
   const expenses = groupedExpenseHtml(rec.expenses || [], false, rec.extraSpends || []);
@@ -529,9 +531,10 @@ function renderDetail(rec) {
   const extraStatus = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
   const debtStatus = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
   const investmentBlock = rules.investmentTracking && c.investmentTotal != null ? `<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div>` : '';
-  root.innerHTML = `<div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h3>${esc(monthLabel(rec.month))}</h3></div>${rec.finalized ? '<span class="finance-final-badge">Locked</span>' : '<div class="finance-detail-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'}</div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${debtStatus}${incomes ? `<div class="finance-review-section"><h3>Income</h3>${incomes}</div>` : ''}${expenses ? `<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>` : ''}${investmentBlock}`;
-  $('[data-fin-edit]', root)?.addEventListener('click', () => startEdit(rec));
-  $('[data-fin-finalize-existing]', root)?.addEventListener('click', () => confirmExistingMonth(rec));
+  showMini(`<div class="finance-month-detail-window"><div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h2>${esc(monthLabel(rec.month))}</h2></div>${rec.finalized ? '<span class="finance-final-badge">Locked</span>' : '<div class="finance-detail-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'}</div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${debtStatus}${incomes ? `<div class="finance-review-section"><h3>Income</h3>${incomes}</div>` : ''}${expenses ? `<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>` : ''}${investmentBlock}</div>`);
+  const modalBody = $('#financeMiniBody');
+  $('[data-fin-edit]', modalBody)?.addEventListener('click', () => { closeMini(); startEdit(rec); });
+  $('[data-fin-finalize-existing]', modalBody)?.addEventListener('click', () => confirmExistingMonth(rec));
 }
 
 function ensureMiniModal() {
