@@ -129,8 +129,16 @@ function nextAfterExpensesStage() {
 }
 function nextAfterExtraStage() { return financeRules().investmentTracking ? 'investmentTotal' : 'review'; }
 
+function normalizeRecurringConfig(value) {
+  const v = value && typeof value === 'object' ? value : {};
+  return {
+    custom: v.custom === true,
+    incomes: Array.isArray(v.incomes) ? v.incomes.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), amount: x.amount ?? '' })).filter((x) => x.name) : [],
+    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '' })).filter((x) => x.name) : [],
+  };
+}
 function freshProfile() {
-  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, updatedAt: '', updatedBy: '' };
+  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, recurring: normalizeRecurringConfig({}), updatedAt: '', updatedBy: '' };
 }
 function normalizeProfile(profileData) {
   const p = profileData && typeof profileData === 'object' ? profileData : {};
@@ -146,12 +154,33 @@ function normalizeProfile(profileData) {
     scenarios: Array.isArray(p.scenarios) ? p.scenarios.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), upfront: x.upfront ?? '', monthly: x.monthly ?? '' })) : [],
     wishlist: Array.isArray(p.wishlist) ? JSON.parse(JSON.stringify(p.wishlist)) : [],
     compareLab: p.compareLab && typeof p.compareLab === 'object' ? JSON.parse(JSON.stringify(p.compareLab)) : {},
+    recurring: normalizeRecurringConfig(p.recurring),
     updatedAt: p.updatedAt || '', updatedBy: p.updatedBy || '',
   };
 }
 function profile() {
   const a = actor();
   return a ? normalizeProfile(financeState.financeProfiles?.[a]) : freshProfile();
+}
+
+function recurringDefaults() {
+  const rules = financeRules();
+  const latest = [...ownMonths()].sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
+  return {
+    custom: false,
+    incomes: rules.recurringIncomes.map((x) => ({ id: uid(), name: x.name, amount: recurringValue(latest, 'income', x.name, x.amount) })),
+    expenses: rules.recurringExpenses
+      .filter((x) => normalizeGroup(x.group) !== 'extra')
+      .map((x) => ({ id: uid(), group: x.group, name: x.name, amount: recurringValue(latest, 'expense', x.name, x.amount) })),
+  };
+}
+function recurringConfig() {
+  const saved = profile().recurring;
+  if (saved?.custom) return normalizeRecurringConfig(saved);
+  return recurringDefaults();
+}
+function recurringExpenseGroups() {
+  return manualGroups().filter((g) => g.key !== 'extra');
 }
 
 function post(action, payload) { return window.TwogetherAPI.post(action, payload, actor()); }
@@ -406,6 +435,60 @@ function renderScenarioPanel() {
   $$('[data-fin-scenario]', root).forEach((btn) => btn.addEventListener('click', () => openScenarioModal(Number(btn.dataset.finScenario))));
 }
 
+function recurringRow(kind, item, index) {
+  const tone = kind === 'income' ? 'other' : groupTone(item.group);
+  const sub = kind === 'income' ? 'Income' : (actor() === 'Principe' ? categoryLabel(tone) : groupLabel(item.group));
+  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(sub)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
+}
+
+function openRecurringManager() {
+  const config = recurringConfig();
+  const incomes = config.incomes.length ? config.incomes.map((x, i) => recurringRow('income', x, i)).join('') : '<div class="finance-current-empty">No recurring income yet.</div>';
+  const expenseRows = config.expenses.map((x, i) => ({ ...x, index: i, tone: groupTone(x.group) }));
+  const grouped = {};
+  expenseRows.forEach((x) => (grouped[x.tone] || (grouped[x.tone] = [])).push(x));
+  const expenses = categoryOrder().filter((tone) => grouped[tone]?.length).map((tone) => `<div class="finance-recurring-group"><h3>${esc(categoryLabel(tone))}</h3>${grouped[tone].map((x) => recurringRow('expense', x, x.index)).join('')}</div>`).join('') || '<div class="finance-current-empty">No recurring expenses yet.</div>';
+  showMini(`<span class="panel-kicker">MONTHLY DEFAULTS</span><h2>Manage recurring items</h2><p>These are the usual items Twogether asks you to confirm each month. Changes apply to future monthly check-ins only — confirmed months stay untouched.</p><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Income</h3><button class="text-btn" type="button" data-fin-recurring-add="income">+ Add</button></div>${incomes}</div><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Outflow</h3><button class="text-btn" type="button" data-fin-recurring-add="expense">+ Add</button></div>${expenses}</div>`);
+  $('[data-fin-recurring-kind]').forEach((btn) => btn.addEventListener('click', () => openRecurringEditor(btn.dataset.finRecurringKind, Number(btn.dataset.finRecurringIndex))));
+  $('[data-fin-recurring-add]').forEach((btn) => btn.addEventListener('click', () => openRecurringEditor(btn.dataset.finRecurringAdd, -1)));
+}
+
+function openRecurringEditor(kind, index) {
+  const config = recurringConfig();
+  const list = kind === 'income' ? config.incomes : config.expenses;
+  const item = index >= 0 ? list[index] : null;
+  const isExpense = kind === 'expense';
+  const groups = recurringExpenseGroups();
+  const selectedGroup = item?.group || groups[0]?.key || 'other';
+  const groupField = isExpense ? `<label>Category<select id="finRecurringGroup">${groups.map((g) => `<option value="${g.key}" ${g.key === selectedGroup ? 'selected' : ''}>${esc(g.label)}</option>`).join('')}</select></label>` : '';
+  showMini(`<span class="panel-kicker">RECURRING ${isExpense ? 'OUTFLOW' : 'INCOME'}</span><h2>${item ? 'Edit recurring item' : 'Add recurring item'}</h2><p>This changes what is suggested in future monthly check-ins. It will not rewrite saved months.</p><div class="finance-mini-fields"><label>Name<input id="finRecurringName" value="${esc(item?.name || '')}" placeholder="${isExpense ? 'e.g. Spotify' : 'e.g. Salary'}"></label>${groupField}<label>Usual amount<div class="finance-money mini"><span>€</span><input id="finRecurringAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-recurring-delete>Remove</button>' : '<button class="btn ghost" type="button" data-fin-recurring-back>Back</button>'}<button class="btn primary" type="button" data-fin-recurring-save>Save</button></div>`);
+  $('[data-fin-recurring-back]')?.addEventListener('click', openRecurringManager);
+  $('[data-fin-recurring-save]')?.addEventListener('click', async () => {
+    const name = String($('#finRecurringName')?.value || '').trim();
+    const amount = $('#finRecurringAmount')?.value || '';
+    if (!name) return toast('Add a name first', 'warn');
+    if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
+    const next = profile();
+    const nextConfig = recurringConfig();
+    nextConfig.custom = true;
+    const row = { id: item?.id || uid(), name, amount: n(amount) };
+    if (isExpense) row.group = $('#finRecurringGroup')?.value || selectedGroup;
+    const target = isExpense ? nextConfig.expenses : nextConfig.incomes;
+    if (index >= 0) target[index] = row; else target.push(row);
+    next.recurring = nextConfig;
+    await saveProfile(next, 'Recurring item saved');
+  });
+  $('[data-fin-recurring-delete]')?.addEventListener('click', async () => {
+    const next = profile();
+    const nextConfig = recurringConfig();
+    nextConfig.custom = true;
+    const target = isExpense ? nextConfig.expenses : nextConfig.incomes;
+    target.splice(index, 1);
+    next.recurring = nextConfig;
+    await saveProfile(next, 'Recurring item removed');
+  });
+}
+
 function openScenarioModal(index) {
   const p = profile(), item = index >= 0 ? p.scenarios[index] : null;
   showMini(`<span class="panel-kicker">TEST SCENARIO</span><h2>${item ? 'Edit purchase test' : 'Test a purchase'}</h2><p>Purchase price is tested against your accumulated Main account leftover. If that is not enough, Twogether uses your actually available savings. A monthly cost only reduces your usual monthly leftover.</p><div class="finance-mini-fields"><label>What are you considering?<input id="finMiniScenarioName" value="${esc(item?.name || '')}" placeholder="e.g. New laptop"></label><label>Purchase price<div class="finance-money mini"><span>€</span><input id="finMiniScenarioUpfront" inputmode="decimal" value="${esc(String(item?.upfront ?? ''))}" placeholder="0.00"></div></label><label>Monthly cost, if any<div class="finance-money mini"><span>€</span><input id="finMiniScenarioMonthly" inputmode="decimal" value="${esc(String(item?.monthly ?? 0))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save scenario</button></div>`);
@@ -559,9 +642,16 @@ function recurringValue(previous, kind, name, fallback) {
 }
 function seededRecord(month) {
   const rules = financeRules(), previous = latestPriorMonth(month), d = freshRecord(month), carry = extraCarryInfo(month);
+  const savedRecurring = profile().recurring;
+  const custom = savedRecurring?.custom === true;
+  const setup = custom ? normalizeRecurringConfig(savedRecurring) : {
+    incomes: rules.recurringIncomes,
+    expenses: rules.recurringExpenses.filter((x) => normalizeGroup(x.group) !== 'extra'),
+  };
   d.extraBudget = rules.extraTracking ? carry.budget : '';
-  d.incomes = rules.recurringIncomes.map((x) => ({ name: x.name, amount: recurringValue(previous, 'income', x.name, x.amount) }));
-  d.expenses = rules.recurringExpenses.map((x) => ({ group: x.group, name: x.name, amount: x.group === 'extra' ? carry.budget : recurringValue(previous, 'expense', x.name, x.amount) }));
+  d.incomes = setup.incomes.map((x) => ({ name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'income', x.name, x.amount) }));
+  d.expenses = setup.expenses.map((x) => ({ group: x.group, name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount) }));
+  if (rules.extraTracking) d.expenses.push({ group: 'extra', name: 'Extra', amount: carry.budget });
   d.extraSpends = [];
   return d;
 }
@@ -843,6 +933,7 @@ function init() {
   ensureMiniModal();
   tab.addEventListener('click', () => { renderWizard(); renderPage(); setTimeout(loadState, 50); });
   $('#restartFinanceWizard')?.addEventListener('click', resetWizard);
+  $('#financeManageRecurring')?.addEventListener('click', openRecurringManager);
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderWizard(); renderPage(); setTimeout(loadState, 40); } });
   obs.observe(document.body, { attributes: true, attributeFilter: ['data-actor'] });
