@@ -1523,6 +1523,20 @@
 
 }
 
+[data-fin-view="balances"] .v33-shared-jar-bank {
+  cursor:default;
+  border-top:1px solid rgba(100,80,65,.1);
+  background:linear-gradient(90deg,rgba(255,245,218,.48),rgba(255,253,249,.18));
+}
+
+[data-fin-view="balances"] .v33-shared-jar-bank:hover {
+  background:linear-gradient(90deg,rgba(255,241,202,.68),rgba(255,253,249,.34))!important;
+}
+
+[data-fin-view="balances"] .v33-shared-jar-bank small {
+  color:#9b7b45;
+}
+
 .v33-shared-jar {
   margin-top:18px;
   border:1px solid #dccdaE;
