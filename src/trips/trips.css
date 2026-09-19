@@ -4406,6 +4406,7 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   visibility:visible;
   transform:none;
   transition-delay:0s;
+  pointer-events:auto;
 }
 
 .activity-whisper-heart {

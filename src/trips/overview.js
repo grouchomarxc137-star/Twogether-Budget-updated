@@ -197,6 +197,25 @@ function renderCompareNumbers() {
 let activityReady = false;
 let lastActivityKey = '';
 
+function hideActivityWhisper(card) {
+  card.classList.remove('activity-fresh');
+  card.setAttribute('aria-hidden', 'true');
+}
+
+function scheduleActivityHide(card, delay = 3500) {
+  clearTimeout(card._activityFadeTimer);
+  card._activityFadeTimer = setTimeout(() => hideActivityWhisper(card), delay);
+}
+
+function bindActivityHover(card) {
+  if (card._activityHoverBound) return;
+  card._activityHoverBound = true;
+  card.addEventListener('mouseenter', () => clearTimeout(card._activityFadeTimer));
+  card.addEventListener('mouseleave', () => {
+    if (card.classList.contains('activity-fresh')) scheduleActivityHide(card, 1200);
+  });
+}
+
 export function renderActivity() {
   const root = $('#activityList');
   if (!root) return;
@@ -206,10 +225,7 @@ export function renderActivity() {
 
   if (!latest) {
     root.innerHTML = '';
-    if (card) {
-      card.classList.remove('activity-fresh');
-      card.setAttribute('aria-hidden', 'true');
-    }
+    if (card) hideActivityWhisper(card);
     if (!activityReady && state.updatedAt) activityReady = true;
     return;
   }
@@ -237,15 +253,12 @@ export function renderActivity() {
   }
 
   if (card) {
+    bindActivityHover(card);
     card.classList.remove('activity-fresh');
     void card.offsetWidth;
     card.classList.add('activity-fresh');
     card.setAttribute('aria-hidden', 'false');
-    clearTimeout(card._activityFadeTimer);
-    card._activityFadeTimer = setTimeout(() => {
-      card.classList.remove('activity-fresh');
-      card.setAttribute('aria-hidden', 'true');
-    }, 3500);
+    scheduleActivityHide(card);
   }
 }
 
