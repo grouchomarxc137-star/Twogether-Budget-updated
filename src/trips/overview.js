@@ -194,31 +194,59 @@ function renderCompareNumbers() {
   Object.entries(values).forEach(([id, val]) => { const el = $('#' + id); if (el) el.textContent = money(val); });
 }
 
+let activityReady = false;
+let lastActivityKey = '';
+
 export function renderActivity() {
   const root = $('#activityList');
   if (!root) return;
-  const state = getState();
-  const items = [...(state.audit || [])].slice(-2).reverse();
-  if (!items.length) { root.innerHTML = '<div class="activity-empty">No recent changes yet.</div>'; return; }
-  root.innerHTML = items.map((a) => {
-    const t = state.trips.find((x) => x.id === a.ref);
-    const place = t ? (tripMeta(t).city || locationLabel(tripMeta(t))) : '';
-    const labels = {
-      addSubmission: 'added a trip version', updateSubmission: 'edited a trip version', confirmTrip: 'confirmed a trip',
-      updateCompare: 'updated the comparison',
-      saveSharedExpense: 'saved shared expense', savePlanPartial: 'saved trip expense', savePlanSubmission: 'saved trip expenses',
-      saveSubmission: 'saved a trip version', saveFinanceMonth: 'saved monthly finances',
-    };
-    const raw = String(a.action || ''); const [actionKey, ...actionDetail] = raw.split(':');
-    const action = labels[actionKey] || raw || 'made a change'; const detail = actionDetail.join(':');
-    const suffix = detail ? `: ${esc(detail)}` : place ? ` · ${esc(place)}` : '';
-    return `<div class="activity-item"><span class="avatar-mini">${esc(String(a.actor || '?').slice(0, 1))}</span><div><strong>${esc(a.actor || 'Unknown')}</strong> ${esc(action)}${suffix}<small>${formatTime(a.at)}</small></div></div>`;
-  }).join('');
   const card = root.closest('.activity-card');
+  const state = getState();
+  const latest = [...(state.audit || [])].slice(-1)[0] || null;
+
+  if (!latest) {
+    root.innerHTML = '';
+    if (card) {
+      card.classList.remove('activity-fresh');
+      card.setAttribute('aria-hidden', 'true');
+    }
+    if (!activityReady && state.updatedAt) activityReady = true;
+    return;
+  }
+
+  const t = state.trips.find((x) => x.id === latest.ref);
+  const place = t ? (tripMeta(t).city || locationLabel(tripMeta(t))) : '';
+  const labels = {
+    addSubmission: 'added a trip version', updateSubmission: 'edited a trip version', confirmTrip: 'confirmed a trip',
+    updateCompare: 'updated the comparison',
+    saveSharedExpense: 'saved shared expense', savePlanPartial: 'saved trip expense', savePlanSubmission: 'saved trip expenses',
+    saveSubmission: 'saved a trip version', saveFinanceMonth: 'saved monthly finances',
+  };
+  const raw = String(latest.action || ''); const [actionKey, ...actionDetail] = raw.split(':');
+  const action = labels[actionKey] || raw || 'made a change'; const detail = actionDetail.join(':');
+  const suffix = detail ? `: ${esc(detail)}` : place ? ` · ${esc(place)}` : '';
+  root.innerHTML = `<div class="activity-item"><span class="avatar-mini">${esc(String(latest.actor || '?').slice(0, 1))}</span><div><strong>${esc(latest.actor || 'Unknown')}</strong> ${esc(action)}${suffix}<small>${formatTime(latest.at)}</small></div></div>`;
+
+  const latestKey = String(latest.id || `${latest.at || ''}|${latest.actor || ''}|${latest.action || ''}|${latest.ref || ''}`);
+  if (!activityReady) {
+    activityReady = true;
+    lastActivityKey = latestKey;
+    if (card) card.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  if (latestKey === lastActivityKey) return;
+  lastActivityKey = latestKey;
+
   if (card) {
+    card.classList.remove('activity-fresh');
+    void card.offsetWidth;
     card.classList.add('activity-fresh');
+    card.setAttribute('aria-hidden', 'false');
     clearTimeout(card._activityFadeTimer);
-    card._activityFadeTimer = setTimeout(() => card.classList.remove('activity-fresh'), 3500);
+    card._activityFadeTimer = setTimeout(() => {
+      card.classList.remove('activity-fresh');
+      card.setAttribute('aria-hidden', 'true');
+    }, 3500);
   }
 }
 

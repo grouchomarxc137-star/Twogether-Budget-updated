@@ -4379,3 +4379,74 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   line-height:1.36!important;
 }
 
+/* Activity updates are transient app-wide popups instead of a persistent card. */
+.activity-popup-wrap {
+  position:fixed;
+  right:18px;
+  bottom:78px;
+  z-index:160;
+  width:min(320px,calc(100vw - 28px));
+  pointer-events:none;
+}
+
+.activity-popup-wrap .activity-card {
+  padding:12px 14px!important;
+  border:1px solid rgba(205,186,161,.48)!important;
+  border-radius:16px!important;
+  background:rgba(255,253,249,.95)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+  backdrop-filter:blur(12px)!important;
+  box-shadow:0 10px 28px rgba(57,43,32,.14)!important;
+  opacity:0!important;
+  visibility:hidden;
+  transform:translateY(12px) scale(.98);
+  transition:opacity .22s ease,transform .22s ease,visibility 0s linear .22s;
+  pointer-events:none;
+}
+
+.activity-popup-wrap .activity-card.activity-fresh {
+  opacity:1!important;
+  visibility:visible;
+  transform:none;
+  transition-delay:0s;
+}
+
+.activity-popup-wrap .panel-head {
+  margin-bottom:5px!important;
+}
+
+.activity-popup-wrap .panel-head h2 {
+  margin:1px 0 0!important;
+  font-size:19px!important;
+  line-height:1.05!important;
+}
+
+.activity-popup-wrap .activity-item {
+  padding:6px 0 2px!important;
+  border-bottom:0!important;
+  gap:8px!important;
+}
+
+.activity-popup-wrap .activity-item div {
+  font-size:13px!important;
+  line-height:1.3!important;
+}
+
+.activity-popup-wrap .activity-item small {
+  font-size:12px!important;
+  margin-top:2px!important;
+}
+
+.activity-popup-wrap #activityList .activity-item:nth-child(n+2) {
+  display:none!important;
+}
+
+@media(max-width:760px) {
+  .activity-popup-wrap {
+    left:12px;
+    right:12px;
+    bottom:76px;
+    width:auto;
+  }
+}
+
