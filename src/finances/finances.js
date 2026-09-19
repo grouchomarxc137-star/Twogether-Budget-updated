@@ -449,8 +449,18 @@ function openRecurringManager() {
   expenseRows.forEach((x) => (grouped[x.tone] || (grouped[x.tone] = [])).push(x));
   const expenses = categoryOrder().filter((tone) => grouped[tone]?.length).map((tone) => `<div class="finance-recurring-group"><h3>${esc(categoryLabel(tone))}</h3>${grouped[tone].map((x) => recurringRow('expense', x, x.index)).join('')}</div>`).join('') || '<div class="finance-current-empty">No recurring expenses yet.</div>';
   showMini(`<span class="panel-kicker">MONTHLY DEFAULTS</span><h2>Manage recurring items</h2><p>These are the usual items Twogether asks you to confirm each month. Changes apply to future monthly check-ins only — confirmed months stay untouched.</p><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Income</h3><button class="text-btn" type="button" data-fin-recurring-add="income">+ Add</button></div>${incomes}</div><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Outflow</h3><button class="text-btn" type="button" data-fin-recurring-add="expense">+ Add</button></div>${expenses}</div>`);
-  $('[data-fin-recurring-kind]').forEach((btn) => btn.addEventListener('click', () => openRecurringEditor(btn.dataset.finRecurringKind, Number(btn.dataset.finRecurringIndex))));
-  $('[data-fin-recurring-add]').forEach((btn) => btn.addEventListener('click', () => openRecurringEditor(btn.dataset.finRecurringAdd, -1)));
+  const modalBody = $('#financeMiniBody');
+  if (modalBody) {
+    modalBody.onclick = (e) => {
+      const edit = e.target.closest?.('[data-fin-recurring-kind]');
+      if (edit) {
+        openRecurringEditor(edit.dataset.finRecurringKind, Number(edit.dataset.finRecurringIndex));
+        return;
+      }
+      const add = e.target.closest?.('[data-fin-recurring-add]');
+      if (add) openRecurringEditor(add.dataset.finRecurringAdd, -1);
+    };
+  }
 }
 
 function openRecurringEditor(kind, index) {
