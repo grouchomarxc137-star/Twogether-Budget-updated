@@ -3504,6 +3504,118 @@ html body .eyebrow, html body .panel-kicker {
   border:1px solid #e7dccd;
   background:#fff;
   border-radius:12px;
+  max-height:78px;
+  overflow:hidden;
+  transform-origin:center;
+  transition:opacity .2s ease,transform .23s cubic-bezier(.2,.8,.2,1),max-height .23s ease,padding .23s ease,border-width .23s ease,margin .23s ease;
+}
+
+.v33-check-row.is-moving {
+  pointer-events:none;
+}
+
+.v33-check-row.is-completing {
+  opacity:0;
+  transform:translateY(8px) scale(.985);
+  max-height:0;
+  padding-top:0;
+  padding-bottom:0;
+  border-width:0;
+  margin-top:-6px;
+}
+
+.v33-check-row.is-restoring {
+  opacity:0;
+  transform:translateY(-8px) scale(.985);
+  max-height:0;
+  padding-top:0;
+  padding-bottom:0;
+  border-width:0;
+  margin-top:-6px;
+}
+
+.v33-check-row.just-arrived {
+  animation:v33-check-arrive .42s cubic-bezier(.2,.8,.2,1);
+}
+
+@keyframes v33-check-arrive {
+  from { opacity:0; transform:translateY(-8px) scale(.985); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+
+.v33-check-copy {
+  min-width:0;
+  display:grid;
+  gap:1px;
+}
+
+.v33-check-empty {
+  padding:10px 12px;
+  border:1px dashed #e3d9cc;
+  border-radius:12px;
+  color:#8b8176;
+  font-size:14px;
+  background:#fffdf9;
+}
+
+.v33-prep-completed {
+  margin-top:24px;
+  padding-top:20px;
+  border-top:1px solid #eadfd2;
+}
+
+.v33-completed-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:9px;
+}
+
+.v33-completed-head h3 {
+  font-size:22px;
+  margin:2px 0 0;
+}
+
+.v33-completed-count {
+  min-width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:#edf3df;
+  border:1px solid #d7e1c2;
+  color:#5d7041;
+  font-size:13px;
+  font-weight:700;
+}
+
+.v33-check-completed {
+  background:#f7f8f1;
+  border-color:#dfe5cf;
+}
+
+.v33-check-completed .v33-check-text {
+  color:#887f75;
+  text-decoration:line-through;
+  text-decoration-thickness:1px;
+  text-decoration-color:#aaa197;
+}
+
+.v33-check-kind {
+  color:#998f82;
+  font-size:11px;
+  line-height:1.1;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .v33-check-row {
+    transition:none;
+  }
+
+  .v33-check-row.just-arrived {
+    animation:none;
+  }
 }
 
 .v33-check-row input[type=checkbox] {
