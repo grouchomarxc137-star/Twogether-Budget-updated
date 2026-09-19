@@ -40,20 +40,48 @@ export function openPrep(id) {
 function closePrep() {
   $('#v33PrepModal')?.classList.remove('show'); $('#v33PrepModal')?.setAttribute('aria-hidden', 'true');
 }
-function prepRows(kind, list) {
-  return `<div class="v33-check-list" data-prep-list="${kind}">${list.map((x) => `<div class="v33-check-row" data-prep-id="${esc(x.id)}"><input type="checkbox" ${x.done ? 'checked' : ''} data-prep-check aria-label="Done"><input class="v33-check-text" value="${esc(x.text)}" data-prep-text><button type="button" data-prep-remove aria-label="Remove">×</button></div>`).join('')}</div><div class="v33-add-check"><input placeholder="Add another item" data-prep-new="${kind}"><button class="btn ghost" type="button" data-prep-add="${kind}">Add</button></div>`;
+function prepRow(kind, item, completed = false) {
+  const kindLabel = kind === 'packing' ? 'Packing' : 'Reminder';
+  return `<div class="v33-check-row${completed ? ' v33-check-completed' : ''}" data-prep-id="${esc(item.id)}" data-prep-kind="${kind}"><input type="checkbox" ${item.done ? 'checked' : ''} data-prep-check aria-label="${item.done ? 'Mark as active' : 'Mark as completed'}"><div class="v33-check-copy"><input class="v33-check-text" value="${esc(item.text)}" data-prep-text>${completed ? `<small class="v33-check-kind">${kindLabel}</small>` : ''}</div><button type="button" data-prep-remove aria-label="Remove">×</button></div>`;
 }
-function renderPrep() {
+function prepRows(kind, list) {
+  const active = list.filter((x) => !x.done);
+  const rows = active.length ? active.map((x) => prepRow(kind, x)).join('') : '<div class="v33-check-empty">All clear here ♡</div>';
+  return `<div class="v33-check-list" data-prep-list="${kind}">${rows}</div><div class="v33-add-check"><input placeholder="Add another item" data-prep-new="${kind}"><button class="btn ghost" type="button" data-prep-add="${kind}">Add</button></div>`;
+}
+function completedRows(prep) {
+  const done = [
+    ...prep.packing.filter((x) => x.done).map((item) => ({ kind: 'packing', item })),
+    ...prep.reminders.filter((x) => x.done).map((item) => ({ kind: 'reminders', item })),
+  ];
+  if (!done.length) return '';
+  return `<section class="v33-prep-completed" data-prep-completed><div class="v33-completed-head"><div><span class="panel-kicker">DONE</span><h3>Completed</h3></div><span class="v33-completed-count">${done.length}</span></div><div class="v33-check-list v33-completed-list">${done.map(({ kind, item }) => prepRow(kind, item, true)).join('')}</div></section>`;
+}
+function renderPrep(move = null) {
   const modal = $('#v33PrepModal'), body = $('#v33PrepBody'), prep = modal?._prep; if (!body || !prep) return;
   const plan = planById(prepPlanId);
-  body.innerHTML = `<span class="panel-kicker">${esc(plan?.meta?.city || 'TRIP')}</span><h2>Prepare for trip</h2><p>Tick things off, edit them, or add your own.</p><section class="v33-prep-section"><h3>Packing / things to take</h3>${prepRows('packing', prep.packing)}</section><section class="v33-prep-section"><h3>Important trip reminders</h3>${prepRows('reminders', prep.reminders)}</section><button class="btn primary v33-prep-save" type="button" data-prep-save>Save checklist</button>`;
+  body.innerHTML = `<span class="panel-kicker">${esc(plan?.meta?.city || 'TRIP')}</span><h2>Prepare for trip</h2><p>Tick things off, edit them, or add your own. Completed items move neatly underneath.</p><section class="v33-prep-section"><h3>Packing / things to take</h3>${prepRows('packing', prep.packing)}</section><section class="v33-prep-section"><h3>Important trip reminders</h3>${prepRows('reminders', prep.reminders)}</section>${completedRows(prep)}<button class="btn primary v33-prep-save" type="button" data-prep-save>Save checklist</button>`;
   bindPrep();
+  if (move?.id) requestAnimationFrame(() => {
+    const row = $('[data-prep-id]', modal).find((x) => x.dataset.prepId === move.id);
+    if (!row) return;
+    row.classList.add('just-arrived');
+    setTimeout(() => row.classList.remove('just-arrived'), 480);
+  });
 }
 function bindPrep() {
   const modal = $('#v33PrepModal'), prep = modal._prep;
-  $$('[data-prep-id]', modal).forEach((row) => {
-    const list = row.closest('[data-prep-list]').dataset.prepList, item = prep[list].find((x) => x.id === row.dataset.prepId);
-    $('[data-prep-check]', row).addEventListener('change', (e) => item.done = e.target.checked);
+  $('[data-prep-id]', modal).forEach((row) => {
+    const list = row.dataset.prepKind || row.closest('[data-prep-list]')?.dataset.prepList;
+    const item = prep[list]?.find((x) => x.id === row.dataset.prepId);
+    if (!item) return;
+    $('[data-prep-check]', row).addEventListener('change', (e) => {
+      if (row.classList.contains('is-moving')) return;
+      const done = e.target.checked;
+      item.done = done;
+      row.classList.add('is-moving', done ? 'is-completing' : 'is-restoring');
+      setTimeout(() => renderPrep({ id: item.id, to: done ? 'completed' : 'active' }), 230);
+    });
     $('[data-prep-text]', row).addEventListener('change', (e) => item.text = e.target.value.trim());
     $('[data-prep-remove]', row).addEventListener('click', () => { prep[list] = prep[list].filter((x) => x.id !== item.id); renderPrep(); });
   });
