@@ -231,11 +231,10 @@ export function renderActivity() {
   if (!activityReady) {
     activityReady = true;
     lastActivityKey = latestKey;
-    if (card) card.setAttribute('aria-hidden', 'true');
-    return;
+  } else {
+    if (latestKey === lastActivityKey) return;
+    lastActivityKey = latestKey;
   }
-  if (latestKey === lastActivityKey) return;
-  lastActivityKey = latestKey;
 
   if (card) {
     card.classList.remove('activity-fresh');
