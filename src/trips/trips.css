@@ -4395,10 +4395,13 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   opacity:0;
   visibility:hidden;
   transform:translateY(7px);
-  transition:opacity .24s ease,transform .24s ease,visibility 0s linear .24s;
+  transition:opacity .24s ease,transform .24s ease,visibility 0s linear .24s,color .18s ease,text-shadow .18s ease;
   pointer-events:none;
   text-align:right;
   text-shadow:0 1px 12px rgba(255,253,249,.96),0 1px 4px rgba(255,253,249,.96);
+  -webkit-user-select:none;
+  user-select:none;
+  cursor:none;
 }
 
 .activity-whisper.activity-fresh {
@@ -4407,6 +4410,20 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   transform:none;
   transition-delay:0s;
   pointer-events:auto;
+}
+
+.activity-whisper.activity-fresh:hover {
+  opacity:1;
+  color:#3f352f;
+  text-shadow:0 1px 14px rgba(255,253,249,1),0 1px 5px rgba(255,253,249,1);
+}
+
+.activity-whisper.activity-fresh:hover .activity-whisper-heart {
+  color:#976771;
+}
+
+.activity-whisper.activity-fresh:hover .activity-item strong {
+  font-weight:800;
 }
 
 .activity-whisper-heart {
