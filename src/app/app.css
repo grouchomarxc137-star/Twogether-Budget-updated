@@ -305,8 +305,11 @@ body.dev-playground #loggedUserBadge {
   overflow:visible!important;
 }
 
+/* Keep the main navigation below full-screen dialogs/overlays.
+   The nav keeps its own stacking context for dropdowns without cutting
+   across open modals as a horizontal ribbon. */
 .hub-tabs {
-  z-index:210!important;
+  z-index:60!important;
 }
 
 .tw-nav-menu {
