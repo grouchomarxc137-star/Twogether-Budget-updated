@@ -160,6 +160,29 @@ test('persists finance and wishlist data independently', () => {
   }
 });
 
+test('partial finance drafts keep only the expenses explicitly logged', () => {
+  const context = setup();
+  try {
+    const result = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [],
+        expenses: [{ group: 'rent', name: 'Rent', amount: 50 }],
+        extraBudget: 250,
+        extraSpends: [],
+        partialOnly: true,
+        finalized: false,
+      },
+    });
+    assert.equal(result.ok, true);
+    const saved = getState().finances.Principessa[0];
+    assert.equal(saved.partialOnly, true);
+    assert.deepEqual(saved.expenses.map((x) => x.name), ['Rent']);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('Principe Saved up spending is savings-only and adjusts the saved total by the edit delta', () => {
   const context = setup();
   try {
