@@ -497,8 +497,9 @@ function recurringRow(kind, item, index) {
   const tone = kind === 'income' ? 'other' : groupTone(item.group);
   const sub = kind === 'income' ? 'Income' : (actor() === 'Principe' ? categoryLabel(tone) : groupLabel(item.group));
   const day = normalizeRecurringDay(item.day);
-  const timing = day === '' ? 'Date optional' : `Usually ${ordinalDay(day)}`;
-  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(sub)} · ${esc(timing)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
+  const timing = day === '' ? '' : `Usually ${ordinalDay(day)}`;
+  const detail = timing ? `${sub} · ${timing}` : sub;
+  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(detail)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
 }
 
 function openRecurringManager() {
