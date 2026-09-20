@@ -81,6 +81,7 @@ const FINANCE_RULES = {
 const CATEGORY_ORDER = ['fixed', 'medical', 'subscriptions', 'budgets', 'wealth', 'other'];
 const CATEGORY_LABELS = { fixed: 'Fixed expenses', medical: 'Medical', subscriptions: 'Subscriptions', budgets: 'Budgets', wealth: 'Savings / Investments', other: 'Other' };
 const HOUSE_GOAL_TARGET = 150000;
+const HOUSE_EMERGENCY_RESERVE = 5000;
 
 let financeState = {
   version: 0,
@@ -367,6 +368,26 @@ function profileStats() {
   return { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth, mainLeftover };
 }
 
+function netWorthForOwner(owner) {
+  const p = normalizeProfile(financeState.financeProfiles?.[owner]);
+  const savingsTotal = n(p.savingsTotal);
+  const heldTotal = p.savingsReserved.reduce((sum, x) => sum + n(x.amount), 0);
+  const availableSavings = savingsTotal - heldTotal;
+  const latestInvestment = [...(financeState.finances?.[owner] || [])]
+    .filter((x) => hasValue(x.investmentTotal))
+    .sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
+  const investmentTotal = latestInvestment && hasValue(latestInvestment.investmentTotal) ? n(latestInvestment.investmentTotal) : 0;
+  const sisterInvestments = latestInvestment && hasValue(latestInvestment.sisterInvestments) ? n(latestInvestment.sisterInvestments) : 0;
+  const ownInvestments = Math.max(0, investmentTotal - sisterInvestments);
+  return availableSavings + ownInvestments;
+}
+
+function sharedHouseProgressStats() {
+  const combinedNetWorth = ['Principessa', 'Principe'].reduce((sum, owner) => sum + netWorthForOwner(owner), 0);
+  const availableForHouse = Math.max(0, combinedNetWorth - HOUSE_EMERGENCY_RESERVE);
+  return { combinedNetWorth, availableForHouse };
+}
+
 async function loadState() {
   if (loading || !actor()) return;
   loading = true;
@@ -397,11 +418,12 @@ function renderPage() {
   const summary = calc(latest || {});
   const ps = profileStats();
   const latestGl = latest ? investmentGL(latest) : null;
-  const housePercent = HOUSE_GOAL_TARGET > 0 ? Math.max(0, (ps.netWorth / HOUSE_GOAL_TARGET) * 100) : 0;
+  const house = sharedHouseProgressStats();
+  const housePercent = HOUSE_GOAL_TARGET > 0 ? Math.max(0, (house.availableForHouse / HOUSE_GOAL_TARGET) * 100) : 0;
   const houseProgress = Math.min(100, housePercent);
   const houseMarker = Math.min(98, Math.max(2, houseProgress));
   const housePercentLabel = housePercent.toFixed(1).replace(/\.0$/, '');
-  const houseRemaining = Math.max(0, HOUSE_GOAL_TARGET - ps.netWorth);
+  const houseRemaining = Math.max(0, HOUSE_GOAL_TARGET - house.availableForHouse);
   const summaryRoot = $('#financeSummary');
   if (summaryRoot) {
     const statusClass = latest ? (latest.finalized ? 'status-final' : 'status-draft') : 'status-empty';
@@ -419,13 +441,13 @@ function renderPage() {
             <div><span class="panel-kicker">OUR DREAM HOME</span><h2>Closer to our own front door</h2></div>
             <div class="finance-house-goal-percent"><strong>${housePercentLabel}%</strong><span>of the way there</span></div>
           </div>
-          <div class="finance-house-goal-money"><strong>${money(ps.netWorth)}</strong><span>of ${money(HOUSE_GOAL_TARGET)}</span></div>
+          <div class="finance-house-goal-money"><strong>${money(house.availableForHouse)}</strong><span>of ${money(HOUSE_GOAL_TARGET)}</span></div>
           <div class="finance-house-goal-track" role="progressbar" aria-label="House goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${houseProgress.toFixed(1)}">
             <span style="width:${houseProgress}%"></span><i style="left:${houseMarker}%" aria-hidden="true">♡</i>
           </div>
           <div class="finance-house-goal-foot">
             <span>${houseRemaining > 0 ? `${money(houseRemaining)} to go` : 'Dream-home goal reached ♡'}</span>
-            <small>Saved up + investments update this automatically.</small>
+            <small>Both net worths combined, with ${money(HOUSE_EMERGENCY_RESERVE)} kept for emergencies.</small>
           </div>
         </div>
       </article>`;
