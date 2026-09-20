@@ -244,13 +244,18 @@ function normalizeFinanceRecord(rec, owner = actor()) {
   const rules = financeRules(owner);
   copy.incomes = Array.isArray(copy.incomes) ? copy.incomes.map((x) => ({ ...x, date: normalizeFinanceDate(x.date, copy.month) })) : [];
   copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({ ...x, group: normalizeGroup(x.group), date: normalizeFinanceDate(x.date, copy.month) })) : [];
+  copy.partialOnly = copy.partialOnly === true;
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
   if (rules.extraTracking) {
     const storedBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : (fixedExtras.length && hasValue(fixedExtras[0].amount) ? n(fixedExtras[0].amount) : rules.extraBudget);
     copy.extraBudget = storedBudget;
-    copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
-    if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget, date: '' });
-    copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') { x.amount = storedBudget; x.date = ''; } });
+    if (copy.partialOnly) {
+      copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
+    } else {
+      copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
+      if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget, date: '' });
+      copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') { x.amount = storedBudget; x.date = ''; } });
+    }
   } else {
     copy.extraBudget = '';
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
@@ -686,7 +691,7 @@ function openLoanRepayment(index) {
 
 function freshRecord(month) {
   const rules = financeRules();
-  return { month, incomes: [], expenses: [], extraBudget: rules.extraTracking ? rules.extraBudget : '', extraSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', finalized: false, finalizedAt: '' };
+  return { month, incomes: [], expenses: [], extraBudget: rules.extraTracking ? rules.extraBudget : '', extraSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', partialOnly: false, finalized: false, finalizedAt: '' };
 }
 function cloneRecord(rec) {
   const rules = financeRules();
@@ -701,7 +706,13 @@ function cloneRecord(rec) {
 }
 
 function startMonth(month = '2026-09', skipMonth = false) { const target = month || selectedMonth; if (skipMonth) { startRecurringMonth(target); return; } flow = { data: freshRecord(target), stage: 'month', temp: {} }; renderWizard(); }
-function startPartialMonth(month = selectedMonth) { const target = month || selectedMonth || '2026-09'; flow = { data: freshRecord(target), stage: 'partialMonth', temp: {}, partialMode: true }; renderWizard(); }
+function startPartialMonth(month = selectedMonth) {
+  const target = month || selectedMonth || '2026-09';
+  const data = freshRecord(target);
+  data.partialOnly = true;
+  flow = { data, stage: 'partialMonth', temp: {}, partialMode: true };
+  renderWizard();
+}
 function partialRecurringExpenses(month) {
   return (seededRecord(month).expenses || []).filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
 }
@@ -713,7 +724,10 @@ function startPartialExpenses(month) {
   const target = month || selectedMonth;
   const existing = recordFor(target);
   if (existing?.finalized === true) return toast('This month is final and locked', 'warn');
-  flow = { data: existing ? cloneRecord(existing) : freshRecord(target), stage: 'partialChoose', temp: {}, partialMode: true };
+  const data = existing ? cloneRecord(existing) : freshRecord(target);
+  data.partialOnly = true;
+  data.expenses = (data.expenses || []).filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
+  flow = { data, stage: 'partialChoose', temp: {}, partialMode: true };
   selectedMonth = target;
   renderWizard();
 }
@@ -1233,6 +1247,10 @@ async function confirmExistingMonth(rec) {
 async function saveMonth(finalize = false) {
   if (!flow) return;
   const d = cloneRecord(flow.data); if (!d.month) return toast('Choose a month first', 'warn');
+  if (flow.partialMode) {
+    d.partialOnly = true;
+    d.expenses = (d.expenses || []).filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
+  }
   d.finalized = !!finalize; d.finalizedAt = finalize ? new Date().toISOString() : '';
   const btn = $(finalize ? '[data-fin-finalize]' : '[data-fin-save-draft]'); if (btn) btn.disabled = true;
   try {
