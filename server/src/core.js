@@ -1004,7 +1004,9 @@ function sanitizeFinanceMonth_(record, actor) {
     }
     return true;
   });
-  if (usesExtraBudget && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget, date:''});
+  const partialOnly = !!(record && record.partialOnly === true);
+  if (usesExtraBudget && !partialOnly && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget, date:''});
+  if (partialOnly) expenses = expenses.filter(function(x){ return !(x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'); });
 
   const allowedExtraSources = actor === 'Principe' ? ['savings'] : ['creditcard','savings','main'];
   let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
@@ -1026,6 +1028,7 @@ function sanitizeFinanceMonth_(record, actor) {
     investmentTotal: cleanMoney_(record && record.investmentTotal),
     sisterInvestments: cleanMoney_(record && record.sisterInvestments),
     planning: sanitizeFinancePlanning_(record && record.planning),
+    partialOnly: !!(record && record.partialOnly === true),
     finalized: !!(record && record.finalized === true),
     finalizedAt: cleanText_(record && record.finalizedAt, 40),
     updatedAt: cleanText_(record && record.updatedAt, 40),
