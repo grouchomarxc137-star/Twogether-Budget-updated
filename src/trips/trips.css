@@ -2586,7 +2586,7 @@ body:has(#log.active) .app {
 }
 
 #log *, #twCurrentTripsSection * {
-  font-family:'Crimson Pro',serif!important;
+  font-family:'Crimson Pro',Georgia,serif!important;
 }
 
 #twCurrentTripsSection.v27-current-side .tw-current-card {
@@ -2898,7 +2898,7 @@ dialog.current-overview {
   min-width:0!important;
   table-layout:fixed!important;
   border-collapse:collapse!important;
-  font-family:'Crimson Pro',serif!important;
+  font-family:'Crimson Pro',Georgia,serif!important;
 }
 
 .current-overview .overview-table th,
@@ -4639,20 +4639,6 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
 .overview-back{font-size:13px!important}
 .overview-category-head h3{font-size:32px!important}
 .overview-category-head p{font-size:14px!important;line-height:1.45!important}
-.overview-category-totals{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:0;
-  margin:0 0 14px;
-  border:1px solid #e7ddd1;
-  border-radius:13px;
-  background:#fff;
-  overflow:hidden;
-}
-.overview-category-totals>div{padding:12px 14px}
-.overview-category-totals>div+div{border-left:1px solid #e7ddd1}
-.overview-category-totals span{display:block;margin-bottom:4px;color:#7d7167;font-size:12px}
-.overview-category-totals strong{font-size:18px}
 .overview-category-layout{
   display:grid;
   grid-template-columns:minmax(0,7fr) minmax(230px,3fr);
@@ -4722,8 +4708,33 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   .overview-history-panel{order:2}
 }
 @media(max-width:620px){
-  .overview-category-totals{grid-template-columns:1fr}
-  .overview-category-totals>div+div{border-left:0;border-top:1px solid #e7ddd1}
   .overview-simple-table th,.overview-simple-table td{font-size:14px!important}
   .overview-category-btn{font-size:14px!important}
+}
+
+
+/* Keep Open Trip typography identical to the site's title font stack. */
+.current-overview .overview-simple-table,
+.current-overview .overview-simple-table *,
+.current-overview .overview-category-layout,
+.current-overview .overview-category-layout *{
+  font-family:'Crimson Pro',Georgia,serif!important;
+}
+.overview-form-chips button,
+.overview-jar-toggle,
+.overview-more{
+  transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease;
+}
+.overview-form-chips button.active{
+  box-shadow:inset 0 0 0 1px rgba(185,135,44,.10);
+}
+.overview-form-chips button:active,
+.overview-jar-toggle:active{
+  transform:scale(.985);
+}
+.overview-more-fields{
+  transition:opacity .16s ease,transform .16s ease;
+}
+.overview-expense-form .hidden{
+  display:none!important;
 }

@@ -47,15 +47,6 @@ function rowPaid(plan, trip, row, name) {
   return legacyPaid(plan, trip, row, name) + rowEntries(plan, row).reduce((sum, entry) => sum + entryPaid(entry, name), 0);
 }
 
-function rowTotal(plan, trip, row) {
-  const [a, b] = records(plan, trip);
-  const legacy = row.legacy.reduce((sum, key) => {
-    const shared = sharedFor(plan, trip, key);
-    return sum + (has(shared?.total) ? n(shared.total) : Math.max(n(a?.[key]), n(b?.[key])));
-  }, 0);
-  return legacy + rowEntries(plan, row).reduce((sum, entry) => sum + n(entry?.amount), 0);
-}
-
 function legacyTotal(plan, trip) {
   const [a, b] = records(plan, trip);
   return legacyKeys.reduce((sum, key) => {
@@ -192,12 +183,12 @@ function categoryFormHtml(plan, row, draft, entry) {
   const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
   return '<div class="overview-expense-form">' +
     formSubtype(row, draft) +
-    (needsName ? '<label>Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' : '') +
+    '<label data-form-name-wrap class="' + (needsName ? '' : 'hidden') + '">Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' +
     '<label>Amount<div class="overview-money-input"><span>€</span><input id="overviewExpenseAmount" inputmode="decimal" value="' + esc(draft.amount || '') + '" placeholder="0.00"></div></label>' +
     '<fieldset><legend>Who paid?</legend><div class="overview-form-chips">' + names.concat('both').map((value) => '<button type="button" class="' + (draft.paidBy === value ? 'active' : '') + '" data-form-payer="' + value + '">' + (value === 'both' ? 'Both' : value) + '</button>').join('') + '</div></fieldset>' +
     '<fieldset><legend>How should we count it?</legend><div class="overview-form-chips"><button type="button" class="' + (draft.split === 'shared' ? 'active' : '') + '" data-form-split="shared">Shared 50/50</button><button type="button" class="' + (draft.split === 'personal' ? 'active' : '') + '" data-form-split="personal">Personal</button></div></fieldset>' +
-    (draft.split === 'personal' ? '<fieldset><legend>Personal expense for</legend><div class="overview-form-chips">' + names.map((value) => '<button type="button" class="' + (draft.forActor === value ? 'active' : '') + '" data-form-owner="' + value + '">' + value + '</button>').join('') + '</div></fieldset>' : '') +
-    (row.category === 'accommodation' ? '<button type="button" class="overview-jar-toggle ' + (draft.useJar ? 'active' : '') + '" data-form-jar><span><strong>Use 20% from Shared Jar</strong><small>Accommodation only · ' + money(available) + ' available</small></span><b>' + (draft.useJar ? money(jar) + ' from Jar' : 'Off') + '</b></button>' : '') +
+    '<fieldset data-form-owner-wrap class="' + (draft.split === 'personal' ? '' : 'hidden') + '"><legend>Personal expense for</legend><div class="overview-form-chips">' + names.map((value) => '<button type="button" class="' + (draft.forActor === value ? 'active' : '') + '" data-form-owner="' + value + '">' + value + '</button>').join('') + '</div></fieldset>' +
+    (row.category === 'accommodation' ? '<button type="button" class="overview-jar-toggle ' + (draft.useJar ? 'active' : '') + '" data-form-jar><span><strong>Use 20% from Shared Jar</strong><small>Accommodation only · ' + money(available) + ' available</small></span><b data-form-jar-value>' + (draft.useJar ? money(jar) + ' from Jar' : 'Off') + '</b></button>' : '') +
     '<button type="button" class="overview-more" data-form-more aria-expanded="' + (draft.showMore ? 'true' : 'false') + '"><span>' + (draft.showMore ? '⌃' : '⌄') + '</span> More options</button>' +
     '<div class="overview-more-fields ' + (draft.showMore ? '' : 'hidden') + '"><label>Date<input id="overviewExpenseDate" type="date" value="' + esc(draft.date || today()) + '"></label><label>Note <small>optional</small><input id="overviewExpenseNote" value="' + esc(draft.note || '') + '" placeholder="Add a note"></label><label class="overview-estimate"><input id="overviewExpenseEstimate" type="checkbox" ' + (draft.uncertain ? 'checked' : '') + '><span>This amount is an estimate</span></label></div>' +
     '<div class="overview-form-actions">' + (draft.id ? '<button type="button" class="btn ghost" data-form-cancel>Cancel edit</button>' : '') + '<button type="button" class="btn primary" data-form-save>' + (draft.id ? 'Save changes' : 'Save expense') + '</button></div><p data-overview-error class="overview-form-error" role="status"></p></div>';
@@ -211,10 +202,6 @@ function historyHtml(plan, row, expanded) {
     (expanded && list.length > 1 ? categoryEntriesHtml(plan, row) : '') + '</aside>';
 }
 
-function categorySummaryHtml(plan, trip, row) {
-  return '<div class="overview-category-totals"><div><span>Category total</span><strong>' + money(rowTotal(plan, trip, row)) + '</strong></div><div><span>Principessa paid</span><strong>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</strong></div><div><span>Principe paid</span><strong>' + money(rowPaid(plan, trip, row, 'Principe')) + '</strong></div></div>';
-}
-
 function drawCategory(plan, key, editId = '', expandedHistory = false) {
   const row = rowByKey(key); if (!row || !dialog) return;
   const selected = editId ? entries(plan).find((item) => item.id === editId) || null : null;
@@ -226,14 +213,43 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
     const currentEntry = draft.id ? entries(plan).find((item) => item.id === draft.id) || selected : null;
     dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
       '<div class="overview-scroll"><button type="button" class="overview-back" data-category-back>← Back to expenses</button><div class="overview-category-head"><div><span class="panel-kicker">EXPENSES</span><h3>' + esc(row.label) + '</h3><p>' + (draft.id ? 'Editing a logged expense.' : 'Log a new expense and the category total updates automatically.') + '</p></div>' + matchCell(rowMatch(plan, trip, row)) + '</div>' +
-      categorySummaryHtml(plan, trip, row) +
       '<div class="overview-category-layout"><section class="overview-quick-log"><div class="overview-quick-log-head"><span>' + (draft.id ? 'EDIT EXPENSE' : 'QUICK LOG') + '</span><strong>' + (draft.id ? esc(entryTitle(row, currentEntry || draft)) : 'Add to ' + esc(row.label)) + '</strong></div>' + categoryFormHtml(plan, row, draft, currentEntry) + '</section>' +
       historyHtml(plan, row, expanded) + '</div></div></div>';
 
     dialog.querySelector('[data-overview-close]').onclick = close;
     dialog.querySelector('[data-category-back]').onclick = () => draw(plan);
+
     const amount = dialog.querySelector('#overviewExpenseAmount');
-    amount?.addEventListener('input', (event) => { draft.amount = event.target.value; });
+    const syncChoices = () => {
+      dialog.querySelectorAll('[data-form-subtype]').forEach((button) => {
+        const current = row.category === 'transport' ? draft.transportType : draft.foodType;
+        button.classList.toggle('active', current === button.dataset.formSubtype || (current === 'tolls' && button.dataset.formSubtype === 'parking-tolls'));
+      });
+      dialog.querySelectorAll('[data-form-payer]').forEach((button) => button.classList.toggle('active', draft.paidBy === button.dataset.formPayer));
+      dialog.querySelectorAll('[data-form-split]').forEach((button) => button.classList.toggle('active', draft.split === button.dataset.formSplit));
+      dialog.querySelectorAll('[data-form-owner]').forEach((button) => button.classList.toggle('active', draft.forActor === button.dataset.formOwner));
+
+      const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
+      dialog.querySelector('[data-form-name-wrap]')?.classList.toggle('hidden', !needsName);
+      dialog.querySelector('[data-form-owner-wrap]')?.classList.toggle('hidden', draft.split !== 'personal');
+
+      const more = dialog.querySelector('[data-form-more]');
+      const moreFields = dialog.querySelector('.overview-more-fields');
+      if (more) {
+        more.setAttribute('aria-expanded', draft.showMore ? 'true' : 'false');
+        const icon = more.querySelector('span'); if (icon) icon.textContent = draft.showMore ? '⌃' : '⌄';
+      }
+      moreFields?.classList.toggle('hidden', !draft.showMore);
+
+      const jarButton = dialog.querySelector('[data-form-jar]');
+      if (jarButton) {
+        jarButton.classList.toggle('active', !!draft.useJar);
+        const jarValue = jarButton.querySelector('[data-form-jar-value]');
+        if (jarValue) jarValue.textContent = draft.useJar ? money(n(draft.amount) * .2) + ' from Jar' : 'Off';
+      }
+    };
+
+    amount?.addEventListener('input', (event) => { draft.amount = event.target.value; syncChoices(); });
     dialog.querySelector('#overviewExpenseName')?.addEventListener('input', (event) => { draft.name = event.target.value; });
     dialog.querySelector('#overviewExpenseDate')?.addEventListener('input', (event) => { draft.date = event.target.value; });
     dialog.querySelector('#overviewExpenseNote')?.addEventListener('input', (event) => { draft.note = event.target.value; });
@@ -242,22 +258,37 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
     dialog.querySelectorAll('[data-form-subtype]').forEach((button) => button.onclick = () => {
       if (row.category === 'transport') draft.transportType = button.dataset.formSubtype;
       else draft.foodType = button.dataset.formSubtype;
-      render();
+      syncChoices();
+      if ((draft.foodType === 'other' || draft.transportType === 'other') && !draft.name) {
+        requestAnimationFrame(() => dialog.querySelector('#overviewExpenseName')?.focus());
+      }
     });
     dialog.querySelectorAll('[data-form-payer]').forEach((button) => button.onclick = () => {
       draft.paidBy = button.dataset.formPayer;
       if (draft.paidBy === 'both' && draft.split === 'personal') draft.split = 'shared';
-      render();
+      syncChoices();
     });
     dialog.querySelectorAll('[data-form-split]').forEach((button) => button.onclick = () => {
       draft.split = button.dataset.formSplit;
       if (draft.split === 'personal' && draft.paidBy === 'both') draft.paidBy = document.body.dataset.actor || 'Principessa';
+      syncChoices();
+    });
+    dialog.querySelectorAll('[data-form-owner]').forEach((button) => button.onclick = () => {
+      draft.forActor = button.dataset.formOwner;
+      syncChoices();
+    });
+    dialog.querySelector('[data-form-jar]')?.addEventListener('click', () => {
+      draft.useJar = !draft.useJar;
+      syncChoices();
+    });
+    dialog.querySelector('[data-form-more]').onclick = () => {
+      draft.showMore = !draft.showMore;
+      syncChoices();
+    };
+    dialog.querySelector('[data-form-cancel]')?.addEventListener('click', () => {
+      draft = blankDraft(row);
       render();
     });
-    dialog.querySelectorAll('[data-form-owner]').forEach((button) => button.onclick = () => { draft.forActor = button.dataset.formOwner; render(); });
-    dialog.querySelector('[data-form-jar]')?.addEventListener('click', () => { draft.useJar = !draft.useJar; render(); });
-    dialog.querySelector('[data-form-more]').onclick = () => { draft.showMore = !draft.showMore; render(); };
-    dialog.querySelector('[data-form-cancel]')?.addEventListener('click', () => { draft = blankDraft(row); render(); });
     dialog.querySelector('[data-form-save]').onclick = () => saveEntry(plan, row, draft);
 
     const historyButton = dialog.querySelector('[data-history-open]');
@@ -279,6 +310,7 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
       render();
     });
     dialog.querySelectorAll('[data-entry-delete]').forEach((button) => button.onclick = () => deleteEntry(plan, row, button));
+    syncChoices();
     if (!draft.id && row.subtypes?.length === 0) setTimeout(() => amount?.focus(), 0);
   };
 
