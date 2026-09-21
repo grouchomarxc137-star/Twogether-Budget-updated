@@ -318,8 +318,18 @@ test('trip expense entries save one at a time, keep Food types, and restrict Sha
     const foodTypes = getState().plans[0].expenseEntries.filter((x) => x.category === 'food').map((x) => x.foodType);
     assert.deepEqual(foodTypes, ['groceries', 'eating-out']);
 
+    const tolls = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'transport', transportType: 'tolls', amount: 12, paidBy: 'Principessa', split: 'shared', date: '2026-09-21' } });
+    const fuel = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'transport', transportType: 'fuel', amount: 55, paidBy: 'Principe', split: 'shared', date: '2026-09-21' } });
+    const transportOther = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'transport', transportType: 'other', amount: 9, paidBy: 'Principessa', split: 'personal', forActor: 'Principessa', date: '2026-09-21' } });
+    assert.equal(tolls.expense.transportType, 'tolls');
+    assert.equal(fuel.expense.transportType, 'fuel');
+    assert.equal(transportOther.expense.transportType, 'other');
+    const transportTypes = getState().plans[0].expenseEntries.filter((x) => x.category === 'transport').map((x) => x.transportType);
+    assert.deepEqual(transportTypes, ['tolls', 'fuel', 'other']);
+
     const a = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'accommodation', foodType: 'groceries', amount: 500, paidBy: 'Principessa', split: 'shared', date: '2026-09-20', useJar: true } });
     assert.equal(a.expense.foodType, '');
+    assert.equal(a.expense.transportType, '');
     assert.equal(a.expense.jarContribution, 100);
     assert.equal(a.sharedJar.balance, 770);
     const d = action(c.database, 'deleteTripExpense', { planId: p.planId, expenseId: a.expense.id });
