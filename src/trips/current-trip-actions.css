@@ -300,3 +300,30 @@
     font-size:11px!important;
   }
 }
+
+
+/* Current Trip actions: expenses now live behind Open trip. */
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:auto!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]){
+  grid-row:1!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-open]{
+  background:linear-gradient(135deg,#b8872f,#c89a3a)!important;
+  border-color:#a97824!important;
+  color:#fff!important;
+  box-shadow:0 6px 16px rgba(151,108,34,.16)!important;
+  font-size:13.5px!important;
+  font-weight:750!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-open]::after{
+  color:#fff!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-open]:hover{
+  background:linear-gradient(135deg,#ad7d28,#c18e30)!important;
+  border-color:#9f711f!important;
+  color:#fff!important;
+  box-shadow:0 8px 18px rgba(151,108,34,.22)!important;
+}

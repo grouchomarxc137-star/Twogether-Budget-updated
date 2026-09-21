@@ -155,12 +155,6 @@ function entryMeta(row, entry) {
   return parts.filter(Boolean).join(' · ');
 }
 
-function legacySummary(plan, trip, row) {
-  const p = legacyPaid(plan, trip, row, 'Principessa'), q = legacyPaid(plan, trip, row, 'Principe');
-  if (p < .005 && q < .005) return '';
-  return '<div class="overview-legacy-note"><span>Already logged</span><strong>Principessa ' + money(p) + ' · Principe ' + money(q) + '</strong><small>Older trip entries stay included in the totals above.</small></div>';
-}
-
 function categoryEntriesHtml(plan, row) {
   const list = rowEntries(plan, row);
   if (!list.length) return '<div class="overview-category-empty"><strong>Nothing logged here yet.</strong><span>Your next saved expense will appear here.</span></div>';
@@ -232,7 +226,7 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
     const currentEntry = draft.id ? entries(plan).find((item) => item.id === draft.id) || selected : null;
     dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
       '<div class="overview-scroll"><button type="button" class="overview-back" data-category-back>← Back to expenses</button><div class="overview-category-head"><div><span class="panel-kicker">EXPENSES</span><h3>' + esc(row.label) + '</h3><p>' + (draft.id ? 'Editing a logged expense.' : 'Log a new expense and the category total updates automatically.') + '</p></div>' + matchCell(rowMatch(plan, trip, row)) + '</div>' +
-      categorySummaryHtml(plan, trip, row) + legacySummary(plan, trip, row) +
+      categorySummaryHtml(plan, trip, row) +
       '<div class="overview-category-layout"><section class="overview-quick-log"><div class="overview-quick-log-head"><span>' + (draft.id ? 'EDIT EXPENSE' : 'QUICK LOG') + '</span><strong>' + (draft.id ? esc(entryTitle(row, currentEntry || draft)) : 'Add to ' + esc(row.label)) + '</strong></div>' + categoryFormHtml(plan, row, draft, currentEntry) + '</section>' +
       historyHtml(plan, row, expanded) + '</div></div></div>';
 
