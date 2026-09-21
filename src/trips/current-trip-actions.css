@@ -155,11 +155,12 @@
   min-height:70px!important;
   margin:10px 0 0!important;
   padding:0!important;
-  border:1px solid rgba(211,196,177,.62)!important;
+  border:1px solid rgba(217,205,191,.78)!important;
   border-radius:15px!important;
-  background:rgba(255,253,249,.46)!important;
-  -webkit-backdrop-filter:blur(3px)!important;
-  backdrop-filter:blur(3px)!important;
+  background:linear-gradient(90deg,rgba(255,253,249,.62) 0%,rgba(251,250,246,.52) 48%,rgba(239,247,247,.50) 100%)!important;
+  -webkit-backdrop-filter:blur(7px) saturate(108%)!important;
+  backdrop-filter:blur(7px) saturate(108%)!important;
+  box-shadow:0 8px 20px rgba(55,43,31,.075),inset 0 1px 0 rgba(255,255,255,.72)!important;
   overflow:hidden!important;
 }
 
@@ -178,7 +179,7 @@
 }
 
 #twCurrentTripsSection .tw-current-card .tw-current-numbers>div+div {
-  border-left:1px solid rgba(211,196,177,.62)!important;
+  border-left:1px solid rgba(181,171,158,.46)!important;
 }
 
 #twCurrentTripsSection .tw-current-card .tw-current-numbers span {
@@ -192,7 +193,8 @@
   white-space:normal!important;
   overflow:visible!important;
   text-overflow:clip!important;
-  color:#665d55!important;
+  color:#68615b!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.42)!important;
   text-align:center!important;
 }
 
@@ -202,7 +204,8 @@
   margin:0!important;
   font-size:14.5px!important;
   line-height:1.1!important;
-  color:#211d19!important;
+  color:#171411!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.36)!important;
   white-space:nowrap!important;
   text-align:center!important;
 }
@@ -234,7 +237,7 @@
     min-height:68px!important;
     margin-top:8px!important;
     border-radius:13px!important;
-    background:rgba(255,253,249,.43)!important;
+    background:linear-gradient(90deg,rgba(255,253,249,.58) 0%,rgba(251,250,246,.49) 48%,rgba(239,247,247,.47) 100%)!important;
   }
 
   #twCurrentTripsSection .tw-current-card .tw-current-numbers>div {
