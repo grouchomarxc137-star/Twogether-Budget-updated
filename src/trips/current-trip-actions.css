@@ -145,3 +145,133 @@
     white-space:normal!important;
   }
 }
+
+
+/* Match the approved Current Trips card proportions */
+#twCurrentTripsSection .tw-current-card .tw-current-numbers {
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:0!important;
+  width:100%!important;
+  margin:10px 0 0!important;
+  padding:0!important;
+  border:1px solid rgba(211,196,177,.82)!important;
+  border-radius:15px!important;
+  background:rgba(255,253,249,.68)!important;
+  -webkit-backdrop-filter:blur(5px)!important;
+  backdrop-filter:blur(5px)!important;
+  overflow:hidden!important;
+}
+
+#twCurrentTripsSection .tw-current-card .tw-current-numbers>div {
+  min-width:0!important;
+  padding:10px 12px!important;
+  border:0!important;
+  background:transparent!important;
+  box-sizing:border-box!important;
+}
+
+#twCurrentTripsSection .tw-current-card .tw-current-numbers>div+div {
+  padding-left:12px!important;
+  border-left:1px solid rgba(211,196,177,.82)!important;
+}
+
+#twCurrentTripsSection .tw-current-card .tw-current-numbers span {
+  display:block!important;
+  margin:0 0 4px!important;
+  font-size:11.5px!important;
+  line-height:1.25!important;
+  letter-spacing:0!important;
+  text-transform:none!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  color:#6f655c!important;
+}
+
+#twCurrentTripsSection .tw-current-card .tw-current-numbers strong {
+  display:block!important;
+  font-size:14.5px!important;
+  line-height:1.15!important;
+  color:#211d19!important;
+  white-space:nowrap!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+  box-sizing:border-box!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget]::before,
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep]::before {
+  flex:0 0 auto!important;
+  margin-right:1px!important;
+}
+
+@media(max-width:620px) {
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers {
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    margin-top:8px!important;
+    border-radius:13px!important;
+    background:rgba(255,253,249,.66)!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers>div {
+    padding:9px 8px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers>div+div {
+    padding-left:8px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers span {
+    font-size:10.5px!important;
+    line-height:1.18!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers strong {
+    font-size:13.5px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+    padding:7px 5px!important;
+    font-size:11.25px!important;
+    white-space:nowrap!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget]::before,
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep]::before {
+    display:inline-block!important;
+    font-size:12px!important;
+  }
+}
+
+@media(max-width:390px) {
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers>div {
+    padding:8px 6px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers>div+div {
+    padding-left:6px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers span {
+    font-size:10px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card .tw-current-numbers strong {
+    font-size:13px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+    padding-inline:3px!important;
+    font-size:10.6px!important;
+    white-space:nowrap!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget]::before,
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep]::before {
+    font-size:11px!important;
+  }
+}
