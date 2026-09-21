@@ -1,0 +1,147 @@
+/* Approved Current Trips action layout.
+   Keeps the trip actions readable and ordered without changing behavior. */
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions {
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:auto auto!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  gap:8px!important;
+  width:100%!important;
+  padding:12px 0 0!important;
+  margin:0!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-expenses] {
+  grid-column:1 / -1!important;
+  grid-row:1!important;
+  position:relative!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:44px!important;
+  padding:10px 42px 10px 14px!important;
+  border:1px solid #a97824!important;
+  border-radius:13px!important;
+  background:linear-gradient(135deg,#b8872f,#c89a3a)!important;
+  color:#fff!important;
+  box-shadow:0 6px 16px rgba(151,108,34,.16)!important;
+  font-size:14px!important;
+  font-weight:750!important;
+  line-height:1.15!important;
+  text-align:center!important;
+  white-space:normal!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-expenses]::after {
+  content:"→";
+  position:absolute;
+  right:14px;
+  top:50%;
+  transform:translateY(-52%);
+  font-size:19px;
+  line-height:1;
+  font-weight:500;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+  grid-row:2!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:40px!important;
+  margin:0!important;
+  padding:8px 9px!important;
+  border:1px solid #ddcfbd!important;
+  border-radius:12px!important;
+  background:rgba(255,252,247,.92)!important;
+  color:#5f4828!important;
+  box-shadow:0 2px 7px rgba(71,52,30,.035)!important;
+  font-size:12.5px!important;
+  font-weight:650!important;
+  line-height:1.15!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget] {
+  grid-column:1!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep] {
+  grid-column:2!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-open] {
+  grid-column:3!important;
+  color:#2b241d!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget]::before {
+  content:"✎";
+  font-size:14px;
+  color:#9a6f25;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep]::before {
+  content:"☷";
+  font-size:14px;
+  color:#9a6f25;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-open]::after {
+  content:"›"!important;
+  margin-left:2px;
+  font-size:18px!important;
+  line-height:1!important;
+  vertical-align:0!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]):hover {
+  border-color:#c9b48f!important;
+  background:#fffaf1!important;
+  box-shadow:0 4px 12px rgba(71,52,30,.07)!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-expenses]:hover {
+  background:linear-gradient(135deg,#ad7d28,#c18e30)!important;
+  box-shadow:0 8px 18px rgba(151,108,34,.22)!important;
+}
+
+@media(max-width:620px) {
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions {
+    gap:7px!important;
+    padding:10px 15px 15px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-expenses] {
+    min-height:43px!important;
+    font-size:13px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+    min-height:40px!important;
+    padding:7px 6px!important;
+    font-size:11.5px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-current-budget]::before,
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions [data-v33-prep]::before {
+    display:none!important;
+  }
+}
+
+@media(max-width:390px) {
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions {
+    gap:5px!important;
+    padding-inline:12px!important;
+  }
+
+  #twCurrentTripsSection .tw-current-card[data-current-plan] .tw-current-actions :is([data-current-budget],[data-v33-prep],[data-current-open]) {
+    padding-inline:4px!important;
+    font-size:11px!important;
+    white-space:normal!important;
+  }
+}
