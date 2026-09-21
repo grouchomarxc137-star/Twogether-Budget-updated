@@ -4524,3 +4524,6 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   .wizard-resume-card{grid-template-columns:auto 1fr;padding:10px}
   .wizard-resume-card b{display:none}
 }
+
+#workflowV5Overlay .shared-total-actions{display:flex;align-items:center;gap:8px}
+@media(max-width:620px){#workflowV5Overlay .shared-total-actions{gap:6px;flex-wrap:wrap}}
