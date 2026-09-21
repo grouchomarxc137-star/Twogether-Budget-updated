@@ -4479,4 +4479,72 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
 }
 
 
-body.trip-expense-open{overflow:hidden}.trip-expense-modal{display:none;position:fixed;inset:0;z-index:220;place-items:center;padding:18px}.trip-expense-modal.show{display:grid}.trip-expense-backdrop{position:absolute;inset:0;background:rgba(40,34,29,.46);backdrop-filter:blur(5px)}.trip-expense-sheet{position:relative;width:min(650px,calc(100vw - 32px));max-height:min(760px,calc(100vh - 36px));overflow:auto;padding:24px;border:1px solid var(--line);border-radius:24px;background:var(--card);box-shadow:0 28px 90px rgba(48,37,26,.22)}.trip-expense-close{position:absolute;right:14px;top:12px;width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:#fffdf9;font-size:22px}.trip-expense-head{padding-right:42px}.trip-expense-head h2{margin:5px 0;font-size:34px}.trip-expense-head p{margin:0;color:var(--muted);font-size:13px}.trip-expense-head.compact{display:grid;grid-template-columns:auto 1fr;gap:6px 10px}.trip-expense-back{border:0;background:none;text-align:left}.trip-expense-summary{display:flex;justify-content:space-between;gap:14px;margin:18px 0;padding:13px 15px;border:1px solid #eadfce;border-radius:15px;background:#fffaf1}.trip-expense-summary span{font-size:11px;color:var(--muted)}.trip-expense-summary strong{font-size:20px}.trip-expense-summary p{margin:0;font-size:11px}.trip-expense-categories{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.trip-expense-categories button{display:grid;justify-items:center;gap:6px;min-height:72px;padding:10px 5px;border:1px solid #e3d8ca;border-radius:13px;background:#fffdf9}.trip-expense-categories span{display:grid;place-items:center;width:29px;height:29px;border-radius:50%;background:#f3eee6}.trip-expense-categories strong{font-size:10.5px}.trip-expense-recent{margin-top:16px}.trip-expense-row{display:grid;grid-template-columns:1fr auto;gap:8px;border-bottom:1px solid #eee;padding:7px 0}.trip-expense-row-main{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:9px;border:0;background:none;text-align:left}.trip-expense-row-main strong,.trip-expense-row-main small{display:block}.trip-expense-row-main small{font-size:9.5px;color:var(--muted)}.trip-expense-row-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#f7f1e8}.trip-expense-delete{border:0;background:none;font-size:9.5px;color:#9a6d63}.trip-expense-form{display:grid;gap:14px;margin-top:17px}.trip-expense-form label,.trip-expense-form fieldset{display:grid;gap:7px;border:0;padding:0;margin:0}.trip-expense-amount{display:flex;align-items:center;border:1px solid #dfd3c6;border-radius:15px;padding:0 15px}.trip-expense-amount input{width:100%;min-height:56px;border:0;outline:0;font-size:22px}.trip-expense-jar{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #e1d5c6;border-radius:14px;background:#fffdf9;text-align:left}.trip-expense-jar strong,.trip-expense-jar small{display:block}.trip-expense-jar small{font-size:10px;color:var(--muted)}.trip-expense-jar.active{border-color:#c49337;background:#fff7e3}.trip-expense-chips{display:flex;gap:7px;flex-wrap:wrap}.trip-expense-chips button{min-height:36px;padding:7px 12px;border:1px solid #dfd4c8;border-radius:999px;background:#fff}.trip-expense-chips button.active{border-color:#b9872c;background:#fff4d7}.trip-expense-more{border:0;border-top:1px solid #eee;background:none;padding:9px 0;text-align:left}.trip-expense-more-fields{display:grid;gap:10px}.trip-expense-more-fields.hidden{display:none}.trip-expense-more-fields input{min-height:42px;padding:9px;border:1px solid #ddd;border-radius:11px}.trip-expense-estimate{padding:9px;border:1px solid #ddd;border-radius:11px;background:#fff}.trip-expense-estimate.active{background:#fff8e9}.trip-expense-actions{display:flex;justify-content:space-between;gap:10px}.trip-expense-empty,.trip-expense-loading{padding:18px;color:var(--muted)}@media(max-width:640px){.trip-expense-modal{place-items:end center;padding:0}.trip-expense-sheet{width:100%;max-height:calc(100dvh - 10px);border-radius:22px 22px 0 0;padding:20px 16px}.trip-expense-categories{grid-template-columns:repeat(3,1fr)}.trip-expense-summary{flex-direction:column}.trip-expense-actions .btn{flex:1}}
+#workflowV5Overlay.trip-expense-mode{padding:18px 20px 22px;background:var(--card,#fffefa);overflow:auto}
+.trip-expense-workspace{width:min(820px,100%);margin:auto;display:grid;gap:16px;padding:4px 2px 16px}
+.trip-expense-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.trip-expense-head h2{margin:4px 0 3px;font-size:clamp(30px,3.2vw,42px);font-weight:500;letter-spacing:-.035em}
+.trip-expense-head p{margin:0;color:var(--muted);font-size:13px}
+.trip-expense-done{flex:0 0 auto;margin-top:4px}
+.trip-expense-summary{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 14px;border:1px solid #eadfce;border-radius:14px;background:#fffaf1}
+.trip-expense-summary span{display:block;font-size:10px;color:var(--muted)}
+.trip-expense-summary strong{display:block;margin-top:2px;font-size:20px}
+.trip-expense-summary p{margin:0;color:#6f6258;font-size:11px;text-align:right}
+.trip-expense-form{display:grid;gap:14px}
+.trip-expense-form label,.trip-expense-form fieldset{display:grid;gap:7px;border:0;padding:0;margin:0}
+.trip-expense-form legend{padding:0;font-size:12px;font-weight:750;color:#4a4038}
+.trip-expense-categories{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.trip-expense-categories button{display:grid;justify-items:center;gap:5px;min-height:68px;padding:9px 5px;border:1px solid #e3d8ca;border-radius:13px;background:#fffdf9;color:inherit;cursor:pointer}
+.trip-expense-categories button.active{border-color:#bc8526;background:#fff2cf;box-shadow:inset 0 0 0 1px rgba(188,133,38,.12)}
+.trip-expense-categories span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#f3eee6}
+.trip-expense-categories button.active span{background:#f8df9f}
+.trip-expense-categories strong{font-size:10.5px}
+.trip-expense-food{padding:10px 12px!important;border:1px solid #eee2d2!important;border-radius:13px!important;background:#fffaf2}
+.trip-expense-food-types{display:flex;gap:8px;flex-wrap:wrap}
+.trip-expense-food-types button{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 13px;border:1px solid #dfd4c8;border-radius:999px;background:#fff;color:inherit}
+.trip-expense-food-types button.active{border-color:#b9872c;background:#fff1c8}
+.trip-expense-amount{display:flex;align-items:center;border:1px solid #dfd3c6;border-radius:14px;padding:0 14px;background:#fff}
+.trip-expense-amount>span{font-weight:700;color:#6e6259}
+.trip-expense-amount input{width:100%;min-height:52px;border:0;outline:0;background:transparent;padding-left:10px;font:inherit;font-size:21px}
+.trip-expense-chips{display:flex;gap:7px;flex-wrap:wrap}
+.trip-expense-chips button{min-height:36px;padding:7px 13px;border:1px solid #dfd4c8;border-radius:999px;background:#fff;color:inherit}
+.trip-expense-chips button.active{border-color:#b9872c;background:#fff1cc}
+.trip-expense-jar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #e1d5c6;border-radius:14px;background:#fffdf9;text-align:left;color:inherit}
+.trip-expense-jar strong,.trip-expense-jar small{display:block}
+.trip-expense-jar small{margin-top:2px;font-size:10px;color:var(--muted)}
+.trip-expense-jar.active{border-color:#c49337;background:#fff6dc}
+.trip-expense-error{margin:-6px 0 0;color:#9a5146;font-size:11px}
+.trip-expense-more{display:flex;align-items:center;gap:7px;width:100%;border:0;border-top:1px solid #eee3d7;background:none;padding:11px 1px 2px;text-align:left;color:#67594f;cursor:pointer}
+.trip-expense-more>span{font-size:14px;color:#9a722a}
+.trip-expense-more-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:11px;border:1px solid #eee2d7;border-radius:13px;background:#fbf8f3}
+.trip-expense-more-fields.hidden{display:none}
+.trip-expense-more-fields input[type="date"],.trip-expense-more-fields input[type="text"],.trip-expense-more-fields input:not([type]){min-height:41px;padding:8px 10px;border:1px solid #ddd1c5;border-radius:10px;background:#fff;font:inherit}
+.trip-expense-estimate{grid-column:1/-1;display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;justify-content:flex-start;gap:8px!important;padding:8px 1px}
+.trip-expense-estimate input{width:17px;height:17px;accent-color:#b9872c}
+.trip-expense-actions{display:flex;justify-content:flex-end;gap:9px;align-items:center}
+.trip-expense-actions .btn{min-width:150px}
+.trip-expense-recent{padding-top:13px;border-top:1px solid #eee3d7}
+.trip-expense-recent-head{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:7px}
+.trip-expense-recent-head h3{margin:2px 0 0;font-size:20px}
+.trip-expense-recent-head small{color:var(--muted)}
+.trip-expense-row{display:grid;grid-template-columns:1fr auto;gap:8px;border-bottom:1px solid #eee7de;padding:7px 0}
+.trip-expense-row-main{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:9px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.trip-expense-row-main strong,.trip-expense-row-main small{display:block}
+.trip-expense-row-main small{margin-top:2px;font-size:9.5px;color:var(--muted)}
+.trip-expense-row-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#f7f1e8}
+.trip-expense-delete{border:0;background:none;font-size:9.5px;color:#9a6d63;cursor:pointer}
+.trip-expense-empty,.trip-expense-loading{display:grid;gap:4px;padding:18px;color:var(--muted)}
+@media(max-width:640px){
+  #workflowV5Overlay.trip-expense-mode{padding:14px 13px 18px}
+  .trip-expense-head{gap:10px}
+  .trip-expense-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .trip-expense-summary{align-items:flex-start;flex-direction:column}
+  .trip-expense-summary p{text-align:left}
+  .trip-expense-more-fields{grid-template-columns:1fr}
+  .trip-expense-estimate{grid-column:auto}
+  .trip-expense-actions{display:grid;grid-template-columns:1fr}
+  .trip-expense-actions>span{display:none}
+  .trip-expense-actions .btn{width:100%;min-width:0}
+  .trip-expense-row-main{grid-template-columns:30px minmax(0,1fr)}
+  .trip-expense-row-main>b{grid-column:2}
+}
+

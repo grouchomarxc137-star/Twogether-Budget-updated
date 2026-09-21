@@ -304,4 +304,27 @@ test('keeps saved data after the database is closed and reopened', () => {
   }
 });
 
-test('trip expense entries save one at a time and Shared Jar is accommodation only',()=>{const c=setup();try{const p=action(c.database,'savePlan',{meta:{location:'Italy',city:'Lonato',start:'2026-09-19',end:'2026-09-22'},budget:500});const f=action(c.database,'saveTripExpense',{planId:p.planId,expense:{category:'food',amount:42,paidBy:'Principessa',split:'shared',date:'2026-09-20',useJar:true}});assert.equal(f.expense.useJar,false);assert.equal(f.sharedJar.balance,870);const a=action(c.database,'saveTripExpense',{planId:p.planId,expense:{category:'accommodation',amount:500,paidBy:'Principessa',split:'shared',date:'2026-09-20',useJar:true}});assert.equal(a.expense.jarContribution,100);assert.equal(a.sharedJar.balance,770);const d=action(c.database,'deleteTripExpense',{planId:p.planId,expenseId:a.expense.id});assert.equal(d.sharedJar.balance,870);}finally{c.cleanup();}});
+test('trip expense entries save one at a time, keep Food types, and restrict Shared Jar to accommodation', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', { meta: { location: 'Italy', city: 'Lonato', start: '2026-09-19', end: '2026-09-22' }, budget: 500 });
+    const groceries = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'food', foodType: 'groceries', amount: 42, paidBy: 'Principessa', split: 'shared', date: '2026-09-20', useJar: true } });
+    assert.equal(groceries.expense.foodType, 'groceries');
+    assert.equal(groceries.expense.useJar, false);
+    assert.equal(groceries.sharedJar.balance, 870);
+
+    const eatingOut = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'food', foodType: 'eating-out', amount: 18, paidBy: 'Principe', split: 'shared', date: '2026-09-21' } });
+    assert.equal(eatingOut.expense.foodType, 'eating-out');
+    const foodTypes = getState().plans[0].expenseEntries.filter((x) => x.category === 'food').map((x) => x.foodType);
+    assert.deepEqual(foodTypes, ['groceries', 'eating-out']);
+
+    const a = action(c.database, 'saveTripExpense', { planId: p.planId, expense: { category: 'accommodation', foodType: 'groceries', amount: 500, paidBy: 'Principessa', split: 'shared', date: '2026-09-20', useJar: true } });
+    assert.equal(a.expense.foodType, '');
+    assert.equal(a.expense.jarContribution, 100);
+    assert.equal(a.sharedJar.balance, 770);
+    const d = action(c.database, 'deleteTripExpense', { planId: p.planId, expenseId: a.expense.id });
+    assert.equal(d.sharedJar.balance, 870);
+  } finally {
+    c.cleanup();
+  }
+});
