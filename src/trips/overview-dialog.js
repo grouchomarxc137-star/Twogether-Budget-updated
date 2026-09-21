@@ -47,6 +47,15 @@ function rowPaid(plan, trip, row, name) {
   return legacyPaid(plan, trip, row, name) + rowEntries(plan, row).reduce((sum, entry) => sum + entryPaid(entry, name), 0);
 }
 
+function rowTotal(plan, trip, row) {
+  const [a, b] = records(plan, trip);
+  const legacy = row.legacy.reduce((sum, key) => {
+    const shared = sharedFor(plan, trip, key);
+    return sum + (has(shared?.total) ? n(shared.total) : Math.max(n(a?.[key]), n(b?.[key])));
+  }, 0);
+  return legacy + rowEntries(plan, row).reduce((sum, entry) => sum + n(entry?.amount), 0);
+}
+
 function legacyTotal(plan, trip) {
   const [a, b] = records(plan, trip);
   return legacyKeys.reduce((sum, key) => {
@@ -154,35 +163,27 @@ function legacySummary(plan, trip, row) {
 
 function categoryEntriesHtml(plan, row) {
   const list = rowEntries(plan, row);
-  if (!list.length) return '<div class="overview-category-empty"><strong>No individual expenses here yet.</strong><span>Add one whenever something is paid.</span></div>';
+  if (!list.length) return '<div class="overview-category-empty"><strong>Nothing logged here yet.</strong><span>Your next saved expense will appear here.</span></div>';
   return '<div class="overview-category-list">' + list.slice().reverse().map((entry) =>
     '<div class="overview-category-entry"><button type="button" class="overview-entry-main" data-entry-edit="' + esc(entry.id) + '"><span><strong>' + esc(entryTitle(row, entry)) + '</strong><small>' + esc(entryMeta(row, entry)) + '</small></span><b>' + money(entry.amount) + '</b></button><button type="button" class="overview-entry-delete" data-entry-delete="' + esc(entry.id) + '">Delete</button></div>'
   ).join('') + '</div>';
 }
 
-function subtypeButtons(row) {
-  if (!row.subtypes?.length) return '<button type="button" class="btn primary" data-category-add>Add expense</button>';
-  return '<div class="overview-subtype-grid">' + row.subtypes.map(([key, label]) => '<button type="button" data-category-add="' + key + '">' + esc(label) + '<span>＋</span></button>').join('') + '</div>';
-}
-
-function drawCategory(plan, key) {
-  const row = rowByKey(key); if (!row || !dialog) return;
-  const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
-  dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
-    '<div class="overview-scroll"><button type="button" class="overview-back" data-category-back>← Back to expenses</button><div class="overview-category-head"><div><span class="panel-kicker">EXPENSES</span><h3>' + esc(row.label) + '</h3><p>Principessa ' + money(rowPaid(plan, trip, row, 'Principessa')) + ' · Principe ' + money(rowPaid(plan, trip, row, 'Principe')) + '</p></div>' + matchCell(rowMatch(plan, trip, row)) + '</div>' +
-    legacySummary(plan, trip, row) + subtypeButtons(row) + categoryEntriesHtml(plan, row) + '<p data-overview-error class="overview-form-error" role="status"></p></div></div>';
-  dialog.querySelector('[data-overview-close]').onclick = close;
-  dialog.querySelector('[data-category-back]').onclick = () => draw(plan);
-  dialog.querySelectorAll('[data-category-add]').forEach((button) => button.onclick = () => drawExpenseForm(plan, row, null, button.dataset.categoryAdd || ''));
-  dialog.querySelectorAll('[data-entry-edit]').forEach((button) => {
-    const entry = entries(plan).find((item) => item.id === button.dataset.entryEdit);
-    button.onclick = () => entry && drawExpenseForm(plan, row, entry, '');
-  });
-  dialog.querySelectorAll('[data-entry-delete]').forEach((button) => button.onclick = () => deleteEntry(plan, row, button));
-}
-
-function blankDraft(row, subtype) {
+function blankDraft(row, subtype = '') {
   return { id: '', category: row.category, foodType: row.category === 'food' ? subtype : '', transportType: row.category === 'transport' ? subtype : '', name: '', amount: '', paidBy: document.body.dataset.actor || 'Principessa', split: 'shared', forActor: document.body.dataset.actor || 'Principessa', date: today(), note: '', uncertain: false, useJar: false, showMore: false };
+}
+
+function draftFromEntry(entry) {
+  return {
+    ...entry,
+    name: entry?.name || '',
+    foodType: entry?.foodType || '',
+    transportType: entry?.transportType === 'tolls' ? 'parking-tolls' : (entry?.transportType || ''),
+    amount: String(entry?.amount ?? ''),
+    date: entry?.date || today(),
+    note: entry?.note || '',
+    showMore: !!(entry?.note || entry?.uncertain || (entry?.date && entry.date !== today())),
+  };
 }
 
 function formSubtype(row, draft) {
@@ -191,48 +192,102 @@ function formSubtype(row, draft) {
   return '<fieldset><legend>' + esc(row.label) + ' type</legend><div class="overview-form-chips">' + row.subtypes.map(([key, label]) => '<button type="button" class="' + (current === key || (current === 'tolls' && key === 'parking-tolls') ? 'active' : '') + '" data-form-subtype="' + key + '">' + esc(label) + '</button>').join('') + '</div></fieldset>';
 }
 
-function drawExpenseForm(plan, row, entry, subtype) {
-  if (!dialog) return;
-  const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
-  const draft = entry ? { ...entry, name: entry.name || '', foodType: entry.foodType || '', transportType: entry.transportType === 'tolls' ? 'parking-tolls' : (entry.transportType || ''), amount: String(entry.amount ?? ''), date: entry.date || today(), showMore: !!(entry.note || entry.uncertain || (entry.date && entry.date !== today())) } : blankDraft(row, subtype);
+function categoryFormHtml(plan, row, draft, entry) {
   const available = n(latest?.sharedJar?.balance) + n(entry?.jarContribution);
   const jar = draft.useJar && row.category === 'accommodation' ? n(draft.amount) * .2 : 0;
   const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
+  return '<div class="overview-expense-form">' +
+    formSubtype(row, draft) +
+    (needsName ? '<label>Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' : '') +
+    '<label>Amount<div class="overview-money-input"><span>€</span><input id="overviewExpenseAmount" inputmode="decimal" value="' + esc(draft.amount || '') + '" placeholder="0.00"></div></label>' +
+    '<fieldset><legend>Who paid?</legend><div class="overview-form-chips">' + names.concat('both').map((value) => '<button type="button" class="' + (draft.paidBy === value ? 'active' : '') + '" data-form-payer="' + value + '">' + (value === 'both' ? 'Both' : value) + '</button>').join('') + '</div></fieldset>' +
+    '<fieldset><legend>How should we count it?</legend><div class="overview-form-chips"><button type="button" class="' + (draft.split === 'shared' ? 'active' : '') + '" data-form-split="shared">Shared 50/50</button><button type="button" class="' + (draft.split === 'personal' ? 'active' : '') + '" data-form-split="personal">Personal</button></div></fieldset>' +
+    (draft.split === 'personal' ? '<fieldset><legend>Personal expense for</legend><div class="overview-form-chips">' + names.map((value) => '<button type="button" class="' + (draft.forActor === value ? 'active' : '') + '" data-form-owner="' + value + '">' + value + '</button>').join('') + '</div></fieldset>' : '') +
+    (row.category === 'accommodation' ? '<button type="button" class="overview-jar-toggle ' + (draft.useJar ? 'active' : '') + '" data-form-jar><span><strong>Use 20% from Shared Jar</strong><small>Accommodation only · ' + money(available) + ' available</small></span><b>' + (draft.useJar ? money(jar) + ' from Jar' : 'Off') + '</b></button>' : '') +
+    '<button type="button" class="overview-more" data-form-more aria-expanded="' + (draft.showMore ? 'true' : 'false') + '"><span>' + (draft.showMore ? '⌃' : '⌄') + '</span> More options</button>' +
+    '<div class="overview-more-fields ' + (draft.showMore ? '' : 'hidden') + '"><label>Date<input id="overviewExpenseDate" type="date" value="' + esc(draft.date || today()) + '"></label><label>Note <small>optional</small><input id="overviewExpenseNote" value="' + esc(draft.note || '') + '" placeholder="Add a note"></label><label class="overview-estimate"><input id="overviewExpenseEstimate" type="checkbox" ' + (draft.uncertain ? 'checked' : '') + '><span>This amount is an estimate</span></label></div>' +
+    '<div class="overview-form-actions">' + (draft.id ? '<button type="button" class="btn ghost" data-form-cancel>Cancel edit</button>' : '') + '<button type="button" class="btn primary" data-form-save>' + (draft.id ? 'Save changes' : 'Save expense') + '</button></div><p data-overview-error class="overview-form-error" role="status"></p></div>';
+}
+
+function historyHtml(plan, row, expanded) {
+  const list = rowEntries(plan, row);
+  const currentTotal = list.reduce((sum, entry) => sum + n(entry?.amount), 0);
+  if (!list.length) return '<aside class="overview-history-panel"><div class="overview-history-title"><span>Logged expenses</span><strong>Nothing yet</strong></div><p>Add an expense on the left and it will appear here.</p></aside>';
+  return '<aside class="overview-history-panel"><button type="button" class="overview-history-summary" data-history-open><span><small>Logged expenses</small><strong>' + list.length + (list.length === 1 ? ' expense' : ' expenses') + '</strong></span><b>' + money(currentTotal) + '</b><i>' + (list.length === 1 ? 'Edit' : (expanded ? 'Hide' : 'View')) + ' →</i></button>' +
+    (expanded && list.length > 1 ? categoryEntriesHtml(plan, row) : '') + '</aside>';
+}
+
+function categorySummaryHtml(plan, trip, row) {
+  return '<div class="overview-category-totals"><div><span>Category total</span><strong>' + money(rowTotal(plan, trip, row)) + '</strong></div><div><span>Principessa paid</span><strong>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</strong></div><div><span>Principe paid</span><strong>' + money(rowPaid(plan, trip, row, 'Principe')) + '</strong></div></div>';
+}
+
+function drawCategory(plan, key, editId = '', expandedHistory = false) {
+  const row = rowByKey(key); if (!row || !dialog) return;
+  const selected = editId ? entries(plan).find((item) => item.id === editId) || null : null;
+  let draft = selected ? draftFromEntry(selected) : blankDraft(row);
+  let expanded = expandedHistory;
 
   const render = () => {
-    const currentTrip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
-    const currentAvailable = n(latest?.sharedJar?.balance) + n(entry?.jarContribution);
-    const currentJar = draft.useJar && row.category === 'accommodation' ? n(draft.amount) * .2 : 0;
-    const currentNeedsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
-    dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, currentTrip) +
-      '<div class="overview-scroll"><button type="button" class="overview-back" data-form-back>← Back to ' + esc(row.label) + '</button><div class="overview-category-head"><div><span class="panel-kicker">' + esc(row.label.toUpperCase()) + '</span><h3>' + (draft.id ? 'Edit expense' : 'Add expense') + '</h3></div></div><div class="overview-expense-form">' +
-      formSubtype(row, draft) +
-      (currentNeedsName ? '<label>Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' : '') +
-      '<label>Amount<div class="overview-money-input"><span>€</span><input id="overviewExpenseAmount" inputmode="decimal" value="' + esc(draft.amount || '') + '" placeholder="0.00"></div></label>' +
-      '<fieldset><legend>Who paid?</legend><div class="overview-form-chips">' + names.concat('both').map((value) => '<button type="button" class="' + (draft.paidBy === value ? 'active' : '') + '" data-form-payer="' + value + '">' + (value === 'both' ? 'Both' : value) + '</button>').join('') + '</div></fieldset>' +
-      '<fieldset><legend>How should we count it?</legend><div class="overview-form-chips"><button type="button" class="' + (draft.split === 'shared' ? 'active' : '') + '" data-form-split="shared">Shared 50/50</button><button type="button" class="' + (draft.split === 'personal' ? 'active' : '') + '" data-form-split="personal">Personal</button></div></fieldset>' +
-      (draft.split === 'personal' ? '<fieldset><legend>Personal expense for</legend><div class="overview-form-chips">' + names.map((value) => '<button type="button" class="' + (draft.forActor === value ? 'active' : '') + '" data-form-owner="' + value + '">' + value + '</button>').join('') + '</div></fieldset>' : '') +
-      (row.category === 'accommodation' ? '<button type="button" class="overview-jar-toggle ' + (draft.useJar ? 'active' : '') + '" data-form-jar><span><strong>Use 20% from Shared Jar</strong><small>Accommodation only · ' + money(currentAvailable) + ' available</small></span><b>' + (draft.useJar ? money(currentJar) + ' from Jar' : 'Off') + '</b></button>' : '') +
-      '<button type="button" class="overview-more" data-form-more aria-expanded="' + (draft.showMore ? 'true' : 'false') + '"><span>' + (draft.showMore ? '⌃' : '⌄') + '</span> More options</button>' +
-      '<div class="overview-more-fields ' + (draft.showMore ? '' : 'hidden') + '"><label>Date<input id="overviewExpenseDate" type="date" value="' + esc(draft.date || today()) + '"></label><label>Note <small>optional</small><input id="overviewExpenseNote" value="' + esc(draft.note || '') + '" placeholder="Add a note"></label><label class="overview-estimate"><input id="overviewExpenseEstimate" type="checkbox" ' + (draft.uncertain ? 'checked' : '') + '><span>This amount is an estimate</span></label></div>' +
-      '<div class="overview-form-actions"><button type="button" class="btn ghost" data-form-cancel>Cancel</button><button type="button" class="btn primary" data-form-save>' + (draft.id ? 'Save changes' : 'Save expense') + '</button></div><p data-overview-error class="overview-form-error" role="status"></p></div></div></div>';
+    const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
+    const currentEntry = draft.id ? entries(plan).find((item) => item.id === draft.id) || selected : null;
+    dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
+      '<div class="overview-scroll"><button type="button" class="overview-back" data-category-back>← Back to expenses</button><div class="overview-category-head"><div><span class="panel-kicker">EXPENSES</span><h3>' + esc(row.label) + '</h3><p>' + (draft.id ? 'Editing a logged expense.' : 'Log a new expense and the category total updates automatically.') + '</p></div>' + matchCell(rowMatch(plan, trip, row)) + '</div>' +
+      categorySummaryHtml(plan, trip, row) + legacySummary(plan, trip, row) +
+      '<div class="overview-category-layout"><section class="overview-quick-log"><div class="overview-quick-log-head"><span>' + (draft.id ? 'EDIT EXPENSE' : 'QUICK LOG') + '</span><strong>' + (draft.id ? esc(entryTitle(row, currentEntry || draft)) : 'Add to ' + esc(row.label)) + '</strong></div>' + categoryFormHtml(plan, row, draft, currentEntry) + '</section>' +
+      historyHtml(plan, row, expanded) + '</div></div></div>';
 
     dialog.querySelector('[data-overview-close]').onclick = close;
-    dialog.querySelector('[data-form-back]').onclick = () => drawCategory(plan, row.key);
-    dialog.querySelector('[data-form-cancel]').onclick = () => drawCategory(plan, row.key);
-    dialog.querySelector('#overviewExpenseAmount')?.addEventListener('input', (event) => { draft.amount = event.target.value; });
+    dialog.querySelector('[data-category-back]').onclick = () => draw(plan);
+    const amount = dialog.querySelector('#overviewExpenseAmount');
+    amount?.addEventListener('input', (event) => { draft.amount = event.target.value; });
     dialog.querySelector('#overviewExpenseName')?.addEventListener('input', (event) => { draft.name = event.target.value; });
     dialog.querySelector('#overviewExpenseDate')?.addEventListener('input', (event) => { draft.date = event.target.value; });
     dialog.querySelector('#overviewExpenseNote')?.addEventListener('input', (event) => { draft.note = event.target.value; });
     dialog.querySelector('#overviewExpenseEstimate')?.addEventListener('change', (event) => { draft.uncertain = event.target.checked; });
-    dialog.querySelectorAll('[data-form-subtype]').forEach((button) => button.onclick = () => { if (row.category === 'transport') draft.transportType = button.dataset.formSubtype; else draft.foodType = button.dataset.formSubtype; render(); });
-    dialog.querySelectorAll('[data-form-payer]').forEach((button) => button.onclick = () => { draft.paidBy = button.dataset.formPayer; if (draft.paidBy === 'both' && draft.split === 'personal') draft.split = 'shared'; render(); });
-    dialog.querySelectorAll('[data-form-split]').forEach((button) => button.onclick = () => { draft.split = button.dataset.formSplit; if (draft.split === 'personal' && draft.paidBy === 'both') draft.paidBy = document.body.dataset.actor || 'Principessa'; render(); });
+
+    dialog.querySelectorAll('[data-form-subtype]').forEach((button) => button.onclick = () => {
+      if (row.category === 'transport') draft.transportType = button.dataset.formSubtype;
+      else draft.foodType = button.dataset.formSubtype;
+      render();
+    });
+    dialog.querySelectorAll('[data-form-payer]').forEach((button) => button.onclick = () => {
+      draft.paidBy = button.dataset.formPayer;
+      if (draft.paidBy === 'both' && draft.split === 'personal') draft.split = 'shared';
+      render();
+    });
+    dialog.querySelectorAll('[data-form-split]').forEach((button) => button.onclick = () => {
+      draft.split = button.dataset.formSplit;
+      if (draft.split === 'personal' && draft.paidBy === 'both') draft.paidBy = document.body.dataset.actor || 'Principessa';
+      render();
+    });
     dialog.querySelectorAll('[data-form-owner]').forEach((button) => button.onclick = () => { draft.forActor = button.dataset.formOwner; render(); });
     dialog.querySelector('[data-form-jar]')?.addEventListener('click', () => { draft.useJar = !draft.useJar; render(); });
     dialog.querySelector('[data-form-more]').onclick = () => { draft.showMore = !draft.showMore; render(); };
+    dialog.querySelector('[data-form-cancel]')?.addEventListener('click', () => { draft = blankDraft(row); render(); });
     dialog.querySelector('[data-form-save]').onclick = () => saveEntry(plan, row, draft);
+
+    const historyButton = dialog.querySelector('[data-history-open]');
+    if (historyButton) historyButton.onclick = () => {
+      const list = rowEntries(plan, row);
+      if (list.length === 1) {
+        draft = draftFromEntry(list[0]);
+        expanded = false;
+        render();
+      } else {
+        expanded = !expanded;
+        render();
+      }
+    };
+    dialog.querySelectorAll('[data-entry-edit]').forEach((button) => button.onclick = () => {
+      const entry = entries(plan).find((item) => item.id === button.dataset.entryEdit);
+      if (!entry) return;
+      draft = draftFromEntry(entry);
+      render();
+    });
+    dialog.querySelectorAll('[data-entry-delete]').forEach((button) => button.onclick = () => deleteEntry(plan, row, button));
+    if (!draft.id && row.subtypes?.length === 0) setTimeout(() => amount?.focus(), 0);
   };
+
   render();
 }
 
