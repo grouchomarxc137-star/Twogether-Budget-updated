@@ -17,6 +17,26 @@ let sharedState = { version: 0, plans: [], trips: [] };
 let refreshPromise = null;
 let activeFlow = null;
 
+const WORKFLOW_CATEGORIES = ['Accommodation', 'Transport', 'Food', 'Activities', 'Summary'];
+
+function workflowCategory(title) {
+  const text = `${title || ''} ${activeFlow?.key || ''}`.toLowerCase();
+  if (/review|ready to save|actually pay|summary/.test(text)) return 'Summary';
+  if (/other expense|activities/.test(text)) return 'Activities';
+  if (/grocer|eating|food/.test(text)) return 'Food';
+  if (/flight|train|transport|fuel|toll|parking/.test(text)) return 'Transport';
+  if (/accommodation|airbnb|shared jar|repayment/.test(text)) return 'Accommodation';
+  if (activeFlow?.type === 'actual') return 'Accommodation';
+  return '';
+}
+
+function workflowTrackerHtml(title) {
+  const current = workflowCategory(title);
+  if (!current) return '';
+  const active = WORKFLOW_CATEGORIES.indexOf(current);
+  return `<div class="workflow-category-track" aria-label="Expense logging progress">${WORKFLOW_CATEGORIES.map((name, index) => `<div class="workflow-category-step ${index < active ? 'done' : ''} ${index === active ? 'active' : ''}"><span>${index < active ? '✓' : index + 1}</span><small>${name}</small></div>`).join('')}</div>`;
+}
+
 export function getSharedState() {
   return sharedState;
 }
@@ -106,9 +126,10 @@ export function installStyles() {
   stylesInstalled = true;
   const style = document.createElement('style'); style.id = 'workflowV5Styles';
   style.textContent = `
-    .v5-overlay{display:none;position:absolute;inset:0;z-index:8;background:var(--card,#fffefa);border-radius:29px;padding:22px;overflow:auto}.v5-overlay.show{display:flex;flex-direction:column}.wizard-card{position:relative}
-    .v5-top{display:flex;justify-content:space-between;align-items:start;gap:18px}.v5-progress-side{flex:1}.v5-step{font-size:12px;font-weight:850;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.v5-progress{height:5px;background:#eee7df;border-radius:999px;margin-top:9px;overflow:hidden}.v5-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--rose),var(--accent));border-radius:inherit;transition:width .2s ease}
-    .v5-body{flex:1;display:flex}.v5-question{width:100%;display:flex;flex-direction:column;justify-content:center;padding:25px 18px 8px}.v5-question h2{font-size:clamp(30px,3vw,44px);font-weight:500;letter-spacing:-.035em;margin:0}.v5-question>p{color:var(--muted);margin:10px 0 22px;line-height:1.55}
+    .v5-overlay{display:none;position:relative;z-index:8;background:transparent;border-radius:0;padding:0;overflow:visible}.v5-overlay.show{display:flex;flex-direction:column}.wizard-card{position:relative}.wizard-card.workflow-active>.wizard-top,.wizard-card.workflow-active>.wizard-body{display:none!important}
+    .v5-top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}.v5-progress-side{flex:1;min-width:0}.v5-step{font-size:11px;font-weight:850;color:#9b762c;text-transform:uppercase;letter-spacing:.12em;margin-top:10px}.v5-progress{height:4px;background:#eee7df;border-radius:999px;margin-top:9px;overflow:hidden}.v5-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--rose),var(--accent));border-radius:inherit;transition:width .2s ease}
+    .workflow-category-track{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;min-width:0}.workflow-category-step{position:relative;display:grid;justify-items:center;gap:6px;color:#8a8178;text-align:center}.workflow-category-step:not(:last-child)::after{content:"";position:absolute;left:calc(50% + 11px);right:calc(-50% + 11px);top:10px;height:1px;background:#ded5ca}.workflow-category-step span{position:relative;z-index:1;display:grid;place-items:center;width:21px;height:21px;border:1px solid #d4cabf;border-radius:50%;background:#fffdf9;font-size:9px;color:#8d8277}.workflow-category-step small{font-size:10px;line-height:1.1;white-space:nowrap}.workflow-category-step.active{color:#9a6f1c;font-weight:750}.workflow-category-step.active span,.workflow-category-step.done span{border-color:#b98721;background:#b98721;color:#fff}.workflow-category-step.done:not(:last-child)::after{background:#caa758}.workflow-save-exit{flex:0 0 auto;border:1px solid #decba9;background:#fffaf1;border-radius:11px;padding:9px 12px;font:inherit;font-size:12px;font-weight:750;color:#7d5a19;cursor:pointer;white-space:nowrap}.workflow-resume-note{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;margin:0 0 16px;border:1px solid #ead6a8;border-radius:13px;background:#fff7e4;color:#6d5427}.workflow-resume-note strong{display:block;font-size:13px}.workflow-resume-note span{font-size:11px;opacity:.8}
+    .v5-body{display:block}.v5-question{width:100%;display:flex;flex-direction:column;justify-content:flex-start;padding:0}.v5-question h2{font-size:clamp(27px,2.4vw,38px);font-weight:500;letter-spacing:-.035em;margin:0}.v5-question>p{color:var(--muted);margin:8px 0 18px;line-height:1.5}
     .v5-reference{background:#edf2e9;border:1px solid rgba(90,110,85,.12);border-radius:17px;padding:13px 15px;margin-bottom:12px}.v5-reference span{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}.v5-reference strong{font-size:21px}.v5-reference small{display:block;color:var(--muted);margin-top:5px}
     .v5-choice-stack{display:grid;gap:10px}.v5-actions{display:flex;justify-content:space-between;gap:10px;margin-top:20px}.v5-use{width:100%;border:1px dashed #d4c9bd;background:#faf7f2;border-radius:14px;padding:10px 12px;margin-top:10px;cursor:pointer;color:var(--muted)}
     .v5-review{display:grid;gap:9px}.v5-review-row{display:flex;justify-content:space-between;gap:14px;background:#f6f2ed;border-radius:14px;padding:11px 13px}.v5-review-row span{color:var(--muted)}
@@ -153,14 +174,21 @@ export function closeBudgetModal() {
 export function showOverlay(stepLabel, progress, title, help, content) {
   installUi();
   const overlay = document.querySelector('#workflowV5Overlay'); if (!overlay) return;
-  overlay.innerHTML = `<div class="v5-top"><div class="v5-progress-side"><div class="v5-step">${esc(stepLabel)}</div><div class="v5-progress"><span style="width:${Math.max(8, Math.min(100, progress))}%"></span></div></div><button class="text-btn" type="button" data-v5-close>Start over</button></div><div class="v5-body"><div class="v5-question"><h2>${esc(title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${content}</div></div>`;
+  const card = document.querySelector('#wizardCard');
+  const tracker = workflowTrackerHtml(title);
+  const canSaveExit = activeFlow?.type === 'actual' || activeFlow?.type === 'partial';
+  const resume = activeFlow?.resumeNotice ? '<div class="workflow-resume-note"><div><strong>You left off here</strong><span>Continue from where you stopped, or use Save & exit anytime.</span></div></div>' : '';
+  if (activeFlow?.resumeNotice) activeFlow.resumeNotice = false;
+  overlay.innerHTML = `<div class="v5-top"><div class="v5-progress-side">${tracker || `<div class="v5-progress"><span style="width:${Math.max(8, Math.min(100, progress))}%"></span></div>`}<div class="v5-step">${esc(stepLabel)}</div></div>${canSaveExit ? '<button class="workflow-save-exit" type="button" data-v5-save-exit>Save & exit</button>' : ''}</div><div class="v5-body">${resume}<div class="v5-question"><h2>${esc(title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${content}</div></div>`;
+  card?.classList.add('workflow-active');
   overlay.classList.add('show');
-  overlay.querySelector('[data-v5-close]')?.addEventListener('click', closeOverlay);
+  overlay.querySelector('[data-v5-save-exit]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('twogether:workflow-save-exit')));
 }
 
 export function closeOverlay() {
   activeFlow = null;
   const overlay = document.querySelector('#workflowV5Overlay');
+  document.querySelector('#wizardCard')?.classList.remove('workflow-active');
   overlay?.classList.remove('show');
   if (overlay) overlay.innerHTML = '';
 }

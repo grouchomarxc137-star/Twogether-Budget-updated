@@ -15,7 +15,7 @@ const labels = { accom: 'Accommodation', travel: 'Flights / Train' };
 const amount = (v) => Number(String(v).replace(',', '.'));
 const valid = (v) => String(v ?? '').trim() !== '' && Number.isFinite(amount(v)) && amount(v) >= 0;
 
-function renderTravel({ host, plan, key, onDone }) {
+function renderTravel({ host, plan, key, onDone, onBack }) {
   const who = actor(), partner = otherActor(who);
   const meta = plan.sharedExpenses?.[key] || {}, known = meta.total !== '' && meta.total != null;
   let total = known ? String(meta.total) : '', unknown = false, mode = meta.mode?.[who] || '', paid = meta.paid?.[who] ?? '';
@@ -26,7 +26,7 @@ function renderTravel({ host, plan, key, onDone }) {
   function draw() {
     const details = known ? `<p>Total: ${money(meta.total)} · ${esc(partner)} paid ${meta.paid?.[partner] === '' || meta.paid?.[partner] == null ? 'not recorded' : money(meta.paid[partner])}</p>` : '';
     let body = '';
-    if (stage === 'total') body = `<h2>Total ${labels[key]}</h2>${details}<label>Total bill<input id="sharedTotal" class="big-input" inputmode="decimal" value="${esc(total)}"></label><div class="v5-actions"><button type="button" data-unknown>I don’t know the total</button><button type="button" class="btn primary" data-next>Next</button></div>`;
+    if (stage === 'total') body = `<h2>Total ${labels[key]}</h2>${details}<label>Total bill<input id="sharedTotal" class="big-input" inputmode="decimal" value="${esc(total)}"></label><div class="v5-actions"><button type="button" class="btn ghost" data-back>← Back</button><div class="shared-entry-actions"><button type="button" data-unknown>I don’t know the total</button><button type="button" class="btn primary" data-next>Continue →</button></div></div>`;
     if (stage === 'mode') body = `<h2>Who paid this?</h2><p>Total: ${money(total)}</p><div class="v5-choice-stack"><button type="button" class="trip-pick" data-mode="full">I paid it fully myself</button><button type="button" class="trip-pick" data-mode="shared">It’s shared</button></div><button type="button" data-back>Back</button>`;
     if (stage === 'paid') body = `<h2>How much did you pay for ${labels[key].toLowerCase()}?</h2>${details}<p>${unknown ? 'The total is unknown. Save your payment now and resolve the total later.' : `Suggested remaining share: ${money(Math.max(0, amount(total) - amount(meta.paid?.[partner] || 0)))}. You can change this amount.`}</p><label>Your payment<input id="sharedPaid" class="big-input" inputmode="decimal" value="${esc(paid)}"></label><div class="v5-actions"><button type="button" data-back>Back</button><button type="button" class="btn primary" data-save>Save & continue</button></div>`;
     host.innerHTML = `<section class="shared-entry">${body}<p role="status" data-error></p></section>`;
@@ -34,7 +34,7 @@ function renderTravel({ host, plan, key, onDone }) {
     input?.addEventListener('input', () => { stage === 'total' ? total = input.value : paid = input.value; });
     host.querySelector('[data-next]')?.addEventListener('click', () => { if (!valid(total)) return error('Enter a non-negative total, or choose “I don’t know the total”.'); unknown = false; if (paid === '') paid = String(Math.max(0, amount(total) - amount(meta.paid?.[partner] || 0))); stage = 'mode'; draw(); });
     host.querySelector('[data-unknown]')?.addEventListener('click', () => { unknown = !known; total = known ? String(meta.total) : ''; mode = 'shared'; stage = 'paid'; draw(); });
-    host.querySelector('[data-back]')?.addEventListener('click', () => { stage = 'total'; draw(); });
+    host.querySelector('[data-back]')?.addEventListener('click', () => { if (stage === 'total') { onBack?.(); return; } stage = 'total'; draw(); });
     host.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; if (mode === 'full') { paid = total; save(); } else { stage = 'paid'; draw(); } }));
     host.querySelector('[data-save]')?.addEventListener('click', () => { mode = 'shared'; save(); });
   }
@@ -50,7 +50,7 @@ function renderTravel({ host, plan, key, onDone }) {
   draw(); return true;
 }
 
-function renderAccommodation({ host, plan, onDone }) {
+function renderAccommodation({ host, plan, onDone, onBack }) {
   let state = null, jarBalance = 870, busy = false, stage = 'loading', total = '', useJar = false, paymentType = '', paidUpfront = false;
   const who = actor(), partner = otherActor(who);
   const current = plan.sharedExpenses?.accom || {};
@@ -78,7 +78,7 @@ function renderAccommodation({ host, plan, onDone }) {
       body = `<span class="panel-kicker">ACCOMMODATION REPAYMENT</span><h2>${confirmed ? 'Repayment confirmed' : `You owe ${esc(repayment.creditor)} ${money(repayment.amount)}`}</h2>${summaryHtml()}${confirmed ? '<p class="v33-status-ok">This accommodation repayment is confirmed.</p><button class="btn primary" type="button" data-continue>Continue</button>' : `<p>Have you already paid ${esc(repayment.creditor)} back?</p><div class="v5-choice-stack"><button class="trip-pick" type="button" data-repaid="yes">Yes, I paid it back</button><button class="trip-pick" type="button" data-repaid="no">Not yet</button></div>`}`;
     }
     if (stage === 'existing') body = `<span class="panel-kicker">ACCOMMODATION</span><h2>Accommodation setup</h2>${summaryHtml()}<div class="v5-actions"><button type="button" data-edit>Change setup</button><button class="btn primary" type="button" data-continue>Continue</button></div>`;
-    if (stage === 'total') body = `<span class="panel-kicker">ACCOMMODATION</span><h2>What is the total Airbnb/accommodation cost?</h2><label>Total Airbnb cost<div class="money-input-wrap"><span>€</span><input id="v33AccomTotal" class="big-input money-field" inputmode="decimal" value="${esc(total)}"></div></label><div class="v5-actions"><span></span><button class="btn primary" type="button" data-next>Next</button></div>`;
+    if (stage === 'total') body = `<span class="panel-kicker">ACCOMMODATION</span><h2>What is the total Airbnb/accommodation cost?</h2><label>Total Airbnb cost<div class="money-input-wrap"><span>€</span><input id="v33AccomTotal" class="big-input money-field" inputmode="decimal" value="${esc(total)}"></div></label><div class="v5-actions"><button class="btn ghost" type="button" data-back>← Back</button><button class="btn primary" type="button" data-next>Continue →</button></div>`;
     if (stage === 'jar') {
       const c = calc();
       body = `<span class="panel-kicker">SHARED JAR · ${money(jarBalance)} AVAILABLE</span><h2>Use the 20% Shared Jar contribution?</h2><div class="v33-jar-preview"><div><span>20% from Jar</span><strong>${money(c.gross * 0.2)}</strong></div><div><span>Cost after Jar</span><strong>${money(c.gross * 0.8)}</strong></div></div><div class="v5-choice-stack"><button class="trip-pick" type="button" data-jar="yes">Yes, use 20%</button><button class="trip-pick" type="button" data-jar="no">No, don’t use the Jar</button></div><button type="button" data-back>Back</button>`;
@@ -101,7 +101,7 @@ function renderAccommodation({ host, plan, onDone }) {
     host.querySelectorAll('[data-jar]').forEach((b) => b.addEventListener('click', () => { useJar = b.dataset.jar === 'yes'; const c = calc(); if (useJar && c.jar > jarBalance + 0.005) return error('The Shared Jar does not have enough for this 20% contribution.'); stage = 'payer'; draw(); }));
     host.querySelectorAll('[data-paytype]').forEach((b) => b.addEventListener('click', () => { paymentType = b.dataset.paytype; if (paymentType === 'solo') { paidUpfront = false; stage = 'review'; } else stage = 'upfront'; draw(); }));
     host.querySelectorAll('[data-upfront]').forEach((b) => b.addEventListener('click', () => { paidUpfront = b.dataset.upfront === 'yes'; stage = 'review'; draw(); }));
-    host.querySelector('[data-back]')?.addEventListener('click', () => { stage = stage === 'jar' ? 'total' : stage === 'payer' ? 'jar' : stage === 'upfront' ? 'payer' : stage === 'review' ? (paymentType === 'shared' ? 'upfront' : 'payer') : 'total'; draw(); });
+    host.querySelector('[data-back]')?.addEventListener('click', () => { if (stage === 'total') { onBack?.(); return; } stage = stage === 'jar' ? 'total' : stage === 'payer' ? 'jar' : stage === 'upfront' ? 'payer' : stage === 'review' ? (paymentType === 'shared' ? 'upfront' : 'payer') : 'total'; draw(); });
     host.querySelector('[data-edit]')?.addEventListener('click', () => { total = String(current.total ?? ''); useJar = !!existing.useJar; paymentType = ''; paidUpfront = false; stage = 'total'; draw(); });
     host.querySelector('[data-continue]')?.addEventListener('click', () => onDone(String(current.total || 0), false));
     host.querySelector('[data-save]')?.addEventListener('click', save);

@@ -16,6 +16,65 @@ import { closeTripModal } from './overview.js';
 
 let wizard = freshWizard();
 
+const WIZARD_CATEGORIES = ['Trip', 'Accommodation', 'Transport', 'Food', 'Activities', 'Summary'];
+
+function wizardStorageKey() {
+  return `twogether:trip-wizard:v2:${actor() || 'guest'}`;
+}
+
+function readSavedWizard() {
+  try {
+    const raw = localStorage.getItem(wizardStorageKey());
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.mode || !saved.draft || !Number.isFinite(Number(saved.index))) return null;
+    return { ...saved, index: Math.max(0, Number(saved.index) || 0), otherFlow: saved.otherFlow || null };
+  } catch {
+    return null;
+  }
+}
+
+function saveWizardDraftLocal() {
+  if (!wizard?.mode) return;
+  try {
+    localStorage.setItem(wizardStorageKey(), JSON.stringify({
+      mode: wizard.mode,
+      tripId: wizard.tripId || '',
+      draft: wizard.draft,
+      index: wizard.index || 0,
+      otherFlow: wizard.otherFlow || null,
+      savedAt: new Date().toISOString(),
+    }));
+  } catch {}
+}
+
+function clearSavedWizard() {
+  try { localStorage.removeItem(wizardStorageKey()); } catch {}
+}
+
+function wizardCategory(step) {
+  const key = step?.key || '';
+  if (['tripChoice', 'location', 'otherLocation', 'city', 'start', 'end', 'budget'].includes(key)) return 'Trip';
+  if (key === 'accom') return 'Accommodation';
+  if (['travel', 'fuel', 'tolls'].includes(key)) return 'Transport';
+  if (['groceries', 'eat'].includes(key)) return 'Food';
+  if (key === 'otherFlow') return 'Activities';
+  if (['paid', 'review'].includes(key)) return 'Summary';
+  return 'Trip';
+}
+
+function categoryTrackerHtml(step) {
+  const current = wizardCategory(step);
+  const active = Math.max(0, WIZARD_CATEGORIES.indexOf(current));
+  return `<div class="wizard-category-bar"><div class="wizard-category-track" aria-label="Trip logging progress">${WIZARD_CATEGORIES.map((name, index) => `<div class="wizard-category-step ${index < active ? 'done' : ''} ${index === active ? 'active' : ''}"><span>${index < active ? '✓' : index + 1}</span><small>${name}</small></div>`).join('')}</div>${wizard.mode ? '<button class="wizard-save-exit" type="button" data-wizard-save-exit>Save & exit</button>' : ''}</div>`;
+}
+
+function expenseModeHtml(step, uncertain) {
+  if (!MONEY_FIELDS.includes(step.key) || step.noUncertain) return '';
+  const label = MONEY_LABELS[step.key] || 'expense';
+  return `<div class="expense-mode-grid"><button class="expense-mode-card ${!uncertain ? 'active' : ''}" type="button" data-certainty="exact"><span>€</span><strong>Add ${esc(label.toLowerCase())} cost</strong><small>Enter the amount you paid.</small></button><button class="expense-mode-card ${uncertain ? 'active' : ''}" type="button" data-certainty="estimate"><span>?</span><strong>Not sure of cost</strong><small>Enter your best estimate.</small></button></div>`;
+}
+
 function freshDraft() {
   return {
     location: '', otherLocation: '', city: '', start: '', end: '', budget: '',
@@ -45,11 +104,13 @@ function editableForActor() {
 }
 
 export function beginNew() {
+  clearSavedWizard();
   wizard = { mode: 'new', tripId: '', draft: freshDraft(), index: 0, otherFlow: null };
   renderWizard();
 }
 
 export function beginJoin(id) {
+  clearSavedWizard();
   const plan = window.TwogetherWorkflow?.state.plans.find((p) => p.linkedTripId === id);
   if (plan) { window.TwogetherWorkflow.start(plan.id); return; }
   const t = getState().trips.find((x) => x.id === id);
@@ -63,6 +124,7 @@ export function beginJoin(id) {
 }
 
 export function beginEdit(id) {
+  clearSavedWizard();
   const plan = window.TwogetherWorkflow?.state.plans.find((p) => p.linkedTripId === id);
   if (plan) { window.TwogetherWorkflow.start(plan.id); return; }
   const t = getState().trips.find((x) => x.id === id);
@@ -86,11 +148,11 @@ function flowSteps() {
 
   const moneySteps = [
     { key: 'accom', title: 'How much was accommodation?', type: 'money' },
-    { key: 'groceries', title: 'How much on groceries?', type: 'money' },
-    { key: 'eat', title: 'How much on eating out?', type: 'money' },
     { key: 'travel', title: 'How much on flights or trains?', type: 'money' },
     { key: 'fuel', title: 'How much on fuel?', type: 'money' },
     { key: 'tolls', title: 'How much on tolls or parking?', type: 'money' },
+    { key: 'groceries', title: 'How much on groceries?', type: 'money' },
+    { key: 'eat', title: 'How much on eating out?', type: 'money' },
     { key: 'otherFlow', title: 'Other expenses', type: 'otherExpenses' },
     { key: 'paid', title: `How much did ${actor()} actually pay?`, type: 'money', optional: true, noUncertain: true },
     { key: 'review', title: wizard.mode === 'edit' ? 'Save your corrected version?' : 'Ready to save your version?', type: 'review' },
@@ -198,7 +260,9 @@ export function renderWizard() {
   } else if (s.type === 'tripChoice') {
     const pending = pendingForActor();
     const editable = editableForActor().filter((t) => t.submissions?.Principessa && t.submissions?.Principe && differences(t).length);
-    control = `<div class="trip-choice-stack">
+    const saved = readSavedWizard();
+    const savedCity = saved?.draft?.city || 'your saved trip';
+    control = `${saved ? `<button class="wizard-resume-card" type="button" data-wizard-resume><span>↻</span><div><strong>Continue where you left off</strong><small>${esc(savedCity)} · your answers are saved on this device.</small></div><b>Continue →</b></button>` : ''}<div class="trip-choice-stack">
       <button class="trip-pick new-trip-pick" data-trip-pick="new" type="button"><span class="pick-icon">＋</span><div><strong>Start a new trip</strong><small>Log location, dates, planned budget and your expenses.</small></div></button>
       ${pending.map((t) => {
         const m = tripMeta(t);
@@ -217,8 +281,8 @@ export function renderWizard() {
     const value = wizard.draft[s.key] ?? '';
     const isUncertain = !!wizard.draft.uncertain?.[s.key];
     control = `<div class="${isUncertain ? 'uncertain-mode' : ''}">
+      ${expenseModeHtml(s, isUncertain)}
       <div class="money-input-wrap"><span>€</span><input id="wizardInput" class="big-input money-field" inputmode="decimal" value="${esc(value)}" placeholder="0.00"></div>
-      ${(!s.noUncertain && MONEY_FIELDS.includes(s.key)) ? `<div class="certainty-row"><button class="certainty ${!isUncertain ? 'active' : ''}" type="button" data-certainty="exact">Exact</button><button class="certainty ${isUncertain ? 'active' : ''}" type="button" data-certainty="estimate">Not sure · estimate</button></div>` : ''}
       ${isUncertain ? '<div class="estimate-note">This amount will count in totals but stay marked as an estimate.</div>' : ''}
       ${s.type === 'moneyOrNone' ? '<button class="btn ghost full" type="button" data-none> No other expenses </button>' : ''}
       ${s.type === 'budget' ? '<button class="btn ghost full" type="button" data-skip-budget>Skip budget</button>' : ''}
@@ -231,15 +295,17 @@ export function renderWizard() {
     ? `Start a new trip, or add your version to one ${otherActor()} already logged.`
     : (s.help || (wizard.mode === 'join' ? 'The trip details are already shared. Only enter your expense calculations.' : wizard.mode === 'edit' ? 'Correct only the calculations that need changing.' : ''));
 
-  body.innerHTML = `<div class="question-stage">${contextBanner()}<h2>${esc(s.title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${control}${wizardActions(s)}</div>`;
+  body.innerHTML = `<div class="question-stage">${categoryTrackerHtml(s)}${contextBanner()}<h2>${esc(s.title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${control}${wizardActions(s)}</div>`;
   bindWizard(s);
+  saveWizardDraftLocal();
 }
 
 function wizardActions(s) {
-  if (s.type === 'tripChoice' || s.type === 'choice' || s.type === 'review' || s.type === 'otherExpenses') return '';
-  const back = `<button class="btn ghost" type="button" data-wizard-back>Back</button>`;
+  if (s.type === 'tripChoice' || s.type === 'review' || s.type === 'otherExpenses') return '';
+  const back = `<button class="btn ghost" type="button" data-wizard-back>← Back</button>`;
+  if (s.type === 'choice') return `<div class="wizard-actions single-back">${back}</div>`;
   const optional = s.optional;
-  return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${optional ? 'Continue' : 'Next'}</button></div>`;
+  return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${optional ? 'Continue' : 'Next'} →</button></div>`;
 }
 
 function reviewHtml() {
@@ -259,6 +325,18 @@ function reviewHtml() {
 }
 
 function bindWizard(s) {
+  $('[data-wizard-resume]')?.addEventListener('click', () => {
+    const saved = readSavedWizard();
+    if (!saved) return;
+    wizard = saved;
+    renderWizard();
+  });
+  $('[data-wizard-save-exit]')?.addEventListener('click', () => {
+    saveWizardDraftLocal();
+    wizard = freshWizard();
+    renderWizard();
+    toast('Saved. You can continue from here later.');
+  });
   $$('[data-trip-pick]').forEach((btn) => btn.addEventListener('click', () => {
     const id = btn.dataset.tripPick;
     id === 'new' ? beginNew() : beginJoin(id);
@@ -369,6 +447,7 @@ async function saveWizardVersion() {
   try {
     await postAction('saveSubmission', payload, actor());
     toast(wizard.mode === 'edit' ? 'Your version was updated' : 'Your version was saved');
+    clearSavedWizard();
     wizard = freshWizard();
     renderWizard();
   } catch (err) {
@@ -378,5 +457,5 @@ async function saveWizardVersion() {
 }
 
 export function bindRestartWizard() {
-  $('#restartWizard')?.addEventListener('click', () => { wizard = freshWizard(); renderWizard(); });
+  $('#restartWizard')?.addEventListener('click', () => { clearSavedWizard(); wizard = freshWizard(); renderWizard(); });
 }
