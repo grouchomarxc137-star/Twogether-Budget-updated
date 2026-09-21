@@ -4548,3 +4548,69 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   .trip-expense-row-main>b{grid-column:2}
 }
 
+
+
+/* Simplified Current Trip expense overview */
+.overview-simple-table{border:1px solid #e6dbcf;border-radius:14px;overflow:hidden;background:#fff}
+.overview-simple-table table{width:100%;border-collapse:collapse}
+.overview-simple-table th,.overview-simple-table td{padding:13px 14px;border-bottom:1px solid #eee5dc;border-right:1px solid #eee5dc;text-align:left;font-size:12px}
+.overview-simple-table tr:last-child th,.overview-simple-table tr:last-child td{border-bottom:0}
+.overview-simple-table th:last-child,.overview-simple-table td:last-child{border-right:0}
+.overview-simple-table thead th{background:#f3f6ef;color:#3e443a;font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.overview-simple-table thead th:first-child{background:#fff1c9}
+.overview-simple-table tbody th{padding:0;background:#fbf8f3;width:34%}
+.overview-category-btn{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:13px 14px;border:0;background:transparent;color:#2a241f;font:inherit;font-weight:800;text-align:left;cursor:pointer}
+.overview-category-btn:hover{background:#fff7e4}
+.overview-category-btn span{color:#a87925;font-size:18px;font-weight:500}
+.overview-table-hint{margin:10px 2px 0;color:#81756b;font-size:11px}
+.overview-back{border:0;background:none;padding:0;margin:3px 0 13px;color:#8a6424;font:inherit;font-size:11px;cursor:pointer}
+.overview-category-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:13px}
+.overview-category-head h3{margin:3px 0 2px;font-size:28px;line-height:1}
+.overview-category-head p{margin:0;color:#7b7067;font-size:11px}
+.overview-legacy-note{display:grid;gap:3px;margin:0 0 12px;padding:11px 13px;border:1px solid #eadfce;border-radius:12px;background:#fffaf0}
+.overview-legacy-note span,.overview-legacy-note small{color:#80736a;font-size:10px}
+.overview-legacy-note strong{font-size:12px}
+.overview-subtype-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:0 0 14px}
+.overview-subtype-grid button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 12px;border:1px solid #dfd3c5;border-radius:12px;background:#fffdf9;color:#3f352e;font:inherit;font-size:11px;cursor:pointer}
+.overview-subtype-grid button:hover{border-color:#bf8a2d;background:#fff6df}
+.overview-subtype-grid button span{color:#a97824;font-size:17px}
+.overview-category-list{border:1px solid #e9dfd4;border-radius:12px;overflow:hidden;background:#fff}
+.overview-category-entry{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:0 10px;border-bottom:1px solid #eee6dc}
+.overview-category-entry:last-child{border-bottom:0}
+.overview-entry-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:11px 2px;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.overview-entry-main strong,.overview-entry-main small{display:block}
+.overview-entry-main small{margin-top:3px;color:#82776f;font-size:9.5px}
+.overview-entry-main b{font-size:12px}
+.overview-entry-delete{border:0;background:none;color:#9a6d63;font-size:9.5px;cursor:pointer}
+.overview-category-empty{display:grid;gap:4px;padding:18px;border:1px dashed #ded2c5;border-radius:12px;color:#7e7268}
+.overview-category-empty strong{color:#4a4038}
+.overview-expense-form{display:grid;gap:14px}
+.overview-expense-form label,.overview-expense-form fieldset{display:grid;gap:7px;border:0;padding:0;margin:0}
+.overview-expense-form label,.overview-expense-form legend{font-size:11px;font-weight:750;color:#4c423a}
+.overview-expense-form label>input{min-height:42px;padding:9px 11px;border:1px solid #ded2c5;border-radius:11px;background:#fff;font:inherit;font-size:13px}
+.overview-form-chips{display:flex;gap:7px;flex-wrap:wrap}
+.overview-form-chips button{min-height:36px;padding:7px 12px;border:1px solid #ded2c5;border-radius:999px;background:#fff;color:inherit;font:inherit;font-size:10.5px;cursor:pointer}
+.overview-form-chips button.active{border-color:#b9872c;background:#fff1cb}
+.overview-money-input{display:flex;align-items:center;border:1px solid #ded2c5;border-radius:12px;background:#fff;padding:0 12px}
+.overview-money-input span{color:#766960;font-weight:800}
+.overview-money-input input{width:100%;min-height:48px;border:0;outline:0;padding-left:9px;background:transparent;font:inherit;font-size:19px}
+.overview-jar-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #dfd3c5;border-radius:12px;background:#fffdf9;color:inherit;text-align:left;cursor:pointer}
+.overview-jar-toggle strong,.overview-jar-toggle small{display:block}
+.overview-jar-toggle small{margin-top:2px;color:#80756d;font-size:9.5px}
+.overview-jar-toggle.active{border-color:#c39338;background:#fff5d9}
+.overview-more{display:flex;align-items:center;gap:7px;width:100%;padding:10px 0 2px;border:0;border-top:1px solid #eee5dc;background:none;color:#6b5d53;text-align:left;cursor:pointer}
+.overview-more span{color:#9a722a}
+.overview-more-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:11px;border:1px solid #e9dfd4;border-radius:12px;background:#fbf8f3}
+.overview-more-fields.hidden{display:none}
+.overview-estimate{grid-column:1/-1;display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;gap:8px!important}
+.overview-estimate input{width:16px;height:16px;accent-color:#b9872c}
+.overview-form-actions{display:flex;justify-content:flex-end;gap:8px}
+.overview-form-error{min-height:15px;margin:0;color:#9a5146;font-size:10px}
+@media(max-width:620px){
+  .overview-simple-table{overflow:auto}
+  .overview-simple-table table{min-width:560px}
+  .overview-category-head{align-items:flex-start;flex-direction:column}
+  .overview-more-fields{grid-template-columns:1fr}
+  .overview-estimate{grid-column:auto}
+  .overview-form-actions{display:grid;grid-template-columns:1fr 1fr}
+}
