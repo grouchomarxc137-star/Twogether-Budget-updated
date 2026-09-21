@@ -57,6 +57,7 @@ async function createPlanFromMainWizard(budget) {
     if (!result?.planId) throw new Error('The trip could not be confirmed as saved. Please retry once.');
 
     const created = { id: result.planId, meta: m, createdBy: a };
+    try { localStorage.removeItem(`twogether:trip-wizard:v3:${a}`); } catch {}
     showScope(created);
 
     Promise.resolve(window.TwogetherWorkflow?.refresh?.()).catch(() => {});
