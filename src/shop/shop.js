@@ -11,6 +11,7 @@ import {
 } from './state.js';
 import { sendHeart, openNote } from './signals.js';
 import { renderWishlist } from '../wishlist/wishlist.js';
+import { beginNew } from '../trips/wizard.js';
 
 let layoutRetries = 0;
 
@@ -267,7 +268,7 @@ function planTrip() {
   const logTab = $('[data-sheet="log"]');
   if (logTab) logTab.click();
   setTimeout(() => {
-    $('#restartWizard')?.click();
+    beginNew();
     $('#wizardCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 40);
 }
