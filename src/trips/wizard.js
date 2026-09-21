@@ -108,8 +108,7 @@ function flowSteps() {
     { key: 'city', title: 'Which city or area?', help: `For example: ${locationExample}.`, type: 'text', placeholder: `e.g. ${locationExample}` },
     { key: 'start', title: 'When did the trip start?', type: 'date' },
     { key: 'end', title: 'When did it end?', type: 'date' },
-    { key: 'budget', title: 'What is your ideal total budget for this trip?', help: 'Enter your own budget. Your partner adds theirs separately.', type: 'budget', optional: true },
-    ...moneySteps,
+    { key: 'budget', title: 'Do you have a budget for this trip?', help: 'Add your own budget, or skip it for now. Your partner can add theirs separately.', type: 'budget', optional: true, finish: true },
   ].filter((s) => !s.when || s.when(wizard.draft));
 }
 
@@ -199,7 +198,7 @@ export function renderWizard() {
     const pending = pendingForActor();
     const editable = editableForActor().filter((t) => t.submissions?.Principessa && t.submissions?.Principe && differences(t).length);
     control = `<div class="trip-choice-stack">
-      <button class="trip-pick new-trip-pick" data-trip-pick="new" type="button"><span class="pick-icon">＋</span><div><strong>Start a new trip</strong><small>Log location, dates, planned budget and your expenses.</small></div></button>
+      <button class="trip-pick new-trip-pick" data-trip-pick="new" type="button"><span class="pick-icon">＋</span><div><strong>Start a new trip</strong><small>Log the trip details and optional budget.</small></div></button>
       ${pending.map((t) => {
         const m = tripMeta(t);
         return `<button class="trip-pick" data-trip-pick="${esc(t.id)}" type="button"><span class="pick-icon">↔</span><div><strong>Add your version · ${esc(m.city || locationLabel(m))}</strong><small>${fmtDate(m.start)}–${fmtDate(m.end)} · only expense questions</small></div></button>`;
@@ -239,7 +238,7 @@ function wizardActions(s) {
   if (s.type === 'tripChoice' || s.type === 'choice' || s.type === 'review' || s.type === 'otherExpenses') return '';
   const back = `<button class="btn ghost" type="button" data-wizard-back>Back</button>`;
   const optional = s.optional;
-  return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${optional ? 'Continue' : 'Next'}</button></div>`;
+  return `<div class="wizard-actions">${back}<button class="btn primary big" type="button" data-wizard-next>${s.finish ? 'Save trip' : optional ? 'Continue' : 'Next'}</button></div>`;
 }
 
 function reviewHtml() {
@@ -352,6 +351,7 @@ function bindWizard(s) {
     if ((MONEY_FIELDS.includes(s.key) || s.key === 'paid' || s.key === 'budget') && value && !Number.isFinite(Number(value.replace(',', '.')))) {
       toast('Enter a valid amount', 'warn'); return;
     }
+    if (wizard.mode === 'new' && s.finish) return;
     wizard.index++;
     renderWizard();
   });

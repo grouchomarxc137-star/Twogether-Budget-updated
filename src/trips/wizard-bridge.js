@@ -1,11 +1,9 @@
-// Intercepts the Log Trip wizard at the "ideal total budget" step and
-// reroutes it into saving a budget Plan, then offers a scope choice
-// (budget-only / some expenses / all expenses). Extracted from
-// trip-wizard-bridge-v15.js. Pairs with trips/wizard.js and
-// trips/budget-plans.js/expenses-flow.js via the window.TwogetherWorkflow
-// bridge, same as the original.
+// Intercepts the Log Trip wizard at the final budget step and saves the
+// trip as a Plan. New-trip creation ends there; expenses are managed later
+// from Current Trips > Open trip. Legacy join/edit compatibility remains in
+// trips/wizard.js for older unmatched records.
 import { $ } from '../lib/dom.js';
-import { esc, n, money } from '../lib/format.js';
+import { esc } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 
@@ -74,30 +72,8 @@ function showScope(plan) {
   const city = plan?.meta?.city || 'this trip';
   const step = $('#wizardStep'); if (step) step.textContent = 'Trip saved';
   const progress = $('#wizardProgress'); if (progress) progress.style.width = '100%';
-  body.innerHTML = `<div class="question-stage bridge15-scope-stage"><h2>Your trip is ready</h2><p><strong>${esc(city)}</strong> is now under Current Trips. Add one expense now, or come back whenever something is paid.</p><div class="bridge15-scope"><button class="trip-pick" data-bridge15-scope="expense"><span class="pick-icon">＋</span><div><strong>Add an expense</strong><small>Log one thing now. It saves immediately.</small></div></button><button class="trip-pick" data-bridge15-scope="done"><span class="pick-icon">✓</span><div><strong>Done for now</strong><small>Your trip stays open in Current Trips.</small></div></button></div></div>`;
-  body.querySelector('[data-bridge15-scope="expense"]')?.addEventListener('click',()=>window.TwogetherWorkflow?.start(plan.id));
-  body.querySelector('[data-bridge15-scope="done"]')?.addEventListener('click',()=>$('#restartWizard')?.click());
-}
-
-function enhanceAccommodation20() {
-  const h = heading();
-  const input = $('#wizardInput');
-  if (!/How much was accommodation/i.test(h) || !input) return;
-  const wrap = input.closest('.money-input-wrap');
-  if (!wrap) return;
-  let calc = $('#bridge15Accommodation20');
-  if (!calc) {
-    calc = document.createElement('div');
-    calc.id = 'bridge15Accommodation20';
-    calc.className = 'bridge15-20';
-    wrap.insertAdjacentElement('afterend', calc);
-  }
-  const update = () => { const html = `20% = <strong>${money(n(input.value) * 0.20)}</strong>`; if (calc.innerHTML !== html) calc.innerHTML = html; };
-  if (input.dataset.bridge15Calc !== '1') {
-    input.dataset.bridge15Calc = '1';
-    input.addEventListener('input', update);
-  }
-  update();
+  body.innerHTML = `<div class="question-stage bridge15-scope-stage"><h2>Trip saved</h2><p><strong>${esc(city)}</strong> is now under Current Trips. Expenses can be added later from Open trip.</p><div class="wizard-actions"><button class="btn primary big" type="button" data-bridge15-done>Done</button></div></div>`;
+  body.querySelector('[data-bridge15-done]')?.addEventListener('click',()=>$('#restartWizard')?.click());
 }
 
 export function installWizardBridge() {
@@ -130,7 +106,4 @@ export function installWizardBridge() {
     if (e.target.closest?.('#restartWizard')) resetMeta();
   }, false);
 
-  const body = $('#wizardBody');
-  if (body) { new MutationObserver(() => requestAnimationFrame(enhanceAccommodation20)).observe(body, { childList: true, subtree: true }); }
-  enhanceAccommodation20();
 }
