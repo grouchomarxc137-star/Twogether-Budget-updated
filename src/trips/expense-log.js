@@ -17,6 +17,7 @@ const cat=k=>CATS.find(x=>x[0]===k)||CATS[4];
 function settlement(list){const paid={Principessa:0,Principe:0},share={Principessa:0,Principe:0};list.forEach(e=>{const a=n(e.amount),jar=n(e.jarContribution),r=Math.max(0,a-jar);if(e.paidBy==='both'){paid.Principessa+=r/2;paid.Principe+=r/2}else if(paid[e.paidBy]!=null)paid[e.paidBy]+=r;if(e.split==='personal')share[e.forActor==='Principe'?'Principe':'Principessa']+=r;else{share.Principessa+=r/2;share.Principe+=r/2}});const d=paid.Principessa-share.Principessa;if(Math.abs(d)<.005)return 'You are even on these expenses.';return d>0?`Principe owes Principessa ${money(d)}.`:`Principessa owes Principe ${money(Math.abs(d))}.`}
 function ensure(){installUi();const overlay=$('#workflowV5Overlay');if(overlay)overlay.classList.add('trip-expense-mode');return overlay}
 function body(){return $('#workflowV5Overlay')}
+async function refresh(){state=await (window.TwogetherAPI.remoteState?window.TwogetherAPI.remoteState():window.TwogetherAPI.state());return state}
 function blankDraft(){return{id:'',category:'',foodType:'',amount:'',paidBy:actor(),split:'shared',forActor:actor(),date:today(),note:'',uncertain:false,useJar:false,showMore:false}}
 function foodTypeLabel(value){return FOOD_LABEL[value]||''}
 function expenseTitle(entry){return entry?.note||foodTypeLabel(entry?.foodType)||LABEL[entry?.category]||'Expense'}
@@ -28,16 +29,16 @@ root.innerHTML='<div class="trip-expense-workspace"><header class="trip-expense-
 const input=$('#tripExpenseAmount');input.oninput=()=>draft.amount=input.value;
 $('#tripExpenseDate')?.addEventListener('input',e=>draft.date=e.target.value);$('#tripExpenseNote')?.addEventListener('input',e=>draft.note=e.target.value);$('#tripExpenseEstimate')?.addEventListener('change',e=>{draft.uncertain=e.target.checked});
 $('[data-exp-done]',root)?.addEventListener('click',closeTripExpenseLogger);
-$('[data-exp-cat]',root).forEach(b=>b.onclick=()=>{draft.category=b.dataset.expCat;if(draft.category!=='food')draft.foodType='';if(draft.category!=='accommodation')draft.useJar=false;render()});
-$('[data-exp-food]',root).forEach(b=>b.onclick=()=>{draft.foodType=b.dataset.expFood;render()});
+$$('[data-exp-cat]',root).forEach(b=>b.onclick=()=>{draft.category=b.dataset.expCat;if(draft.category!=='food')draft.foodType='';if(draft.category!=='accommodation')draft.useJar=false;render()});
+$$('[data-exp-food]',root).forEach(b=>b.onclick=()=>{draft.foodType=b.dataset.expFood;render()});
 $('[data-exp-jar]',root)?.addEventListener('click',()=>{draft.useJar=!draft.useJar;render()});
-$('[data-exp-payer]',root).forEach(b=>b.onclick=()=>{draft.paidBy=b.dataset.expPayer;if(draft.paidBy==='both'&&draft.split==='personal')draft.split='shared';render()});
-$('[data-exp-split]',root).forEach(b=>b.onclick=()=>{draft.split=b.dataset.expSplit;if(draft.split==='personal'&&draft.paidBy==='both')draft.paidBy=me;render()});
-$('[data-exp-owner]',root).forEach(b=>b.onclick=()=>{draft.forActor=b.dataset.expOwner;render()});
+$$('[data-exp-payer]',root).forEach(b=>b.onclick=()=>{draft.paidBy=b.dataset.expPayer;if(draft.paidBy==='both'&&draft.split==='personal')draft.split='shared';render()});
+$$('[data-exp-split]',root).forEach(b=>b.onclick=()=>{draft.split=b.dataset.expSplit;if(draft.split==='personal'&&draft.paidBy==='both')draft.paidBy=me;render()});
+$$('[data-exp-owner]',root).forEach(b=>b.onclick=()=>{draft.forActor=b.dataset.expOwner;render()});
 $('[data-exp-more]',root)?.addEventListener('click',()=>{draft.showMore=!draft.showMore;render()});
 $('[data-exp-cancel-edit]',root)?.addEventListener('click',()=>{loadDraft();render()});
-$('[data-exp-edit]',root).forEach(b=>b.onclick=()=>{const found=entries(p).find(e=>e.id===b.dataset.expEdit);if(found){loadDraft(found);render();root.scrollTo?.({top:0,behavior:'smooth'})}});
-$('[data-exp-del]',root).forEach(b=>b.onclick=()=>remove(b));
+$$('[data-exp-edit]',root).forEach(b=>b.onclick=()=>{const found=entries(p).find(e=>e.id===b.dataset.expEdit);if(found){loadDraft(found);render();root.scrollTo?.({top:0,behavior:'smooth'})}});
+$$('[data-exp-del]',root).forEach(b=>b.onclick=()=>remove(b));
 $('[data-exp-save]',root)?.addEventListener('click',()=>save(p));
 if(!draft.id&&draft.category)setTimeout(()=>input?.focus(),0)}
 async function save(p){if(busy)return;if(!draft.category)return toast('Choose what the expense was first','warn');if(draft.category==='food'&&!draft.foodType)return toast('Choose Groceries or Eating out','warn');const amount=Number(String(draft.amount||'').replace(',','.'));if(!Number.isFinite(amount)||amount<=0)return toast('Enter the expense amount first','warn');busy=true;try{await window.TwogetherAPI.post('saveTripExpense',{planId:p.id,expense:{id:draft.id||'',category:draft.category,foodType:draft.category==='food'?draft.foodType:'',amount,paidBy:draft.paidBy,split:draft.split,forActor:draft.split==='personal'?draft.forActor:'',date:draft.date||today(),note:draft.note||'',uncertain:!!draft.uncertain,useJar:draft.category==='accommodation'&&!!draft.useJar}},actor());await refresh();toast(draft.id?'Expense updated':'Expense saved');loadDraft();render()}catch(e){toast(e.message||'Could not save expense','warn')}finally{busy=false}}
