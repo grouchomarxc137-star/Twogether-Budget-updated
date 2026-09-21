@@ -21,6 +21,7 @@ import { $, $$ } from '../lib/dom.js';
 import { esc, n, money, fmtDate } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
+import { openTripExpenseLogger } from './expense-log.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -53,7 +54,7 @@ function ensureCurrentTrips() {
       if (card.dataset.currentPlan) {
         const id = card.dataset.currentPlan; const plan = remoteState?.plans?.find((p) => p.id === id); if (!plan) return;
         if (e.target.closest('[data-current-budget]')) return window.TwogetherWorkflow?.budget(id);
-        if (e.target.closest('[data-current-expenses]')) return window.TwogetherWorkflow?.start(id);
+        if (e.target.closest('[data-current-expenses]')) return openTripExpenseLogger(id);
         if (e.target.closest('[data-current-open],.tw-current-main')) return window.TwogetherOverview?.open(plan);
       } else {
         const id = card.dataset.currentTrip; if (e.target.closest('[data-current-open],.tw-current-main')) window.TwogetherApp?.open(id);
@@ -66,13 +67,14 @@ function ensureCurrentTrips() {
 function expenseTotal(plan, trip) {
   const a = trip?.submissions?.Principessa || plan?.partials?.Principessa || {};
   const b = trip?.submissions?.Principe || plan?.partials?.Principe || {};
-  return MONEY_KEYS.reduce((sum, key) => {
+  const legacy = MONEY_KEYS.reduce((sum, key) => {
     const shared = plan?.sharedExpenses?.[key] || trip?.sharedExpenses?.[key];
     if (has(shared?.total)) return sum + n(shared.total);
     const av = has(a?.[key]) ? n(a[key]) : null, bv = has(b?.[key]) ? n(b[key]) : null;
     if (av != null && bv != null) return sum + Math.max(av, bv);
     return sum + (av ?? bv ?? 0);
   }, 0);
+  return legacy + (Array.isArray(plan?.expenseEntries) ? plan.expenseEntries.reduce((sum, entry) => sum + n(entry?.amount), 0) : 0);
 }
 
 function planCard(plan, trip) {
@@ -80,7 +82,7 @@ function planCard(plan, trip) {
   const totalBudget = (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0); const spent = expenseTotal(plan, trip);
   const status = trip || plan?.partials?.Principessa || plan?.partials?.Principe ? 'In progress' : (has(p) && has(q) ? 'Planned' : 'Waiting for budget');
   const ownLabel = a === 'Principe' ? 'Principe budget' : 'Principessa budget'; const ownBudget = a === 'Principe' ? q : p;
-  return `<article class="tw-current-card" data-current-plan="${esc(plan.id)}"><button class="tw-current-main" type="button"><div class="tw-current-top"><span class="trip-country">${esc(locationLabel(meta))}</span><span class="tw-current-status">${esc(status)}</span></div><h3>${esc(meta.city || locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p><div class="tw-current-numbers"><div><span>${ownLabel}</span><strong>${has(ownBudget) ? money(ownBudget) : 'Not set'}</strong></div><div><span>Total budget</span><strong>${has(p) || has(q) ? money(totalBudget) : 'Not set'}</strong></div><div><span>Trip so far</span><strong>${money(spent)}</strong></div></div></button><div class="tw-current-actions"><button class="text-btn" type="button" data-current-budget>${has(plan?.budgets?.[a]) ? 'Edit budget' : 'Add budget'}</button><button class="btn ghost" type="button" data-current-expenses>${trip?.submissions?.[a] ? 'Edit expenses' : plan?.partials?.[a] ? 'Continue expenses' : 'Add expenses'}</button><button class="text-btn" type="button" data-current-open>Open trip</button></div></article>`;
+  return `<article class="tw-current-card" data-current-plan="${esc(plan.id)}"><button class="tw-current-main" type="button"><div class="tw-current-top"><span class="trip-country">${esc(locationLabel(meta))}</span><span class="tw-current-status">${esc(status)}</span></div><h3>${esc(meta.city || locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p><div class="tw-current-numbers"><div><span>${ownLabel}</span><strong>${has(ownBudget) ? money(ownBudget) : 'Not set'}</strong></div><div><span>Total budget</span><strong>${has(p) || has(q) ? money(totalBudget) : 'Not set'}</strong></div><div><span>Trip so far</span><strong>${money(spent)}</strong></div></div></button><div class="tw-current-actions"><button class="text-btn" type="button" data-current-budget>${has(plan?.budgets?.[a]) ? 'Edit budget' : 'Add budget'}</button><button class="btn ghost" type="button" data-current-expenses>Add expense</button><button class="text-btn" type="button" data-current-open>Open trip</button></div></article>`;
 }
 
 function standaloneCard(trip) {

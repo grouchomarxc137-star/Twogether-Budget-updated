@@ -8,7 +8,8 @@ import {
   getSharedState, getActiveFlow, getBypassNewTrip, refreshState, closeOverlay, installUi,
 } from './budget-state.js';
 import { eligibleBudgetPlans, showNewTripChoice, openBudgetOnly, renderBudgetPlans } from './budget-plans.js';
-import { startActualChoice, startMatch, renderPartialActual, renderActualFlow } from './expenses-flow.js';
+import { startMatch, renderPartialActual, renderActualFlow } from './expenses-flow.js';
+import { openTripExpenseLogger } from './expense-log.js';
 
 let lastTripId = '';
 
@@ -29,7 +30,7 @@ function bindGlobalClicks() {
       const id = card?.dataset?.v5Plan || '';
       if (id) {
         event.preventDefault(); event.stopImmediatePropagation();
-        startActualChoice(id); return;
+        openTripExpenseLogger(id); return;
       }
     }
 
@@ -82,7 +83,7 @@ function init() {
     refresh: refreshState,
     get state() { return getSharedState(); },
     get flow() { return getActiveFlow(); },
-    start: startActualChoice,
+    start: openTripExpenseLogger,
     budget: openBudgetOnly,
     match: startMatch,
     close: closeOverlay,

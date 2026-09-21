@@ -17,30 +17,6 @@ let sharedState = { version: 0, plans: [], trips: [] };
 let refreshPromise = null;
 let activeFlow = null;
 
-const FLOW_CATEGORIES = ['Trip', 'Accommodation', 'Transport', 'Food', 'Activities', 'Summary'];
-
-function flowCategory(title) {
-  const text = String(title || '').toLowerCase();
-  if (/review|ready to save|actually pay|summary/.test(text)) return 'Summary';
-  if (/other expense|activit/.test(text)) return 'Activities';
-  if (/grocer|eating|food/.test(text)) return 'Food';
-  if (/flight|train|fuel|toll|parking|transport/.test(text)) return 'Transport';
-  if (/accommodation|airbnb|shared jar|repayment/.test(text)) return 'Accommodation';
-  return 'Accommodation';
-}
-
-function flowGuideHtml(title) {
-  if (activeFlow?.type !== 'actual') return '';
-  const current = flowCategory(title);
-  const active = Math.max(1, FLOW_CATEGORIES.indexOf(current));
-  return `<div class="workflow-guide">
-    <div class="wizard-guide-top"><span>${esc(current)}</span><button class="wizard-save-exit" type="button" data-v5-save-exit>Save & exit</button></div>
-    <div class="wizard-category-track" aria-label="Trip expense progress">
-      ${FLOW_CATEGORIES.map((name, index) => `<div class="wizard-category-step ${index < active ? 'done' : ''} ${index === active ? 'active' : ''}"><span>${index < active ? '✓' : index + 1}</span><small>${name}</small></div>`).join('')}
-    </div>
-  </div>`;
-}
-
 export function getSharedState() {
   return sharedState;
 }
@@ -177,14 +153,9 @@ export function closeBudgetModal() {
 export function showOverlay(stepLabel, progress, title, help, content) {
   installUi();
   const overlay = document.querySelector('#workflowV5Overlay'); if (!overlay) return;
-  const guide = flowGuideHtml(title);
-  const resume = activeFlow?.resumeNotice ? '<div class="workflow-resume-note"><strong>You left off here</strong><span>Continue from where you stopped.</span></div>' : '';
-  if (activeFlow?.resumeNotice) activeFlow.resumeNotice = false;
-  const defaultTop = activeFlow ? `<div class="v5-top"><div class="v5-progress-side"><div class="v5-step">${esc(stepLabel)}</div><div class="v5-progress"><span style="width:${Math.max(8, Math.min(100, progress))}%"></span></div></div><button class="text-btn" type="button" data-v5-close>Start over</button></div>` : '';
-  overlay.innerHTML = `${guide || defaultTop}<div class="v5-body"><div class="v5-question">${resume}<h2>${esc(title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${content}</div></div>`;
+  overlay.innerHTML = `<div class="v5-top"><div class="v5-progress-side"><div class="v5-step">${esc(stepLabel)}</div><div class="v5-progress"><span style="width:${Math.max(8, Math.min(100, progress))}%"></span></div></div><button class="text-btn" type="button" data-v5-close>Start over</button></div><div class="v5-body"><div class="v5-question"><h2>${esc(title)}</h2>${help ? `<p>${esc(help)}</p>` : ''}${content}</div></div>`;
   overlay.classList.add('show');
   overlay.querySelector('[data-v5-close]')?.addEventListener('click', closeOverlay);
-  overlay.querySelector('[data-v5-save-exit]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('twogether:workflow-save-exit')));
 }
 
 export function closeOverlay() {

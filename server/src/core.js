@@ -254,11 +254,11 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const useJar = payload.useJar === true;
       const other = actor === 'Principessa' ? 'Principe' : 'Principessa';
       state.sharedJar = sanitizeSharedJar_(state.sharedJar);
-      const oldTx = state.sharedJar.transactions.find(function(x){ return x.planId === planId; });
+      const oldTx = state.sharedJar.transactions.find(function(x){ return x.planId === planId && !x.expenseId; });
       const availableBefore = money2_(Number(state.sharedJar.balance || 0) + Number(oldTx && oldTx.amount || 0));
       const jarContribution = useJar ? money2_(Number(total) * .2) : 0;
       if (jarContribution > availableBefore + .005) throw new Error('The Shared Jar only has €' + availableBefore.toFixed(2) + ' available');
-      state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){ return x.planId !== planId; });
+      state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){ return !(x.planId === planId && !x.expenseId); });
       if (jarContribution > 0) state.sharedJar.transactions.push({planId:planId,amount:jarContribution,actor:actor,at:new Date().toISOString()});
       state.sharedJar = sanitizeSharedJar_(state.sharedJar);
 
@@ -408,6 +408,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       addAudit_(state, actor, 'saveSharedExpense:' + key, plan.id);
       saveState_(state);
       return output_({ok:true, planId:plan.id, sharedExpense:plan.sharedExpenses[key]});
+    }
+
+    if (action === 'saveTripExpense') {
+      const planId=cleanText_(payload.planId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),raw=payload.expense||{},id=cleanText_(raw.id,80),at=id?plan.expenseEntries.findIndex(x=>x.id===id):-1,prev=at>=0?plan.expenseEntries[at]:null,now=new Date().toISOString(),expense=sanitizeTripExpense_(Object.assign({},raw,{id:id||Utilities.getUuid(),loggedBy:prev&&prev.loggedBy||actor,createdAt:prev&&prev.createdAt||now,updatedAt:now}),actor);
+      if(expense.amount===''||Number(expense.amount)<=0)throw new Error('Enter a valid expense amount');if(!expense.paidBy)throw new Error('Choose who paid');if(expense.split==='personal'&&expense.paidBy==='both')throw new Error('Choose one payer for a personal expense');if(expense.split==='personal'&&!expense.forActor)expense.forActor=actor;if(!expense.date)expense.date=now.slice(0,10);
+      state.sharedJar=sanitizeSharedJar_(state.sharedJar);const old=state.sharedJar.transactions.find(x=>x.planId===planId&&x.expenseId===expense.id),available=money2_(Number(state.sharedJar.balance||0)+Number(old&&old.amount||0)),jar=expense.useJar?money2_(Number(expense.amount)*.2):0;if(jar>available+.005)throw new Error('The Shared Jar only has €'+available.toFixed(2)+' available');expense.jarContribution=jar;state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expense.id));if(jar>0)state.sharedJar.transactions.push({planId:planId,expenseId:expense.id,amount:jar,actor:actor,at:now});state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+      if(at>=0)plan.expenseEntries[at]=expense;else plan.expenseEntries.push(expense);plan.updatedAt=now;plan.updatedBy=actor;state.plans[idx]=plan;addAudit_(state,actor,at>=0?'updateTripExpense':'addTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,expense:expense,sharedJar:state.sharedJar});
+    }
+    if (action === 'deleteTripExpense') {
+      const planId=cleanText_(payload.planId,80),expenseId=cleanText_(payload.expenseId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),at=plan.expenseEntries.findIndex(x=>x.id===expenseId);if(at<0)throw new Error('Expense not found');plan.expenseEntries.splice(at,1);state.sharedJar=sanitizeSharedJar_(state.sharedJar);state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expenseId));state.sharedJar=sanitizeSharedJar_(state.sharedJar);plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;state.plans[idx]=plan;addAudit_(state,actor,'deleteTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,sharedJar:state.sharedJar});
     }
 
     if (action === 'savePlanPartial') {
@@ -807,17 +817,9 @@ function cleanSharedMode_(value) {
 function money2_(value) { return Math.round((Number(value) || 0) * 100) / 100; }
 function defaultSharedJar_() { return {initialBalance:870,balance:870,transactions:[]}; }
 function sanitizeSharedJar_(value) {
-  const source = value && typeof value === 'object' ? value : {};
-  let initialBalance = cleanMoney_(source.initialBalance); if (initialBalance === '') initialBalance = 870;
-  const byPlan = {};
-  (Array.isArray(source.transactions) ? source.transactions : []).slice(-300).forEach(function(x){
-    const planId = cleanText_(x && x.planId, 80), amount = cleanMoney_(x && x.amount);
-    if (!planId || amount === '' || Number(amount) <= 0) return;
-    byPlan[planId] = {planId:planId,amount:money2_(amount),actor:cleanActor_(x && x.actor),at:cleanText_(x && x.at,40)};
-  });
-  const transactions = Object.keys(byPlan).map(function(k){ return byPlan[k]; });
-  const used = transactions.reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
-  return {initialBalance:initialBalance,balance:money2_(Math.max(0,Number(initialBalance)-used)),transactions:transactions};
+  const source=value&&typeof value==='object'?value:{};let initialBalance=cleanMoney_(source.initialBalance);if(initialBalance==='')initialBalance=870;const byKey={};
+  (Array.isArray(source.transactions)?source.transactions:[]).slice(-500).forEach(function(x){const planId=cleanText_(x&&x.planId,80),expenseId=cleanText_(x&&x.expenseId,80),amount=cleanMoney_(x&&x.amount);if(!planId||amount===''||Number(amount)<=0)return;const key=expenseId?planId+'::'+expenseId:planId;byKey[key]={planId:planId,expenseId:expenseId,amount:money2_(amount),actor:cleanActor_(x&&x.actor),at:cleanText_(x&&x.at,40)};});
+  const transactions=Object.keys(byKey).map(function(k){return byKey[k];}),used=transactions.reduce(function(sum,x){return sum+Number(x.amount||0);},0);return {initialBalance:initialBalance,balance:money2_(Math.max(0,Number(initialBalance)-used)),transactions:transactions};
 }
 function defaultAccommodationMeta_(){return {useJar:false,jarContribution:0,jarBalanceAfter:870,remaining:'',paymentType:'',paidUpfront:false,upfrontBy:'',shareEach:'',repayment:{debtor:'',creditor:'',amount:'',status:'none',confirmedAt:''}};}
 function sanitizeAccommodationMeta_(value){
@@ -1193,6 +1195,11 @@ function sanitizePlanMeta_(meta) {
   };
 }
 
+function sanitizeTripExpense_(item, fallbackActor) {
+  const s=item&&typeof item==='object'?item:{},cats=['accommodation','transport','food','activities','other'],category=cats.includes(String(s.category||''))?String(s.category):'other',amount=cleanMoney_(s.amount),paidRaw=String(s.paidBy||''),paidBy=ACTORS.includes(paidRaw)||paidRaw==='both'?paidRaw:'',split=String(s.split||'')==='personal'?'personal':'shared',fa=cleanActor_(s.forActor),fallback=cleanActor_(fallbackActor),forActor=fa==='Unknown'?(paidBy==='both'?(fallback==='Unknown'?'':fallback):paidBy):fa,useJar=category==='accommodation'&&s.useJar===true,logged=cleanActor_(s.loggedBy||fallbackActor);
+  return {id:cleanText_(s.id,80)||Utilities.getUuid(),category:category,amount:amount,paidBy:paidBy,split:split,forActor:ACTORS.includes(forActor)?forActor:'',date:cleanFinanceDate_(s.date),note:cleanText_(s.note,180),uncertain:s.uncertain===true,useJar:useJar,jarContribution:useJar&&amount!==''?money2_(Number(amount)*.2):0,loggedBy:logged==='Unknown'?'':logged,createdAt:cleanText_(s.createdAt,40),updatedAt:cleanText_(s.updatedAt,40)};
+}
+
 function sanitizePartialActual_(partial, actor) {
   if (!partial || typeof partial !== 'object') return null;
   const out = {
@@ -1224,6 +1231,7 @@ function sanitizePlan_(plan) {
       Principe: sanitizePartialActual_(partials.Principe, 'Principe')
     },
     sharedExpenses: sanitizeSharedExpenses_(plan && plan.sharedExpenses),
+    expenseEntries:(Array.isArray(plan&&plan.expenseEntries)?plan.expenseEntries:[]).slice(-500).map(function(x){return sanitizeTripExpense_(x,x&&x.loggedBy);}).filter(function(x){return x.amount!==''&&!!x.paidBy;}),
     prep: sanitizeTripPrep_(plan && plan.prep),
     linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
     createdAt: cleanText_(plan && plan.createdAt, 40),
@@ -1316,7 +1324,7 @@ function reconciliationWarnings_(trip) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveSharedExpense', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'saveFinanceMonth', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',

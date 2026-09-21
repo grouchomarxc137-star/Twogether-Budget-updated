@@ -303,3 +303,5 @@ test('keeps saved data after the database is closed and reopened', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('trip expense entries save one at a time and Shared Jar is accommodation only',()=>{const c=setup();try{const p=action(c.database,'savePlan',{meta:{location:'Italy',city:'Lonato',start:'2026-09-19',end:'2026-09-22'},budget:500});const f=action(c.database,'saveTripExpense',{planId:p.planId,expense:{category:'food',amount:42,paidBy:'Principessa',split:'shared',date:'2026-09-20',useJar:true}});assert.equal(f.expense.useJar,false);assert.equal(f.sharedJar.balance,870);const a=action(c.database,'saveTripExpense',{planId:p.planId,expense:{category:'accommodation',amount:500,paidBy:'Principessa',split:'shared',date:'2026-09-20',useJar:true}});assert.equal(a.expense.jarContribution,100);assert.equal(a.sharedJar.balance,770);const d=action(c.database,'deleteTripExpense',{planId:p.planId,expenseId:a.expense.id});assert.equal(d.sharedJar.balance,870);}finally{c.cleanup();}});

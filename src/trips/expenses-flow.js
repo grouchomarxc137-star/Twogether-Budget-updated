@@ -19,61 +19,6 @@ import {
 import { renderBudgetPlans } from './budget-plans.js';
 import { renderShared } from './shared-expenses.js';
 
-function actualDraftKey(planId) {
-  return `twogether:actual-flow:v3:${actor() || 'guest'}:${planId || ''}`;
-}
-
-function readActualDraft(planId) {
-  try {
-    const raw = localStorage.getItem(actualDraftKey(planId));
-    if (!raw) return null;
-    const saved = JSON.parse(raw);
-    return saved?.type === 'actual' && saved?.planId === planId && saved?.draft ? saved : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistActualDraft(flow) {
-  if (!flow || flow.type !== 'actual' || !flow.planId) return;
-  try {
-    localStorage.setItem(actualDraftKey(flow.planId), JSON.stringify({
-      type: 'actual',
-      planId: flow.planId,
-      index: Math.max(0, Number(flow.index) || 0),
-      otherFlow: flow.otherFlow || null,
-      draft: flow.draft,
-      savedAt: new Date().toISOString(),
-    }));
-  } catch {}
-}
-
-function clearActualDraft(planId) {
-  try { localStorage.removeItem(actualDraftKey(planId)); } catch {}
-}
-
-async function saveActualAndExit() {
-  const flow = getActiveFlow();
-  if (!flow || flow.type !== 'actual') return;
-  persistActualDraft(flow);
-  const partial = { otherNote: flow.draft.otherNote || '', uncertain: { ...(flow.draft.uncertain || {}) } };
-  MONEY_FIELDS.forEach((key) => { partial[key] = flow.draft[key] ?? ''; });
-  const hasAnything = MONEY_FIELDS.some((key) => partial[key] !== '' && partial[key] != null);
-  try {
-    if (hasAnything) await post('savePlanPartial', { planId: flow.planId, partial });
-    closeOverlay();
-    toast(hasAnything ? 'Saved. Continue this trip whenever you’re ready.' : 'Your place is saved. Continue whenever you’re ready.');
-    if (hasAnything) setTimeout(() => refreshState(), 550);
-  } catch (err) {
-    toast(err.message || 'Could not save your progress', 'warn');
-  }
-}
-
-document.addEventListener('twogether:workflow-save-exit', () => {
-  const flow = getActiveFlow();
-  if (flow?.type === 'actual') saveActualAndExit();
-});
-
 // ---- Full "actual expenses" wizard ----
 
 export function startActualChoice(planId) {
@@ -99,11 +44,9 @@ export function startActualChoice(planId) {
 function startPlanActual(planId) {
   const plan = planById(planId); const a = actor(); if (!plan || !a) return;
   const trip = tripForPlan(plan); const existing = trip?.submissions?.[a] || {}; const partial = plan?.partials?.[a] || {};
-  const saved = readActualDraft(planId);
-  const baseDraft = { accom: '', groceries: '', eat: '', travel: '', fuel: '', tolls: '', other: '', otherNote: '', paid: '', uncertain: {}, ...partial, ...existing, uncertain: { ...(partial.uncertain || {}), ...(existing.uncertain || {}) } };
   setActiveFlow({
-    type: 'actual', planId, index: saved?.index ?? 0, otherFlow: saved?.otherFlow || null, resumeNotice: !!saved,
-    draft: saved?.draft ? { ...baseDraft, ...saved.draft, uncertain: { ...baseDraft.uncertain, ...(saved.draft.uncertain || {}) } } : baseDraft,
+    type: 'actual', planId, index: 0, otherFlow: null,
+    draft: { accom: '', groceries: '', eat: '', travel: '', fuel: '', tolls: '', other: '', otherNote: '', paid: '', uncertain: {}, ...partial, ...existing, uncertain: { ...(partial.uncertain || {}), ...(existing.uncertain || {}) } },
   });
   closeBudgetModal();
   document.querySelector('.tab[data-sheet="log"]')?.click();
@@ -114,7 +57,7 @@ function startPlanActual(planId) {
 function actualSteps() {
   const f = getActiveFlow();
   const base = [
-    ['accom', 'How much was accommodation?'], ['travel', 'How much on flights or trains?'], ['fuel', 'How much on fuel?'], ['tolls', 'How much on tolls or parking?'], ['groceries', 'How much on groceries?'], ['eat', 'How much on eating out?'],
+    ['accom', 'How much was accommodation?'], ['groceries', 'How much on groceries?'], ['eat', 'How much on eating out?'], ['travel', 'How much on flights or trains?'], ['fuel', 'How much on fuel?'], ['tolls', 'How much on tolls or parking?'],
   ].map(([key, title]) => ({ key, title, type: 'money' }));
   base.push({ key: 'otherFlow', title: 'Other expenses', type: 'otherExpenses' });
   base.push({ key: 'paid', title: `How much did ${actor()} actually pay?`, type: 'money', noUncertain: true });
@@ -186,7 +129,6 @@ function renderActualOtherExpenses(plan, steps, qCount, qNum) {
 function renderActualFlow() {
   const f = getActiveFlow();
   if (f?.type !== 'actual') return;
-  persistActualDraft(f);
   const plan = planById(f.planId); if (!plan) return closeOverlay();
   const steps = actualSteps(); if (f.index >= steps.length) f.index = steps.length - 1;
   const step = steps[f.index]; const isReview = step.type === 'review';
@@ -202,7 +144,7 @@ function renderActualFlow() {
   }
   if (['accom', 'travel'].includes(step.key)) {
     showOverlay('SHARED EXPENSE', ((f.index + 1) / steps.length) * 100, MONEY_LABELS[step.key], 'Record the total bill and your payment.', '<div id="sharedHost"></div>');
-    return renderShared({ host: $('#sharedHost'), plan, key: step.key, onBack: () => { if (f.index === 0) startActualChoice(f.planId); else { f.index--; renderActualFlow(); } }, onDone: (total, unknown) => { f.draft[step.key] = total; f.draft.uncertain[step.key] = unknown; f.index++; renderActualFlow(); } });
+    return renderShared({ host: $('#sharedHost'), plan, key: step.key, onDone: (total, unknown) => { f.draft[step.key] = total; f.draft.uncertain[step.key] = unknown; f.index++; renderActualFlow(); } });
   }
   if (step.type === 'otherExpenses') { renderActualOtherExpenses(plan, steps, qCount, qNum); return; }
   const uncertain = !!f.draft?.uncertain?.[step.key];
@@ -211,15 +153,14 @@ function renderActualFlow() {
     control = `<div class="field-wrap"><input id="v5FlowInput" class="big-input" type="text" value="${esc(f.draft[step.key] || '')}"></div>`;
   } else {
     const pot = step.key === 'accom' ? `<div id="v5FullJointPot" style="margin-top:10px;font-weight:800">20% = <strong>${money(n(f.draft.accom) * 0.20)}</strong></div>` : '';
-    const modeCards = !step.noUncertain ? `<div class="wizard-cost-modes"><button class="wizard-cost-mode ${!uncertain ? 'active' : ''}" type="button" data-v5-cert="exact"><span>€</span><div><strong>I know the cost</strong><small>Enter the amount you paid.</small></div></button><button class="wizard-cost-mode ${uncertain ? 'active' : ''}" type="button" data-v5-cert="estimate"><span>≈</span><div><strong>Not sure of cost</strong><small>Use your best estimate.</small></div></button></div>` : '';
-    control = `<div class="${uncertain ? 'uncertain-mode' : ''}">${modeCards}<div class="money-input-wrap"><span>€</span><input id="v5FlowInput" class="big-input money-field" inputmode="decimal" value="${esc(String(f.draft[step.key] ?? ''))}" placeholder="0.00"></div>${pot}${step.key === 'other' ? '<button class="btn ghost full" type="button" data-v5-none>No other expenses</button>' : ''}</div>`;
+    control = `<div class="${uncertain ? 'uncertain-mode' : ''}"><div class="money-input-wrap"><span>€</span><input id="v5FlowInput" class="big-input money-field" inputmode="decimal" value="${esc(String(f.draft[step.key] ?? ''))}" placeholder="0.00"></div>${!step.noUncertain ? `<div class="certainty-row"><button class="certainty ${!uncertain ? 'active' : ''}" type="button" data-v5-cert="exact">Exact</button><button class="certainty ${uncertain ? 'active' : ''}" type="button" data-v5-cert="estimate">Not sure · estimate</button></div>` : ''}${pot}${step.key === 'other' ? '<button class="btn ghost full" type="button" data-v5-none>No other expenses</button>' : ''}</div>`;
   }
-  control += `<div class="v5-actions"><button class="btn ghost" type="button" data-v5-back>← Back</button><button class="btn primary big" type="button" data-v5-next>Continue →</button></div>`;
+  control += `<div class="v5-actions"><button class="btn ghost" type="button" data-v5-back>${f.index === 0 ? 'Cancel' : 'Back'}</button><button class="btn primary big" type="button" data-v5-next>Next</button></div>`;
   showOverlay(`QUESTION ${Math.max(1, qNum)} OF ${qCount}`, ((f.index + 1) / steps.length) * 100, step.title, `Budgeted trip: ${plan.meta?.city || locationLabel(plan.meta)} · ${fmtDate(plan.meta?.start)}–${fmtDate(plan.meta?.end)}`, control);
   const input = $('#v5FlowInput'); input?.addEventListener('input', () => { f.draft[step.key] = input.value; if (step.key === 'accom') { const strong = $('#v5FullJointPot strong'); if (strong) strong.textContent = money(n(input.value) * 0.20); } }); setTimeout(() => input?.focus(), 0);
   $$('[data-v5-cert]').forEach((btn) => btn.addEventListener('click', () => { f.draft.uncertain = { ...(f.draft.uncertain || {}) }; f.draft.uncertain[step.key] = btn.dataset.v5Cert === 'estimate'; renderActualFlow(); }));
   $('[data-v5-none]')?.addEventListener('click', () => { f.draft.other = '0'; f.draft.uncertain.other = false; f.index++; renderActualFlow(); });
-  $('[data-v5-back]')?.addEventListener('click', () => { if (f.index === 0) startActualChoice(f.planId); else { f.index--; renderActualFlow(); } });
+  $('[data-v5-back]')?.addEventListener('click', () => { if (f.index === 0) closeOverlay(); else { f.index--; renderActualFlow(); } });
   $('[data-v5-next]')?.addEventListener('click', () => {
     const value = String(f.draft[step.key] ?? '').trim();
     if (step.type === 'money' && (!value || !Number.isFinite(Number(value.replace(',', '.'))))) { toast('Enter a valid amount first', 'warn'); return; }
@@ -232,7 +173,6 @@ async function savePlanActual() {
   const btn = $('[data-v5-save-actual]'); if (btn) btn.disabled = true;
   try {
     await post('savePlanSubmission', { planId: flow.planId, submission: { ...flow.draft, uncertain: { ...(flow.draft.uncertain || {}) } } });
-    clearActualDraft(flow.planId);
     closeOverlay(); toast('Your actual expenses were saved');
     setTimeout(() => refreshState(), 750);
   } catch (err) { toast(err.message || 'Could not save expenses', 'warn'); if (btn) btn.disabled = false; }

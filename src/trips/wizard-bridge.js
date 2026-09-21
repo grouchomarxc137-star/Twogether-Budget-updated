@@ -57,7 +57,6 @@ async function createPlanFromMainWizard(budget) {
     if (!result?.planId) throw new Error('The trip could not be confirmed as saved. Please retry once.');
 
     const created = { id: result.planId, meta: m, createdBy: a };
-    try { localStorage.removeItem(`twogether:trip-wizard:v3:${a}`); } catch {}
     showScope(created);
 
     Promise.resolve(window.TwogetherWorkflow?.refresh?.()).catch(() => {});
@@ -75,44 +74,9 @@ function showScope(plan) {
   const city = plan?.meta?.city || 'this trip';
   const step = $('#wizardStep'); if (step) step.textContent = 'Trip saved';
   const progress = $('#wizardProgress'); if (progress) progress.style.width = '100%';
-  body.innerHTML = `<div class="question-stage bridge15-scope-stage">
-    <h2>What do you want to log now?</h2>
-    <p><strong>${esc(city)}</strong> is now under Current Trips. You can stop here or add expenses now.</p>
-    <div class="bridge15-scope">
-      <button class="trip-pick" type="button" data-bridge15-scope="budget"><span class="pick-icon">✓</span><div><strong>Budget only for now</strong><small>Add expenses later from Current Trips.</small></div></button>
-      <button class="trip-pick" type="button" data-bridge15-scope="some"><span class="pick-icon">＋</span><div><strong>Log some expenses</strong><small>Choose only the categories you want to add now.</small></div></button>
-      <button class="trip-pick" type="button" data-bridge15-scope="all"><span class="pick-icon">→</span><div><strong>Log all expenses</strong><small>Continue through the full trip expense flow.</small></div></button>
-    </div>
-  </div>`;
-
-  body.querySelectorAll('[data-bridge15-scope]').forEach((btn) => btn.addEventListener('click', () => {
-    const mode = btn.dataset.bridge15Scope;
-    if (mode === 'budget') {
-      $('#restartWizard')?.click();
-      setTimeout(() => $('#twCurrentTripsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-      return;
-    }
-    launchPlanExpenses(plan.id, mode);
-  }));
-}
-
-async function launchPlanExpenses(planId, mode) {
-  try { await window.TwogetherWorkflow?.refresh?.(); } catch {}
-
-  if (window.TwogetherWorkflow?.start) {
-    window.TwogetherWorkflow.start(planId);
-  } else {
-    const actual = $(`#budgetPlanGrid [data-v5-plan="${window.CSS?.escape ? CSS.escape(planId) : planId}"] [data-v5-actual]`);
-    if (actual) actual.click();
-  }
-
-  const wanted = mode === 'some' ? 'partial' : 'full';
-  for (let i = 0; i < 16; i++) {
-    const btn = $(`[data-v5-actual-mode="${wanted}"]`);
-    if (btn) { btn.click(); return; }
-    await sleep(80);
-  }
-  toast('The trip is saved. Open it from Current Trips to add expenses.', 'warn');
+  body.innerHTML = `<div class="question-stage bridge15-scope-stage"><h2>Your trip is ready</h2><p><strong>${esc(city)}</strong> is now under Current Trips. Add one expense now, or come back whenever something is paid.</p><div class="bridge15-scope"><button class="trip-pick" data-bridge15-scope="expense"><span class="pick-icon">＋</span><div><strong>Add an expense</strong><small>Log one thing now. It saves immediately.</small></div></button><button class="trip-pick" data-bridge15-scope="done"><span class="pick-icon">✓</span><div><strong>Done for now</strong><small>Your trip stays open in Current Trips.</small></div></button></div></div>`;
+  body.querySelector('[data-bridge15-scope="expense"]')?.addEventListener('click',()=>window.TwogetherWorkflow?.start(plan.id));
+  body.querySelector('[data-bridge15-scope="done"]')?.addEventListener('click',()=>$('#restartWizard')?.click());
 }
 
 function enhanceAccommodation20() {
