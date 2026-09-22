@@ -288,17 +288,21 @@ function simplifiedTrip(plan, trip) {
 }
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
-  root.classList.toggle('tv2-trip-view', simplifiedView.name === 'trip');
   if (simplifiedView.name === 'trip') {
     const plan = (remoteState.plans || []).find((p)=>p.id===simplifiedView.planId);
     if (!plan) simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
     else {
       const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
+      root.classList.add('tv2-trip-view');
+      section.classList.add('tv2-focus-open');
+      document.body.classList.add('tv2-trip-focus');
       root.innerHTML = simplifiedTrip(plan, trip);
       return;
     }
   }
   root.classList.remove('tv2-trip-view');
+  section.classList.remove('tv2-focus-open');
+  document.body.classList.remove('tv2-trip-focus');
   root.innerHTML = simplifiedHome(allSimplifiedItems());
 }
 
