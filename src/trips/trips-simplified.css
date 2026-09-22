@@ -273,3 +273,85 @@ html body #twCurrentTripsSection.tv2-current-host{
     backface-visibility:hidden;
   }
 }
+
+
+/* Mobile swipe-to-delete trip cards */
+.tv2-swipe-row{display:contents}
+.tv2-delete-reveal{display:none}
+.tv2-confirm-layer{
+  position:fixed;
+  inset:0;
+  z-index:1700;
+  display:grid;
+  place-items:center;
+  padding:20px;
+}
+.tv2-confirm-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(38,34,30,.34);
+  backdrop-filter:blur(2px);
+}
+.tv2-confirm-card{
+  position:relative;
+  z-index:1;
+  width:min(100%,320px);
+  border-radius:20px;
+  border:1px solid var(--tv2-line);
+  background:var(--tv2-card);
+  box-shadow:0 20px 55px rgba(38,34,30,.18);
+  padding:20px;
+  display:grid;
+  gap:10px;
+  text-align:left;
+}
+.tv2-confirm-card h2{margin:0;font-size:22px;line-height:1.15}
+.tv2-confirm-card p{margin:0;color:var(--tv2-muted);font-size:14.5px;line-height:1.45}
+.tv2-confirm-card p strong{color:var(--tv2-ink)}
+.tv2-confirm-note{font-size:13px!important}
+.tv2-confirm-error{min-height:0;color:var(--tv2-over)!important}
+.tv2-confirm-error:empty{display:none}
+.tv2-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.tv2-confirm-actions button{
+  min-height:44px;
+  border-radius:12px;
+  border:1px solid var(--tv2-line);
+  background:var(--tv2-bg);
+  font-weight:650;
+}
+.tv2-confirm-actions .is-delete{
+  border-color:transparent;
+  background:var(--tv2-over);
+  color:white;
+}
+.tv2-confirm-actions button:disabled{opacity:.55}
+
+@media(max-width:760px){
+  .tv2-swipe-row{
+    position:relative;
+    display:block;
+    overflow:hidden;
+    border-radius:18px;
+  }
+  .tv2-swipe-row>.tv2-card{
+    position:relative;
+    z-index:2;
+    transition:transform .18s cubic-bezier(.22,.8,.28,1);
+    will-change:transform;
+  }
+  .tv2-delete-reveal{
+    position:absolute;
+    inset:0 0 0 auto;
+    z-index:1;
+    display:grid;
+    place-items:center;
+    width:84px;
+    border:0;
+    border-radius:0 18px 18px 0;
+    background:var(--tv2-over);
+    color:white;
+    font-weight:700;
+    font-size:14px;
+  }
+  .tv2-swipe-row.is-open>.tv2-card{transform:translateX(-84px)}
+}
