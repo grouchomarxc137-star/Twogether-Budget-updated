@@ -35,6 +35,26 @@ function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
 function tripMeta(t) { return t?.submissions?.[t?.createdBy] || t?.submissions?.Principessa || t?.submissions?.Principe || {}; }
 function locationLabel(m) { return m?.location === 'Other' ? (m.otherLocation || 'Other') : (m?.location || '—'); }
+function localDate(value) { if (!value) return null; const d = new Date(value + 'T12:00:00'); return Number.isNaN(d.getTime()) ? null : d; }
+function localToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); }
+function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
+function tripTiming(meta) {
+  const start = localDate(meta?.start), end = localDate(meta?.end), now = localToday();
+  if (!start || !end) return '';
+  if (now < start) { const days = Math.max(1, dayDiff(now, start)); return `Starts in ${days} day${days === 1 ? '' : 's'}`; }
+  if (now <= end) { const total = Math.max(1, dayDiff(start, end) + 1), day = Math.max(1, Math.min(total, dayDiff(start, now) + 1)); return `Day ${day} of ${total}`; }
+  return 'Past trip';
+}
+function shortDate(value) { const d = localDate(value); return d ? `${d.getDate()} ${d.toLocaleDateString('en-GB',{month:'short'})}` : ''; }
+function shortRange(start, end) {
+  const a = localDate(start), b = localDate(end); if (!a || !b) return '';
+  const am = a.toLocaleDateString('en-GB',{month:'short'}), bm = b.toLocaleDateString('en-GB',{month:'short'});
+  return am === bm ? `${a.getDate()}–${b.getDate()} ${bm}` : `${a.getDate()} ${am}–${b.getDate()} ${bm}`;
+}
+function cardMoney(value) {
+  const amount = n(value); const whole = Math.abs(amount - Math.round(amount)) < .005;
+  return '€' + amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});
+}
 
 function simplifyStaticCopy() {
   const compare = $('#compare .page-heading'); if (compare) { const eyebrow = $('.eyebrow', compare); if (eyebrow) eyebrow.textContent = ''; const p = $('p', compare); if (p) p.textContent = 'Compare your current costs with possible next steps.'; }
@@ -46,7 +66,7 @@ function ensureCurrentTrips() {
   let section = $('#twCurrentTripsSection');
   if (!section) {
     section = document.createElement('section'); section.id = 'twCurrentTripsSection'; section.className = 'tw-current-trips-section';
-    section.innerHTML = '<div class="tw-current-head"><div><span class="panel-kicker">NOW</span><h2 id="twCurrentTitle">Current Trips</h2><p>Everything active stays here. Add expenses later from Open trip.</p></div><button class="btn primary tw-plan-trip-btn" type="button" data-plan-trip><span aria-hidden="true">＋</span>Plan a trip</button></div><div id="twCurrentTrips" class="tw-current-list"></div>';
+    section.innerHTML = '<div class="tw-current-head"><div><span class="panel-kicker">NOW</span><h2 id="twCurrentTitle">Trips</h2><p>Keep your active and upcoming trips together.</p></div></div><div id="twCurrentTrips" class="tw-current-list"></div><div class="tw-current-dock"><button class="btn primary tw-plan-trip-btn" type="button" data-plan-trip>＋ New trip</button></div>';
     gallery.parentNode.insertBefore(section, gallery);
     section.addEventListener('click', (e) => {
       const planButton = e.target.closest('[data-plan-trip]');
@@ -82,17 +102,16 @@ function expenseTotal(plan, trip) {
 }
 
 function planCard(plan, trip) {
-  const meta = plan?.meta || {}; const a = actor(); const p = plan?.budgets?.Principessa, q = plan?.budgets?.Principe;
-  const totalBudget = (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0); const spent = expenseTotal(plan, trip);
-  const status = trip || plan?.partials?.Principessa || plan?.partials?.Principe ? 'In progress' : (has(p) && has(q) ? 'Planned' : 'Waiting for budget');
-  const ownLabel = a === 'Principe' ? 'Principe budget' : 'Principessa budget'; const ownBudget = a === 'Principe' ? q : p;
-  return `<article class="tw-current-card" data-current-plan="${esc(plan.id)}"><button class="tw-current-main" type="button"><div class="tw-current-top"><span class="trip-country">${esc(locationLabel(meta))}</span><span class="tw-current-status">${esc(status)}</span></div><h3>${esc(meta.city || locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p><div class="tw-current-numbers"><div><span>${ownLabel}</span><strong>${has(ownBudget) ? money(ownBudget) : 'Not set'}</strong></div><div><span>Total budget</span><strong>${has(p) || has(q) ? money(totalBudget) : 'Not set'}</strong></div><div><span>Trip so far</span><strong>${money(spent)}</strong></div></div></button><div class="tw-current-actions"><button class="text-btn" type="button" data-current-budget>${has(plan?.budgets?.[a]) ? 'Edit budget' : 'Add budget'}</button><button class="text-btn" type="button" data-current-open>Open trip</button></div></article>`;
+  const meta = plan?.meta || {}; const p = plan?.budgets?.Principessa, q = plan?.budgets?.Principe;
+  const available = (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0); const spent = expenseTotal(plan, trip);
+  const left = available - spent, pct = available > 0 ? Math.max(0, Math.min(100, (spent / available) * 100)) : 0;
+  return `<article class="tw-current-card tw-current-simple" data-current-plan="${esc(plan.id)}"><button class="tw-current-main" type="button"><div class="tw-current-card-top"><h3>${esc(meta.city || locationLabel(meta))}</h3><span>${esc(shortRange(meta.start, meta.end))}</span></div><p class="tw-current-timing">${esc(tripTiming(meta))}</p><div class="tw-current-money"><span>${cardMoney(spent)} spent</span>${available > 0 ? `<span>${cardMoney(left)} left</span>` : ''}</div>${available > 0 ? `<span class="tw-current-progress"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</button></article>`;
 }
 
 function standaloneCard(trip) {
-  const meta = tripMeta(trip); const spent = expenseTotal({}, trip);
-  const ownLabel = actor() === 'Principe' ? 'Principe budget' : 'Principessa budget';
-  return `<article class="tw-current-card" data-current-trip="${esc(trip.id)}"><button class="tw-current-main" type="button"><div class="tw-current-top"><span class="trip-country">${esc(locationLabel(meta))}</span><span class="tw-current-status">In progress</span></div><h3>${esc(meta.city || locationLabel(meta))}</h3><p>${fmtDate(meta.start)}–${fmtDate(meta.end)}</p><div class="tw-current-numbers"><div><span>${ownLabel}</span><strong>—</strong></div><div><span>Total budget</span><strong>${has(trip.budget) ? money(trip.budget) : 'Not set'}</strong></div><div><span>Trip so far</span><strong>${money(spent)}</strong></div></div></button><div class="tw-current-actions"><button class="text-btn" type="button" data-current-open>Open trip</button></div></article>`;
+  const meta = tripMeta(trip), spent = expenseTotal({}, trip), available = has(trip?.budget) ? n(trip.budget) : 0;
+  const left = available - spent, pct = available > 0 ? Math.max(0, Math.min(100, (spent / available) * 100)) : 0;
+  return `<article class="tw-current-card tw-current-simple" data-current-trip="${esc(trip.id)}"><button class="tw-current-main" type="button"><div class="tw-current-card-top"><h3>${esc(meta.city || locationLabel(meta))}</h3><span>${esc(shortRange(meta.start, meta.end))}</span></div><p class="tw-current-timing">${esc(tripTiming(meta))}</p><div class="tw-current-money"><span>${cardMoney(spent)} spent</span>${available > 0 ? `<span>${cardMoney(left)} left</span>` : ''}</div>${available > 0 ? `<span class="tw-current-progress"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</button></article>`;
 }
 
 function renderCurrentTrips() {
@@ -100,7 +119,7 @@ function renderCurrentTrips() {
   const trips = remoteState.trips || [], plans = remoteState.plans || []; const tripMap = new Map(trips.map((t) => [t.id, t])); const linked = new Set(plans.map((p) => p.linkedTripId).filter(Boolean));
   const activePlans = plans.filter((p) => !isLocked(tripMap.get(p.linkedTripId))).sort((a, b) => String(b?.meta?.start || b.updatedAt || '').localeCompare(String(a?.meta?.start || a.updatedAt || '')));
   const standalone = trips.filter((t) => !isLocked(t) && !linked.has(t.id)).sort((a, b) => String(tripMeta(b).start || b.updatedAt || '').localeCompare(String(tripMeta(a).start || a.updatedAt || '')));
-  const count = activePlans.length + standalone.length; $('#twCurrentTitle').textContent = count === 1 ? 'Current Trip' : 'Current Trips';
+  const count = activePlans.length + standalone.length; $('#twCurrentTitle').textContent = 'Trips';
   root.innerHTML = count ? activePlans.map((p) => planCard(p, tripMap.get(p.linkedTripId))).join('') + standalone.map(standaloneCard).join('') : '<div class="tw-current-empty"><strong>No current trips</strong><span>Start a trip when you are ready.</span></div>';
   document.dispatchEvent(new CustomEvent('twogether:v18-rendered'));
 }
