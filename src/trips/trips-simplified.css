@@ -147,11 +147,12 @@ body.tv2-locked { overflow: hidden; }
 
 .tv2-defaults { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 40px; color: var(--tv2-muted); font-size: 14.5px; }
 .tv2-summary { border-bottom: 1px dashed var(--tv2-faint); }
-.tv2-more { display: grid; gap: 14px; padding: 14px; border-radius: 14px; background: var(--tv2-card); border: 1px solid var(--tv2-line); }
+.tv2-more { display: grid; gap: 14px; min-width: 0; padding: 14px; border-radius: 14px; background: var(--tv2-card); border: 1px solid var(--tv2-line); }
 .tv2-more[hidden], .tv2-field[hidden] { display: none; }
-.tv2-field { display: grid; gap: 6px; font-size: 14px; color: var(--tv2-muted); }
+.tv2-field { display: grid; gap: 6px; min-width: 0; font-size: 14px; color: var(--tv2-muted); }
 .tv2-field em { font-style: normal; color: var(--tv2-faint); }
-.tv2-field input { width: 100%; min-height: 46px; border: 1px solid var(--tv2-line); border-radius: 12px; background: var(--tv2-card); padding: 0 12px; font-size: 16px !important; color: var(--tv2-ink); }
+.tv2-field input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 46px; border: 1px solid var(--tv2-line); border-radius: 12px; background: var(--tv2-card); padding: 0 12px; font-size: 16px !important; color: var(--tv2-ink); }
+.tv2-field input[type="date"] { display: block; inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; }
 .tv2-big input { min-height: 52px; font-size: 18px !important; }
 .tv2-seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .tv2-seg button { min-height: 38px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--tv2-line) !important; background: var(--tv2-bg) !important; color: var(--tv2-ink); font-size: 14px !important; }
