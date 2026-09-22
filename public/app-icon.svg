@@ -3,4 +3,5 @@
   <rect x="42" y="42" width="428" height="428" rx="98" fill="#fffaf0" stroke="#d8b66c" stroke-width="10"/>
   <path d="M256 370C199 327 116 273 116 194c0-46 35-80 79-80 29 0 50 14 61 36 12-22 33-36 62-36 44 0 78 34 78 80 0 79-82 133-140 176Z" fill="none" stroke="#a87820" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M207 182c13-21 31-31 49-31 19 0 37 10 49 31" fill="none" stroke="#cfaa5a" stroke-width="11" stroke-linecap="round"/>
+  <text x="256" y="286" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="92" font-weight="700" fill="#a87820">€</text>
 </svg>
