@@ -33,6 +33,7 @@ let storyObserver = null;
 let simplifiedView = { name: 'home', planId: '' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
+let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
 
 function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
@@ -77,6 +78,7 @@ function ensureCurrentTrips() {
     section.innerHTML = '<div id="twCurrentTrips" class="tv2-root"></div>';
     section.dataset.tv2Full = '1';
     section.addEventListener('click', handleSimplifiedClick);
+    bindSimplifiedSwipe(section);
   }
   return section;
 }
@@ -232,6 +234,7 @@ function simplifiedTrip(plan, trip) {
 
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
+  root.classList.toggle('tv2-trip-view', simplifiedView.name === 'trip');
   if (simplifiedView.name === 'trip') {
     const plan = (remoteState.plans || []).find((p)=>p.id===simplifiedView.planId);
     if (!plan) simplifiedView = { name:'home', planId:'' };
@@ -241,6 +244,7 @@ function renderCurrentTrips() {
       return;
     }
   }
+  root.classList.remove('tv2-trip-view');
   root.innerHTML = simplifiedHome(allSimplifiedItems());
 }
 
@@ -386,6 +390,66 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
   mount();
 }
+
+function bindSimplifiedSwipe(section) {
+  if (section.dataset.tv2Swipe === '1') return;
+  section.dataset.tv2Swipe = '1';
+  const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
+  const page = () => section.querySelector('#twCurrentTrips.tv2-trip-view > .tv2-page');
+  const clearVisual = (animate = true) => {
+    const current = page(); if (!current) return;
+    current.style.transition = animate ? 'transform .18s cubic-bezier(.22,.8,.28,1), opacity .18s ease' : 'none';
+    current.style.transform = 'translateX(0)';
+    current.style.opacity = '1';
+    if (animate) setTimeout(() => { if (current.isConnected) current.style.transition = ''; }, 200);
+  };
+  const cancel = () => {
+    if (swipeBack.active) clearVisual(true);
+    swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
+  };
+  section.addEventListener('touchstart', (e) => {
+    if (!mobile() || simplifiedView.name !== 'trip' || simplifiedLayer || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (t.clientX > 46) return;
+    swipeBack = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX };
+  }, { passive:true });
+  section.addEventListener('touchmove', (e) => {
+    if (!swipeBack.tracking || e.touches.length !== 1) return;
+    const t = e.touches[0], dx = t.clientX - swipeBack.startX, dy = Math.abs(t.clientY - swipeBack.startY);
+    swipeBack.lastX = t.clientX;
+    if (!swipeBack.active) {
+      if (Math.abs(dx) < 8 && dy < 8) return;
+      if (dx > 10 && dx > dy * 1.25) swipeBack.active = true;
+      else if (dy >= Math.abs(dx) || dx < 0) { swipeBack.tracking = false; return; }
+    }
+    if (!swipeBack.active) return;
+    e.preventDefault();
+    const current = page(); if (!current) return;
+    const distance = Math.max(0, Math.min(dx, window.innerWidth * .78));
+    current.style.transition = 'none';
+    current.style.transform = 'translateX(' + distance + 'px)';
+    current.style.opacity = String(Math.max(.82, 1 - distance / (window.innerWidth * 2.5)));
+  }, { passive:false });
+  section.addEventListener('touchend', () => {
+    if (!swipeBack.tracking) { swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 }; return; }
+    const dx = swipeBack.lastX - swipeBack.startX, current = page();
+    const goBack = swipeBack.active && dx >= Math.min(92, window.innerWidth * .24);
+    swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
+    if (!current) return;
+    if (goBack) {
+      current.style.transition = 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      current.style.transform = 'translateX(100vw)';
+      current.style.opacity = '.72';
+      setTimeout(() => {
+        simplifiedView = { name:'home', planId:'' };
+        renderCurrentTrips();
+        window.scrollTo({ top:0, behavior:'auto' });
+      }, 170);
+    } else clearVisual(true);
+  }, { passive:true });
+  section.addEventListener('touchcancel', cancel, { passive:true });
+}
+
 function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
