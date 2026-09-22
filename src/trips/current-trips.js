@@ -112,8 +112,8 @@ function tripPhase(meta) {
 function statusLine(meta) {
   const start = localDate(meta?.start), end = localDate(meta?.end), now = localToday();
   if (!start || !end) return '';
-  if (now < start) { const days = Math.max(1, dayDiff(now, start)); return days === 1 ? 'Starts tomorrow' : \`Starts in \${days} days\`; }
-  if (now <= end) { const total = Math.max(1, dayDiff(start, end) + 1), day = Math.max(1, Math.min(total, dayDiff(start, now) + 1)); return \`Day \${day} of \${total}\`; }
+  if (now < start) { const days = Math.max(1, dayDiff(now, start)); return days === 1 ? 'Starts tomorrow' : `Starts in ${days} days`; }
+  if (now <= end) { const total = Math.max(1, dayDiff(start, end) + 1), day = Math.max(1, Math.min(total, dayDiff(start, now) + 1)); return `Day ${day} of ${total}`; }
   return 'Ended · still open';
 }
 function dayLabel(value) {
@@ -122,7 +122,7 @@ function dayLabel(value) {
   const diff = dayDiff(d, now);
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Yesterday';
-  return \`\${d.toLocaleDateString('en-GB',{weekday:'short'})} \${d.getDate()} \${d.toLocaleDateString('en-GB',{month:'short'})}\`;
+  return `${d.toLocaleDateString('en-GB',{weekday:'short'})} ${d.getDate()} ${d.toLocaleDateString('en-GB',{month:'short'})}`;
 }
 function relativePayer(name) { return name === actor() ? 'you' : name; }
 function categoryInfo(entry) {
@@ -145,7 +145,7 @@ function entryMeta(entry) {
   const parts = [];
   if (entry?.paidBy === 'both') parts.push('each paid half');
   else if (entry?.paidBy) parts.push(relativePayer(entry.paidBy));
-  if (entry?.jarContribution) parts.push(\`\${displayMoney(entry.jarContribution,true)} from Jar\`);
+  if (entry?.jarContribution) parts.push(`${displayMoney(entry.jarContribution,true)} from Jar`);
   if (entry?.uncertain) parts.push('estimate');
   return parts.join(' · ');
 }
@@ -171,9 +171,9 @@ function settlementLine(plan) {
   const d = paid.Principessa - share.Principessa, me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
   if (Math.abs(d) < .005) return 'You’re even';
   const creditor = d > 0 ? 'Principessa' : 'Principe', debtor = d > 0 ? 'Principe' : 'Principessa', amount = Math.abs(d);
-  if (me === creditor) return \`\${debtor} owes you \${displayMoney(amount,true)}\`;
-  if (me === debtor) return \`You owe \${creditor} \${displayMoney(amount,true)}\`;
-  return \`\${debtor} owes \${creditor} \${displayMoney(amount,true)}\`;
+  if (me === creditor) return `${debtor} owes you ${displayMoney(amount,true)}`;
+  if (me === debtor) return `You owe ${creditor} ${displayMoney(amount,true)}`;
+  return `${debtor} owes ${creditor} ${displayMoney(amount,true)}`;
 }
 function displayMoney(value, forceCents = false) {
   const amount = n(value), whole = Math.abs(amount - Math.round(amount)) < .005 && !forceCents;
