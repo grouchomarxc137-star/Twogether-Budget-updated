@@ -66,6 +66,23 @@ function metrics(plan, trip) {
     '<div><span>Trip so far</span><strong>' + money(total(plan, trip)) + '</strong></div></div>';
 }
 
+function budgetSplit(plan, trip) {
+  const principessaSet = has(plan?.budgets?.Principessa);
+  const principeSet = has(plan?.budgets?.Principe);
+  const principessa = principessaSet ? n(plan.budgets.Principessa) : 0;
+  const principe = principeSet ? n(plan.budgets.Principe) : 0;
+  const splitTotal = principessa + principe;
+  const totalBudget = splitTotal || (has(trip?.budget) ? n(trip.budget) : 0);
+  const share = splitTotal > 0 ? Math.max(0, Math.min(100, (principessa / splitTotal) * 100)) : 0;
+  const hasBudget = principessaSet || principeSet || has(trip?.budget);
+  return '<div class="overview-budget-split">' +
+    '<div class="overview-budget-donut' + (splitTotal > 0 ? '' : ' empty') + '" style="--principessa-share:' + share.toFixed(2) + '%"><div><span>Total</span><strong>' + (hasBudget ? money(totalBudget) : '—') + '</strong></div></div>' +
+    '<div class="overview-budget-breakdown">' +
+      '<span class="principessa"><i></i><em>Principessa</em><strong>' + (principessaSet ? money(principessa) : 'Not set') + '</strong></span>' +
+      '<span class="principe"><i></i><em>Principe</em><strong>' + (principeSet ? money(principe) : 'Not set') + '</strong></span>' +
+    '</div></div>';
+}
+
 function warnings(plan, trip) {
   const result = [];
   for (const key of ['accom', 'travel']) {
@@ -107,7 +124,7 @@ export function open(plan) { if (!plan) return; opened = plan.id; draw(plan); }
 function hero(plan, trip) {
   const locked = names.every((name) => trip?.confirmed?.[name]);
   const country = plan.meta?.location === 'Other' ? (plan.meta?.otherLocation || 'Trip') : (plan.meta?.location || 'Trip');
-  return '<header class="overview-hero"><div class="overview-title-row"><div class="overview-title-copy"><span class="overview-country">' + esc(country) + '</span><h2>' + esc(plan.meta?.city || 'Current trip') + '</h2><p>' + fmtDate(plan.meta?.start) + ' – ' + fmtDate(plan.meta?.end) + '</p></div><span class="overview-status-pill ' + (locked ? 'confirmed' : '') + '">' + (locked ? 'Confirmed' : 'In progress') + '</span></div>' + metrics(plan, trip) + '</header>';
+  return '<header class="overview-hero"><div class="overview-title-row"><div class="overview-title-copy"><span class="overview-country">' + esc(country) + '</span><h2>' + esc(plan.meta?.city || 'Current trip') + '</h2><p>' + fmtDate(plan.meta?.start) + ' – ' + fmtDate(plan.meta?.end) + '</p></div><span class="overview-status-pill ' + (locked ? 'confirmed' : '') + '">' + (locked ? 'Confirmed' : 'In progress') + '</span></div>' + budgetSplit(plan, trip) + '</header>';
 }
 
 function draw(plan) {
@@ -116,8 +133,8 @@ function draw(plan) {
   dialog.className = 'current-overview';
   const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
   dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
-    '<div class="overview-scroll"><div class="overview-simple-table"><table><thead><tr><th>Expenses</th><th>Principessa</th><th>Principe</th><th>Match</th></tr></thead><tbody>' +
-    rows.map((row) => '<tr><th><button type="button" class="overview-category-btn" data-category="' + row.key + '">' + esc(row.label) + '<span>›</span></button></th><td>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</td><td>' + money(rowPaid(plan, trip, row, 'Principe')) + '</td><td>' + matchCell(rowMatch(plan, trip, row)) + '</td></tr>').join('') +
+    '<div class="overview-scroll"><div class="overview-simple-table"><table><thead><tr><th>Expenses</th><th>Principessa</th><th>Principe</th></tr></thead><tbody>' +
+    rows.map((row) => '<tr><th><button type="button" class="overview-category-btn" data-category="' + row.key + '">' + esc(row.label) + '<span>›</span></button></th><td>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</td><td>' + money(rowPaid(plan, trip, row, 'Principe')) + '</td></tr>').join('') +
     '</tbody></table></div><p class="overview-table-hint">Select a category to view, add or edit its expenses.</p></div></div>';
   document.body.appendChild(dialog);
   dialog.showModal();

@@ -4866,3 +4866,135 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   .plan-cal-footer{align-items:stretch;flex-direction:column}
   .plan-cal-footer .btn{width:100%}
 }
+
+
+/* Open Trip compact budget split + mobile-friendly three-column table */
+.overview-budget-split{
+  display:flex!important;
+  align-items:center!important;
+  gap:14px!important;
+  width:max-content!important;
+  max-width:100%!important;
+  margin-top:14px!important;
+  padding:9px 12px 9px 9px!important;
+  border:1px solid #eadfce!important;
+  border-radius:14px!important;
+  background:#fff!important;
+  box-sizing:border-box!important;
+}
+.overview-budget-donut{
+  --principessa-color:#d9a12e;
+  --principe-color:#c8732e;
+  position:relative!important;
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 68px!important;
+  width:68px!important;
+  height:68px!important;
+  border-radius:50%!important;
+  background:conic-gradient(var(--principessa-color) 0 var(--principessa-share),var(--principe-color) var(--principessa-share) 100%)!important;
+}
+.overview-budget-donut.empty{background:#eee7dd!important}
+.overview-budget-donut::after{
+  content:"";
+  position:absolute;
+  inset:9px;
+  border-radius:50%;
+  background:#fffdf9;
+}
+.overview-budget-donut>div{
+  position:relative;
+  z-index:1;
+  display:grid;
+  place-items:center;
+  gap:1px;
+  min-width:0;
+}
+.overview-budget-donut span{
+  color:#84776b;
+  font-size:8px!important;
+  line-height:1;
+}
+.overview-budget-donut strong{
+  max-width:50px;
+  overflow:hidden;
+  color:#2a241f;
+  font-size:10px!important;
+  line-height:1.05;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.overview-budget-breakdown{
+  display:grid!important;
+  gap:6px!important;
+  min-width:190px!important;
+}
+.overview-budget-breakdown>span{
+  display:grid!important;
+  grid-template-columns:8px minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:7px!important;
+  min-width:0!important;
+}
+.overview-budget-breakdown i{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+}
+.overview-budget-breakdown .principessa i{background:#d9a12e}
+.overview-budget-breakdown .principe i{background:#c8732e}
+.overview-budget-breakdown em{
+  overflow:hidden;
+  color:#786b61;
+  font-size:11px!important;
+  font-style:normal;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.overview-budget-breakdown strong{
+  color:#2a241f;
+  font-size:12px!important;
+  white-space:nowrap;
+}
+.current-overview .overview-simple-table table{
+  width:100%!important;
+  min-width:0!important;
+  table-layout:fixed!important;
+}
+.current-overview .overview-simple-table th:nth-child(1),
+.current-overview .overview-simple-table td:nth-child(1){width:46%!important}
+.current-overview .overview-simple-table th:nth-child(2),
+.current-overview .overview-simple-table td:nth-child(2),
+.current-overview .overview-simple-table th:nth-child(3),
+.current-overview .overview-simple-table td:nth-child(3){width:27%!important}
+.current-overview .overview-simple-table td{white-space:nowrap}
+@media(max-width:620px){
+  .overview-budget-split{
+    width:100%!important;
+    gap:11px!important;
+    margin-top:12px!important;
+    padding:8px 9px!important;
+  }
+  .overview-budget-donut{
+    flex-basis:62px!important;
+    width:62px!important;
+    height:62px!important;
+  }
+  .overview-budget-donut::after{inset:8px}
+  .overview-budget-donut strong{max-width:45px;font-size:9px!important}
+  .overview-budget-breakdown{flex:1!important;min-width:0!important;gap:5px!important}
+  .overview-budget-breakdown em{font-size:10.5px!important}
+  .overview-budget-breakdown strong{font-size:11px!important}
+  .current-overview .overview-simple-table{overflow:hidden!important}
+  .current-overview .overview-simple-table table{min-width:0!important}
+  .current-overview .overview-simple-table th,
+  .current-overview .overview-simple-table td{padding:11px 8px!important;font-size:13px!important}
+  .current-overview .overview-simple-table thead th{font-size:9px!important}
+  .current-overview .overview-simple-table th:nth-child(1),
+  .current-overview .overview-simple-table td:nth-child(1){width:44%!important}
+  .current-overview .overview-simple-table th:nth-child(2),
+  .current-overview .overview-simple-table td:nth-child(2),
+  .current-overview .overview-simple-table th:nth-child(3),
+  .current-overview .overview-simple-table td:nth-child(3){width:28%!important}
+  .current-overview .overview-category-btn{gap:7px!important;padding:11px 9px!important;font-size:13px!important}
+}
