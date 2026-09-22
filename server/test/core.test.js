@@ -366,3 +366,78 @@ test('trip expense entries save one at a time, keep Food types, and restrict Sha
     c.cleanup();
   }
 });
+
+test('deletes an unfinished current trip safely and restores Shared Jar usage', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Lonato', start: '2026-09-19', end: '2026-09-22' },
+      budget: 500,
+    });
+    const stay = action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { category: 'accommodation', amount: 500, paidBy: 'Principessa', split: 'shared', date: '2026-09-20', useJar: true },
+    });
+    assert.equal(stay.sharedJar.balance, 770);
+
+    const linked = action(c.database, 'savePlanSubmission', {
+      planId: p.planId,
+      submission: {
+        location: 'Italy', city: 'Lonato', start: '2026-09-19', end: '2026-09-22',
+        accom: 0, travel: 0, groceries: 0, eat: 0, fuel: 0, tolls: 0, other: 0,
+        otherNote: '', paid: 0, uncertain: {},
+      },
+    });
+    assert.ok(linked.tripId);
+    assert.equal(getState().plans.length, 1);
+    assert.equal(getState().trips.length, 1);
+
+    const removed = action(c.database, 'deleteCurrentTrip', { kind: 'plan', id: p.planId });
+    assert.equal(removed.ok, true);
+    assert.equal(removed.sharedJar.balance, 870);
+    assert.equal(getState().plans.length, 0);
+    assert.equal(getState().trips.length, 0);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('deletes standalone unfinished trips but protects confirmed trips', () => {
+  const c = setup();
+  try {
+    const standalone = action(c.database, 'saveSubmission', {
+      submission: {
+        location: 'Italy', city: 'Bergamo', start: '2026-10-01', end: '2026-10-02',
+        accom: 10, travel: 0, groceries: 0, eat: 0, fuel: 0, tolls: 0, other: 0,
+        otherNote: '', paid: 10, uncertain: {},
+      },
+      budget: 100,
+    });
+    assert.equal(action(c.database, 'deleteCurrentTrip', { kind: 'trip', id: standalone.tripId }).ok, true);
+    assert.equal(getState().trips.length, 0);
+
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Rome', start: '2026-11-01', end: '2026-11-02' },
+      budget: 300,
+    });
+    action(c.database, 'savePlan', { id: p.planId, budget: 300 }, 'Principe');
+    const submission = {
+      location: 'Italy', city: 'Rome', start: '2026-11-01', end: '2026-11-02',
+      accom: 0, travel: 0, groceries: 0, eat: 0, fuel: 0, tolls: 0, other: 0,
+      otherNote: '', paid: 0, uncertain: {},
+    };
+    const first = action(c.database, 'savePlanSubmission', { planId: p.planId, submission });
+    action(c.database, 'savePlanSubmission', { planId: p.planId, submission }, 'Principe');
+    action(c.database, 'confirmTrip', { id: first.tripId });
+    action(c.database, 'confirmTrip', { id: first.tripId }, 'Principe');
+
+    const blocked = action(c.database, 'deleteCurrentTrip', { kind: 'plan', id: p.planId });
+    assert.equal(blocked.ok, false);
+    assert.match(blocked.error, /Confirmed trips cannot be deleted/);
+    assert.equal(getState().plans.length, 1);
+    assert.equal(getState().trips.length, 1);
+  } finally {
+    c.cleanup();
+  }
+});
+
