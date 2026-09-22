@@ -200,15 +200,18 @@ function allSimplifiedItems() {
   const rank = { now:0, upcoming:1, past:2, unknown:3 };
   return planItems.concat(standalone).sort((a,b)=>(rank[a.phase]-rank[b.phase])||String(a.meta?.start||'').localeCompare(String(b.meta?.start||'')));
 }
+function cardCountryEmoji(meta) {
+  const country = String(meta?.location === 'Other' ? (meta?.otherLocation || '') : (meta?.location || '')).trim();
+  return COUNTRY_EMOJI[country] || COUNTRY_EMOJI[String(meta?.location || '').trim()] || '🌍';
+}
 function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
-  const city = String(item.meta?.city || '').trim().toLowerCase(), country = item.meta?.location || '';
-  const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
   const name = item.meta?.city || locationLabel(item.meta);
+  const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     '<button type="button" class="tv2-delete-reveal" data-act="delete-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" aria-label="Delete '+esc(name)+'">Delete</button>'+
-    '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" style="--tv2-card-photo:url(&quot;'+esc(image)+'&quot;)">'+
-      '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+    '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
+      '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
       '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
       '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
       (item.available && item.available > 0?'<span class="tv2-bar"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
