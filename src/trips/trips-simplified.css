@@ -584,14 +584,28 @@ html body #twCurrentTripsSection.tv2-current-host{
   font-weight:800;
   line-height:1;
 }
-.tv2-check-text{
+.tv2-check-text-scroll{
   min-width:0;
   width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  touch-action:pan-x pan-y;
+}
+.tv2-check-text-scroll::-webkit-scrollbar{display:none}
+.tv2-check-text{
+  display:block;
+  min-width:100%;
+  width:max(100%,calc(var(--tv2-check-chars,14) * 1ch));
   border:0;
   outline:0;
   background:transparent;
   color:var(--tv2-ink);
   font-size:15px!important;
+  line-height:1.35;
+  white-space:nowrap;
   padding:10px 0;
 }
 .tv2-check-text:focus{
