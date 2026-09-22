@@ -1,27 +1,48 @@
-// Boots the Shop/Wishlist/Compare Lab/Social Signals suite -- the migrated
-// replacement for v27.js. Loaded from its own <script type="module"> at the
-// exact document position v27.js used to occupy (before v28.js-v33.js),
-// not bundled into the shared main.js (which loads last): v28.js's and
-// v29.js's own load-time init() calls read window.TwogetherV27
-// synchronously (not just from click handlers), so this needs to exist
-// before their scripts run, matching the original script order.
+// Boots the shared rewards state that Wishlist and Compare still use.
+// The standalone Shop page/navigation was removed; keeping this bridge
+// preserves Wishlist, Compare, existing rewards, and current-trip behavior.
+import { $, $$ } from '../lib/dom.js';
 import * as shopState from './state.js';
-import { installShop, renderShop, renderBadge, applyRewards, ensureCurrentWorkspace, bindPlanButton } from './shop.js';
+import { applyRewards, ensureCurrentWorkspace, bindPlanButton } from './shop.js';
 import { showIncoming } from './signals.js';
 import { renderCompareLab } from '../trips/compare-lab.js';
 import { renderWishlist, wishes } from '../wishlist/wishlist.js';
 
+function showWishlist(e) {
+  e?.preventDefault?.();
+  e?.stopImmediatePropagation?.();
+  $$('.sheet').forEach((x) => x.classList.remove('active'));
+  $$('.hub-tab').forEach((x) => x.classList.remove('active'));
+  $$('[data-fin-view]').forEach((x) => x.classList.toggle('active', x.dataset.finView === 'wishlist'));
+  $('#tripSubnav')?.classList.add('hidden');
+  $('#financeSubnav')?.classList.add('hidden');
+  $('#finances')?.classList.add('active');
+  $('#wishlistHub')?.classList.add('active');
+  shopState.refresh(true).finally(renderWishlist);
+}
+
+function installWishlistHub() {
+  if ($('#wishlistHub')) return;
+  const tabs = $('.hub-tabs');
+  if (!tabs) return;
+  const hub = document.createElement('button');
+  hub.id = 'wishlistHub';
+  hub.className = 'hub-tab';
+  hub.type = 'button';
+  hub.textContent = 'Wishlist';
+  hub.addEventListener('click', showWishlist, true);
+  tabs.appendChild(hub);
+}
+
 function renderAll() {
-  renderBadge();
-  renderShop();
   renderWishlist();
   renderCompareLab();
   ensureCurrentWorkspace();
   applyRewards();
 }
 
-function initShopSuite() {
-  installShop();
+function initSharedSuite() {
+  installWishlistHub();
   shopState.wrapApi();
   bindPlanButton();
   shopState.refresh(false).finally(renderAll);
@@ -33,7 +54,7 @@ function initShopSuite() {
   }));
   document.addEventListener('twogether:v18-rendered', () => requestAnimationFrame(ensureCurrentWorkspace));
   document.addEventListener('twogether:shop-refreshed', () => { renderAll(); showIncoming(); });
-  document.addEventListener('twogether:shop-award', () => { renderShop(); renderWishlist(); });
+  document.addEventListener('twogether:shop-award', () => { renderWishlist(); applyRewards(); });
   document.addEventListener('twogether:shop-refresh-all', renderAll);
   window.addEventListener('focus', () => shopState.refresh(true));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') shopState.refresh(true); });
@@ -48,4 +69,4 @@ function initShopSuite() {
   };
 }
 
-initShopSuite();
+initSharedSuite();

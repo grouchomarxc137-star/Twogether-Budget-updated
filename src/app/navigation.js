@@ -75,7 +75,7 @@ function activateMobileHub(name) {
   const trip = $('[data-hub="trips"]'), fin = $('[data-hub="finances"]');
   if (name === 'trips') {
     trip?.classList.add('active'); fin?.classList.remove('active');
-    $('#wishlistHub')?.classList.remove('active'); $('#shopHub')?.classList.remove('active');
+    $('#wishlistHub')?.classList.remove('active');
     $('#tripSubnav')?.classList.remove('hidden'); $('#financeSubnav')?.classList.add('hidden');
     let last = lastTripView();
     if (!['log', 'monthly', 'compare'].includes(last)) last = 'log';
@@ -85,7 +85,7 @@ function activateMobileHub(name) {
     return;
   }
   trip?.classList.remove('active'); fin?.classList.add('active');
-  $('#wishlistHub')?.classList.remove('active'); $('#shopHub')?.classList.remove('active');
+  $('#wishlistHub')?.classList.remove('active');
   $('#tripSubnav')?.classList.add('hidden'); $('#financeSubnav')?.classList.remove('hidden');
   let last = lastFinanceView();
   if (!['overview', 'monthly', 'balances', 'scenarios'].includes(last)) last = 'overview';
