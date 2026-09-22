@@ -1,0 +1,83 @@
+/* Shared mobile modal centering.
+   Keep every full-screen window inside the visible mobile viewport and
+   centered regardless of feature-specific width/margin rules. */
+@media (max-width:760px) {
+  html body .trip-modal,
+  html body .identity-modal,
+  html body .v5-budget-modal,
+  html body .v33-prep-modal,
+  html body .finance-mini-modal,
+  html body .v27-modal {
+    box-sizing:border-box!important;
+    inset:0!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    padding:
+      max(8px,env(safe-area-inset-top))
+      max(8px,env(safe-area-inset-right))
+      max(8px,env(safe-area-inset-bottom))
+      max(8px,env(safe-area-inset-left))!important;
+    justify-items:center!important;
+    align-items:center!important;
+    place-items:center!important;
+    overflow:auto!important;
+    overscroll-behavior:contain;
+  }
+
+  html body .trip-modal .trip-modal-card,
+  html body .identity-modal .identity-card,
+  html body .v5-budget-modal .v5-budget-card,
+  html body .v33-prep-modal .v33-prep-card,
+  html body .finance-mini-modal .finance-mini-card,
+  html body .v27-modal .v27-modal-card {
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:auto!important;
+    left:auto!important;
+    right:auto!important;
+    transform:none!important;
+    max-height:calc(100dvh - 16px)!important;
+  }
+
+  html body dialog.current-overview {
+    box-sizing:border-box!important;
+    width:calc(100% - 16px)!important;
+    max-width:calc(100% - 16px)!important;
+    min-width:0!important;
+    margin:auto!important;
+    left:0!important;
+    right:0!important;
+  }
+}
+
+@media (max-width:390px) {
+  html body .trip-modal,
+  html body .identity-modal,
+  html body .v5-budget-modal,
+  html body .v33-prep-modal,
+  html body .finance-mini-modal,
+  html body .v27-modal {
+    padding:
+      max(6px,env(safe-area-inset-top))
+      max(6px,env(safe-area-inset-right))
+      max(6px,env(safe-area-inset-bottom))
+      max(6px,env(safe-area-inset-left))!important;
+  }
+
+  html body .trip-modal .trip-modal-card,
+  html body .identity-modal .identity-card,
+  html body .v5-budget-modal .v5-budget-card,
+  html body .v33-prep-modal .v33-prep-card,
+  html body .finance-mini-modal .finance-mini-card,
+  html body .v27-modal .v27-modal-card {
+    max-height:calc(100dvh - 12px)!important;
+  }
+
+  html body dialog.current-overview {
+    width:calc(100% - 12px)!important;
+    max-width:calc(100% - 12px)!important;
+  }
+}
