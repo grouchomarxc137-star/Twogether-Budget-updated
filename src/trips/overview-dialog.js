@@ -107,7 +107,7 @@ function openExpenseSheet(plan){
   expenseLayer=document.createElement('div');
   expenseLayer.className='tv2-layer';
   expenseLayer.innerHTML='<div class="tv2-backdrop" data-close></div><div class="tv2-sheet" role="dialog" aria-modal="true"></div>';
-  document.body.appendChild(expenseLayer);document.body.classList.add('tv2-locked');
+  (dialog || document.body).appendChild(expenseLayer);document.body.classList.add('tv2-locked');
 
   const sheet=expenseLayer.querySelector('.tv2-sheet');
   function refreshLive(){
