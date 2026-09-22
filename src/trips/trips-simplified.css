@@ -237,29 +237,11 @@ html body #twCurrentTripsSection.tv2-current-host{
 }
 #twCurrentTripsSection.tv2-current-host .tv2-root{width:100%}
 
-/* City-photo trip cards: image only */
-#twCurrentTripsSection .tv2-card{
-  position:relative;
-  overflow:hidden;
-  isolation:isolate;
-}
-#twCurrentTripsSection .tv2-card::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  z-index:0;
-  background-image:var(--tv2-card-photo);
-  background-size:cover;
-  background-position:center;
-  opacity:.34;
-  pointer-events:none;
-}
-#twCurrentTripsSection .tv2-card>*{
-  position:relative;
-  z-index:1;
-}
-@media(max-width:760px){
-  #twCurrentTripsSection .tv2-card::before{opacity:.38}
+/* Country flag emoji shown on trip cards on every screen size */
+.tv2-card-flag{
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-style:normal;
+  font-weight:400;
 }
 
 /* Mobile swipe-back support */
