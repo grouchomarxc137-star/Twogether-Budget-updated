@@ -119,8 +119,8 @@ function ensureNavigation() {
       b.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        closeAfterAction();
         getTarget()?.click();
-        unpinAndFadeAll();
       });
       menu.appendChild(b);
     });
@@ -157,7 +157,15 @@ function fadeClose(w) {
 function closeOthers(except, fade = true) { $$('.tw-nav-wrap').forEach((w) => { if (w !== except) (fade ? fadeClose(w) : hardClose(w)); }); }
 function openWrap(w) { if (!w || suppressHover) return; cancelTimers(w); closeOthers(w, true); w.classList.remove('v22-fade', 'menu-open', 'nav-visible'); w.classList.add('v22-open'); setExpanded(w, true); }
 function scheduleClose(w) { if (!w || pinned === w) return; cancelTimers(w); const t = setTimeout(() => { if (pinned !== w) fadeClose(w); closeTimers.delete(w); }, 170); closeTimers.set(w, t); }
-function unpinAndFadeAll() { pinned = null; $$('.tw-nav-wrap').forEach(fadeClose); }
+function unpinAndFadeAll() { pinned = null; $('.tw-nav-wrap').forEach(fadeClose); }
+function closeAfterAction() {
+  if (isMobile()) {
+    pinned = null;
+    document.querySelectorAll('.tw-nav-wrap').forEach(hardClose);
+    return;
+  }
+  unpinAndFadeAll();
+}
 function closeForScroll() {
   suppressHover = true;
   if (isMobile()) {
@@ -194,7 +202,7 @@ function installDropdownRefinement() {
       if (pinned === w) { pinned = null; openWrap(w); scheduleClose(w); }
       else { const old = pinned; pinned = w; if (old && old !== w) fadeClose(old); openWrap(w); }
     }, true);
-    menu?.addEventListener('click', () => { suppressHover = false; unpinAndFadeAll(); });
+    menu?.addEventListener('click', () => { suppressHover = false; closeAfterAction(); });
   });
   if (navInstalled) return; navInstalled = true;
   let scrollQueued = false;
@@ -212,7 +220,7 @@ function installDropdownRefinement() {
       if (w) openWrap(w);
     }
   }, { passive: true, capture: true });
-  document.addEventListener('pointerdown', (e) => { suppressHover = false; if (!e.target.closest?.('.tw-nav-wrap')) unpinAndFadeAll(); }, true);
+  document.addEventListener('pointerdown', (e) => { suppressHover = false; if (!e.target.closest?.('.tw-nav-wrap')) closeAfterAction(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { suppressHover = false; unpinAndFadeAll(); } }, true);
 }
 
