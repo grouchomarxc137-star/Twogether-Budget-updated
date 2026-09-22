@@ -5126,3 +5126,46 @@ body.trip-expense-open{overflow:hidden}
   #workflowV5Overlay.trip-expense-mode .trip-expense-workspace{width:100%;max-width:560px;max-height:92dvh;border-radius:22px 22px 0 0}
   #workflowV5Overlay.trip-expense-mode .trip-expense-categories{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 }
+
+
+/* Direct Trips expense sheet copied from redesign/trips-simplification */
+body.tv2-locked{overflow:hidden}
+.tv2-layer{position:fixed;inset:0;z-index:1400;display:flex;align-items:flex-end;justify-content:center;font-family:inherit}
+.tv2-backdrop{position:absolute;inset:0;background:rgba(38,34,30,.38)}
+.tv2-sheet{position:relative;width:100%;max-width:560px;max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;background:#f8f5ef;border-radius:22px 22px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:14px;box-shadow:0 -12px 40px rgba(38,34,30,.18);font-family:inherit;color:#26221e}
+.tv2-sheet-head{display:flex;justify-content:space-between;align-items:center}
+.tv2-sheet-head h2{margin:0;font:inherit;font-size:28px;font-weight:760;line-height:1.1}
+.tv2-x{width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:#7a736b;font:inherit;font-size:20px;cursor:pointer}
+.tv2-amount{display:flex;align-items:baseline;justify-content:center;gap:4px;padding:6px 0 2px;border-bottom:2px solid #ebe4da;margin:0 40px}
+.tv2-amount:focus-within{border-color:#2f2a25}
+.tv2-amount span{font-size:30px;color:#a39c93;font-weight:500}
+.tv2-amount input{width:7.5ch;border:0!important;background:transparent!important;font:inherit!important;font-size:46px!important;font-weight:650!important;text-align:center;font-variant-numeric:tabular-nums;outline:none!important;padding:0!important;color:#26221e!important;box-shadow:none!important}
+.tv2-amount input::placeholder{color:#ebe4da}
+.tv2-cats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tv2-cat{display:grid;justify-items:center;gap:3px;min-height:64px;padding:8px 2px;border-radius:14px;border:1px solid #ebe4da!important;background:#fffdf9!important;color:#26221e!important;font:inherit!important;font-size:12.5px!important;line-height:1.15;cursor:pointer}
+.tv2-cat span{font-size:21px!important}
+.tv2-cat.on{border-color:#2f2a25!important;box-shadow:inset 0 0 0 1px #2f2a25;font-weight:650}
+.tv2-jar{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:46px;padding:0 14px;border-radius:12px;background:#f3ead8;font-size:15px}
+.tv2-jar.is-off{background:transparent;border:1px dashed #ebe4da;color:#7a736b}
+.tv2-jar button{border:0;background:transparent;color:inherit;font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:3px;padding:8px 0;cursor:pointer}
+.tv2-defaults{display:flex;justify-content:center;align-items:center;gap:8px;min-height:40px;border:0;background:transparent;color:#7a736b;font:inherit;font-size:14.5px;cursor:pointer}
+.tv2-summary{border-bottom:1px dashed #a39c93}
+.tv2-more{display:grid;gap:14px;padding:14px;border-radius:14px;background:#fffdf9;border:1px solid #ebe4da}
+.tv2-more[hidden],.tv2-field[hidden]{display:none}
+.tv2-field{display:grid;gap:6px;font-size:14px;color:#7a736b}
+.tv2-field input{width:100%;min-height:46px;border:1px solid #ebe4da;border-radius:12px;background:#fffdf9;padding:0 12px;font:inherit;font-size:16px;color:#26221e;box-sizing:border-box}
+.tv2-seg{display:flex;flex-wrap:wrap;gap:6px}
+.tv2-seg button{min-height:38px;padding:0 12px;border-radius:99px;border:1px solid #ebe4da!important;background:#f8f5ef!important;color:#26221e!important;font:inherit!important;font-size:14px!important;cursor:pointer}
+.tv2-seg button.on{background:#2f2a25!important;color:#fffdf9!important;border-color:#2f2a25!important}
+.tv2-check{display:flex;gap:10px;align-items:center;font-size:15px;min-height:40px;color:#26221e}
+.tv2-check input{width:20px;height:20px;accent-color:#2f2a25}
+.tv2-hint{margin:-4px 0 0;min-height:18px;text-align:center;font-size:13.5px;color:#7a736b}
+.tv2-hint.is-error{color:#a84a37}
+.tv2-primary{width:100%;min-height:54px;border:0;border-radius:16px;background:#2f2a25!important;color:#fffdf9!important;font:inherit!important;font-size:17px!important;font-weight:650!important;cursor:pointer}
+.tv2-primary:disabled{opacity:.35;cursor:default}
+.overview-trip-snack{position:fixed;left:50%;bottom:86px;z-index:1500;transform:translate(-50%,14px);padding:12px 18px;border-radius:14px;background:#2f2a25;color:#fff;font:inherit;font-size:14px;opacity:0;pointer-events:none;transition:.16s ease;white-space:nowrap;box-shadow:0 10px 30px rgba(38,34,30,.2)}
+.overview-trip-snack.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:760px){
+  .tv2-sheet{max-height:94dvh}
+  .tv2-amount{margin:0 34px}
+}
