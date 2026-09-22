@@ -522,17 +522,15 @@ function openSimplifiedChecklist(plan) {
   document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
 
-  const rowHtml = (kind, item, completed = false) => {
-    const chars = Math.max(14, Math.min(164, String(item.text || '').length + 3));
-    return '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+  const rowHtml = (kind, item, completed = false) =>
+    '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
       '<div class="tv2-check-text-scroll" data-check-scroll>'+
-        '<input class="tv2-check-text" data-check-text maxlength="160" style="--tv2-check-chars:'+chars+'" value="'+esc(item.text)+'" aria-label="Checklist item">'+
+        '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
       '</div>'+
       '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove item">×</button>'+
       (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
     '</div>';
-  };
 
   const activeSection = (kind, title) => {
     const active = prep[kind].filter((item)=>!item.done);
@@ -552,6 +550,25 @@ function openSimplifiedChecklist(plan) {
       '<div class="tv2-check-list">'+done.map(({kind,item})=>rowHtml(kind,item,true)).join('')+'</div></section>';
   };
 
+  const textMeasureCanvas = document.createElement('canvas');
+  const textMeasureContext = textMeasureCanvas.getContext('2d');
+  function syncChecklistTextWidth(input) {
+    const scroller = input?.closest('[data-check-scroll]'); if (!input || !scroller) return;
+    const style = getComputedStyle(input);
+    if (textMeasureContext) {
+      textMeasureContext.font = style.font || [style.fontStyle,style.fontVariant,style.fontWeight,style.fontSize,style.fontFamily].filter(Boolean).join(' ');
+      const exact = Math.ceil(textMeasureContext.measureText(input.value || '').width);
+      input.style.width = Math.max(scroller.clientWidth, exact)+'px';
+    } else {
+      input.style.width = '100%';
+    }
+    const maxScroll = Math.max(0, input.getBoundingClientRect().width - scroller.clientWidth);
+    if (scroller.scrollLeft > maxScroll) scroller.scrollLeft = maxScroll;
+  }
+  function syncAllChecklistTextWidths() {
+    sheet.querySelectorAll('[data-check-text]').forEach(syncChecklistTextWidth);
+  }
+
   function render(moveId = '') {
     if (!sheet) return;
     sheet.innerHTML =
@@ -562,9 +579,12 @@ function openSimplifiedChecklist(plan) {
       completedSection()+
       '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
       '<button type="button" class="tv2-primary tv2-check-save" data-check-save '+(state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save checklist')+'</button>';
-    if (moveId) requestAnimationFrame(() => {
-      const row = sheet.querySelector('[data-check-id="'+CSS.escape(moveId)+'"]');
-      row?.classList.add('just-arrived');
+    requestAnimationFrame(() => {
+      syncAllChecklistTextWidths();
+      if (moveId) {
+        const row = sheet.querySelector('[data-check-id="'+CSS.escape(moveId)+'"]');
+        row?.classList.add('just-arrived');
+      }
     });
   }
 
@@ -607,7 +627,7 @@ function openSimplifiedChecklist(plan) {
     if(!e.target.matches('[data-check-text]'))return;
     const row=e.target.closest('.tv2-check-row'),item=findItem(row);
     if(item)item.text=e.target.value;
-    e.target.style.setProperty('--tv2-check-chars', String(Math.max(14, Math.min(164, e.target.value.length + 3))));
+    syncChecklistTextWidth(e.target);
   });
   sheet.addEventListener('keydown',(e)=>{
     const input=e.target.closest('[data-check-new]'); if(!input||e.key!=='Enter')return;
