@@ -324,39 +324,44 @@ html body #twCurrentTripsSection.tv2-current-host{
   .tv2-swipe-row>.tv2-card{
     position:relative;
     z-index:2;
-    transition:transform .18s cubic-bezier(.22,.8,.28,1);
-    will-change:transform;
+    transition:transform .2s cubic-bezier(.22,.8,.28,1),opacity .16s ease;
+    will-change:transform,opacity;
+  }
+  .tv2-delete-reveal,
+  .tv2-checklist-reveal{
+    position:absolute;
+    top:0;
+    bottom:0;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:0;
+    overflow:hidden;
+    opacity:0;
+    pointer-events:none;
+    white-space:nowrap;
+    font-weight:700;
+    font-size:14px;
+    will-change:width,opacity;
   }
   .tv2-delete-reveal{
-    position:absolute;
-    inset:0 0 0 auto;
-    z-index:1;
-    display:grid;
-    place-items:center;
-    width:84px;
-    border:0;
+    right:0;
     border-radius:0 18px 18px 0;
     background:var(--tv2-over);
     color:white;
-    font-weight:700;
-    font-size:14px;
   }
   .tv2-checklist-reveal{
-    position:absolute;
-    inset:0 auto 0 0;
-    z-index:1;
-    display:grid;
-    place-items:center;
-    width:104px;
+    left:0;
     border-radius:18px 0 0 18px;
     background:#efe4bd;
     color:#6b5417;
-    font-weight:700;
-    font-size:14px;
-    pointer-events:none;
   }
-  .tv2-swipe-row.is-delete-open>.tv2-card{transform:translateX(-84px)}
-  .tv2-swipe-row.is-checklist-open>.tv2-card{transform:translateX(104px)}
+  .tv2-delete-reveal b,
+  .tv2-checklist-reveal b{
+    min-width:max-content;
+    font:inherit;
+  }
 }
 
 
