@@ -327,3 +327,37 @@
   color:#fff!important;
   box-shadow:0 8px 18px rgba(151,108,34,.22)!important;
 }
+
+
+/* Screenshot-matched Trips list */
+#twCurrentTripsSection .tw-current-dock{margin-top:18px}
+#twCurrentTripsSection .tw-current-simple{overflow:hidden;border:1px solid #e7ddd2;border-radius:18px;background:#fffdfa;box-shadow:none}
+#twCurrentTripsSection .tw-current-simple .tw-trip-art,
+#twCurrentTripsSection .tw-current-simple .tw-current-top,
+#twCurrentTripsSection .tw-current-simple .tw-current-numbers,
+#twCurrentTripsSection .tw-current-simple .tw-current-actions{display:none!important}
+#twCurrentTripsSection .tw-current-simple .tw-current-main{display:block;width:100%;padding:18px 20px 16px;border:0;background:transparent;color:inherit;text-align:left}
+#twCurrentTripsSection .tw-current-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+#twCurrentTripsSection .tw-current-card-top h3{margin:0;font-size:24px;line-height:1.12;font-weight:750;letter-spacing:-.02em}
+#twCurrentTripsSection .tw-current-card-top span{padding-top:3px;color:#7d746c;font-size:15px;white-space:nowrap}
+#twCurrentTripsSection .tw-current-timing{margin:5px 0 10px;color:#7d746c;font-size:16px}
+#twCurrentTripsSection .tw-current-money{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:18px;line-height:1.2}
+#twCurrentTripsSection .tw-current-progress{display:block;height:7px;margin-top:9px;border-radius:999px;background:#e9e2d9;overflow:hidden}
+#twCurrentTripsSection .tw-current-progress i{display:block;height:100%;border-radius:inherit;background:#4f744f}
+#twCurrentTripsSection .tw-current-dock .tw-plan-trip-btn{width:100%;min-height:58px;border-radius:18px;background:#2f2924;border-color:#2f2924;color:#fff;font-size:18px;font-weight:750}
+@media(max-width:760px){
+  #twCurrentTripsSection{padding-bottom:88px!important}
+  #twCurrentTripsSection .tw-current-head{display:block;margin-bottom:18px}
+  #twCurrentTripsSection .tw-current-head .panel-kicker,
+  #twCurrentTripsSection .tw-current-head p{display:none!important}
+  #twCurrentTripsSection .tw-current-head h2{margin:0;font-size:38px;line-height:1;font-weight:750;letter-spacing:-.03em}
+  #twCurrentTripsSection .tw-current-list{display:grid;gap:14px}
+  #twCurrentTripsSection .tw-current-simple{border-radius:18px}
+  #twCurrentTripsSection .tw-current-simple .tw-current-main{padding:17px 18px 15px}
+  #twCurrentTripsSection .tw-current-card-top h3{font-size:24px}
+  #twCurrentTripsSection .tw-current-card-top span{font-size:15px}
+  #twCurrentTripsSection .tw-current-timing{font-size:16px}
+  #twCurrentTripsSection .tw-current-money{font-size:18px}
+  #twCurrentTripsSection .tw-current-dock{position:sticky;bottom:10px;z-index:8;margin-top:24px;padding-top:8px;background:linear-gradient(to top,var(--page,#f8f5ef) 70%,rgba(248,245,239,0))}
+  #twCurrentTripsSection .tw-current-dock .tw-plan-trip-btn{min-height:60px;border-radius:18px;font-size:19px}
+}
