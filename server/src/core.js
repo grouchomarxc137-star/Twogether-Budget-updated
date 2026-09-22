@@ -426,6 +426,49 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planId=cleanText_(payload.planId,80),expenseId=cleanText_(payload.expenseId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),at=plan.expenseEntries.findIndex(x=>x.id===expenseId);if(at<0)throw new Error('Expense not found');plan.expenseEntries.splice(at,1);state.sharedJar=sanitizeSharedJar_(state.sharedJar);state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expenseId));state.sharedJar=sanitizeSharedJar_(state.sharedJar);plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;state.plans[idx]=plan;addAudit_(state,actor,'deleteTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,sharedJar:state.sharedJar});
     }
 
+    if (action === 'deleteCurrentTrip') {
+      const kind = String(payload.kind || '');
+      const id = cleanText_(payload.id, 80);
+      if (!id || (kind !== 'plan' && kind !== 'trip')) throw new Error('Trip not found');
+
+      let linkedTripId = '';
+      if (kind === 'plan') {
+        const planIdx = state.plans.findIndex(function(x){ return x.id === id; });
+        if (planIdx < 0) throw new Error('Trip not found');
+        const plan = sanitizePlan_(state.plans[planIdx]);
+        linkedTripId = cleanText_(plan.linkedTripId, 80);
+        const linkedIdx = linkedTripId ? state.trips.findIndex(function(t){ return t.id === linkedTripId; }) : -1;
+        if (linkedIdx >= 0 && isTripLocked_(state.trips[linkedIdx])) throw new Error('Confirmed trips cannot be deleted');
+        state.plans.splice(planIdx, 1);
+        if (linkedIdx >= 0) state.trips.splice(linkedIdx, 1);
+
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+        state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){ return x.planId !== id; });
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      } else {
+        const tripIdx = state.trips.findIndex(function(t){ return t.id === id; });
+        if (tripIdx < 0) throw new Error('Trip not found');
+        const trip = sanitizeTripRecord_(state.trips[tripIdx]);
+        if (isTripLocked_(trip)) throw new Error('Confirmed trips cannot be deleted');
+        if (state.plans.some(function(p){ return p.linkedTripId === id; })) throw new Error('This trip is linked to a plan and must be deleted from that trip card');
+        state.trips.splice(tripIdx, 1);
+      }
+
+      state.game = sanitizeGame_(state.game);
+      ACTORS.forEach(function(name){
+        const profile = state.game[name];
+        [id, linkedTripId].filter(Boolean).forEach(function(key){
+          if (profile.packing) delete profile.packing[key];
+          if (profile.planners) delete profile.planners[key];
+        });
+        state.game[name] = sanitizeGameProfile_(profile);
+      });
+
+      addAudit_(state, actor, 'deleteCurrentTrip', id);
+      saveState_(state);
+      return output_({ok:true,kind:kind,id:id,deletedTripId:linkedTripId,sharedJar:sanitizeSharedJar_(state.sharedJar)});
+    }
+
     if (action === 'savePlanPartial') {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(x => x.id === planId);
