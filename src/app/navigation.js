@@ -78,7 +78,7 @@ function activateMobileHub(name) {
     $('#wishlistHub')?.classList.remove('active'); $('#shopHub')?.classList.remove('active');
     $('#tripSubnav')?.classList.remove('hidden'); $('#financeSubnav')?.classList.add('hidden');
     let last = lastTripView();
-    if (!['log', 'monthly', 'compare'].includes(last)) last = 'log';
+    if (!['tripsV2', 'log', 'monthly', 'compare'].includes(last)) last = 'log';
     const target = $(`#tripSubnav .tab[data-sheet="${last}"]`) || $('#tripSubnav .tab[data-sheet="log"]');
     if (target) target.click();
     else $$('.sheet').forEach((x) => x.classList.toggle('active', x.id === 'log'));
@@ -104,7 +104,7 @@ function ensureNavigation() {
   if ($('.tw-v18-nav-wrap')) return;
   const hub = $('.hub-tabs'); if (!hub) return;
   const defs = [
-    { key: 'trips', items: [['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
+    { key: 'trips', items: [['New Trips', () => $('.trip-subnav [data-sheet="tripsV2"]')], ['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
     { key: 'finances', items: [['Overview', () => $('.finance-subnav [data-fin-subview="overview"]')], ['Monthly finances', () => $('.finance-subnav [data-fin-subview="monthly"]')], ['Balances & loans', () => $('.finance-subnav [data-fin-subview="balances"]')], ['Test scenarios', () => $('.finance-subnav [data-fin-subview="scenarios"]')]] },
   ];
   defs.forEach((def) => {

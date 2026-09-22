@@ -38,8 +38,9 @@ export function openDatabase(databasePath) {
   db.pragma('busy_timeout = 10000');
   db.pragma('foreign_keys = ON');
 
-  const migrationPath = fileURLToPath(new URL('./migrations/001_init.sql', import.meta.url));
-  db.exec(readFileSync(migrationPath, 'utf8'));
+  for (const file of ['001_init.sql', '002_trip_ledger.sql']) {
+    db.exec(readFileSync(fileURLToPath(new URL(`./migrations/${file}`, import.meta.url)), 'utf8'));
+  }
 
   const putAppState = db.prepare('INSERT OR IGNORE INTO app_state (key, json) VALUES (?, ?)');
   putAppState.run('sharedJar', encode(DEFAULT_JAR));
@@ -58,6 +59,7 @@ export function openDatabase(databasePath) {
   const appValue = db.prepare('SELECT json FROM app_state WHERE key = ?');
   const selectTrips = db.prepare('SELECT json FROM trips ORDER BY rowid');
   const selectPlans = db.prepare('SELECT json FROM plans ORDER BY rowid');
+  const selectTripLedger = db.prepare('SELECT json FROM trip_ledger ORDER BY rowid');
   const selectMonths = db.prepare('SELECT actor, json FROM finance_months ORDER BY actor, month');
   const selectFinanceProfiles = db.prepare('SELECT actor, json FROM finance_profiles');
   const selectGameProfiles = db.prepare('SELECT actor, json FROM game_profiles');
@@ -90,6 +92,7 @@ export function openDatabase(databasePath) {
       version: Number(meta.version) || 18,
       trips: selectTrips.all().map((row) => decode(row.json, {})),
       plans: selectPlans.all().map((row) => decode(row.json, {})),
+      tripLedger: selectTripLedger.all().map((row) => decode(row.json, {})),
       finances,
       financeProfiles,
       sharedJar: decode(appValue.get('sharedJar')?.json, DEFAULT_JAR),
@@ -105,6 +108,7 @@ export function openDatabase(databasePath) {
   const clearMonths = db.prepare('DELETE FROM finance_months');
   const insertTrip = db.prepare('INSERT INTO trips (id, json, updated_at) VALUES (?, ?, ?)');
   const insertPlan = db.prepare('INSERT INTO plans (id, json, linked_trip_id, updated_at) VALUES (?, ?, ?, ?)');
+  const upsertTripLedger = db.prepare('INSERT INTO trip_ledger (id, json, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET json=excluded.json, updated_at=excluded.updated_at');
   const insertMonth = db.prepare('INSERT INTO finance_months (actor, month, json) VALUES (?, ?, ?)');
   const upsertFinanceProfile = db.prepare('INSERT INTO finance_profiles (actor, json) VALUES (?, ?) ON CONFLICT(actor) DO UPDATE SET json=excluded.json');
   const upsertGameProfile = db.prepare('INSERT INTO game_profiles (actor, json) VALUES (?, ?) ON CONFLICT(actor) DO UPDATE SET json=excluded.json');
@@ -116,6 +120,12 @@ export function openDatabase(databasePath) {
 
     clearPlans.run();
     for (const plan of state.plans || []) insertPlan.run(plan.id, encode(plan), plan.linkedTripId || '', plan.updatedAt || '');
+
+    // Redesigned trips are upserted, never cleared: a trip the state does not
+    // mention is left exactly as stored.
+    for (const trip of state.tripLedger || []) {
+      if (trip?.id) upsertTripLedger.run(trip.id, encode(trip), trip.updatedAt || '');
+    }
 
     clearMonths.run();
     for (const actor of ACTORS) {

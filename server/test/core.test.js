@@ -33,7 +33,7 @@ test('starts with a complete empty state stored in SQLite tables', () => {
     assert.equal(state.sharedJar.balance, 870);
     assert.deepEqual(
       context.database.db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((row) => row.name),
-      ['app_state', 'finance_months', 'finance_profiles', 'game_profiles', 'plans', 'trips'],
+      ['app_state', 'finance_months', 'finance_profiles', 'game_profiles', 'plans', 'trip_ledger', 'trips'],
     );
   } finally {
     context.cleanup();

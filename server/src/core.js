@@ -1,3 +1,6 @@
+import { cleanTrip, ledgerJarUsage } from '../../shared/trips-model.js';
+import { TRIP_LEDGER_ACTIONS, runTripLedgerAction } from './trips-ledger.js';
+
 let stateStore = null;
 
 function randomUuid_() {
@@ -22,6 +25,7 @@ function defaultState_() {
     version: 18,
     trips: [],
     plans: [],
+    tripLedger: [],
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
       Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}},
@@ -47,14 +51,16 @@ function readState_() {
       version: 18,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
+      tripLedger: Array.isArray(parsed.tripLedger) ? parsed.tripLedger.map(cleanTrip) : [],
       finances: sanitizeFinances_(parsed.finances),
       financeProfiles: sanitizeFinanceProfiles_(parsed.financeProfiles),
-      sharedJar: sanitizeSharedJar_(parsed.sharedJar),
+      sharedJar: null,
       game: sanitizeGame_(parsed.game),
       compare: Object.assign(base.compare, parsed.compare || {}),
       audit: Array.isArray(parsed.audit) ? parsed.audit.slice(-MAX_AUDIT) : [],
       updatedAt: parsed.updatedAt || ''
     };
+    state.sharedJar = withLedgerJar_(parsed.sharedJar, state.tripLedger);
 
     return state;
   } catch (err) {
@@ -172,9 +178,10 @@ function saveState_(state) {
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
   state.trips = Array.isArray(state.trips) ? state.trips.map(sanitizeTripRecord_) : [];
+  state.tripLedger = Array.isArray(state.tripLedger) ? state.tripLedger.map(cleanTrip) : [];
   state.finances = sanitizeFinances_(state.finances);
   state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
-  state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+  state.sharedJar = withLedgerJar_(state.sharedJar, state.tripLedger);
   state.game = sanitizeGame_(state.game);
   if (!stateStore) throw new Error('Database is not configured');
   stateStore.write(state);
@@ -191,6 +198,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
   try {
     const state = readState_();
+
+    if (TRIP_LEDGER_ACTIONS.has(action)) {
+      const result = runTripLedgerAction(state, action, payload, actor, {
+        now: function(){ return new Date().toISOString(); },
+        uuid: Utilities.getUuid,
+        jarBaseCents: function(st){ const jar = sanitizeSharedJar_(st.sharedJar); return jarBaseCents_(jar.initialBalance, jar.transactions); },
+      });
+      if (result && result.ok) saveState_(state);
+      return output_(result);
+    }
 
     if (action === 'savePlan') {
       const id = cleanText_(payload.id, 80);
@@ -313,8 +330,10 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       state.sharedJar = sanitizeSharedJar_(state.sharedJar);
       const balance = cleanMoney_(payload.balance);
       if (balance === '') throw new Error('Enter a valid Shared Jar balance');
-      const used = state.sharedJar.transactions.reduce(function(sum, x){ return sum + Number(x.amount || 0); }, 0);
-      state.sharedJar.initialBalance = money2_(Number(balance) + used);
+      // Keep the entered balance as what is available, counting Jar money used
+      // by both the older trip flows and the redesigned Trips ledger (cents).
+      const usedCents = Math.round(Number(state.sharedJar.initialBalance) * 100) - state.sharedJar.availableCents;
+      state.sharedJar.initialBalance = (Math.round(Number(balance) * 100) + usedCents) / 100;
       state.sharedJar = sanitizeSharedJar_(state.sharedJar);
       addAudit_(state, actor, 'updateSharedJarBalance', '');
       saveState_(state);
@@ -819,7 +838,24 @@ function defaultSharedJar_() { return {initialBalance:870,balance:870,transactio
 function sanitizeSharedJar_(value) {
   const source=value&&typeof value==='object'?value:{};let initialBalance=cleanMoney_(source.initialBalance);if(initialBalance==='')initialBalance=870;const byKey={};
   (Array.isArray(source.transactions)?source.transactions:[]).slice(-500).forEach(function(x){const planId=cleanText_(x&&x.planId,80),expenseId=cleanText_(x&&x.expenseId,80),amount=cleanMoney_(x&&x.amount);if(!planId||amount===''||Number(amount)<=0)return;const key=expenseId?planId+'::'+expenseId:planId;byKey[key]={planId:planId,expenseId:expenseId,amount:money2_(amount),actor:cleanActor_(x&&x.actor),at:cleanText_(x&&x.at,40)};});
-  const transactions=Object.keys(byKey).map(function(k){return byKey[k];}),used=transactions.reduce(function(sum,x){return sum+Number(x.amount||0);},0);return {initialBalance:initialBalance,balance:money2_(Math.max(0,Number(initialBalance)-used)),transactions:transactions};
+  const transactions=Object.keys(byKey).map(function(k){return byKey[k];});
+  // The redesigned Trips ledger keeps its Jar usage as integer cents on each
+  // expense (never as transactions here). ledgerUsedCents is recomputed from
+  // the ledger on every read and save (see withLedgerJar_); the Jar's
+  // available amount is worked out in whole cents. `balance` stays the
+  // existing euro field that Finances and the older trip flows read.
+  const ledgerUsedCents=Number.isInteger(source.ledgerUsedCents)&&source.ledgerUsedCents>0?source.ledgerUsedCents:0;
+  const availableCents=jarBaseCents_(initialBalance,transactions)-ledgerUsedCents;
+  return {initialBalance:initialBalance,balance:money2_(Math.max(0,availableCents)/100),transactions:transactions,ledgerUsedCents:ledgerUsedCents,availableCents:availableCents};
+}
+// Jar money not committed by the older trip flows, in whole cents. Those
+// flows store euro amounts with at most two decimals, converted once here.
+function jarBaseCents_(initialBalance, transactions) {
+  const used=transactions.reduce(function(sum,x){return sum+Math.round(Number(x.amount||0)*100);},0);
+  return Math.round(Number(initialBalance)*100)-used;
+}
+function withLedgerJar_(jar, tripLedger) {
+  return sanitizeSharedJar_(Object.assign({}, jar||{}, {ledgerUsedCents: ledgerJarUsage(tripLedger||[])}));
 }
 function defaultAccommodationMeta_(){return {useJar:false,jarContribution:0,jarBalanceAfter:870,remaining:'',paymentType:'',paidUpfront:false,upfrontBy:'',shareEach:'',repayment:{debtor:'',creditor:'',amount:'',status:'none',confirmedAt:''}};}
 function sanitizeAccommodationMeta_(value){
@@ -1329,6 +1365,7 @@ export const SUPPORTED_ACTIONS = new Set([
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',
+  ...TRIP_LEDGER_ACTIONS,
 ]);
 
 export function configureStateStore(store) {

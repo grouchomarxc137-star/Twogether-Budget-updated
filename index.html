@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/src/finances/finances.css">
 <link rel="stylesheet" href="/src/wishlist/wishlist.css">
 <link rel="stylesheet" href="/src/shop/shop.css">
+<link rel="stylesheet" href="/src/trips-v2/trips-v2.css">
 </head>
 <body>
 <div class="app" id="app">
@@ -38,6 +39,7 @@
     <button class="hub-tab tab" data-hub="finances" data-sheet="finances" type="button">My finances</button>
   </nav>
   <nav class="tabs trip-subnav" id="tripSubnav" role="tablist" aria-label="Trip pages">
+    <button class="tab" data-sheet="tripsV2" type="button">New Trips</button>
     <button class="tab active" data-sheet="log" type="button">Log trip</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
@@ -69,6 +71,8 @@
       </section>
 
     </section>
+
+    <section id="tripsV2" class="sheet" aria-label="Trips (redesigned)"></section>
 
     <section id="monthly" class="sheet">
       <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>January through December 2026. Trips that are not fully confirmed yet remain marked as estimates.</p></div>
@@ -187,6 +191,7 @@
 <script type="module" src="/src/shop/decorations.js"></script>
 <script type="module" src="/src/shop/packing.js"></script>
 <script type="module" src="/src/finances/planner-boot.js"></script>
+<script type="module" src="/src/trips-v2/boot.js"></script>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
