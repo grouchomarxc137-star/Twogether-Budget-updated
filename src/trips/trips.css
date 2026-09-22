@@ -5094,6 +5094,8 @@ body.trip-expense-open{overflow:hidden}
 .current-overview-trip .overview-trip-left span{font-size:17px;font-weight:700}
 .current-overview-trip .overview-trip-left.over{color:#a34e40}
 .current-overview-trip .overview-trip-balance{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:58px;padding:0 18px;border:0;border-radius:17px;background:#edf3e9;color:#28231f;font:inherit;font-size:17px;font-weight:720;text-align:left;cursor:pointer}
+.current-overview-trip .overview-trip-balance.is-debtor{background:#f8e9e4;color:#a84a37}
+.current-overview-trip .overview-trip-balance.is-even{background:transparent;border:1px solid #ebe3da;color:#7a736c;font-weight:600}
 .current-overview-trip .overview-trip-balance b{font-size:22px}
 .current-overview-trip .overview-trip-list{display:grid;gap:12px}
 .current-overview-trip .overview-trip-empty{margin:18px 0 0;color:#7a736c;font-size:16px;line-height:1.45}

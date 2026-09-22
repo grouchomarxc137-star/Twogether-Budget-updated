@@ -277,7 +277,7 @@ function simplifiedTrip(plan, trip) {
       (available && available > 0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>':'')+
       (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
     '</section>'+
-    '<button class="tv2-balance '+(settlementLine(plan)==='You’re even'?'is-even':'')+'" data-act="balance"><span>'+esc(settlementLine(plan))+'</span><span aria-hidden="true">›</span></button>'+
+    (()=>{const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?'is-even':balanceLine.startsWith('You owe ')?'is-debtor':'';return '<button class="tv2-balance '+balanceClass+'" data-act="balance"><span>'+esc(balanceLine)+'</span><span aria-hidden="true">›</span></button>';})()+
     '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan)+'</section>'+
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';

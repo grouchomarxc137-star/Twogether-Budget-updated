@@ -290,7 +290,8 @@ function draw(plan) {
   dialog=document.createElement('dialog');
   dialog.className='current-overview current-overview-trip';
   const trip=latest?.trips?.find((item)=>item.id===plan.linkedTripId);
-  dialog.innerHTML='<div class="overview-trip-shell">'+hero(plan,trip)+'<button type="button" class="overview-trip-balance"><span>'+esc(settlementLine(plan))+'</span><b>›</b></button><div class="overview-trip-list">'+expenseTimeline(plan)+'</div><div class="overview-trip-dock"><button type="button" data-overview-add>＋ Add expense</button></div></div>';
+  const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?' is-even':balanceLine.startsWith('You owe ')?' is-debtor':'';
+  dialog.innerHTML='<div class="overview-trip-shell">'+hero(plan,trip)+'<button type="button" class="overview-trip-balance'+balanceClass+'"><span>'+esc(balanceLine)+'</span><b>›</b></button><div class="overview-trip-list">'+expenseTimeline(plan)+'</div><div class="overview-trip-dock"><button type="button" data-overview-add>＋ Add expense</button></div></div>';
   document.body.appendChild(dialog);dialog.showModal();
   dialog.addEventListener('cancel',close);
   dialog.querySelector('[data-overview-close]').onclick=close;
