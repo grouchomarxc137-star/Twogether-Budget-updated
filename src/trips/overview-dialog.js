@@ -133,13 +133,18 @@ function draw(plan) {
   dialog.className = 'current-overview';
   const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
   dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
-    '<div class="overview-scroll"><div class="overview-simple-table"><table><thead><tr><th>Expenses</th><th>Principessa</th><th>Principe</th></tr></thead><tbody>' +
+    '<div class="overview-scroll"><button type="button" class="btn primary overview-log-expense" data-overview-log-expense>＋ Log expense</button><div class="overview-simple-table"><table><thead><tr><th>Expenses</th><th>Principessa</th><th>Principe</th></tr></thead><tbody>' +
     rows.map((row) => '<tr><th><button type="button" class="overview-category-btn" data-category="' + row.key + '">' + esc(row.label) + '<span>›</span></button></th><td>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</td><td>' + money(rowPaid(plan, trip, row, 'Principe')) + '</td></tr>').join('') +
-    '</tbody></table></div><p class="overview-table-hint">Select a category to view, add or edit its expenses.</p></div></div>';
+    '</tbody></table></div><p class="overview-table-hint">Select a category to view or edit its expenses.</p></div></div>';
   document.body.appendChild(dialog);
   dialog.showModal();
   dialog.addEventListener('cancel', close);
   dialog.querySelector('[data-overview-close]').onclick = close;
+  dialog.querySelector('[data-overview-log-expense]').onclick = () => {
+    const id = plan.id;
+    close();
+    window.TwogetherWorkflow?.start(id);
+  };
   dialog.querySelectorAll('[data-category]').forEach((button) => button.onclick = () => drawCategory(plan, button.dataset.category));
 }
 
