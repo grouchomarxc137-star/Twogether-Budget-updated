@@ -472,6 +472,14 @@ test('logs partial trip repayments without double-counting the trip expense', ()
     assert.equal(first.settlement.creditor, 'Principe');
     assert.equal(first.settlement.amount, 150);
 
+    const tooMuch = action(c.database, 'saveTripRepayment', {
+      planId: p.planId,
+      amount: 151,
+      date: '2026-10-01',
+    }, 'Principessa');
+    assert.equal(tooMuch.ok, false);
+    assert.match(tooMuch.error, /only owe €150\.00/i);
+
     const second = action(c.database, 'saveTripRepayment', {
       planId: p.planId,
       amount: 100,
