@@ -29,8 +29,23 @@
   background:var(--accent-soft);
   display:grid;
   place-items:center;
+  position:relative;
   color:var(--accent-dark);
-  font-size:22px;
+}
+.brand-heart {
+  font-size:24px;
+  line-height:1;
+}
+.brand-euro {
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-47%);
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:10px;
+  line-height:1;
+  font-weight:800;
+  color:var(--accent-dark);
 }
 
 .brand {
