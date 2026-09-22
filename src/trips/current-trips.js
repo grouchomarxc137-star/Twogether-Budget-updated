@@ -1060,7 +1060,7 @@ function bindSimplifiedSwipe(section) {
   section.addEventListener('touchcancel', cancel, { passive:true });
 }
 
-function handleSimplifiedClick(e) {
+async function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
