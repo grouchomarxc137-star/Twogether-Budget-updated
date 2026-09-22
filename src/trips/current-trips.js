@@ -34,7 +34,7 @@ let simplifiedView = { name: 'home', planId: '', budgetMode: 'combined' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
-let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, openSide:'', ignoreClickUntil:0 };
+let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
 
 function has(v) { return v !== '' && v != null; }
@@ -241,8 +241,8 @@ function simplifiedCard(item) {
   const name = item.meta?.city || locationLabel(item.meta);
   const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
-    (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true">Checklist</span>' : '')+
-    '<button type="button" class="tv2-delete-reveal" data-act="delete-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" aria-label="Delete '+esc(name)+'">Delete</button>'+
+    (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
+    '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
       '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
       '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
@@ -251,6 +251,7 @@ function simplifiedCard(item) {
     '</button>'+
   '</div>';
 }
+
 function simplifiedHome(items) {
   return '<div class="tv2-page"><header class="tv2-home-head"><h1>Trips</h1></header>'+
     (items.length?items.map(simplifiedCard).join(''):'<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>')+
@@ -622,17 +623,33 @@ function openSimplifiedChecklist(plan) {
   render();
 }
 
-function setCardSwipeSide(row, side = '') {
+function resetCardSwipeVisual(row, animate = true) {
   if (!row) return;
-  row.classList.toggle('is-open', !!side);
-  row.classList.toggle('is-delete-open', side === 'delete');
-  row.classList.toggle('is-checklist-open', side === 'checklist');
+  const card = row.querySelector('.tv2-card');
+  const checklist = row.querySelector('.tv2-checklist-reveal');
+  const remove = row.querySelector('.tv2-delete-reveal');
+  row.classList.remove('is-swiping-checklist','is-swiping-delete');
+  [checklist,remove].forEach((action) => {
+    if (!action) return;
+    action.style.transition = animate ? 'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease' : 'none';
+    action.style.width = '0px';
+    action.style.opacity = '0';
+  });
+  if (card) {
+    card.style.transition = animate ? 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease' : 'none';
+    card.style.transform = 'translateX(0)';
+    card.style.opacity = '1';
+  }
+  if (animate) setTimeout(() => {
+    [card,checklist,remove].forEach((el)=>{ if (el?.isConnected) el.style.transition=''; });
+  },220);
 }
 function closeCardSwipeRows(except = null) {
-  document.querySelectorAll('#twCurrentTrips .tv2-swipe-row.is-open').forEach((row) => {
-    if (row !== except) setCardSwipeSide(row, '');
+  document.querySelectorAll('#twCurrentTrips .tv2-swipe-row').forEach((row) => {
+    if (row !== except) resetCardSwipeVisual(row, true);
   });
 }
+
 function closeDeleteConfirm() {
   deleteConfirmLayer?.remove();
   deleteConfirmLayer = null;
@@ -681,88 +698,114 @@ function bindCardDeleteSwipe(section) {
   if (section.dataset.tv2DeleteSwipe === '1') return;
   section.dataset.tv2DeleteSwipe = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
-  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, openSide:'', ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
+  const resetState = () => {
+    cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
+  };
+  const paint = (row, distance, direction) => {
+    const card = row.querySelector('.tv2-card');
+    const action = row.querySelector(direction === 'checklist' ? '.tv2-checklist-reveal' : '.tv2-delete-reveal');
+    const other = row.querySelector(direction === 'checklist' ? '.tv2-delete-reveal' : '.tv2-checklist-reveal');
+    if (!card || !action) return;
+    row.classList.toggle('is-swiping-checklist', direction === 'checklist');
+    row.classList.toggle('is-swiping-delete', direction === 'delete');
+    const exposed = Math.abs(distance);
+    card.style.transition = 'none';
+    card.style.transform = 'translateX('+distance+'px)';
+    action.style.transition = 'none';
+    action.style.width = exposed+'px';
+    action.style.opacity = String(Math.min(1, .35 + exposed / 120));
+    if (other) { other.style.width='0px'; other.style.opacity='0'; }
+  };
+  const finishAction = (row, direction) => {
+    const card = row.querySelector('.tv2-card');
+    const action = row.querySelector(direction === 'checklist' ? '.tv2-checklist-reveal' : '.tv2-delete-reveal');
+    const width = row.getBoundingClientRect().width || window.innerWidth - 32;
+    const finalDistance = direction === 'checklist' ? width : -width;
+    if (card) {
+      card.style.transition = 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform = 'translateX('+finalDistance+'px)';
+      card.style.opacity = '.76';
+    }
+    if (action) {
+      action.style.transition = 'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      action.style.width = width+'px';
+      action.style.opacity = '1';
+    }
+  };
+
   section.addEventListener('touchstart', (e) => {
     if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || simplifiedLayer || e.touches.length !== 1) return;
     const row = e.target.closest('.tv2-swipe-row'); if (!row) return;
     closeCardSwipeRows(row);
+    resetCardSwipeVisual(row, false);
     const t = e.touches[0];
-    const openSide = row.classList.contains('is-delete-open') ? 'delete' : row.classList.contains('is-checklist-open') ? 'checklist' : '';
-    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, openSide, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
+    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, direction:'', ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
   }, { passive:true });
+
   section.addEventListener('touchmove', (e) => {
     if (!cardSwipe.tracking || !cardSwipe.row || e.touches.length !== 1) return;
     const t = e.touches[0], dx = t.clientX - cardSwipe.startX, dy = Math.abs(t.clientY - cardSwipe.startY);
     const row = cardSwipe.row, canChecklist = row.dataset.swipeKind === 'plan';
     cardSwipe.lastX = t.clientX;
+
     if (!cardSwipe.active) {
       if (Math.abs(dx) < 8 && dy < 8) return;
       const horizontal = Math.abs(dx) > dy * 1.2;
-      let allowed = false;
-      if (!cardSwipe.openSide) allowed = dx < -10 || (canChecklist && dx > 10);
-      else if (cardSwipe.openSide === 'delete') allowed = dx > 10;
-      else if (cardSwipe.openSide === 'checklist') allowed = Math.abs(dx) > 10;
-      if (horizontal && allowed) cardSwipe.active = true;
-      else if (dy >= Math.abs(dx) || (horizontal && Math.abs(dx) > 10 && !allowed)) { reset(); return; }
+      const direction = dx > 10 && canChecklist ? 'checklist' : dx < -10 ? 'delete' : '';
+      if (horizontal && direction) {
+        cardSwipe.active = true;
+        cardSwipe.direction = direction;
+      } else if (dy >= Math.abs(dx) || (horizontal && Math.abs(dx) > 10 && !direction)) {
+        resetState();
+        return;
+      }
     }
     if (!cardSwipe.active) return;
     e.preventDefault();
-    const card = row.querySelector('.tv2-card'); if (!card) return;
+
     const width = row.getBoundingClientRect().width || window.innerWidth - 32;
-    const fullThreshold = Math.max(150, width * .56);
-    const maxRight = fullThreshold + 52;
-    const base = cardSwipe.openSide === 'delete' ? -84 : cardSwipe.openSide === 'checklist' ? 104 : 0;
-    let distance = base + dx;
-    if (cardSwipe.openSide === 'delete') distance = Math.max(-84, Math.min(0, distance));
-    else if (cardSwipe.openSide === 'checklist') distance = Math.max(0, Math.min(maxRight, distance));
-    else if (dx < 0) distance = Math.max(-84, Math.min(0, dx));
-    else distance = Math.max(0, Math.min(maxRight, dx));
-    card.style.transition = 'none';
-    card.style.transform = 'translateX('+distance+'px)';
+    const maxDistance = width * .94;
+    let distance = dx;
+    if (cardSwipe.direction === 'checklist') distance = Math.max(0, Math.min(maxDistance, dx));
+    else distance = Math.min(0, Math.max(-maxDistance, dx));
+    paint(row, distance, cardSwipe.direction);
   }, { passive:false });
+
   section.addEventListener('touchend', () => {
-    if (!cardSwipe.tracking || !cardSwipe.row) { reset(); return; }
-    const row = cardSwipe.row, card = row.querySelector('.tv2-card');
+    if (!cardSwipe.tracking || !cardSwipe.row) { resetState(); return; }
+    const row = cardSwipe.row;
     const dx = cardSwipe.lastX - cardSwipe.startX;
     const width = row.getBoundingClientRect().width || window.innerWidth - 32;
-    const fullThreshold = Math.max(150, width * .56);
-    const base = cardSwipe.openSide === 'delete' ? -84 : cardSwipe.openSide === 'checklist' ? 104 : 0;
-    const position = base + dx;
-    const canChecklist = row.dataset.swipeKind === 'plan';
+    const threshold = Math.max(180, width * .62);
+    const direction = cardSwipe.direction;
+    const fullSwipe = cardSwipe.active && ((direction === 'checklist' && dx >= threshold) || (direction === 'delete' && -dx >= threshold));
 
-    if (cardSwipe.active && canChecklist && cardSwipe.openSide !== 'delete' && position >= fullThreshold) {
-      const planId = row.dataset.swipeId;
-      cardSwipe.ignoreClickUntil = Date.now() + 550;
-      setCardSwipeSide(row, '');
-      if (card) {
-        card.style.transition = 'transform .18s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-        card.style.transform = 'translateX(100%)';
-        card.style.opacity = '.82';
-      }
-      reset();
-      setTimeout(() => {
-        if (card) { card.style.transition=''; card.style.transform=''; card.style.opacity=''; }
-        const plan = (remoteState?.plans || []).find((item)=>item.id===planId);
-        if (plan) openSimplifiedChecklist(plan);
-      }, 160);
+    if (!cardSwipe.active) { resetCardSwipeVisual(row, true); resetState(); return; }
+
+    cardSwipe.ignoreClickUntil = Date.now() + 550;
+    if (!fullSwipe) {
+      resetCardSwipeVisual(row, true);
+      resetState();
       return;
     }
 
-    if (card) { card.style.transition = ''; card.style.transform = ''; card.style.opacity = ''; }
-    if (cardSwipe.active) {
-      cardSwipe.ignoreClickUntil = Date.now() + 450;
-      let side = cardSwipe.openSide;
-      if (!cardSwipe.openSide) side = dx <= -44 ? 'delete' : canChecklist && dx >= 44 ? 'checklist' : '';
-      else if (cardSwipe.openSide === 'delete' && dx >= 44) side = '';
-      else if (cardSwipe.openSide === 'checklist' && dx <= -44) side = '';
-      setCardSwipeSide(row, side);
-    }
-    reset();
+    const kind = row.dataset.swipeKind, id = row.dataset.swipeId;
+    finishAction(row, direction);
+    resetState();
+    setTimeout(() => {
+      resetCardSwipeVisual(row, false);
+      if (direction === 'checklist') {
+        const plan = (remoteState?.plans || []).find((item)=>item.id===id);
+        if (plan) openSimplifiedChecklist(plan);
+      } else {
+        openDeleteConfirm(kind, id);
+      }
+    }, 180);
   }, { passive:true });
+
   section.addEventListener('touchcancel', () => {
-    const card = cardSwipe.row?.querySelector('.tv2-card');
-    if (card) { card.style.transition = ''; card.style.transform = ''; card.style.opacity = ''; }
-    reset();
+    resetCardSwipeVisual(cardSwipe.row, true);
+    resetState();
   }, { passive:true });
 }
 
@@ -827,8 +870,7 @@ function bindSimplifiedSwipe(section) {
 
 function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
-  if ((b.dataset.act === 'open-trip' || b.dataset.act === 'delete-trip') && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
-  if (b.dataset.act === 'delete-trip') { openDeleteConfirm(b.dataset.kind, b.dataset.id); return; }
+  if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
   if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:'',budgetMode:'combined'}; renderCurrentTrips(); return; }
   if (b.dataset.act === 'open-trip') {
