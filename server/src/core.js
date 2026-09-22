@@ -426,6 +426,41 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planId=cleanText_(payload.planId,80),expenseId=cleanText_(payload.expenseId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),at=plan.expenseEntries.findIndex(x=>x.id===expenseId);if(at<0)throw new Error('Expense not found');plan.expenseEntries.splice(at,1);state.sharedJar=sanitizeSharedJar_(state.sharedJar);state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expenseId));state.sharedJar=sanitizeSharedJar_(state.sharedJar);plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;state.plans[idx]=plan;addAudit_(state,actor,'deleteTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,sharedJar:state.sharedJar});
     }
 
+    if (action === 'saveTripRepayment') {
+      const planId = cleanText_(payload.planId, 80);
+      const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const linkedTrip = plan.linkedTripId ? state.trips.find(function(t){ return t.id === plan.linkedTripId; }) : null;
+      if (linkedTrip && isTripLocked_(linkedTrip)) throw new Error('This trip is already confirmed by both of you');
+
+      const settlement = tripSettlement_(plan);
+      if (!settlement.debtor || settlement.debtor !== actor || settlement.amount <= .005) throw new Error('You do not owe anything on this trip right now');
+
+      const amount = cleanMoney_(payload.amount);
+      if (amount === '' || Number(amount) <= 0) throw new Error('Enter how much you paid back');
+      if (Number(amount) > settlement.amount + .005) throw new Error('You only owe €' + settlement.amount.toFixed(2));
+
+      const now = new Date().toISOString();
+      const repayment = sanitizeTripRepayment_({
+        id: Utilities.getUuid(),
+        from: actor,
+        to: settlement.creditor,
+        amount: amount,
+        date: payload.date || now.slice(0,10),
+        createdAt: now
+      }, actor);
+      plan.repayments.push(repayment);
+      plan.updatedAt = now;
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+
+      const nextSettlement = tripSettlement_(plan);
+      addAudit_(state, actor, 'saveTripRepayment', plan.id);
+      saveState_(state);
+      return output_({ok:true,planId:plan.id,repayment:repayment,settlement:nextSettlement});
+    }
+
     if (action === 'deleteCurrentTrip') {
       const kind = String(payload.kind || '');
       const id = cleanText_(payload.id, 80);
@@ -1265,6 +1300,68 @@ function sanitizePartialActual_(partial, actor) {
   return hasAny ? out : null;
 }
 
+function sanitizeTripRepayment_(item, fallbackActor) {
+  const s = item && typeof item === 'object' ? item : {};
+  const fallback = cleanActor_(fallbackActor);
+  const fromRaw = cleanActor_(s.from || fallbackActor);
+  const from = fromRaw === 'Unknown' ? (fallback === 'Unknown' ? '' : fallback) : fromRaw;
+  const toRaw = cleanActor_(s.to);
+  const to = toRaw === 'Unknown' ? (from === 'Principessa' ? 'Principe' : from === 'Principe' ? 'Principessa' : '') : toRaw;
+  return {
+    id: cleanText_(s.id,80) || Utilities.getUuid(),
+    from: ACTORS.includes(from) ? from : '',
+    to: ACTORS.includes(to) ? to : '',
+    amount: cleanMoney_(s.amount),
+    date: cleanFinanceDate_(s.date),
+    createdAt: cleanText_(s.createdAt,40)
+  };
+}
+
+function tripSettlement_(plan) {
+  const safe = plan && plan.expenseEntries ? plan : sanitizePlan_(plan);
+  const paid = {Principessa:0,Principe:0};
+  const share = {Principessa:0,Principe:0};
+
+  (safe.expenseEntries || []).forEach(function(entry){
+    const remaining = Math.max(0, Number(entry.amount || 0) - Number(entry.jarContribution || 0));
+    if (entry.paidBy === 'both') {
+      paid.Principessa += remaining / 2;
+      paid.Principe += remaining / 2;
+    } else if (ACTORS.includes(entry.paidBy)) {
+      paid[entry.paidBy] += remaining;
+    }
+
+    if (entry.split === 'personal') {
+      const owner = ACTORS.includes(entry.forActor) ? entry.forActor : entry.paidBy;
+      if (ACTORS.includes(owner)) share[owner] += remaining;
+    } else {
+      share.Principessa += remaining / 2;
+      share.Principe += remaining / 2;
+    }
+  });
+
+  (safe.repayments || []).forEach(function(repayment){
+    const amount = Number(repayment.amount || 0);
+    if (repayment.from === 'Principessa' && repayment.to === 'Principe') {
+      paid.Principessa += amount;
+      paid.Principe -= amount;
+    } else if (repayment.from === 'Principe' && repayment.to === 'Principessa') {
+      paid.Principe += amount;
+      paid.Principessa -= amount;
+    }
+  });
+
+  const delta = money2_(paid.Principessa - share.Principessa);
+  if (Math.abs(delta) < .005) return {debtor:'',creditor:'',amount:0,paid:paid,share:share};
+  return {
+    debtor: delta > 0 ? 'Principe' : 'Principessa',
+    creditor: delta > 0 ? 'Principessa' : 'Principe',
+    amount: money2_(Math.abs(delta)),
+    paid: paid,
+    share: share
+  };
+}
+
 function sanitizePlan_(plan) {
   const budgets = plan && plan.budgets || {};
   const partials = plan && plan.partials || {};
@@ -1281,6 +1378,7 @@ function sanitizePlan_(plan) {
     },
     sharedExpenses: sanitizeSharedExpenses_(plan && plan.sharedExpenses),
     expenseEntries:(Array.isArray(plan&&plan.expenseEntries)?plan.expenseEntries:[]).slice(-500).map(function(x){return sanitizeTripExpense_(x,x&&x.loggedBy);}).filter(function(x){return x.amount!==''&&!!x.paidBy;}),
+    repayments:(Array.isArray(plan&&plan.repayments)?plan.repayments:[]).slice(-300).map(function(x){return sanitizeTripRepayment_(x,x&&x.from);}).filter(function(x){return x.amount!==''&&Number(x.amount)>0&&!!x.from&&!!x.to&&x.from!==x.to;}),
     prep: sanitizeTripPrep_(plan && plan.prep),
     linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
     createdAt: cleanText_(plan && plan.createdAt, 40),
@@ -1373,7 +1471,7 @@ function reconciliationWarnings_(trip) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'saveFinanceMonth', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
