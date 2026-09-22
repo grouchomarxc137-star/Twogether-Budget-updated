@@ -102,6 +102,33 @@ function expenseTotal(plan, trip) {
 function tripEntries(plan) {
   return Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
 }
+function tripRepayments(plan) {
+  return Array.isArray(plan?.repayments) ? plan.repayments : [];
+}
+function settlementState(plan) {
+  const paid = { Principessa:0, Principe:0 }, share = { Principessa:0, Principe:0 };
+  for (const entry of tripEntries(plan)) {
+    const remaining = Math.max(0, n(entry.amount) - n(entry.jarContribution));
+    if (entry.paidBy === 'both') { paid.Principessa += remaining / 2; paid.Principe += remaining / 2; }
+    else if (paid[entry.paidBy] != null) paid[entry.paidBy] += remaining;
+    if (entry.split === 'personal') share[entry.forActor === 'Principe' ? 'Principe' : 'Principessa'] += remaining;
+    else { share.Principessa += remaining / 2; share.Principe += remaining / 2; }
+  }
+  for (const repayment of tripRepayments(plan)) {
+    const value = n(repayment.amount);
+    if (repayment.from === 'Principessa' && repayment.to === 'Principe') { paid.Principessa += value; paid.Principe -= value; }
+    else if (repayment.from === 'Principe' && repayment.to === 'Principessa') { paid.Principe += value; paid.Principessa -= value; }
+  }
+  const delta = paid.Principessa - share.Principessa;
+  if (Math.abs(delta) < .005) return { debtor:'', creditor:'', amount:0, paid, share };
+  return {
+    debtor: delta > 0 ? 'Principe' : 'Principessa',
+    creditor: delta > 0 ? 'Principessa' : 'Principe',
+    amount: Math.abs(delta),
+    paid,
+    share,
+  };
+}
 function tripBudget(plan, trip) {
   const p = plan?.budgets?.Principessa, q = plan?.budgets?.Principe;
   if (has(p) || has(q)) return (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0);
@@ -155,30 +182,29 @@ function entryMeta(entry) {
   return parts.join(' · ');
 }
 function expenseTimeline(plan) {
-  const list = tripEntries(plan).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-  if (!list.length) return '<div class="tv2-empty-list">No expenses yet. Add them as they happen, it takes a few seconds.</div>';
+  const rows = tripEntries(plan).map((entry)=>({ kind:'expense', date:entry.date || '', entry }))
+    .concat(tripRepayments(plan).map((repayment)=>({ kind:'repayment', date:repayment.date || String(repayment.createdAt || '').slice(0,10), repayment })))
+    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if (!rows.length) return '<div class="tv2-empty-list">No expenses yet. Add them as they happen, it takes a few seconds.</div>';
   const groups = new Map();
-  list.forEach((entry) => { const key = entry.date || ''; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(entry); });
-  return [...groups.entries()].map(([date, items]) => '<div class="tv2-day"><h2>'+esc(dayLabel(date))+'</h2>'+items.map((entry) => {
-    const [, icon] = categoryInfo(entry);
+  rows.forEach((row) => { const key = row.date || ''; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(row); });
+  return [...groups.entries()].map(([date, items]) => '<div class="tv2-day"><h2>'+esc(dayLabel(date))+'</h2>'+items.map((row) => {
+    if (row.kind === 'repayment') {
+      const repayment = row.repayment, me = actor();
+      const title = repayment.from === me ? 'Paid back '+repayment.to : repayment.from+' paid you back';
+      const meta = repayment.from === me ? 'Owed money · you → '+repayment.to : 'Owed money · '+repayment.from+' → you';
+      return '<div class="tv2-row is-settlement"><span class="tv2-ic" aria-hidden="true">💸</span><span class="tv2-row-main"><strong>'+esc(title)+'</strong><small>'+esc(meta)+'</small></span><span class="tv2-amt">'+displayMoney(repayment.amount,true)+'</span></div>';
+    }
+    const entry = row.entry, [, icon] = categoryInfo(entry);
     return '<button class="tv2-row" data-act="open-expense" data-id="'+esc(entry.id)+'"><span class="tv2-ic" aria-hidden="true">'+icon+'</span><span class="tv2-row-main"><strong>'+esc(entryTitle(entry))+'</strong><small>'+esc(entryMeta(entry))+'</small></span><span class="tv2-amt">'+displayMoney(entry.amount,true)+'</span></button>';
   }).join('')+'</div>').join('');
 }
 function settlementLine(plan) {
-  const paid = { Principessa:0, Principe:0 }, share = { Principessa:0, Principe:0 };
-  for (const entry of tripEntries(plan)) {
-    const remaining = Math.max(0, n(entry.amount) - n(entry.jarContribution));
-    if (entry.paidBy === 'both') { paid.Principessa += remaining / 2; paid.Principe += remaining / 2; }
-    else if (paid[entry.paidBy] != null) paid[entry.paidBy] += remaining;
-    if (entry.split === 'personal') share[entry.forActor === 'Principe' ? 'Principe' : 'Principessa'] += remaining;
-    else { share.Principessa += remaining / 2; share.Principe += remaining / 2; }
-  }
-  const d = paid.Principessa - share.Principessa, me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
-  if (Math.abs(d) < .005) return 'You’re even';
-  const creditor = d > 0 ? 'Principessa' : 'Principe', debtor = d > 0 ? 'Principe' : 'Principessa', amount = Math.abs(d);
-  if (me === creditor) return `${debtor} owes you ${displayMoney(amount,true)}`;
-  if (me === debtor) return `You owe ${creditor} ${displayMoney(amount,true)}`;
-  return `${debtor} owes ${creditor} ${displayMoney(amount,true)}`;
+  const settlement = settlementState(plan), me = actor();
+  if (!settlement.debtor) return 'You’re even';
+  if (me === settlement.creditor) return `${settlement.debtor} owes you ${displayMoney(settlement.amount,true)}`;
+  if (me === settlement.debtor) return `You owe ${settlement.creditor} ${displayMoney(settlement.amount,true)}`;
+  return `${settlement.debtor} owes ${settlement.creditor} ${displayMoney(settlement.amount,true)}`;
 }
 function displayMoney(value, forceCents = false) {
   const amount = n(value), whole = Math.abs(amount - Math.round(amount)) < .005 && !forceCents;
@@ -260,7 +286,7 @@ function renderCurrentTrips() {
 
 const EXPENSE_CATS = [
   ['stay','Stay','🛏'],['transport','Transport','✈️'],['car','Car','⛽'],
-  ['groceries','Groceries','🛒'],['eating-out','Eating out','🍝'],['activities','Activities','🎟'],['other','Other','•'],
+  ['groceries','Groceries','🛒'],['eating-out','Eating out','🍝'],['activities','Activities','🎟'],['owed','Owed money','💸'],['other','Other','•'],
 ];
 function uiCategoryFromEntry(entry) {
   if (!entry) return '';
@@ -291,6 +317,9 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   closeSimplifiedSheet();
   const me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
   const oldJar = n(existing?.jarContribution), availableJar = () => n(remoteState?.sharedJar?.balance) + oldJar;
+  const debt = () => settlementState(plan);
+  const owedAmount = () => { const current = debt(); return current.debtor === me ? current.amount : 0; };
+  const owedTo = () => { const current = debt(); return current.debtor === me ? current.creditor : ''; };
   const state = {
     amountText: existing ? String(existing.amount ?? '') : '',
     category: uiCategoryFromEntry(existing),
@@ -307,62 +336,108 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   const amount = () => Number(String(state.amountText||'').replace(',','.'));
   const validAmount = () => Number.isFinite(amount()) && amount() > 0;
   const jarAmount = () => state.category === 'stay' && state.useJar && validAmount() ? amount() * .2 : 0;
-  const canSave = () => validAmount() && !!state.category && (state.category !== 'stay' || !state.useJar || jarAmount() <= availableJar()+.005);
+  const canSave = () => {
+    if (state.category === 'owed') return owedAmount() > .005 && validAmount() && amount() <= owedAmount() + .005;
+    return validAmount() && !!state.category && (state.category !== 'stay' || !state.useJar || jarAmount() <= availableJar()+.005);
+  };
   const summary = () => {
     const payer = state.paidBy === me ? 'Paid by you' : state.paidBy === 'both' ? 'Each paid half' : 'Paid by '+state.paidBy;
     const split = state.paidBy === 'both' ? '' : state.split === 'shared' ? 'split 50/50' : state.forActor === me ? 'just you' : 'just '+other;
     const date = state.date === new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10) ? 'today' : fmtDate(state.date);
     return [payer,split,date,state.uncertain?'estimate':''].filter(Boolean).join(' · ');
   };
-  const html = () => '<div class="tv2-sheet-head"><h2>'+(existing?'Edit expense':'Add expense')+'</h2><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
-    '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-    '<div class="tv2-cats" role="group" aria-label="Category">'+EXPENSE_CATS.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join('')+'</div>'+
-    '<div class="tv2-jar-slot"></div>'+
-    '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-    '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
-      '<div class="tv2-field"><span>Paid by</span><div class="tv2-seg">'+
-        [[me,'You'],[other,other],['both','Each paid half']].map(([k,l])=>'<button type="button" data-payer="'+k+'" class="'+(state.paidBy===k?'on':'')+'">'+esc(l)+'</button>').join('')+
-        '<button type="button" data-jar-payer>Shared Jar</button>'+
-      '</div></div>'+
-      '<div class="tv2-field" '+(state.paidBy==='both'?'hidden':'')+'><span>For</span><div class="tv2-seg">'+
-        [['shared','Shared 50/50'],[me,'Just you'],[other,'Just '+other]].map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
-      '</div></div>'+
-      '<label class="tv2-field"><span>Date</span><input type="date" id="tv2Date" value="'+esc(state.date)+'"></label>'+
-      '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
-      '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
-    '</div>'+
-    '<p class="tv2-hint" aria-live="polite"></p>'+
-    '<button type="button" class="tv2-primary tv2-save" data-save>'+(existing?'Save changes':'Save')+'</button>'+
-    (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
+  const html = () => {
+    const settlement = debt(), mine = settlement.debtor === me ? settlement.amount : 0;
+    const categories = EXPENSE_CATS.filter(([key]) => !existing || key !== 'owed');
+    const amountField = state.category === 'owed' ? '' :
+      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>';
+    let owedPanel = '';
+    if (state.category === 'owed') {
+      if (mine > .005) {
+        owedPanel = '<div class="tv2-owed-panel">'+
+          '<div class="tv2-owed-head"><span>You owe '+esc(settlement.creditor)+'</span><strong>'+displayMoney(mine,true)+'</strong></div>'+
+          '<p>This is a repayment between you two, so it changes who has actually paid without adding another trip expense.</p>'+
+          '<label class="tv2-owed-field"><span>Amount you paid back</span><div><b>€</b><input id="tv2Amount" inputmode="decimal" autocomplete="off" placeholder="0.00" value="'+esc(state.amountText)+'"></div></label>'+
+          '<button type="button" class="tv2-btn tv2-pay-full" data-pay-full>Pay full '+displayMoney(mine,true)+'</button>'+
+        '</div>';
+      } else if (settlement.creditor === me && settlement.debtor) {
+        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(settlement.debtor)+' owes you</span><strong>'+displayMoney(settlement.amount,true)+'</strong></div><p>They can log their repayment from their own profile.</p></div>';
+      } else {
+        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0.00</strong></div><p>You’re even on this trip right now.</p></div>';
+      }
+    }
+    const normalOptions = state.category === 'owed' ? '' :
+      '<div class="tv2-jar-slot"></div>'+
+      '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+      '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
+        '<div class="tv2-field"><span>Paid by</span><div class="tv2-seg">'+
+          [[me,'You'],[other,other],['both','Each paid half']].map(([k,l])=>'<button type="button" data-payer="'+k+'" class="'+(state.paidBy===k?'on':'')+'">'+esc(l)+'</button>').join('')+
+          '<button type="button" data-jar-payer>Shared Jar</button>'+
+        '</div></div>'+
+        '<div class="tv2-field" '+(state.paidBy==='both'?'hidden':'')+'><span>For</span><div class="tv2-seg">'+
+          [['shared','Shared 50/50'],[me,'Just you'],[other,'Just '+other]].map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
+        '</div></div>'+
+        '<label class="tv2-field"><span>Date</span><input type="date" id="tv2Date" value="'+esc(state.date)+'"></label>'+
+        '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
+        '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
+      '</div>';
+    return '<div class="tv2-sheet-head"><h2>'+(existing?'Edit expense':'Add expense')+'</h2><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+      amountField+
+      '<div class="tv2-cats" role="group" aria-label="Category">'+categories.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join('')+'</div>'+
+      owedPanel+normalOptions+
+      '<p class="tv2-hint" aria-live="polite"></p>'+
+      '<button type="button" class="tv2-primary tv2-save" data-save>'+(state.category==='owed'?'Log repayment':existing?'Save changes':'Save')+'</button>'+
+      (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
+  };
   simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet" role="dialog" aria-modal="true"></div>';
   document.body.appendChild(simplifiedLayer); document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-sheet');
   function refreshLive() {
     const slot = sheet.querySelector('.tv2-jar-slot');
-    if (state.category === 'stay') {
-      if (availableJar() <= 0) slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar has '+displayMoney(availableJar(),true)+' available</span></div>';
-      else if (state.useJar) slot.innerHTML = '<div class="tv2-jar"><span>Shared Jar pays <b>'+(validAmount()?displayMoney(jarAmount(),true):'20%')+'</b> (20%)</span><button type="button" data-jar="off">Remove</button></div>';
-      else slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar not used</span><button type="button" data-jar="on">Use 20%</button></div>';
-    } else slot.innerHTML = '';
-    sheet.querySelector('.tv2-summary').textContent = summary();
+    if (slot) {
+      if (state.category === 'stay') {
+        if (availableJar() <= 0) slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar has '+displayMoney(availableJar(),true)+' available</span></div>';
+        else if (state.useJar) slot.innerHTML = '<div class="tv2-jar"><span>Shared Jar pays <b>'+(validAmount()?displayMoney(jarAmount(),true):'20%')+'</b> (20%)</span><button type="button" data-jar="off">Remove</button></div>';
+        else slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar not used</span><button type="button" data-jar="on">Use 20%</button></div>';
+      } else slot.innerHTML = '';
+    }
+    const summaryEl = sheet.querySelector('.tv2-summary');
+    if (summaryEl) summaryEl.textContent = summary();
     const hint = sheet.querySelector('.tv2-hint'), save = sheet.querySelector('[data-save]');
-    save.disabled = !canSave() || state.busy; save.textContent = state.busy ? 'Saving…' : existing ? 'Save changes' : 'Save';
-    hint.textContent = state.error || (state.amountText && !validAmount() ? 'That amount doesn’t look right' : !validAmount() ? 'Enter the amount' : !state.category ? 'Pick a category' : state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005 ? 'Not enough in the Shared Jar.' : '');
-    hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()) || (state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005));
+    save.disabled = !canSave() || state.busy;
+    save.textContent = state.busy ? 'Saving…' : state.category === 'owed' ? 'Log repayment' : existing ? 'Save changes' : 'Save';
+
+    if (state.category === 'owed') {
+      const mine = owedAmount();
+      hint.textContent = state.error || (mine <= .005 ? '' : state.amountText && !validAmount() ? 'That amount doesn’t look right' : !validAmount() ? 'Enter how much you paid back' : amount() > mine + .005 ? 'You only owe '+displayMoney(mine,true) : '');
+      hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()) || (validAmount()&&amount()>mine+.005));
+    } else {
+      hint.textContent = state.error || (state.amountText && !validAmount() ? 'That amount doesn’t look right' : !validAmount() ? 'Enter the amount' : !state.category ? 'Pick a category' : state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005 ? 'Not enough in the Shared Jar.' : '');
+      hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()) || (state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005));
+    }
   }
   function mount() {
     sheet.innerHTML = html();
     const input = sheet.querySelector('#tv2Amount');
-    input.addEventListener('input',()=>{state.amountText=input.value;state.error='';refreshLive();});
-    input.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();if(canSave())save();}});
+    input?.addEventListener('input',()=>{state.amountText=input.value;state.error='';refreshLive();});
+    input?.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();if(canSave())save();}});
     sheet.querySelector('#tv2Date')?.addEventListener('change',(e)=>{state.date=e.target.value||state.date;refreshLive();});
     sheet.querySelector('#tv2Note')?.addEventListener('input',(e)=>{state.note=e.target.value;});
     sheet.querySelector('#tv2Est')?.addEventListener('change',(e)=>{state.uncertain=e.target.checked;refreshLive();});
     sheet.onclick = (e) => {
       const b = e.target.closest('button'); if (!b) return;
       if (b.hasAttribute('data-close')) { closeSimplifiedSheet(); return; }
-      if (b.dataset.cat) { state.category=b.dataset.cat; if(state.category!=='stay')state.useJar=false; sheet.querySelectorAll('[data-cat]').forEach((x)=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));}); refreshLive(); return; }
+      if (b.dataset.cat) {
+        const wasOwed = state.category === 'owed';
+        state.category=b.dataset.cat;
+        if ((state.category === 'owed') !== wasOwed) state.amountText='';
+        if(state.category!=='stay')state.useJar=false;
+        if(state.category==='owed')state.more=false;
+        mount();
+        return;
+      }
+      if (b.hasAttribute('data-pay-full')) { state.amountText=owedAmount().toFixed(2); mount(); return; }
       if (b.dataset.jar) { state.useJar=b.dataset.jar==='on'; refreshLive(); return; }
       if (b.hasAttribute('data-more')) { state.more=!state.more; mount(); return; }
       if (b.dataset.payer) { state.paidBy=b.dataset.payer; if(state.paidBy==='both')state.split='shared'; mount(); return; }
@@ -372,11 +447,20 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       if (b.hasAttribute('data-delete')) { remove(); }
     };
     refreshLive();
-    if (!state.mounted && !existing) { state.mounted=true; setTimeout(()=>input.focus(),0); }
+    if (!state.mounted && !existing && input && state.category !== 'owed') { state.mounted=true; setTimeout(()=>input.focus(),0); }
   }
   async function save() {
     if (!canSave() || state.busy) return;
     state.busy=true; state.error=''; refreshLive();
+    if (state.category === 'owed') {
+      const paidBack = amount(), target = owedTo();
+      try {
+        await window.TwogetherAPI.post('saveTripRepayment',{planId:plan.id,amount:paidBack,date:state.date},actor());
+        closeSimplifiedSheet(); await refreshState(true);
+        simplifiedSnack(displayMoney(paidBack,true)+' paid back to '+target);
+      } catch (err) { state.busy=false; state.error=err?.message||'Could not save repayment. Check your connection and try again.'; refreshLive(); }
+      return;
+    }
     const mapped=mapUiCategory(state.category);
     try {
       await window.TwogetherAPI.post('saveTripExpense',{planId:plan.id,expense:{
