@@ -5169,3 +5169,9 @@ body.tv2-locked{overflow:hidden}
   .tv2-sheet{max-height:94dvh}
   .tv2-amount{margin:0 34px}
 }
+
+
+/* Keep direct expense sheet inside the native trip dialog top layer */
+.current-overview.current-overview-trip{position:fixed}
+.current-overview.current-overview-trip>.tv2-layer{position:absolute;inset:0;z-index:20}
+.current-overview.current-overview-trip>.tv2-layer .tv2-backdrop{position:absolute}
