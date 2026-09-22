@@ -34,7 +34,7 @@ let simplifiedView = { name: 'home', planId: '' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
-let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
+let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, wasOpen:false, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
 
 function has(v) { return v !== '' && v != null; }
@@ -454,14 +454,14 @@ function bindCardDeleteSwipe(section) {
   if (section.dataset.tv2DeleteSwipe === '1') return;
   section.dataset.tv2DeleteSwipe = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
-  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
+  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, wasOpen:false, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
   section.addEventListener('touchstart', (e) => {
     if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || e.touches.length !== 1) return;
     const row = e.target.closest('.tv2-swipe-row');
     if (!row || e.target.closest('.tv2-delete-reveal')) return;
     closeCardSwipeRows(row);
     const t = e.touches[0];
-    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
+    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, wasOpen:row.classList.contains('is-open'), ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
   }, { passive:true });
   section.addEventListener('touchmove', (e) => {
     if (!cardSwipe.tracking || !cardSwipe.row || e.touches.length !== 1) return;
@@ -469,14 +469,18 @@ function bindCardDeleteSwipe(section) {
     cardSwipe.lastX = t.clientX;
     if (!cardSwipe.active) {
       if (Math.abs(dx) < 8 && dy < 8) return;
-      if (dx < -10 && Math.abs(dx) > dy * 1.2) cardSwipe.active = true;
-      else if (dy >= Math.abs(dx) || dx > 0) { reset(); return; }
+      const horizontal = Math.abs(dx) > dy * 1.2;
+      const opening = !cardSwipe.wasOpen && dx < -10 && horizontal;
+      const closing = cardSwipe.wasOpen && dx > 10 && horizontal;
+      if (opening || closing) cardSwipe.active = true;
+      else if (dy >= Math.abs(dx) || (!cardSwipe.wasOpen && dx > 0) || (cardSwipe.wasOpen && dx < 0)) { reset(); return; }
     }
     if (!cardSwipe.active) return;
     e.preventDefault();
     const card = cardSwipe.row.querySelector('.tv2-card');
     if (!card) return;
-    const distance = Math.max(-84, Math.min(0, dx));
+    const base = cardSwipe.wasOpen ? -84 : 0;
+    const distance = Math.max(-84, Math.min(0, base + dx));
     card.style.transition = 'none';
     card.style.transform = 'translateX('+distance+'px)';
   }, { passive:false });
@@ -487,7 +491,8 @@ function bindCardDeleteSwipe(section) {
     if (card) { card.style.transition = ''; card.style.transform = ''; }
     if (cardSwipe.active) {
       cardSwipe.ignoreClickUntil = Date.now() + 450;
-      row.classList.toggle('is-open', dx <= -44);
+      if (cardSwipe.wasOpen) row.classList.toggle('is-open', !(dx >= 44));
+      else row.classList.toggle('is-open', dx <= -44);
     }
     reset();
   }, { passive:true });
