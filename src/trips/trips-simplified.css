@@ -317,9 +317,17 @@ html body #twCurrentTripsSection.tv2-current-host{
 
 /* Opened trip focus view: lock and blur the website behind it, then scroll
    only inside the trip panel when its contents exceed the viewport. */
+html.tv2-trip-focus,
 body.tv2-trip-focus{
   overflow:hidden!important;
-  overscroll-behavior:none;
+  overscroll-behavior:none!important;
+}
+body.tv2-trip-focus{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+  touch-action:none;
 }
 html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   position:relative!important;
@@ -344,6 +352,7 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   overflow-x:hidden;
   overflow-y:auto;
   overscroll-behavior:contain;
+  touch-action:pan-y;
   -webkit-overflow-scrolling:touch;
   transform:translate(-50%,-50%);
   border:1px solid var(--tv2-line);

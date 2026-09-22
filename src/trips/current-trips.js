@@ -37,6 +37,7 @@ let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
 let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:0 };
 let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
+let tripFocusScrollY = 0;
 
 function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
@@ -301,6 +302,23 @@ function simplifiedTrip(plan, trip) {
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
 }
+function setTripFocusLock(locked) {
+  const body = document.body, html = document.documentElement;
+  if (locked) {
+    if (body.classList.contains('tv2-trip-focus')) return;
+    tripFocusScrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
+    body.style.top = '-' + tripFocusScrollY + 'px';
+    html.classList.add('tv2-trip-focus');
+    body.classList.add('tv2-trip-focus');
+    return;
+  }
+  const wasLocked = body.classList.contains('tv2-trip-focus');
+  html.classList.remove('tv2-trip-focus');
+  body.classList.remove('tv2-trip-focus');
+  body.style.top = '';
+  if (wasLocked) window.scrollTo({ top: tripFocusScrollY, left: 0, behavior: 'auto' });
+}
+
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
   if (simplifiedView.name === 'trip') {
@@ -310,14 +328,14 @@ function renderCurrentTrips() {
       const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
       root.classList.add('tv2-trip-view');
       section.classList.add('tv2-focus-open');
-      document.body.classList.add('tv2-trip-focus');
+      setTripFocusLock(true);
       root.innerHTML = simplifiedTrip(plan, trip);
       return;
     }
   }
   root.classList.remove('tv2-trip-view');
   section.classList.remove('tv2-focus-open');
-  document.body.classList.remove('tv2-trip-focus');
+  setTripFocusLock(false);
   root.innerHTML = simplifiedHome(allSimplifiedItems());
 }
 
