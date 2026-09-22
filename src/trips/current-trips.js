@@ -80,6 +80,12 @@ function ensureCurrentTrips() {
     section.innerHTML = '<div id="twCurrentTrips" class="tv2-root"></div>';
     section.dataset.tv2Full = '1';
     section.addEventListener('click', handleSimplifiedClick);
+    section.addEventListener('keydown', (e) => {
+      const card = e.target.closest('[data-act="toggle-budget-view"]');
+      if (!card || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      card.click();
+    });
     bindSimplifiedSwipe(section);
     bindCardDeleteSwipe(section);
   }
@@ -259,7 +265,7 @@ function simplifiedTrip(plan, trip) {
   const left = available == null ? null : available - spent;
   const over = left != null && left < 0, pct = available && available > 0 ? Math.min(100, Math.max(0, (spent / available) * 100)) : 0;
   const personalClass = personal ? ' is-personal '+(me === 'Principe' ? 'is-principe' : 'is-principessa') : '';
-  const budgetLabel = personal ? 'Your budget' : 'Available';
+  const budgetLabel = 'Available';
   return '<div class="tv2-page">'+
     '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>'+
       '<h1>'+esc(meta.city || locationLabel(meta))+'</h1><p>'+esc(shortRange(meta.start,meta.end))+(statusLine(meta)?' · '+esc(statusLine(meta)):'')+'</p></header>'+
