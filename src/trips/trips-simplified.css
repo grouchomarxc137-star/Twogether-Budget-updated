@@ -599,7 +599,7 @@ html body #twCurrentTripsSection.tv2-current-host{
 .tv2-check-text{
   display:block;
   min-width:100%;
-  width:max(100%,calc(var(--tv2-check-chars,14) * 1ch));
+  width:100%;
   border:0;
   outline:0;
   background:transparent;
