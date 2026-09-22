@@ -391,7 +391,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         '<div class="tv2-field" '+(state.paidBy==='both'?'hidden':'')+'><span>For</span><div class="tv2-seg">'+
           [['shared','Shared 50/50'],[me,'Just you'],[other,'Just '+other]].map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
         '</div></div>'+
-        '<label class="tv2-field"><span>Date</span><input type="date" id="tv2Date" value="'+esc(state.date)+'"></label>'+
+        '<label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input type="date" id="tv2Date" value="'+esc(state.date)+'"></span></label>'+
         '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
         '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
       '</div>';
