@@ -730,7 +730,7 @@ function bindCardDeleteSwipe(section) {
     const position = base + dx;
     const canChecklist = row.dataset.swipeKind === 'plan';
 
-    if (cardSwipe.active && canChecklist && position >= fullThreshold) {
+    if (cardSwipe.active && canChecklist && cardSwipe.openSide !== 'delete' && position >= fullThreshold) {
       const planId = row.dataset.swipeId;
       cardSwipe.ignoreClickUntil = Date.now() + 550;
       setCardSwipeSide(row, '');
