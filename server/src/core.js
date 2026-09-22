@@ -1373,7 +1373,7 @@ function reconciliationWarnings_(trip) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'saveFinanceMonth', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
