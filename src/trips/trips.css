@@ -4998,3 +4998,12 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
   .current-overview .overview-simple-table td:nth-child(3){width:28%!important}
   .current-overview .overview-category-btn{gap:7px!important;padding:11px 9px!important;font-size:13px!important}
 }
+
+
+/* Mobile: the dropdown page picker replaces the legacy Trips subnav. */
+@media(max-width:760px){
+  html body #tripSubnav,
+  html body #tripSubnav:not(.hidden){
+    display:none!important;
+  }
+}

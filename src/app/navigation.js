@@ -111,7 +111,19 @@ function ensureNavigation() {
     const main = $(`[data-hub="${def.key}"]`, hub); if (!main) return;
     const wrap = document.createElement('div'); wrap.className = 'tw-nav-wrap tw-v18-nav-wrap'; main.parentNode.insertBefore(wrap, main); wrap.appendChild(main); main.setAttribute('aria-haspopup', 'menu'); main.setAttribute('aria-expanded', 'false');
     const menu = document.createElement('div'); menu.className = 'tw-nav-menu'; menu.setAttribute('role', 'menu');
-    def.items.forEach(([label, getTarget]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('role', 'menuitem'); b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); getTarget()?.click(); }); menu.appendChild(b); });
+    def.items.forEach(([label, getTarget]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('role', 'menuitem');
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        getTarget()?.click();
+        unpinAndFadeAll();
+      });
+      menu.appendChild(b);
+    });
     wrap.appendChild(menu);
   });
 }
@@ -153,7 +165,7 @@ function installDropdownRefinement() {
     hub?.addEventListener('click', () => {
       suppressHover = false;
       if (isMobile()) {
-        if (pinned === w) { pinned = null; hardClose(w); return; }
+        if (pinned === w) { openWrap(w); return; }
         const old = pinned; pinned = w;
         if (old && old !== w) fadeClose(old);
         openWrap(w);

@@ -2301,3 +2301,12 @@
   font-weight:400;
   color:var(--muted);
 }
+
+
+/* Mobile: the dropdown page picker replaces the legacy Finances subnav. */
+@media(max-width:760px){
+  html body #financeSubnav,
+  html body #financeSubnav:not(.hidden){
+    display:none!important;
+  }
+}
