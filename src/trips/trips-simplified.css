@@ -171,6 +171,7 @@ body.tv2-locked { overflow: hidden; }
   width:100%!important;
   min-width:0!important;
   max-width:100%!important;
+  height:44px;
   min-height:44px;
   border:0;
   border-radius:0;
@@ -178,9 +179,30 @@ body.tv2-locked { overflow: hidden; }
   padding:0 12px;
   color:var(--tv2-ink);
   font-size:16px!important;
+  line-height:44px;
   text-align:center;
   -webkit-appearance:none;
   appearance:none;
+}
+.tv2-date-box input[type="date"]::-webkit-date-and-time-value {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:44px;
+  min-height:44px;
+  padding:0;
+  margin:0;
+  text-align:center;
+}
+.tv2-date-box input[type="date"]::-webkit-datetime-edit {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:44px;
+  padding:0;
+  margin:0;
 }
 .tv2-big input { min-height: 52px; font-size: 18px !important; }
 .tv2-seg { display: flex; flex-wrap: wrap; gap: 6px; }
