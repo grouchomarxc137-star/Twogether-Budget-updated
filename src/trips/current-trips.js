@@ -18,7 +18,7 @@
 //   control -- also confirmed non-functional (TwogetherDevV18 is never
 //   defined by any loaded file) but kept for now, not this file's call.
 import { $, $$ } from '../lib/dom.js';
-import { esc, n, money, fmtDate } from '../lib/format.js';
+import { esc, n, money, fmtDate, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 
@@ -34,7 +34,7 @@ let simplifiedView = { name: 'home', planId: '', budgetMode: 'combined' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
-let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, wasOpen:false, ignoreClickUntil:0 };
+let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, openSide:'', ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
 
 function has(v) { return v !== '' && v != null; }
@@ -241,6 +241,7 @@ function simplifiedCard(item) {
   const name = item.meta?.city || locationLabel(item.meta);
   const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
+    (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true">Checklist</span>' : '')+
     '<button type="button" class="tv2-delete-reveal" data-act="delete-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" aria-label="Delete '+esc(name)+'">Delete</button>'+
     '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
       '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
@@ -497,9 +498,139 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   mount();
 }
 
+const CHECKLIST_DEFAULTS = {
+  packing: ['Toothbrushes', 'Slippers', 'Hair brush', 'Shampoo', 'Conditioner', 'Shower gel', 'Dishwasher detergent'],
+  reminders: ["Don't forget to put fuel", "Don't forget to ask mom to make work sandwich", "Don't forget to take pictures of the Airbnb when you arrive"],
+};
+function checklistSeed(list) {
+  return list.map((text) => ({ id: uid(), text, done:false }));
+}
+function openSimplifiedChecklist(plan) {
+  if (!plan) return;
+  closeSimplifiedSheet();
+  const stored = plan.prep || {};
+  const prep = {
+    packing: stored.packing?.length ? JSON.parse(JSON.stringify(stored.packing)) : checklistSeed(CHECKLIST_DEFAULTS.packing),
+    reminders: stored.reminders?.length ? JSON.parse(JSON.stringify(stored.reminders)) : checklistSeed(CHECKLIST_DEFAULTS.reminders),
+  };
+  const state = { busy:false, error:'' };
+  simplifiedLayer = document.createElement('div');
+  simplifiedLayer.className = 'tv2-layer';
+  simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
+  document.body.appendChild(simplifiedLayer);
+  document.body.classList.add('tv2-locked');
+  const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
+
+  const rowHtml = (kind, item, completed = false) =>
+    '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+      '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
+      '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
+      '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove item">×</button>'+
+      (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
+    '</div>';
+
+  const activeSection = (kind, title) => {
+    const active = prep[kind].filter((item)=>!item.done);
+    return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
+      '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">All clear here ♡</p>')+'</div>'+
+      '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
+    '</section>';
+  };
+
+  const completedSection = () => {
+    const done = [
+      ...prep.packing.filter((item)=>item.done).map((item)=>({kind:'packing',item})),
+      ...prep.reminders.filter((item)=>item.done).map((item)=>({kind:'reminders',item})),
+    ];
+    if (!done.length) return '';
+    return '<section class="tv2-check-section tv2-check-completed"><div class="tv2-check-section-head"><h3>Completed</h3><span>'+done.length+'</span></div>'+
+      '<div class="tv2-check-list">'+done.map(({kind,item})=>rowHtml(kind,item,true)).join('')+'</div></section>';
+  };
+
+  function render(moveId = '') {
+    if (!sheet) return;
+    sheet.innerHTML =
+      '<div class="tv2-sheet-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+      '<p class="tv2-check-intro">Keep the little things together before the trip.</p>'+
+      activeSection('packing','Packing / things to take')+
+      activeSection('reminders','Important reminders')+
+      completedSection()+
+      '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
+      '<button type="button" class="tv2-primary tv2-check-save" data-check-save '+(state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save checklist')+'</button>';
+    if (moveId) requestAnimationFrame(() => {
+      const row = sheet.querySelector('[data-check-id="'+CSS.escape(moveId)+'"]');
+      row?.classList.add('just-arrived');
+    });
+  }
+
+  function findItem(row) {
+    const kind = row?.dataset.checkKind, id = row?.dataset.checkId;
+    return kind && Array.isArray(prep[kind]) ? prep[kind].find((item)=>item.id===id) : null;
+  }
+  function addItem(kind) {
+    const input = sheet.querySelector('[data-check-new="'+kind+'"]');
+    const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
+    prep[kind].push({ id:uid(), text, done:false });
+    render();
+    requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
+  }
+  async function saveChecklist() {
+    if (state.busy) return;
+    state.busy=true; state.error=''; render();
+    prep.packing = prep.packing.filter((item)=>String(item.text||'').trim());
+    prep.reminders = prep.reminders.filter((item)=>String(item.text||'').trim());
+    try {
+      await window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep},actor());
+      closeSimplifiedSheet();
+      await refreshState(true);
+      simplifiedSnack('Checklist saved');
+    } catch (err) {
+      state.busy=false; state.error=err?.message||'Could not save checklist'; render();
+    }
+  }
+
+  sheet.addEventListener('change',(e)=>{
+    const row=e.target.closest('.tv2-check-row'); if(!row)return;
+    const item=findItem(row); if(!item)return;
+    if(e.target.matches('[data-check-toggle]')){
+      item.done=e.target.checked;
+      row.classList.add('is-moving');
+      setTimeout(()=>render(item.id),180);
+    } else if(e.target.matches('[data-check-text]')) item.text=e.target.value.trim();
+  });
+  sheet.addEventListener('input',(e)=>{
+    if(!e.target.matches('[data-check-text]'))return;
+    const row=e.target.closest('.tv2-check-row'),item=findItem(row); if(item)item.text=e.target.value;
+  });
+  sheet.addEventListener('keydown',(e)=>{
+    const input=e.target.closest('[data-check-new]'); if(!input||e.key!=='Enter')return;
+    e.preventDefault(); addItem(input.dataset.checkNew);
+  });
+  sheet.addEventListener('click',(e)=>{
+    const b=e.target.closest('button'); if(!b)return;
+    if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
+    if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
+    if(b.hasAttribute('data-check-remove')){
+      const row=b.closest('.tv2-check-row'),kind=row?.dataset.checkKind,id=row?.dataset.checkId;
+      if(kind&&Array.isArray(prep[kind]))prep[kind]=prep[kind].filter((item)=>item.id!==id);
+      render(); return;
+    }
+    if(b.hasAttribute('data-check-save'))saveChecklist();
+  });
+  simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
+  simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
+  render();
+}
+
+function setCardSwipeSide(row, side = '') {
+  if (!row) return;
+  row.classList.toggle('is-open', !!side);
+  row.classList.toggle('is-delete-open', side === 'delete');
+  row.classList.toggle('is-checklist-open', side === 'checklist');
+}
 function closeCardSwipeRows(except = null) {
   document.querySelectorAll('#twCurrentTrips .tv2-swipe-row.is-open').forEach((row) => {
-    if (row !== except) row.classList.remove('is-open');
+    if (row !== except) setCardSwipeSide(row, '');
   });
 }
 function closeDeleteConfirm() {
@@ -550,33 +681,42 @@ function bindCardDeleteSwipe(section) {
   if (section.dataset.tv2DeleteSwipe === '1') return;
   section.dataset.tv2DeleteSwipe = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
-  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, wasOpen:false, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
+  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, openSide:'', ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
   section.addEventListener('touchstart', (e) => {
-    if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || e.touches.length !== 1) return;
-    const row = e.target.closest('.tv2-swipe-row');
-    if (!row) return;
+    if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || simplifiedLayer || e.touches.length !== 1) return;
+    const row = e.target.closest('.tv2-swipe-row'); if (!row) return;
     closeCardSwipeRows(row);
     const t = e.touches[0];
-    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, wasOpen:row.classList.contains('is-open'), ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
+    const openSide = row.classList.contains('is-delete-open') ? 'delete' : row.classList.contains('is-checklist-open') ? 'checklist' : '';
+    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, openSide, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
   }, { passive:true });
   section.addEventListener('touchmove', (e) => {
     if (!cardSwipe.tracking || !cardSwipe.row || e.touches.length !== 1) return;
     const t = e.touches[0], dx = t.clientX - cardSwipe.startX, dy = Math.abs(t.clientY - cardSwipe.startY);
+    const row = cardSwipe.row, canChecklist = row.dataset.swipeKind === 'plan';
     cardSwipe.lastX = t.clientX;
     if (!cardSwipe.active) {
       if (Math.abs(dx) < 8 && dy < 8) return;
       const horizontal = Math.abs(dx) > dy * 1.2;
-      const opening = !cardSwipe.wasOpen && dx < -10 && horizontal;
-      const closing = cardSwipe.wasOpen && dx > 10 && horizontal;
-      if (opening || closing) cardSwipe.active = true;
-      else if (dy >= Math.abs(dx) || (!cardSwipe.wasOpen && dx > 0) || (cardSwipe.wasOpen && dx < 0)) { reset(); return; }
+      let allowed = false;
+      if (!cardSwipe.openSide) allowed = dx < -10 || (canChecklist && dx > 10);
+      else if (cardSwipe.openSide === 'delete') allowed = dx > 10;
+      else if (cardSwipe.openSide === 'checklist') allowed = Math.abs(dx) > 10;
+      if (horizontal && allowed) cardSwipe.active = true;
+      else if (dy >= Math.abs(dx) || (horizontal && Math.abs(dx) > 10 && !allowed)) { reset(); return; }
     }
     if (!cardSwipe.active) return;
     e.preventDefault();
-    const card = cardSwipe.row.querySelector('.tv2-card');
-    if (!card) return;
-    const base = cardSwipe.wasOpen ? -84 : 0;
-    const distance = Math.max(-84, Math.min(0, base + dx));
+    const card = row.querySelector('.tv2-card'); if (!card) return;
+    const width = row.getBoundingClientRect().width || window.innerWidth - 32;
+    const fullThreshold = Math.max(150, width * .56);
+    const maxRight = fullThreshold + 52;
+    const base = cardSwipe.openSide === 'delete' ? -84 : cardSwipe.openSide === 'checklist' ? 104 : 0;
+    let distance = base + dx;
+    if (cardSwipe.openSide === 'delete') distance = Math.max(-84, Math.min(0, distance));
+    else if (cardSwipe.openSide === 'checklist') distance = Math.max(0, Math.min(maxRight, distance));
+    else if (dx < 0) distance = Math.max(-84, Math.min(0, dx));
+    else distance = Math.max(0, Math.min(maxRight, dx));
     card.style.transition = 'none';
     card.style.transform = 'translateX('+distance+'px)';
   }, { passive:false });
@@ -584,17 +724,44 @@ function bindCardDeleteSwipe(section) {
     if (!cardSwipe.tracking || !cardSwipe.row) { reset(); return; }
     const row = cardSwipe.row, card = row.querySelector('.tv2-card');
     const dx = cardSwipe.lastX - cardSwipe.startX;
-    if (card) { card.style.transition = ''; card.style.transform = ''; }
+    const width = row.getBoundingClientRect().width || window.innerWidth - 32;
+    const fullThreshold = Math.max(150, width * .56);
+    const base = cardSwipe.openSide === 'delete' ? -84 : cardSwipe.openSide === 'checklist' ? 104 : 0;
+    const position = base + dx;
+    const canChecklist = row.dataset.swipeKind === 'plan';
+
+    if (cardSwipe.active && canChecklist && position >= fullThreshold) {
+      const planId = row.dataset.swipeId;
+      cardSwipe.ignoreClickUntil = Date.now() + 550;
+      setCardSwipeSide(row, '');
+      if (card) {
+        card.style.transition = 'transform .18s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+        card.style.transform = 'translateX(100%)';
+        card.style.opacity = '.82';
+      }
+      reset();
+      setTimeout(() => {
+        if (card) { card.style.transition=''; card.style.transform=''; card.style.opacity=''; }
+        const plan = (remoteState?.plans || []).find((item)=>item.id===planId);
+        if (plan) openSimplifiedChecklist(plan);
+      }, 160);
+      return;
+    }
+
+    if (card) { card.style.transition = ''; card.style.transform = ''; card.style.opacity = ''; }
     if (cardSwipe.active) {
       cardSwipe.ignoreClickUntil = Date.now() + 450;
-      if (cardSwipe.wasOpen) row.classList.toggle('is-open', !(dx >= 44));
-      else row.classList.toggle('is-open', dx <= -44);
+      let side = cardSwipe.openSide;
+      if (!cardSwipe.openSide) side = dx <= -44 ? 'delete' : canChecklist && dx >= 44 ? 'checklist' : '';
+      else if (cardSwipe.openSide === 'delete' && dx >= 44) side = '';
+      else if (cardSwipe.openSide === 'checklist' && dx <= -44) side = '';
+      setCardSwipeSide(row, side);
     }
     reset();
   }, { passive:true });
   section.addEventListener('touchcancel', () => {
     const card = cardSwipe.row?.querySelector('.tv2-card');
-    if (card) { card.style.transition = ''; card.style.transform = ''; }
+    if (card) { card.style.transition = ''; card.style.transform = ''; card.style.opacity = ''; }
     reset();
   }, { passive:true });
 }
