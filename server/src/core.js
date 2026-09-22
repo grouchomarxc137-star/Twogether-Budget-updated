@@ -205,7 +205,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         uuid: Utilities.getUuid,
         jarBaseCents: function(st){ const jar = sanitizeSharedJar_(st.sharedJar); return jarBaseCents_(jar.initialBalance, jar.transactions); },
       });
-      if (result && result.ok) saveState_(state);
+      if (result && result.ok && !result.duplicate) saveState_(state);
       return output_(result);
     }
 

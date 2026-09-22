@@ -18,11 +18,11 @@
 import {
   ACTORS, PAYERS, SPLITS, cleanTrip, cleanExpense, cleanSettlement, validateExpense,
   validateSettlement, validateTripDetails, parseMoneyToCents, localToday, ledgerJarUsage,
-  ALLOCATION_MODES, autoAllocate, allocationRoom,
+  ALLOCATION_MODES, autoAllocate, allocationRoom, datePhase,
 } from '../../shared/trips-model.js';
 
 export const TRIP_LEDGER_ACTIONS = new Set([
-  'tripCreate', 'tripUpdate', 'tripSetBudget',
+  'tripCreate', 'tripUpdate', 'tripSetBudget', 'tripClose', 'tripReopen',
   'tripExpenseSave', 'tripExpenseDelete', 'tripExpenseRestore',
   'tripSettlementSave', 'tripSettlementDelete', 'tripSettlementRestore',
 ]);
@@ -125,6 +125,37 @@ function tripSetBudget(state, payload, actor, now) {
   const amount = centsOrNull(payload.amount);
   if (amount === undefined) throw new LedgerError('Enter a valid budget, or leave it empty');
   trip.plannedBudgets[actor] = amount;
+  trip.rev += 1;
+  touch(trip, actor, now);
+  return { ok: true, trip };
+}
+
+// ---- Lifecycle: close / reopen ----------------------------------------------
+// Close freezes normal trip activity (trip details, budgets, expenses); it is
+// not a financial reconciliation, and repayments stay allowed. Either person
+// can close or reopen, without confirmation from the other.
+//
+// Both are revision-checked like every other trip change, with one narrow
+// exception for duplicate intent: if the trip is already in the requested
+// state (both phones pressed Close on rev 5; the first one produced rev 6),
+// the late request succeeds with the current trip and changes nothing -- no
+// new revision, no second history event. If the trip is NOT already in the
+// requested state, a stale revision fails as usual.
+//
+// A trip that has not started yet cannot be closed (cancelling a trip is a
+// separate feature). "Today" is the server's local date.
+function tripSetClosed(state, payload, actor, now, closing) {
+  const trip = findTrip(state, text(payload.tripId, 80));
+  requireRev(payload.rev);
+  if (!!trip.closedAt === closing) return { ok: true, trip, duplicate: true };
+  if (payload.rev !== trip.rev) throw stale('trip');
+  if (closing && datePhase(trip, localToday(new Date(now))) === 'upcoming') {
+    throw new LedgerError('This trip hasn’t started yet, so it can’t be closed.', 'TRIP_NOT_STARTED');
+  }
+  trip.closedAt = closing ? now : '';
+  trip.closedBy = closing ? actor : '';
+  // History is append-only: reopening keeps the earlier "closed" event.
+  trip.lifecycle.push({ event: closing ? 'closed' : 'reopened', at: now, by: actor });
   trip.rev += 1;
   touch(trip, actor, now);
   return { ok: true, trip };
@@ -331,6 +362,8 @@ export function runTripLedgerAction(state, action, payload, actor, helpers) {
       case 'tripCreate': return tripCreate(state, p, actor, now, helpers);
       case 'tripUpdate': return tripUpdate(state, p, actor, now);
       case 'tripSetBudget': return tripSetBudget(state, p, actor, now);
+      case 'tripClose': return tripSetClosed(state, p, actor, now, true);
+      case 'tripReopen': return tripSetClosed(state, p, actor, now, false);
       case 'tripExpenseSave': return tripExpenseSave(state, p, actor, now, helpers);
       case 'tripExpenseDelete': return tripExpenseSetDeleted(state, p, actor, now, true);
       case 'tripExpenseRestore': return tripExpenseSetDeleted(state, p, actor, now, false);

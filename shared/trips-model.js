@@ -280,12 +280,69 @@ export function expenseEffect(e) {
   return { paid, share, covered, tracked: true };
 }
 
-export function tripStatus(trip, today = localToday()) {
+// ---------------------------------------------------------------- lifecycle
+//
+// Three separate concepts, never merged into one "status":
+//   date phase      upcoming | ongoing | ended  -- where the trip is in time,
+//                   from its dates and today only
+//   lifecycle state open | closed | deleted     -- what people did to it
+//                   (Close freezes normal activity; it is not reconciliation)
+//   home group      upcoming | now | past       -- where the Trips home shows it
+// Only closedAt/closedBy (and the append-only lifecycle history) are stored;
+// all three are derived.
+
+export const DATE_PHASES = ['upcoming', 'ongoing', 'ended'];
+export const LIFECYCLE_STATES = ['open', 'closed', 'deleted'];
+export const HOME_GROUPS = ['now', 'upcoming', 'past'];
+
+// Where the trip is in time. The first and last day both count as ongoing.
+// A trip without valid dates (only possible for data that bypassed
+// validation) is treated as not started yet.
+export function datePhase(trip, today = localToday()) {
+  if (!trip.start || !trip.end) return 'upcoming';
+  if (today < trip.start) return 'upcoming';
+  if (today > trip.end) return 'ended';
+  return 'ongoing';
+}
+
+export function lifecycleState(trip) {
   if (trip.deletedAt) return 'deleted';
   if (trip.closedAt) return 'closed';
-  if (trip.start && today < trip.start) return 'upcoming';
-  if (trip.end && today > trip.end) return 'ended';
-  return 'ongoing';
+  return 'open';
+}
+
+// Upcoming = open and in the future; Now = open and today is within its
+// dates; Past = ended (open or closed) plus every closed trip. A closed trip
+// never stays in Now just because its dates include today. Deleted trips
+// belong to no group (null).
+export function homeGroup(trip, today = localToday()) {
+  const state = lifecycleState(trip);
+  if (state === 'deleted') return null;
+  if (state === 'closed') return 'past';
+  const phase = datePhase(trip, today);
+  return phase === 'ongoing' ? 'now' : phase === 'upcoming' ? 'upcoming' : 'past';
+}
+
+const compareIds = (a, b) => a.id.localeCompare(b.id);
+const HOME_ORDER = {
+  // Started earliest first (the trip you have been on longest).
+  now: (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || compareIds(a, b),
+  // Soonest first.
+  upcoming: (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || compareIds(a, b),
+  // Most recently ended first.
+  past: (a, b) => b.end.localeCompare(a.end) || b.start.localeCompare(a.start) || compareIds(a, b),
+};
+
+// The Trips home: every non-deleted trip in exactly one group, each group in
+// a fixed order (the same on both phones).
+export function groupTrips(trips, today = localToday()) {
+  const groups = { now: [], upcoming: [], past: [] };
+  for (const t of trips) {
+    const g = homeGroup(t, today);
+    if (g) groups[g].push(t);
+  }
+  for (const g of HOME_GROUPS) groups[g].sort(HOME_ORDER[g]);
+  return groups;
 }
 
 // Every figure the Trips screens show, derived from the trip alone.
@@ -317,12 +374,12 @@ export function deriveTrip(trip, { today = localToday() } = {}) {
     net += s.from === 'Principessa' ? s.amount : -s.amount;
   }
 
-  const status = tripStatus(trip, today);
+  const phase = datePhase(trip, today);
   let dayOf = null, daysUntil = null, length = null;
   if (trip.start && trip.end) {
     length = daysBetween(trip.start, trip.end) + 1;
-    if (status === 'ongoing') dayOf = daysBetween(trip.start, today) + 1;
-    if (status === 'upcoming') daysUntil = daysBetween(today, trip.start);
+    if (phase === 'ongoing') dayOf = daysBetween(trip.start, today) + 1;
+    if (phase === 'upcoming') daysUntil = daysBetween(today, trip.start);
   }
 
   return {
@@ -334,7 +391,8 @@ export function deriveTrip(trip, { today = localToday() } = {}) {
     creditor: net > 0 ? 'Principessa' : net < 0 ? 'Principe' : null,
     owed: Math.abs(net),
     balanceComplete,
-    status, dayOf, daysUntil, length,
+    phase, lifecycle: lifecycleState(trip), group: homeGroup(trip, today),
+    dayOf, daysUntil, length,
     expenseCount: expenses.length,
   };
 }

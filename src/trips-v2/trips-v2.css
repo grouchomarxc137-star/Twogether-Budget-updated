@@ -86,6 +86,32 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-card-top small, .tv2-card-sub { color: var(--tv2-muted); font-size: 14px; }
 .tv2-card-money { display: flex; justify-content: space-between; font-size: 15px; font-variant-numeric: tabular-nums; }
 
+/* ---- home groups: Now / Upcoming / Past ---- */
+.tv2-group { display: grid; gap: 10px; }
+.tv2-group-head { margin: 4px 0 0; font-size: 13px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--tv2-muted); }
+.tv2-card.is-past { gap: 4px; padding: 14px 16px; background: transparent; }
+.tv2-card.is-past .tv2-card-top strong { font-size: 18px; }
+.tv2-card.is-past .tv2-card-money { color: var(--tv2-muted); font-size: 14.5px; gap: 10px; }
+.tv2-card-owed { color: var(--tv2-ink); font-weight: 600; text-align: right; }
+.tv2-pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12.5px; font-weight: 600; }
+.tv2-pill.is-open { background: var(--tv2-jar); color: var(--tv2-ink); }
+.tv2-pill.is-closed { background: var(--tv2-line); color: var(--tv2-muted); }
+
+/* ---- trip menu & closed trip ---- */
+.tv2-more-btn { font-size: 24px; line-height: 1; min-width: 44px; text-align: right; color: var(--tv2-ink); letter-spacing: .05em; }
+.tv2-menu { display: grid; }
+.tv2-menu-item { display: grid; gap: 2px; text-align: left; padding: 14px 2px; min-height: 56px; border-bottom: 1px solid var(--tv2-line); }
+.tv2-menu-item:last-child { border-bottom: 0; }
+.tv2-menu-item strong { font-size: 16.5px; font-weight: 600; }
+.tv2-menu-item small { font-size: 13.5px; color: var(--tv2-muted); line-height: 1.35; }
+.tv2-closed { display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--tv2-line); font-size: 14.5px; color: var(--tv2-muted); }
+.tv2-closed strong { color: var(--tv2-ink); }
+.tv2-closed .tv2-textbtn { margin-top: 2px; min-height: 32px; }
+.tv2-view-amt { margin: 0; text-align: center; font-size: 40px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tv2-view-title { margin: -8px 0 0; text-align: center; font-size: 16px; color: var(--tv2-muted); }
+.tv2-kv b { text-align: right; overflow-wrap: anywhere; }
+.tv2-frozen { margin: 0; text-align: center; font-size: 14px; color: var(--tv2-muted); }
+
 /* ---- primary action, pinned for the thumb ---- */
 .tv2-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, var(--tv2-bg) 70%, rgba(247, 244, 239, 0)); }
 .tv2-dock .tv2-primary { max-width: 528px; margin: 0 auto; display: block; }

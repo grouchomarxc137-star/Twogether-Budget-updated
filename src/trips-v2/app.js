@@ -5,7 +5,7 @@
 import {
   CATEGORIES, SUBCATEGORIES, categoryOf, deriveTrip, timeline, formatCents, parseMoneyToCents,
   jarSuggestion, localToday, otherActorOf, daysBetween, balanceBreakdown, autoAllocate, allocationRoom,
-  repaymentsFor, claimOf,
+  repaymentsFor, claimOf, groupTrips,
 } from '../../shared/trips-model.js';
 import { esc, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
@@ -58,13 +58,21 @@ function dateRange(t) {
   if (ys === ye && ms === me2) return `${Number(t.start.slice(8))}–${shortDate(t.end)}`;
   return `${shortDate(t.start)} – ${shortDate(t.end)}`;
 }
+// One line saying where the trip is: frozen or not first, then time.
 function statusLine(t, d) {
-  if (d.status === 'upcoming') return d.daysUntil === 1 ? 'Starts tomorrow' : `Starts in ${d.daysUntil} days`;
-  if (d.status === 'ongoing') return `Day ${d.dayOf} of ${d.length}`;
-  if (d.status === 'ended') return 'Trip ended';
-  if (d.status === 'closed') return 'Closed';
+  if (d.lifecycle === 'closed') return 'Closed';
+  if (d.phase === 'upcoming') return d.daysUntil === 1 ? 'Starts tomorrow' : `Starts in ${d.daysUntil} days`;
+  if (d.phase === 'ongoing') return `Day ${d.dayOf} of ${d.length}`;
+  if (d.phase === 'ended') return 'Ended · still open';
   return '';
 }
+const isClosed = (t) => !!t.closedAt;
+function balanceLine(d) {
+  if (!d.debtor) return 'You’re even';
+  return d.debtor === me() ? `You owe ${partner()} ${money(d.owed)}` : `${d.debtor} owes you ${money(d.owed)}`;
+}
+// The local calendar day of a stored timestamp.
+const dayOfStamp = (stamp) => (stamp ? localToday(new Date(stamp)) : '');
 
 // ---------------------------------------------------------------- render
 
@@ -77,26 +85,48 @@ export function render() {
       : '<div class="tv2-empty"><p class="tv2-muted">Loading trips…</p></div>';
     return;
   }
-  const active = store.trips().filter((t) => !t.closedAt).sort((a, b) => (a.end < localToday()) - (b.end < localToday()) || a.start.localeCompare(b.start));
+  const groups = groupTrips(store.trips());
   if (view.name === 'trip' && !store.tripById(view.tripId)) view = { name: 'home' };
-  if (view.name === 'home' && !userLeftTrip && active.length === 1) view = { name: 'trip', tripId: active[0].id };
-  root.innerHTML = view.name === 'trip' ? tripHtml(store.tripById(view.tripId)) : homeHtml(active);
+  // Open straight into the trip only when exactly one trip is happening now.
+  if (view.name === 'home' && !userLeftTrip && groups.now.length === 1) view = { name: 'trip', tripId: groups.now[0].id };
+  root.innerHTML = view.name === 'trip' ? tripHtml(store.tripById(view.tripId)) : homeHtml(groups);
 }
 
-function homeHtml(active) {
-  const cards = active.map((t) => {
-    const d = deriveTrip(t);
-    const pct = d.available ? Math.min(100, Math.round((d.spent / d.available) * 100)) : 0;
-    return `<button class="tv2-card" data-act="open-trip" data-id="${esc(t.id)}">
-      <span class="tv2-card-top"><strong>${esc(t.place.city)}</strong><small>${esc(dateRange(t))}</small></span>
-      <span class="tv2-card-sub">${esc(statusLine(t, d))}</span>
-      <span class="tv2-card-money"><span>${whole(d.spent)} spent</span>${d.available !== null ? `<span>${whole(d.left)} left</span>` : ''}</span>
-      ${d.available ? `<span class="tv2-bar"><i style="width:${pct}%"></i></span>` : ''}
-    </button>`;
-  }).join('');
+function tripCard(t) {
+  const d = deriveTrip(t);
+  const pct = d.available ? Math.min(100, Math.round((d.spent / d.available) * 100)) : 0;
+  return `<button class="tv2-card" data-act="open-trip" data-id="${esc(t.id)}">
+    <span class="tv2-card-top"><strong>${esc(t.place.city)}</strong><small>${esc(dateRange(t))}</small></span>
+    <span class="tv2-card-sub">${esc(statusLine(t, d))}</span>
+    <span class="tv2-card-money"><span>${whole(d.spent)} spent</span>${d.available !== null ? `<span>${whole(d.left)} left</span>` : ''}</span>
+    ${d.available ? `<span class="tv2-bar"><i style="width:${pct}%"></i></span>` : ''}
+  </button>`;
+}
+
+// Past trips are quieter: where, when, open or closed, what it cost and
+// whether anything is still owed.
+function pastCard(t) {
+  const d = deriveTrip(t);
+  return `<button class="tv2-card is-past" data-act="open-trip" data-id="${esc(t.id)}">
+    <span class="tv2-card-top"><strong>${esc(t.place.city)}</strong><small>${esc(dateRange(t))}</small></span>
+    <span class="tv2-card-sub"><span class="tv2-pill ${isClosed(t) ? 'is-closed' : 'is-open'}">${esc(statusLine(t, d))}</span></span>
+    <span class="tv2-card-money"><span>${whole(d.spent)} spent</span>${d.debtor ? `<span class="tv2-card-owed">${esc(balanceLine(d))}</span>` : ''}</span>
+  </button>`;
+}
+
+function groupHtml(label, trips, card) {
+  if (!trips.length) return '';
+  return `<section class="tv2-group" aria-label="${esc(label)}"><h2 class="tv2-group-head">${esc(label)}</h2>${trips.map(card).join('')}</section>`;
+}
+
+function homeHtml(groups) {
+  const any = groups.now.length + groups.upcoming.length + groups.past.length > 0;
   return `<div class="tv2-page">
     <header class="tv2-home-head"><h1>Trips</h1></header>
-    ${cards || '<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>'}
+    ${groupHtml('Now', groups.now, tripCard)}
+    ${groupHtml('Upcoming', groups.upcoming, tripCard)}
+    ${groupHtml('Past', groups.past, pastCard)}
+    ${any ? '' : '<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>'}
     <div class="tv2-dock"><button class="tv2-primary" data-act="new-trip">＋ New trip</button></div>
   </div>`;
 }
@@ -105,30 +135,33 @@ function tripHtml(t) {
   const d = deriveTrip(t);
   const over = d.left !== null && d.left < 0;
   const pct = d.available ? Math.min(100, Math.round((d.spent / d.available) * 100)) : 0;
-  const balanceText = !d.debtor
-    ? 'You’re even'
-    : d.debtor === me() ? `You owe ${partner()} ${money(d.owed)}` : `${d.debtor} owes you ${money(d.owed)}`;
-  return `<div class="tv2-page">
+  const closed = isClosed(t);
+  return `<div class="tv2-page ${closed ? 'is-closed' : ''}">
     <header class="tv2-trip-head">
-      <div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>
+      <div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link tv2-more-btn" data-act="trip-menu" aria-label="Trip options" aria-haspopup="dialog">⋯</button></div>
       <h1>${esc(t.place.city)}</h1>
-      <p>${esc(dateRange(t))}${statusLine(t, d) ? ` · ${esc(statusLine(t, d))}` : ''}</p>
+      <p>${esc(dateRange(t))}${statusLine(t, d) && !closed ? ` · ${esc(statusLine(t, d))}` : ''}</p>
     </header>
+    ${closed ? `<div class="tv2-closed" role="note">
+      <div><strong>Closed</strong> by ${esc(who(t.closedBy) || '—')} · ${esc(shortDate(dayOfStamp(t.closedAt)))}</div>
+      <span>Expenses are frozen. Repayments still work.</span>
+      <button type="button" class="tv2-textbtn" data-act="reopen-trip">Reopen trip</button>
+    </div>` : ''}
 
     <section class="tv2-money" aria-label="Trip money">
       <div class="tv2-figs">
-        <button class="tv2-fig" data-act="budgets"><span>Available</span><b>${d.available === null ? 'Not set' : whole(d.available)}</b>${t.plannedBudgets[me()] === null ? '<small class="tv2-nudge">+ add yours</small>' : ''}</button>
+        <button class="tv2-fig" data-act="budgets"><span>Available</span><b>${d.available === null ? 'Not set' : whole(d.available)}</b>${t.plannedBudgets[me()] === null && !closed ? '<small class="tv2-nudge">+ add yours</small>' : ''}</button>
         <div class="tv2-fig"><span>Spent</span><b>${whole(d.spent)}</b></div>
       </div>
       ${d.available ? `<div class="tv2-bar ${over ? 'is-over' : ''}"><i style="width:${pct}%"></i></div>` : ''}
       ${d.left === null ? '' : `<div class="tv2-left ${over ? 'is-over' : ''}"><b>${whole(Math.abs(d.left))}</b><span>${over ? 'over budget' : 'left'}</span></div>`}
     </section>
 
-    <button class="tv2-balance ${d.debtor ? '' : 'is-even'}" data-act="balance"><span>${esc(balanceText)}</span><span aria-hidden="true">›</span></button>
+    <button class="tv2-balance ${d.debtor ? '' : 'is-even'}" data-act="balance"><span>${esc(balanceLine(d))}</span><span aria-hidden="true">›</span></button>
 
     <section class="tv2-list" aria-label="Expenses">${listHtml(t)}</section>
 
-    <div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>
+    ${closed ? '' : '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'}
   </div>`;
 }
 
@@ -165,7 +198,7 @@ function listHtml(t) {
         <span class="tv2-amt">${money(item.amount)}</span></button>`;
     }
     const cat = categoryOf(item.category);
-    return `<button class="tv2-row" data-act="edit-expense" data-id="${esc(item.id)}">
+    return `<button class="tv2-row" data-act="open-expense" data-id="${esc(item.id)}">
       <span class="tv2-ic" aria-hidden="true">${cat.icon}</span>
       <span class="tv2-row-main"><strong>${esc(expenseTitle(item))}</strong><small>${esc(expenseMeta(item))}${item.jarShortfall ? '<em class="tv2-warn-text"> · Jar not applied</em>' : ''}</small></span>
       <span class="tv2-amt">${money(item.amount)}</span></button>`;
@@ -213,9 +246,43 @@ function repaidLine(trip, e) {
   return `<p class="tv2-repaid">${money(total)} repaid toward this by ${esc(payers)}${extra > 0 ? ` · ${money(extra)} more than this share now, counted as general` : ''}</p>`;
 }
 
+// ---- Expense on a closed trip: read-only --------------------------------
+
+// Opens an expense: editable while the trip is open, read-only once closed.
+function openExpense(trip, e) {
+  if (!e || e.deletedAt) return;
+  if (isClosed(trip)) expenseViewSheet(trip, e);
+  else expenseSheet(trip, e);
+}
+
+function expenseViewSheet(trip, e) {
+  const cat = categoryOf(e.category);
+  const sub = (SUBCATEGORIES[e.category] || []).find(([k]) => k === e.subcategory);
+  const payer = e.paidBy === 'each' ? 'Each paid half' : e.paidBy === 'jar' ? 'Shared Jar' : Who(e.paidBy) || '—';
+  const split = e.paidBy === 'jar' || e.paidBy === 'each' ? '' : e.split === 'shared' ? 'Shared 50/50' : `Just ${who(e.split)}`;
+  const rows = [
+    ['Category', `${cat.label}${sub ? ` · ${sub[1]}` : ''}`],
+    ['Paid by', payer],
+    split ? ['For', split] : null,
+    e.jarAmount && e.paidBy !== 'jar' ? ['From Shared Jar', money(e.jarAmount)] : null,
+    ['Date', shortDate(e.date)],
+    e.estimated ? ['Amount', 'Estimate'] : null,
+  ].filter(Boolean);
+  const html = `${sheetHead('Expense')}
+    <p class="tv2-view-amt">${money(e.amount)}</p>
+    <p class="tv2-view-title"><span aria-hidden="true">${cat.icon}</span> ${esc(expenseTitle(e))}</p>
+    <div class="tv2-kvs">${rows.map(([k, v]) => `<div class="tv2-kv"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+    ${repaidLine(trip, e)}
+    <p class="tv2-frozen">This trip is closed. Reopen it to change expenses.</p>
+    <p class="tv2-meta">Added by ${esc(Who(e.createdBy) || '—')} · ${esc(shortDate(e.createdAt.slice(0, 10)))}</p>`;
+  openSheet(html);
+}
+
 // ---- Add / edit expense: one panel, amount first ------------------------
 
 function expenseSheet(trip, existing = null) {
+  // A closed trip is frozen: never offer an editable panel for it.
+  if (isClosed(trip)) { if (existing) expenseViewSheet(trip, existing); return; }
   // The id is chosen once, when the panel opens: pressing Save again after a
   // lost response re-sends the same id, which the server recognises.
   const expenseId = existing?.id || uid();
@@ -412,21 +479,64 @@ function tripSheet(existing = null) {
   });
 }
 
+// ---- Trip menu and lifecycle ----------------------------------------------
+// Close freezes the trip (details, budgets, expenses); repayments still
+// work. Either person can close or reopen, with no confirmation from the
+// other. Close is not offered before the trip starts.
+
+function tripMenu(trip) {
+  const d = deriveTrip(trip);
+  const closed = isClosed(trip);
+  const items = [];
+  if (!closed) items.push(`<button type="button" class="tv2-menu-item" data-menu="edit"><strong>Edit trip</strong><small>Place and dates</small></button>`);
+  if (!closed && d.phase !== 'upcoming') items.push(`<button type="button" class="tv2-menu-item" data-menu="close"><strong>Close trip</strong><small>Freezes expenses. Repayments still work, and either of you can reopen it.</small></button>`);
+  if (closed) items.push(`<button type="button" class="tv2-menu-item" data-menu="reopen"><strong>Reopen trip</strong><small>Lets you add and change expenses again.</small></button>`);
+  openSheet(`${sheetHead(trip.place.city)}<div class="tv2-menu">${items.join('')}</div>`, (sheet) => {
+    sheet.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-menu]'); if (!b) return;
+      if (b.dataset.menu === 'edit') tripSheet(trip);
+      else if (b.dataset.menu === 'close') setClosed(trip, true);
+      else if (b.dataset.menu === 'reopen') setClosed(trip, false);
+    });
+  });
+}
+
+async function setClosed(trip, closing) {
+  closeSheet();
+  try {
+    const r = await store.act(closing ? 'tripClose' : 'tripReopen', { tripId: trip.id, rev: trip.rev });
+    if (r?.duplicate) {
+      // The other phone got there first; the trip is already as intended.
+      snack(closing ? `Already closed by ${who(r.trip.closedBy) || 'the other phone'}` : 'Already reopened');
+    } else if (closing) {
+      snack('Trip closed', () => store.act('tripReopen', { tripId: r.trip.id, rev: r.trip.rev }));
+    } else {
+      snack('Trip reopened');
+    }
+  } catch (err) {
+    snack(err?.message || 'Could not save. Try again.');
+    if (/just changed/i.test(err?.message || '')) store.refresh();
+  }
+}
+
 // ---- Budgets: combined first, each person on request ---------------------
 
 function budgetSheet(trip) {
   const d = deriveTrip(trip);
+  const closed = isClosed(trip);
   const mine = trip.plannedBudgets[me()], theirs = trip.plannedBudgets[partner()];
   const html = `${sheetHead('Budget')}
     <div class="tv2-budget-total"><span>Available together</span><b>${d.available === null ? 'Not set yet' : money(d.available)}</b></div>
-    <label class="tv2-field"><span>Your planned budget</span><input id="tv2MyBudget" inputmode="decimal" placeholder="Not set" autocomplete="off" value="${esc(editable(mine))}"></label>
+    ${closed
+      ? `<div class="tv2-kv"><span>Your planned budget</span><b>${mine === null ? 'Not set' : money(mine)}</b></div>`
+      : `<label class="tv2-field"><span>Your planned budget</span><input id="tv2MyBudget" inputmode="decimal" placeholder="Not set" autocomplete="off" value="${esc(editable(mine))}"></label>`}
     <div class="tv2-kv"><span>${esc(partner())}’s planned budget</span><b>${theirs === null ? 'Not set yet' : money(theirs)}</b></div>
     ${trip.plannedBudgets.unassigned !== null ? `<div class="tv2-kv"><span>Shared budget</span><b>${money(trip.plannedBudgets.unassigned)}</b></div>` : ''}
     <div class="tv2-kv tv2-soft"><span>Your share of spending so far</span><b>${money(d.share[me()])}</b></div>
     <div class="tv2-kv tv2-soft"><span>${esc(partner())}’s share so far</span><b>${money(d.share[partner()])}</b></div>
-    <p class="tv2-hint" aria-live="polite"></p>
-    <button type="button" class="tv2-primary" data-save>Save my budget</button>`;
-  openSheet(html, (sheet) => {
+    ${closed ? '<p class="tv2-frozen">This trip is closed. Reopen it to change budgets.</p>' : `<p class="tv2-hint" aria-live="polite"></p>
+    <button type="button" class="tv2-primary" data-save>Save my budget</button>`}`;
+  openSheet(html, closed ? null : (sheet) => {
     const input = sheet.querySelector('#tv2MyBudget'), hint = sheet.querySelector('.tv2-hint');
     sheet.querySelector('[data-save]').onclick = async (e) => {
       const text = input.value.trim(); const amount = text ? parseMoneyToCents(text) : null;
@@ -502,7 +612,7 @@ function balanceSheet(trip) {
   openSheet(html, (sheet) => {
     sheet.addEventListener('click', (e) => {
       const row = e.target.closest('[data-open-expense]');
-      if (row) { const x = trip.expenses.find((i) => i.id === row.dataset.openExpense); if (x && !x.deletedAt) expenseSheet(trip, x); }
+      if (row) openExpense(trip, trip.expenses.find((i) => i.id === row.dataset.openExpense));
     });
     if (b.even) return;
     const input = sheet.querySelector('#tv2Repay'), coversEl = sheet.querySelector('[data-covers]'), hint = sheet.querySelector('.tv2-hint');
@@ -603,9 +713,10 @@ function onClick(e) {
     case 'home': userLeftTrip = true; setView({ name: 'home' }); break;
     case 'open-trip': setView({ name: 'trip', tripId: b.dataset.id }); break;
     case 'new-trip': tripSheet(); break;
-    case 'edit-trip': if (trip) tripSheet(trip); break;
-    case 'add-expense': if (trip) expenseSheet(trip); break;
-    case 'edit-expense': { const x = trip?.expenses.find((i) => i.id === b.dataset.id); if (x) expenseSheet(trip, x); break; }
+    case 'trip-menu': if (trip) tripMenu(trip); break;
+    case 'reopen-trip': if (trip) setClosed(trip, false); break;
+    case 'add-expense': if (trip && !isClosed(trip)) expenseSheet(trip); break;
+    case 'open-expense': if (trip) openExpense(trip, trip.expenses.find((i) => i.id === b.dataset.id)); break;
     case 'edit-settlement': { const x = trip?.settlements.find((i) => i.id === b.dataset.id); if (x) settlementSheet(trip, x); break; }
     case 'budgets': if (trip) budgetSheet(trip); break;
     case 'balance': if (trip) balanceSheet(trip); break;
