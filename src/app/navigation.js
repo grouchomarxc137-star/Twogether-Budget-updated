@@ -141,12 +141,32 @@ const closeTimers = new WeakMap(), fadeTimers = new WeakMap();
 function cancelTimers(w) { const a = closeTimers.get(w), b = fadeTimers.get(w); if (a) clearTimeout(a); if (b) clearTimeout(b); closeTimers.delete(w); fadeTimers.delete(w); }
 function setExpanded(w, on) { w?.querySelector('[data-hub]')?.setAttribute('aria-expanded', on ? 'true' : 'false'); }
 function hardClose(w) { if (!w) return; cancelTimers(w); w.classList.remove('v22-open', 'v22-fade', 'menu-open', 'nav-visible'); setExpanded(w, false); }
-function fadeClose(w) { if (!w) return; cancelTimers(w); setExpanded(w, false); if (!w.classList.contains('v22-open')) return hardClose(w); w.classList.add('v22-fade'); const t = setTimeout(() => { w.classList.remove('v22-open', 'v22-fade', 'menu-open', 'nav-visible'); fadeTimers.delete(w); }, 135); fadeTimers.set(w, t); }
+function fadeClose(w) {
+  if (!w) return;
+  cancelTimers(w);
+  setExpanded(w, false);
+  if (!w.classList.contains('v22-open')) return hardClose(w);
+  w.classList.add('v22-fade');
+  const duration = isMobile() ? 85 : 135;
+  const t = setTimeout(() => {
+    w.classList.remove('v22-open', 'v22-fade', 'menu-open', 'nav-visible');
+    fadeTimers.delete(w);
+  }, duration);
+  fadeTimers.set(w, t);
+}
 function closeOthers(except, fade = true) { $$('.tw-nav-wrap').forEach((w) => { if (w !== except) (fade ? fadeClose(w) : hardClose(w)); }); }
 function openWrap(w) { if (!w || suppressHover) return; cancelTimers(w); closeOthers(w, true); w.classList.remove('v22-fade', 'menu-open', 'nav-visible'); w.classList.add('v22-open'); setExpanded(w, true); }
 function scheduleClose(w) { if (!w || pinned === w) return; cancelTimers(w); const t = setTimeout(() => { if (pinned !== w) fadeClose(w); closeTimers.delete(w); }, 170); closeTimers.set(w, t); }
 function unpinAndFadeAll() { pinned = null; $$('.tw-nav-wrap').forEach(fadeClose); }
-function closeForScroll() { suppressHover = true; unpinAndFadeAll(); }
+function closeForScroll() {
+  suppressHover = true;
+  if (isMobile()) {
+    pinned = null;
+    document.querySelectorAll('.tw-nav-wrap').forEach(hardClose);
+    return;
+  }
+  unpinAndFadeAll();
+}
 function installDropdownRefinement() {
   const wraps = $$('.tw-nav-wrap'); if (!wraps.length) return;
   wraps.forEach((w) => {
@@ -181,6 +201,7 @@ function installDropdownRefinement() {
   const onScroll = () => { if (scrollQueued) return; scrollQueued = true; requestAnimationFrame(() => { scrollQueued = false; closeForScroll(); }); };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('wheel', closeForScroll, { passive: true, capture: true });
+  document.addEventListener('touchmove', () => { if (isMobile()) closeForScroll(); }, { passive: true, capture: true });
   document.addEventListener('pointermove', (e) => {
     if (isMobile()) return;
     const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2;

@@ -543,3 +543,11 @@ body.dev-v21 #loggedUserBadge {
     display:none!important;
   }
 }
+
+
+/* Faster mobile picker close animation; scrolling closes it immediately in JS. */
+@media(max-width:760px) {
+  .tw-nav-wrap.v22-fade>.tw-nav-menu {
+    animation:v26MenuOut .08s cubic-bezier(.4,0,1,1) both!important;
+  }
+}
