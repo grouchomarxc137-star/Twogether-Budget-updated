@@ -526,3 +526,58 @@ test('logs partial trip repayments without double-counting the trip expense', ()
   }
 });
 
+
+
+test('past planned trips stay open until both users confirm the current logged expenses', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Lonato', start: '2020-01-01', end: '2020-01-03' },
+      budget: 300,
+    });
+    action(c.database, 'savePlan', { id: p.planId, budget: 250 }, 'Principe');
+    const saved = action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { category: 'food', foodType: 'groceries', amount: 40, paidBy: 'Principessa', split: 'shared', date: '2020-01-02' },
+    });
+
+    const first = action(c.database, 'confirmPlanTrip', { planId: p.planId });
+    assert.equal(first.ok, true);
+    assert.equal(first.locked, false);
+    assert.equal(first.confirmed.Principessa, true);
+    assert.equal(first.confirmed.Principe, false);
+    assert.ok(getState().plans[0].linkedTripId);
+    assert.equal(getState().trips[0].submissions.Principessa.groceries, 40);
+    assert.equal(getState().trips[0].submissions.Principe.groceries, 40);
+
+    action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { id: saved.expense.id, category: 'food', foodType: 'groceries', amount: 60, paidBy: 'Principessa', split: 'shared', date: '2020-01-02' },
+    });
+    assert.deepEqual(getState().trips[0].confirmed, { Principessa: false, Principe: false });
+
+    assert.equal(action(c.database, 'confirmPlanTrip', { planId: p.planId }).locked, false);
+    const final = action(c.database, 'confirmPlanTrip', { planId: p.planId }, 'Principe');
+    assert.equal(final.locked, true);
+    assert.deepEqual(getState().trips[0].confirmed, { Principessa: true, Principe: true });
+    assert.equal(getState().trips[0].submissions.Principessa.groceries, 60);
+    assert.equal(getState().trips[0].submissions.Principe.groceries, 60);
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('planned trips cannot be confirmed before their end date has passed', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Rome', start: '2099-01-01', end: '2099-01-03' },
+      budget: 300,
+    });
+    const result = action(c.database, 'confirmPlanTrip', { planId: p.planId });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /after it has ended/);
+  } finally {
+    c.cleanup();
+  }
+});

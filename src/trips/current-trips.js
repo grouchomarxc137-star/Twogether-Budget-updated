@@ -247,7 +247,7 @@ function simplifiedCard(item) {
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
-    '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
+    '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
       '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
       '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
       '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
@@ -257,12 +257,26 @@ function simplifiedCard(item) {
 }
 
 function simplifiedHome(items) {
-  return '<div class="tv2-page"><header class="tv2-home-head"><h1>Trips</h1></header>'+
-    (items.length?items.map(simplifiedCard).join(''):'<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>')+
+  const groups = [
+    ['now','Now'],
+    ['upcoming','Upcoming'],
+    ['past','Past'],
+    ['unknown','Other'],
+  ].map(([phase,label])=>({phase,label,items:items.filter((item)=>item.phase===phase)})).filter((group)=>group.items.length);
+  const content = groups.length
+    ? groups.map((group)=>'<section class="tv2-group"><h2 class="tv2-group-head">'+esc(group.label)+'</h2>'+group.items.map(simplifiedCard).join('')+'</section>').join('')
+    : '<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>';
+  return '<div class="tv2-page"><header class="tv2-home-head"><h1>Trips</h1></header>'+content+
     '<div class="tv2-dock"><button class="tv2-primary" data-act="new-trip">＋ New trip</button></div></div>';
 }
 function simplifiedTrip(plan, trip) {
   const meta = plan?.meta || {}, me = actor(), personal = simplifiedView.budgetMode === 'personal';
+  const other = me === 'Principessa' ? 'Principe' : 'Principessa';
+  const phase = tripPhase(meta), past = phase === 'past';
+  const mineConfirmed = !!trip?.confirmed?.[me], otherConfirmed = !!trip?.confirmed?.[other];
+  const confirmHtml = !past ? '' : mineConfirmed
+    ? '<section class="tv2-trip-confirm is-waiting"><div><strong>✓ You confirmed this trip</strong><span>'+(otherConfirmed?'Finalising trip…':'Waiting for '+esc(other)+'. It stays under Past until both of you confirm.')+'</span></div></section>'
+    : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
   const combinedAvailable = tripBudget(plan, trip), combinedSpent = expenseTotal(plan, trip);
   const ownBudget = has(plan?.budgets?.[me]) ? n(plan.budgets[me]) : null;
   const ownSpent = n(settlementState(plan).paid?.[me]);
@@ -282,6 +296,7 @@ function simplifiedTrip(plan, trip) {
       (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
     '</section>'+
     (()=>{const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?'is-even':balanceLine.startsWith('You owe ')?'is-debtor':'';return '<button class="tv2-balance '+balanceClass+'" data-act="balance"><span>'+esc(balanceLine)+'</span><span aria-hidden="true">›</span></button>';})()+
+    confirmHtml+
     '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan,!isLocked(trip))+'</section>'+
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
@@ -1062,6 +1077,23 @@ function handleSimplifiedClick(e) {
     return;
   }
   if (b.dataset.act === 'budgets' || b.dataset.act === 'edit-trip') { window.TwogetherWorkflow?.budget(plan.id); return; }
+  if (b.dataset.act === 'confirm-trip') {
+    if (tripPhase(plan.meta) !== 'past' || b.disabled) return;
+    const other = actor() === 'Principessa' ? 'Principe' : 'Principessa';
+    b.disabled = true;
+    b.textContent = 'Confirming…';
+    try {
+      const result = await window.TwogetherAPI.post('confirmPlanTrip',{planId:plan.id},actor());
+      if (result?.locked) simplifiedView={name:'home',planId:'',budgetMode:'combined'};
+      await refreshState(true);
+      simplifiedSnack(result?.locked ? 'Trip confirmed · moved to Trip stories' : 'Your confirmation was saved · waiting for '+other);
+    } catch (err) {
+      b.disabled = false;
+      b.textContent = 'Confirm trip';
+      toast(err?.message || 'Could not confirm this trip','warn');
+    }
+    return;
+  }
   if (b.dataset.act === 'add-expense') { openSimplifiedExpenseSheet(plan); return; }
   if (b.dataset.act === 'open-expense') {
     if (Date.now() < expenseSwipe.ignoreClickUntil) { e.preventDefault(); return; }

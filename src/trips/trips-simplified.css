@@ -62,6 +62,15 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-balance.is-debtor { background: var(--tv2-over-soft); color: var(--tv2-over); }
 .tv2-balance.is-even { background: transparent; border: 1px solid var(--tv2-line); font-weight: 500; color: var(--tv2-muted); }
 
+.tv2-trip-confirm { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 15px; border:1px solid #e7dcc7; border-radius:16px; background:#fff8e8; }
+.tv2-trip-confirm>div { display:grid; gap:3px; min-width:0; }
+.tv2-trip-confirm strong { font-size:15.5px; font-weight:650; }
+.tv2-trip-confirm span { color:var(--tv2-muted); font-size:13.5px; line-height:1.35; }
+.tv2-trip-confirm button { flex:0 0 auto; min-height:42px; padding:0 15px!important; border-radius:12px!important; background:var(--tv2-primary)!important; color:var(--tv2-on-primary)!important; font-weight:650!important; }
+.tv2-trip-confirm button:disabled { opacity:.55; }
+.tv2-trip-confirm.is-waiting { background:var(--tv2-good-soft); border-color:transparent; }
+@media(max-width:520px){ .tv2-trip-confirm{align-items:stretch;flex-direction:column}.tv2-trip-confirm button{width:100%} }
+
 /* ---- expense list ---- */
 .tv2-list { display: grid; gap: 14px; }
 .tv2-day h2 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--tv2-muted); letter-spacing: .02em; }
