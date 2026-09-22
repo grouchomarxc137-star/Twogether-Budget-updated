@@ -1,24 +1,254 @@
 /* Trips page polish: destination cards + smoother range calendar. */
 #twCurrentTripsSection .tw-current-list{gap:18px}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"]{position:relative;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;min-height:260px;overflow:hidden;isolation:isolate;border:1px solid rgba(177,137,71,.22);border-radius:26px;background-image:linear-gradient(90deg,rgba(255,252,246,.97) 0%,rgba(255,251,242,.91) 38%,rgba(255,249,239,.66) 67%,rgba(255,248,235,.32) 100%),var(--v27-trip-bg);background-position:center;background-size:cover;box-shadow:0 20px 46px rgba(77,55,26,.10);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.10),transparent 35%),linear-gradient(0deg,rgba(78,49,13,.08),transparent 42%)}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"]:hover{transform:translateY(-2px);border-color:rgba(171,126,54,.34);box-shadow:0 24px 54px rgba(77,55,26,.14)}
+
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"]{
+  position:relative;
+  display:block!important;
+  min-height:292px;
+  overflow:hidden;
+  isolation:isolate;
+  border:1px solid rgba(177,137,71,.22);
+  border-radius:26px;
+  background-image:
+    linear-gradient(90deg,rgba(28,20,11,.03) 0%,rgba(28,20,11,.02) 44%,rgba(255,252,247,.84) 58%,rgba(255,252,247,.98) 78%,rgba(255,252,247,1) 100%),
+    linear-gradient(0deg,rgba(20,14,8,.48) 0%,rgba(20,14,8,.06) 42%,transparent 64%),
+    var(--v27-trip-bg)!important;
+  background-position:center;
+  background-size:cover;
+  box-shadow:0 18px 48px rgba(77,55,26,.105);
+  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"]::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),transparent 38%);
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"]:hover{
+  transform:translateY(-2px);
+  border-color:rgba(171,126,54,.34);
+  box-shadow:0 24px 56px rgba(77,55,26,.14);
+}
 #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-trip-art{display:none!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main{position:relative;z-index:1;grid-column:1!important;grid-row:1!important;padding:24px 26px 12px!important;background:transparent!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-top{align-items:center}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .trip-country{display:inline-flex;align-items:center;min-height:28px;padding:5px 10px;border:1px solid rgba(154,111,38,.20);border-radius:999px;background:rgba(255,253,248,.76);box-shadow:0 7px 18px rgba(83,59,27,.07);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#70552d;font-size:10px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-status{display:inline-flex;align-items:center;min-height:30px;padding:5px 11px;border:1px solid rgba(110,139,105,.20);border-radius:999px;background:rgba(245,251,244,.80);box-shadow:0 7px 18px rgba(48,77,43,.06);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#5f7758}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] h3{max-width:68%;margin:13px 0 3px;color:#30271f;font-size:clamp(29px,3vw,40px);line-height:1.02;letter-spacing:-.035em;text-shadow:0 1px 0 rgba(255,255,255,.55)}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main>p{margin:0 0 18px;color:#736457;font-size:14px}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;width:min(700px,76%);margin:0!important;overflow:hidden;border:1px solid rgba(179,145,97,.24)!important;border-radius:16px!important;background:rgba(255,253,248,.66)!important;box-shadow:0 12px 30px rgba(74,51,21,.06);backdrop-filter:blur(18px) saturate(1.08);-webkit-backdrop-filter:blur(18px) saturate(1.08)}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div{display:flex;min-width:0;min-height:72px;padding:13px 12px!important;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid rgba(179,145,97,.18)!important;border-bottom:0!important;text-align:center}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div:last-child{border-right:0!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers span{display:block;margin:0 0 4px;overflow:visible;color:#887764;font-size:10px!important;font-weight:700;letter-spacing:.055em;line-height:1.15;text-overflow:clip;text-transform:uppercase;white-space:normal}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers strong{color:#2f2821;font-size:17px!important;line-height:1.15}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions{position:relative;z-index:1;grid-column:1!important;grid-row:2!important;display:flex;justify-content:flex-end;gap:9px;padding:4px 26px 22px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button{min-height:42px!important;padding:9px 15px!important;border:1px solid rgba(165,128,70,.22)!important;border-radius:13px!important;background:rgba(255,253,249,.78)!important;box-shadow:0 8px 20px rgba(72,49,20,.06);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#5e503f!important;font-family:'Crimson Pro',Georgia,serif!important;font-size:13px!important;font-weight:650!important;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button:hover{transform:translateY(-1px);background:rgba(255,255,255,.92)!important;box-shadow:0 10px 24px rgba(72,49,20,.09)}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions [data-current-open]{border-color:rgba(170,119,32,.30)!important;background:linear-gradient(135deg,#c79335,#ad7721)!important;color:#fffdf7!important;box-shadow:0 10px 24px rgba(155,103,27,.22)}
+
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main{
+  position:relative!important;
+  display:block!important;
+  width:100%!important;
+  min-height:292px!important;
+  padding:22px 24px!important;
+  background:transparent!important;
+  overflow:hidden!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-top{
+  position:relative;
+  z-index:3;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  width:100%!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .trip-country{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:5px 11px;
+  border:1px solid rgba(255,255,255,.48);
+  border-radius:999px;
+  background:rgba(255,255,255,.88);
+  box-shadow:0 7px 20px rgba(50,34,15,.09);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  color:#4a3824;
+  font-size:11px!important;
+  font-weight:750;
+  letter-spacing:.04em;
+  text-transform:none!important;
+  text-shadow:none!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-status{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:30px;
+  padding:5px 11px;
+  border:1px solid rgba(112,152,111,.16);
+  border-radius:999px;
+  background:rgba(240,250,241,.90);
+  box-shadow:0 7px 20px rgba(48,77,43,.06);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  color:#426844;
+  text-shadow:none!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-status::before{
+  content:"";
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
+  border-radius:50%;
+  background:#1e8c51;
+  box-shadow:0 0 0 3px rgba(30,140,81,.08);
+}
+
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] h3{
+  position:absolute!important;
+  left:28px!important;
+  bottom:52px!important;
+  z-index:2;
+  max-width:43%!important;
+  margin:0!important;
+  color:#fffdf8!important;
+  font-size:clamp(34px,3.7vw,50px)!important;
+  line-height:.98!important;
+  letter-spacing:-.04em!important;
+  text-shadow:0 2px 18px rgba(18,12,7,.42)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main>p{
+  position:absolute!important;
+  left:29px!important;
+  bottom:23px!important;
+  z-index:2;
+  max-width:44%!important;
+  margin:0!important;
+  color:rgba(255,253,249,.96)!important;
+  font-size:14px!important;
+  font-weight:600!important;
+  text-shadow:0 2px 12px rgba(18,12,7,.48)!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers{
+  position:absolute!important;
+  top:64px!important;
+  right:22px!important;
+  bottom:auto!important;
+  left:auto!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  width:calc(48% - 32px)!important;
+  min-height:138px!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  border:1px solid rgba(210,196,176,.50)!important;
+  border-radius:24px!important;
+  background:rgba(255,253,249,.86)!important;
+  box-shadow:0 16px 36px rgba(59,42,21,.08),inset 0 1px 0 rgba(255,255,255,.82)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.08)!important;
+  backdrop-filter:blur(22px) saturate(1.08)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div{
+  display:flex!important;
+  min-width:0!important;
+  min-height:138px!important;
+  padding:20px 13px!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  border:0!important;
+  background:transparent!important;
+  text-align:left!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div+div{
+  border-left:1px solid rgba(181,171,158,.38)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers span{
+  display:block!important;
+  width:100%!important;
+  margin:0 0 8px!important;
+  color:#71665b!important;
+  font-size:12px!important;
+  font-weight:500!important;
+  letter-spacing:0!important;
+  line-height:1.15!important;
+  overflow:visible!important;
+  text-align:left!important;
+  text-overflow:clip!important;
+  text-transform:none!important;
+  white-space:normal!important;
+  text-shadow:none!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers strong{
+  display:block!important;
+  width:100%!important;
+  margin:0!important;
+  color:#1f1a16!important;
+  font-size:20px!important;
+  line-height:1.08!important;
+  text-align:left!important;
+  white-space:nowrap!important;
+  text-shadow:none!important;
+}
+
+#twCurrentTripsSection .tw-current-card[data-current-plan][data-v27-background="1"] .tw-current-actions,
+#twCurrentTripsSection .tw-current-card[data-current-trip][data-v27-background="1"] .tw-current-actions{
+  position:absolute!important;
+  right:22px!important;
+  bottom:18px!important;
+  left:auto!important;
+  z-index:4!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:9px!important;
+  width:calc(48% - 32px)!important;
+  margin:0!important;
+  padding:0!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-trip][data-v27-background="1"] .tw-current-actions{
+  grid-template-columns:1fr!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:48px!important;
+  margin:0!important;
+  padding:9px 11px!important;
+  border:1px solid rgba(194,164,120,.33)!important;
+  border-radius:16px!important;
+  background:rgba(255,253,249,.90)!important;
+  box-shadow:0 8px 20px rgba(72,49,20,.055)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+  backdrop-filter:blur(14px)!important;
+  color:#5f4828!important;
+  font-family:'Crimson Pro',Georgia,serif!important;
+  font-size:13.5px!important;
+  font-weight:650!important;
+  transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button:hover{
+  transform:translateY(-1px);
+  background:rgba(255,255,255,.97)!important;
+  box-shadow:0 11px 25px rgba(72,49,20,.09)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions [data-current-open]{
+  border-color:rgba(170,119,32,.34)!important;
+  background:linear-gradient(135deg,#c99535,#b67d21)!important;
+  color:#fffdf8!important;
+  box-shadow:0 10px 24px rgba(155,103,27,.22)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions [data-current-open]:hover{
+  background:linear-gradient(135deg,#bf882b,#aa7019)!important;
+  color:#fffdf8!important;
+}
+
+@media(max-width:980px) and (min-width:701px){
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"]{
+    min-height:278px;
+    background-image:
+      linear-gradient(90deg,rgba(28,20,11,.05) 0%,rgba(28,20,11,.03) 40%,rgba(255,252,247,.82) 55%,rgba(255,252,247,.99) 100%),
+      linear-gradient(0deg,rgba(20,14,8,.48) 0%,rgba(20,14,8,.05) 42%,transparent 64%),
+      var(--v27-trip-bg)!important;
+  }
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main{min-height:278px!important}
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] h3{max-width:40%!important;font-size:36px!important}
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers,
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions{width:calc(54% - 28px)!important}
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers strong{font-size:17px!important}
+  #twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers span{font-size:11px!important}
+}
 
 .v5-budget-card{max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .plan-trip-modal-head{padding-right:30px}
@@ -58,16 +288,95 @@
 .plan-cal-footer .btn:disabled{box-shadow:none;filter:saturate(.55)}
 
 @media(max-width:700px){
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"]{min-height:286px;border-radius:23px;background-image:linear-gradient(180deg,rgba(255,252,246,.85) 0%,rgba(255,251,242,.92) 54%,rgba(255,251,244,.97) 100%),var(--v27-trip-bg);background-position:center 35%}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main{padding:18px 16px 10px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] h3{max-width:88%;margin-top:14px;font-size:31px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main>p{margin-bottom:14px}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers{width:100%;border-radius:14px!important;background:rgba(255,253,249,.76)!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div{min-height:68px;padding:10px 7px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers span{font-size:8.5px!important;letter-spacing:.035em}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers strong{font-size:14px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions{display:grid;grid-template-columns:1fr 1fr;padding:2px 16px 16px!important}
-#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button{width:100%;min-height:44px!important;margin:0!important}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"]{
+  position:relative!important;
+  display:block!important;
+  min-height:286px!important;
+  border-radius:23px!important;
+  background-image:
+    linear-gradient(180deg,rgba(26,18,10,.06) 0%,rgba(26,18,10,.02) 28%,rgba(255,252,247,.72) 50%,rgba(255,252,247,.96) 72%,rgba(255,252,247,.99) 100%),
+    var(--v27-trip-bg)!important;
+  background-position:center 28%!important;
+  background-size:cover!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main{
+  display:block!important;
+  min-height:0!important;
+  padding:18px 16px 10px!important;
+  overflow:visible!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-top{
+  position:static!important;
+  width:100%!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .trip-country{
+  background:rgba(255,255,255,.88)!important;
+  color:#493822!important;
+  text-shadow:none!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] h3{
+  position:static!important;
+  max-width:88%!important;
+  margin:42px 0 3px!important;
+  color:#fffdf8!important;
+  font-size:31px!important;
+  line-height:1!important;
+  text-shadow:0 2px 16px rgba(19,12,6,.48)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-main>p{
+  position:static!important;
+  max-width:none!important;
+  margin:0 0 14px!important;
+  color:rgba(255,253,249,.96)!important;
+  font-size:13px!important;
+  text-shadow:0 2px 12px rgba(18,12,7,.48)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers{
+  position:static!important;
+  width:100%!important;
+  min-height:68px!important;
+  margin:0!important;
+  border-radius:14px!important;
+  background:rgba(255,253,249,.80)!important;
+  box-shadow:0 10px 24px rgba(58,42,23,.08)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.05)!important;
+  backdrop-filter:blur(16px) saturate(1.05)!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers>div{
+  min-height:68px!important;
+  padding:9px 6px!important;
+  align-items:center!important;
+  text-align:center!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers span{
+  margin-bottom:4px!important;
+  font-size:10.5px!important;
+  text-align:center!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-numbers strong{
+  font-size:13.5px!important;
+  text-align:center!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-plan][data-v27-background="1"] .tw-current-actions,
+#twCurrentTripsSection .tw-current-card[data-current-trip][data-v27-background="1"] .tw-current-actions{
+  position:static!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  width:100%!important;
+  margin:0!important;
+  padding:10px 16px 16px!important;
+  gap:7px!important;
+}
+#twCurrentTripsSection .tw-current-card[data-current-trip][data-v27-background="1"] .tw-current-actions{
+  grid-template-columns:1fr!important;
+}
+#twCurrentTripsSection .tw-current-card[data-v27-background="1"] .tw-current-actions button{
+  width:100%!important;
+  min-height:42px!important;
+  padding:7px 5px!important;
+  border-radius:13px!important;
+  font-size:11.25px!important;
+}
 .v5-budget-card{width:calc(100vw - 18px)!important;max-width:none!important;max-height:calc(100dvh - 18px)!important;margin:9px!important;padding:19px 15px calc(18px + env(safe-area-inset-bottom))!important;border-radius:24px!important}
 .plan-trip-modal-head{padding-right:24px}.plan-trip-modal-head h2{font-size:30px!important}.plan-trip-form{gap:14px!important}
 .plan-trip-field>input,.plan-trip-field>select,.plan-budget-input{min-height:50px!important;border-radius:15px!important}
