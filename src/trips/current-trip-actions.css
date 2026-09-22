@@ -331,12 +331,12 @@
 
 /* Screenshot-matched Trips list */
 #twCurrentTripsSection .tw-current-dock{margin-top:18px}
-#twCurrentTripsSection .tw-current-simple{overflow:hidden;border:1px solid #e7ddd2;border-radius:18px;background:#fffdfa;box-shadow:none}
+#twCurrentTripsSection .tw-current-simple{display:block!important;min-height:0!important;overflow:hidden!important;border:1px solid #e7ddd2!important;border-radius:18px!important;background:#fffdfa!important;background-image:none!important;box-shadow:none!important}
 #twCurrentTripsSection .tw-current-simple .tw-trip-art,
 #twCurrentTripsSection .tw-current-simple .tw-current-top,
 #twCurrentTripsSection .tw-current-simple .tw-current-numbers,
 #twCurrentTripsSection .tw-current-simple .tw-current-actions{display:none!important}
-#twCurrentTripsSection .tw-current-simple .tw-current-main{display:block;width:100%;padding:18px 20px 16px;border:0;background:transparent;color:inherit;text-align:left}
+#twCurrentTripsSection .tw-current-simple .tw-current-main{display:block!important;width:100%!important;min-height:0!important;padding:18px 20px 16px!important;border:0!important;background:transparent!important;color:inherit!important;text-align:left!important}
 #twCurrentTripsSection .tw-current-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 #twCurrentTripsSection .tw-current-card-top h3{margin:0;font-size:24px;line-height:1.12;font-weight:750;letter-spacing:-.02em}
 #twCurrentTripsSection .tw-current-card-top span{padding-top:3px;color:#7d746c;font-size:15px;white-space:nowrap}
