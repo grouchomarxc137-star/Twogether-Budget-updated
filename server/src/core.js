@@ -418,7 +418,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
     }
 
     if (action === 'saveTripExpense') {
-      const planId=cleanText_(payload.planId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),raw=payload.expense||{},id=cleanText_(raw.id,80),at=id?plan.expenseEntries.findIndex(x=>x.id===id):-1,prev=at>=0?plan.expenseEntries[at]:null,now=new Date().toISOString(),expense=sanitizeTripExpense_(Object.assign({},raw,{id:id||Utilities.getUuid(),loggedBy:prev&&prev.loggedBy||actor,createdAt:prev&&prev.createdAt||now,updatedAt:now}),actor);
+      const planId=cleanText_(payload.planId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),linkedTrip=plan.linkedTripId?state.trips.find(x=>x.id===plan.linkedTripId):null;if(linkedTrip&&isTripLocked_(linkedTrip))throw new Error('This trip is already confirmed by both of you');const raw=payload.expense||{},id=cleanText_(raw.id,80),at=id?plan.expenseEntries.findIndex(x=>x.id===id):-1,prev=at>=0?plan.expenseEntries[at]:null,now=new Date().toISOString(),expense=sanitizeTripExpense_(Object.assign({},raw,{id:id||Utilities.getUuid(),loggedBy:prev&&prev.loggedBy||actor,createdAt:prev&&prev.createdAt||now,updatedAt:now}),actor);
       if(expense.amount===''||Number(expense.amount)<=0)throw new Error('Enter a valid expense amount');if(!expense.paidBy)throw new Error('Choose who paid');if(expense.split==='personal'&&expense.paidBy==='both')throw new Error('Choose one payer for a personal expense');if(expense.split==='personal'&&!expense.forActor)expense.forActor=actor;if(!expense.date)expense.date=now.slice(0,10);
       state.sharedJar=sanitizeSharedJar_(state.sharedJar);const old=state.sharedJar.transactions.find(x=>x.planId===planId&&x.expenseId===expense.id),available=money2_(Number(state.sharedJar.balance||0)+Number(old&&old.amount||0)),jar=expense.useJar?money2_(Number(expense.amount)*.2):0;if(jar>available+.005)throw new Error('The Shared Jar only has €'+available.toFixed(2)+' available');expense.jarContribution=jar;state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expense.id));if(jar>0)state.sharedJar.transactions.push({planId:planId,expenseId:expense.id,amount:jar,actor:actor,at:now});state.sharedJar=sanitizeSharedJar_(state.sharedJar);
       if(at>=0)plan.expenseEntries[at]=expense;else plan.expenseEntries.push(expense);plan.updatedAt=now;plan.updatedBy=actor;state.plans[idx]=plan;resetPlanTripConfirmations_(state,plan);addAudit_(state,actor,at>=0?'updateTripExpense':'addTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,expense:expense,sharedJar:state.sharedJar});
@@ -665,10 +665,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (isTripLocked_(trip)) return output_({ok:true,tripId:trip.id,confirmed:trip.confirmed,locked:true});
 
       const now = new Date().toISOString();
-      const pSnapshot = planTripSnapshotSubmission_(plan, 'Principessa', now);
-      const qSnapshot = planTripSnapshotSubmission_(plan, 'Principe', now);
-      trip.submissions.Principessa = pSnapshot;
-      trip.submissions.Principe = qSnapshot;
+      const hasCurrentEntries = (Array.isArray(plan.expenseEntries) && plan.expenseEntries.length > 0) || (Array.isArray(plan.repayments) && plan.repayments.length > 0);
+      if (!hasCurrentEntries && trip.submissions.Principessa && trip.submissions.Principe) {
+        if (!sharedExpensesResolved_(trip.sharedExpenses)) throw new Error('Accommodation or Flights / Train still has an unknown total. Add the total before confirming the trip.');
+        if (!submissionsMatch_(trip.submissions.Principessa, trip.submissions.Principe)) throw new Error('Your versions still differ. Edit them until they match first.');
+        const warnings = reconciliationWarnings_(trip);
+        if (warnings.length) throw new Error(warnings.join(' '));
+      } else {
+        trip.submissions.Principessa = planTripSnapshotSubmission_(plan, 'Principessa', now);
+        trip.submissions.Principe = planTripSnapshotSubmission_(plan, 'Principe', now);
+      }
       trip.sharedExpenses = sanitizeSharedExpenses_(plan.sharedExpenses);
       const pBudget = plan.budgets && plan.budgets.Principessa !== '' ? Number(plan.budgets.Principessa) : 0;
       const qBudget = plan.budgets && plan.budgets.Principe !== '' ? Number(plan.budgets.Principe) : 0;
