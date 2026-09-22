@@ -236,3 +236,39 @@ html body #twCurrentTripsSection.tv2-current-host{
   box-shadow:none!important;
 }
 #twCurrentTripsSection.tv2-current-host .tv2-root{width:100%}
+
+
+/* City-photo trip cards */
+#twCurrentTripsSection .tv2-card{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background:var(--tv2-card)!important;
+}
+#twCurrentTripsSection .tv2-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background-image:var(--tv2-card-photo);
+  background-size:cover;
+  background-position:center;
+  opacity:.17;
+  pointer-events:none;
+}
+#twCurrentTripsSection .tv2-card::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background:linear-gradient(90deg,rgba(255,253,249,.58),rgba(255,253,249,.24));
+  pointer-events:none;
+}
+#twCurrentTripsSection .tv2-card>*{
+  position:relative;
+  z-index:1;
+}
+@media(max-width:760px){
+  #twCurrentTripsSection .tv2-card::before{opacity:.18}
+  #twCurrentTripsSection .tv2-card::after{background:linear-gradient(90deg,rgba(255,253,249,.56),rgba(255,253,249,.20))}
+}
