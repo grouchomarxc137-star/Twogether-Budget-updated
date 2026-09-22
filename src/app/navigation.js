@@ -144,7 +144,18 @@ function installDropdownRefinement() {
     w.addEventListener('pointerleave', () => scheduleClose(w));
     menu?.addEventListener('pointerenter', () => { cancelTimers(w); if (!suppressHover) openWrap(w); });
     menu?.addEventListener('pointerleave', () => scheduleClose(w));
-    hub?.addEventListener('click', () => { suppressHover = false; if (pinned === w) { pinned = null; openWrap(w); scheduleClose(w); } else { const old = pinned; pinned = w; if (old && old !== w) fadeClose(old); openWrap(w); } }, true);
+    hub?.addEventListener('click', () => {
+      suppressHover = false;
+      if (isMobile()) {
+        if (pinned === w) { pinned = null; hardClose(w); return; }
+        const old = pinned; pinned = w;
+        if (old && old !== w) fadeClose(old);
+        openWrap(w);
+        return;
+      }
+      if (pinned === w) { pinned = null; openWrap(w); scheduleClose(w); }
+      else { const old = pinned; pinned = w; if (old && old !== w) fadeClose(old); openWrap(w); }
+    }, true);
     menu?.addEventListener('click', () => { suppressHover = false; unpinAndFadeAll(); });
   });
   if (navInstalled) return; navInstalled = true;
@@ -168,12 +179,12 @@ export function initNavigation() {
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {
-    if (isMobile()) { activateMobileHub('trips'); return; }
+    if (isMobile()) return;
     activateTrip(lastTripView());
   });
 
   financeHub.addEventListener('click', () => {
-    if (isMobile()) { activateMobileHub('finances'); return; }
+    if (isMobile()) return;
     setHub('finances');
     ensureFinanceSheet();
     setTimeout(() => activateFinanceView(lastFinanceView()), 0);

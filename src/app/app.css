@@ -495,3 +495,42 @@ body.dev-v21 #loggedUserBadge {
 .tw-nav-wrap.v22-fade>.tw-nav-menu {
   animation:v26MenuOut .12s ease-in both!important;
 }
+
+
+/* Mobile uses the same category picker as desktop; tap replaces hover. */
+@media(max-width:760px) {
+  .hub-tabs {
+    overflow:visible!important;
+    touch-action:manipulation!important;
+  }
+
+  .hub-tabs .tw-nav-wrap {
+    position:relative!important;
+    flex:0 0 auto!important;
+  }
+
+  .tw-nav-wrap .tw-nav-menu {
+    display:none!important;
+    min-width:190px!important;
+    max-width:calc(100vw - 20px)!important;
+    visibility:hidden!important;
+    opacity:0!important;
+    pointer-events:none!important;
+    transform:translateY(-5px)!important;
+  }
+
+  .tw-nav-wrap.v22-open>.tw-nav-menu {
+    display:grid!important;
+    visibility:visible!important;
+    opacity:1!important;
+    pointer-events:auto!important;
+    transform:translateY(0)!important;
+  }
+
+  .tw-nav-menu button {
+    min-height:43px!important;
+    padding:10px 13px!important;
+    font-size:14px!important;
+    touch-action:manipulation!important;
+  }
+}
