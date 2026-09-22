@@ -458,7 +458,7 @@ function bindCardDeleteSwipe(section) {
   section.addEventListener('touchstart', (e) => {
     if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || e.touches.length !== 1) return;
     const row = e.target.closest('.tv2-swipe-row');
-    if (!row || e.target.closest('.tv2-delete-reveal')) return;
+    if (!row) return;
     closeCardSwipeRows(row);
     const t = e.touches[0];
     cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, wasOpen:row.classList.contains('is-open'), ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
@@ -564,7 +564,7 @@ function bindSimplifiedSwipe(section) {
 
 function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
-  if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
+  if ((b.dataset.act === 'open-trip' || b.dataset.act === 'delete-trip') && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'delete-trip') { openDeleteConfirm(b.dataset.kind, b.dataset.id); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
   if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:''}; renderCurrentTrips(); return; }
