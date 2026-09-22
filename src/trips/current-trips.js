@@ -35,6 +35,7 @@ let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
 let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:0 };
+let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
 
 function has(v) { return v !== '' && v != null; }
@@ -88,6 +89,7 @@ function ensureCurrentTrips() {
     });
     bindSimplifiedSwipe(section);
     bindCardDeleteSwipe(section);
+    bindExpenseDeleteSwipe(section);
   }
   return section;
 }
@@ -187,7 +189,7 @@ function entryMeta(entry) {
   if (entry?.uncertain) parts.push('estimate');
   return parts.join(' · ');
 }
-function expenseTimeline(plan) {
+function expenseTimeline(plan, canDelete = true) {
   const rows = tripEntries(plan).map((entry)=>({ kind:'expense', date:entry.date || '', entry }))
     .concat(tripRepayments(plan).map((repayment)=>({ kind:'repayment', date:repayment.date || String(repayment.createdAt || '').slice(0,10), repayment })))
     .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
@@ -202,7 +204,9 @@ function expenseTimeline(plan) {
       return '<div class="tv2-row is-settlement"><span class="tv2-ic" aria-hidden="true">💸</span><span class="tv2-row-main"><strong>'+esc(title)+'</strong><small>'+esc(meta)+'</small></span><span class="tv2-amt">'+displayMoney(repayment.amount,true)+'</span></div>';
     }
     const entry = row.entry, [, icon] = categoryInfo(entry);
-    return '<button class="tv2-row" data-act="open-expense" data-id="'+esc(entry.id)+'"><span class="tv2-ic" aria-hidden="true">'+icon+'</span><span class="tv2-row-main"><strong>'+esc(entryTitle(entry))+'</strong><small>'+esc(entryMeta(entry))+'</small></span><span class="tv2-amt">'+displayMoney(entry.amount,true)+'</span></button>';
+    const button = '<button class="tv2-row" data-act="open-expense" data-id="'+esc(entry.id)+'"><span class="tv2-ic" aria-hidden="true">'+icon+'</span><span class="tv2-row-main"><strong>'+esc(entryTitle(entry))+'</strong><small>'+esc(entryMeta(entry))+'</small></span><span class="tv2-amt">'+displayMoney(entry.amount,true)+'</span></button>';
+    if (!canDelete) return button;
+    return '<div class="tv2-expense-swipe-row" data-expense-id="'+esc(entry.id)+'"><span class="tv2-expense-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+button+'</div>';
   }).join('')+'</div>').join('');
 }
 function settlementLine(plan) {
@@ -278,7 +282,7 @@ function simplifiedTrip(plan, trip) {
       (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
     '</section>'+
     (()=>{const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?'is-even':balanceLine.startsWith('You owe ')?'is-debtor':'';return '<button class="tv2-balance '+balanceClass+'" data-act="balance"><span>'+esc(balanceLine)+'</span><span aria-hidden="true">›</span></button>';})()+
-    '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan)+'</section>'+
+    '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan,!isLocked(trip))+'</section>'+
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
 }
@@ -837,6 +841,147 @@ function bindCardDeleteSwipe(section) {
   }, { passive:true });
 }
 
+
+function resetExpenseSwipeVisual(row, animate = true) {
+  if (!row) return;
+  const expense = row.querySelector('.tv2-row');
+  const remove = row.querySelector('.tv2-expense-delete-reveal');
+  if (remove) {
+    remove.style.transition = animate ? 'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease' : 'none';
+    remove.style.width = '0px';
+    remove.style.opacity = '0';
+  }
+  if (expense) {
+    expense.style.transition = animate ? 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease' : 'none';
+    expense.style.transform = 'translateX(0)';
+    expense.style.opacity = '1';
+  }
+  if (animate) setTimeout(() => {
+    [expense,remove].forEach((el)=>{ if (el?.isConnected) el.style.transition=''; });
+  },220);
+}
+function closeExpenseSwipeRows(except = null) {
+  document.querySelectorAll('#twCurrentTrips .tv2-expense-swipe-row').forEach((row) => {
+    if (row !== except) resetExpenseSwipeVisual(row, true);
+  });
+}
+function openExpenseDeleteConfirm(planId, expenseId) {
+  closeDeleteConfirm();
+  const plan = (remoteState?.plans || []).find((item)=>item.id===planId);
+  const entry = tripEntries(plan).find((item)=>item.id===expenseId);
+  const linkedTrip = plan?.linkedTripId ? (remoteState?.trips || []).find((trip)=>trip.id===plan.linkedTripId) : null;
+  if (!plan || !entry || isLocked(linkedTrip)) return;
+  const title = entryTitle(entry) || categoryInfo(entry)[0] || 'this expense';
+  deleteConfirmLayer = document.createElement('div');
+  deleteConfirmLayer.className = 'tv2-confirm-layer';
+  deleteConfirmLayer.innerHTML =
+    '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2ExpenseDeleteTitle">'+
+      '<h2 id="tv2ExpenseDeleteTitle">Delete expense?</h2>'+
+      '<p>Are you sure you want to delete <strong>'+esc(title)+'</strong> · '+displayMoney(entry.amount,true)+'?</p>'+
+      '<p class="tv2-confirm-note">This expense will be removed from the trip.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
+    '</div>';
+  document.body.appendChild(deleteConfirmLayer);
+  const cancel = () => { closeDeleteConfirm(); closeExpenseSwipeRows(); };
+  deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', cancel));
+  deleteConfirmLayer.addEventListener('keydown', (e) => { if (e.key === 'Escape') cancel(); });
+  const deleteButton = deleteConfirmLayer.querySelector('[data-confirm-delete]');
+  deleteButton.addEventListener('click', async () => {
+    deleteButton.disabled = true;
+    deleteButton.textContent = 'Deleting…';
+    const error = deleteConfirmLayer.querySelector('.tv2-confirm-error');
+    error.textContent = '';
+    try {
+      await window.TwogetherAPI.post('deleteTripExpense',{planId,expenseId},actor());
+      closeDeleteConfirm();
+      closeExpenseSwipeRows();
+      await refreshState(true);
+      simplifiedSnack('Expense deleted');
+    } catch (err) {
+      deleteButton.disabled = false;
+      deleteButton.textContent = 'Delete';
+      error.textContent = err?.message || 'Could not delete this expense';
+    }
+  });
+  setTimeout(() => deleteButton.focus(), 0);
+}
+function bindExpenseDeleteSwipe(section) {
+  if (section.dataset.tv2ExpenseDeleteSwipe === '1') return;
+  section.dataset.tv2ExpenseDeleteSwipe = '1';
+  const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
+  const resetState = () => {
+    expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:expenseSwipe.ignoreClickUntil || 0 };
+  };
+  section.addEventListener('touchstart', (e) => {
+    if (!mobile() || simplifiedView.name !== 'trip' || deleteConfirmLayer || simplifiedLayer || e.touches.length !== 1) return;
+    const plan = (remoteState?.plans || []).find((item)=>item.id===simplifiedView.planId);
+    const linkedTrip = plan?.linkedTripId ? (remoteState?.trips || []).find((trip)=>trip.id===plan.linkedTripId) : null;
+    if (!plan || isLocked(linkedTrip)) return;
+    const row = e.target.closest('.tv2-expense-swipe-row'); if (!row) return;
+    closeExpenseSwipeRows(row);
+    resetExpenseSwipeVisual(row, false);
+    const t = e.touches[0];
+    expenseSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, ignoreClickUntil:expenseSwipe.ignoreClickUntil || 0 };
+  }, { passive:true });
+  section.addEventListener('touchmove', (e) => {
+    if (!expenseSwipe.tracking || !expenseSwipe.row || e.touches.length !== 1) return;
+    const t = e.touches[0], dx = t.clientX - expenseSwipe.startX, dy = Math.abs(t.clientY - expenseSwipe.startY);
+    expenseSwipe.lastX = t.clientX;
+    if (!expenseSwipe.active) {
+      if (Math.abs(dx) < 8 && dy < 8) return;
+      if (dx < -10 && Math.abs(dx) > dy * 1.2) expenseSwipe.active = true;
+      else if (dy >= Math.abs(dx) || dx > 0) { resetState(); return; }
+    }
+    if (!expenseSwipe.active) return;
+    e.preventDefault();
+    const row = expenseSwipe.row, expense = row.querySelector('.tv2-row'), remove = row.querySelector('.tv2-expense-delete-reveal');
+    if (!expense || !remove) return;
+    const width = row.getBoundingClientRect().width || window.innerWidth - 32;
+    const distance = Math.min(0, Math.max(-width * .94, dx));
+    const exposed = Math.abs(distance);
+    expense.style.transition = 'none';
+    expense.style.transform = 'translateX('+distance+'px)';
+    remove.style.transition = 'none';
+    remove.style.width = exposed+'px';
+    remove.style.opacity = String(Math.min(1,.35+exposed/120));
+  }, { passive:false });
+  section.addEventListener('touchend', () => {
+    if (!expenseSwipe.tracking || !expenseSwipe.row) { resetState(); return; }
+    const row = expenseSwipe.row, dx = expenseSwipe.lastX - expenseSwipe.startX;
+    const width = row.getBoundingClientRect().width || window.innerWidth - 32;
+    const fullSwipe = expenseSwipe.active && -dx >= Math.max(180,width*.62);
+    if (!expenseSwipe.active || !fullSwipe) {
+      resetExpenseSwipeVisual(row,true);
+      resetState();
+      return;
+    }
+    expenseSwipe.ignoreClickUntil = Date.now()+550;
+    const expenseId = row.dataset.expenseId, planId = simplifiedView.planId;
+    const expense = row.querySelector('.tv2-row'), remove = row.querySelector('.tv2-expense-delete-reveal');
+    if (expense) {
+      expense.style.transition = 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      expense.style.transform = 'translateX(-'+width+'px)';
+      expense.style.opacity = '.76';
+    }
+    if (remove) {
+      remove.style.transition = 'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      remove.style.width = width+'px';
+      remove.style.opacity = '1';
+    }
+    resetState();
+    setTimeout(() => {
+      resetExpenseSwipeVisual(row,false);
+      openExpenseDeleteConfirm(planId,expenseId);
+    },180);
+  }, { passive:true });
+  section.addEventListener('touchcancel', () => {
+    resetExpenseSwipeVisual(expenseSwipe.row,true);
+    resetState();
+  }, { passive:true });
+}
+
 function bindSimplifiedSwipe(section) {
   if (section.dataset.tv2Swipe === '1') return;
   section.dataset.tv2Swipe = '1';
@@ -915,6 +1060,7 @@ function handleSimplifiedClick(e) {
   if (b.dataset.act === 'budgets' || b.dataset.act === 'edit-trip') { window.TwogetherWorkflow?.budget(plan.id); return; }
   if (b.dataset.act === 'add-expense') { openSimplifiedExpenseSheet(plan); return; }
   if (b.dataset.act === 'open-expense') {
+    if (Date.now() < expenseSwipe.ignoreClickUntil) { e.preventDefault(); return; }
     const entry = tripEntries(plan).find((x)=>x.id===b.dataset.id); if (entry) openSimplifiedExpenseSheet(plan,entry);
     return;
   }

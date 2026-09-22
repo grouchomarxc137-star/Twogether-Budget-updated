@@ -66,7 +66,7 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-list { display: grid; gap: 14px; }
 .tv2-day h2 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--tv2-muted); letter-spacing: .02em; }
 .tv2-row { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; width: 100%; min-height: 58px; padding: 6px 0; border-bottom: 1px solid var(--tv2-line); text-align: left; }
-.tv2-day .tv2-row:last-child { border-bottom: 0; }
+.tv2-day > .tv2-row:last-child, .tv2-day > .tv2-expense-swipe-row:last-child > .tv2-row { border-bottom: 0; }
 .tv2-ic { width: 36px; height: 36px; border-radius: 11px; background: var(--tv2-card); border: 1px solid var(--tv2-line); display: grid; place-items: center; font-size: 17px; }
 .tv2-row-main { min-width: 0; display: grid; gap: 1px; }
 .tv2-row-main strong { font-size: 16px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -367,6 +367,9 @@ html body #twCurrentTripsSection.tv2-current-host{
 }
 .tv2-confirm-actions button:disabled{opacity:.55}
 
+.tv2-expense-swipe-row{display:block;}
+.tv2-expense-delete-reveal{display:none;}
+
 @media(max-width:760px){
   .tv2-swipe-row{
     position:relative;
@@ -412,6 +415,42 @@ html body #twCurrentTripsSection.tv2-current-host{
   }
   .tv2-delete-reveal b,
   .tv2-checklist-reveal b{
+    min-width:max-content;
+    font:inherit;
+  }
+  .tv2-expense-swipe-row{
+    position:relative;
+    display:block;
+    overflow:hidden;
+  }
+  .tv2-expense-swipe-row>.tv2-row{
+    position:relative;
+    z-index:2;
+    background:var(--tv2-bg);
+    transition:transform .2s cubic-bezier(.22,.8,.28,1),opacity .16s ease;
+    will-change:transform,opacity;
+  }
+  .tv2-expense-delete-reveal{
+    position:absolute;
+    top:0;
+    right:0;
+    bottom:0;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:0;
+    overflow:hidden;
+    opacity:0;
+    pointer-events:none;
+    white-space:nowrap;
+    background:var(--tv2-over);
+    color:white;
+    font-weight:700;
+    font-size:14px;
+    will-change:width,opacity;
+  }
+  .tv2-expense-delete-reveal b{
     min-width:max-content;
     font:inherit;
   }

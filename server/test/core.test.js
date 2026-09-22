@@ -428,8 +428,17 @@ test('deletes standalone unfinished trips but protects confirmed trips', () => {
     };
     const first = action(c.database, 'savePlanSubmission', { planId: p.planId, submission });
     action(c.database, 'savePlanSubmission', { planId: p.planId, submission }, 'Principe');
+    const expense = action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { category: 'food', foodType: 'groceries', amount: 24, paidBy: 'Principessa', split: 'shared', date: '2026-11-01' },
+    });
     action(c.database, 'confirmTrip', { id: first.tripId });
     action(c.database, 'confirmTrip', { id: first.tripId }, 'Principe');
+
+    const blockedExpense = action(c.database, 'deleteTripExpense', { planId: p.planId, expenseId: expense.expense.id });
+    assert.equal(blockedExpense.ok, false);
+    assert.match(blockedExpense.error, /Confirmed trip expenses cannot be deleted/);
+    assert.equal(getState().plans[0].expenseEntries.length, 1);
 
     const blocked = action(c.database, 'deleteCurrentTrip', { kind: 'plan', id: p.planId });
     assert.equal(blocked.ok, false);
