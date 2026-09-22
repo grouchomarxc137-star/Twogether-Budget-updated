@@ -17,7 +17,7 @@ import {
 } from './budget-state.js';
 import { startActualChoice } from './expenses-flow.js';
 
-document.addEventListener('twogether:budget-new-plan', openNewPlan);
+// New trip creation is handled by plan-trip.js.
 
 export function renderBudgetPlans() {
   installUi();

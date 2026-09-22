@@ -4738,3 +4738,131 @@ html body dialog.current-overview button, html body dialog.current-overview .v5-
 .overview-expense-form .hidden{
   display:none!important;
 }
+
+
+/* Current Trips as the primary Trips page + smooth plan modal */
+#log{padding-top:8px}
+#twCurrentTripsSection{margin:4px 0 34px}
+#twCurrentTripsSection .tw-current-head{align-items:center;margin-bottom:18px;padding:4px 2px}
+#twCurrentTripsSection .tw-current-head h2{
+  margin:3px 0 4px;
+  font-family:'Crimson Pro',Georgia,serif;
+  font-size:clamp(34px,3.3vw,48px);
+  font-weight:600;
+  letter-spacing:-.025em;
+}
+#twCurrentTripsSection .tw-current-head p{
+  margin:0;color:var(--muted);font-family:'Crimson Pro',Georgia,serif;font-size:15px;
+}
+.tw-plan-trip-btn{
+  display:inline-flex!important;align-items:center;justify-content:center;gap:7px;
+  min-height:42px;padding:10px 16px!important;border-radius:14px!important;
+  font-family:'Crimson Pro',Georgia,serif!important;font-size:14px!important;
+  box-shadow:0 8px 22px rgba(160,112,30,.15);
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+}
+.tw-plan-trip-btn:hover{transform:translateY(-1px);box-shadow:0 11px 26px rgba(160,112,30,.2)}
+.tw-plan-trip-btn:active{transform:scale(.985)}
+
+.v5-budget-card{font-family:'Crimson Pro',Georgia,serif}
+.plan-trip-modal-head h2{
+  margin:5px 40px 4px 0!important;
+  font-family:'Crimson Pro',Georgia,serif!important;
+  font-size:36px!important;font-weight:600!important;letter-spacing:-.025em!important;
+}
+.plan-trip-modal-head p{margin:0 0 20px;color:var(--muted);font-size:14px}
+.plan-trip-form{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.plan-trip-field{display:grid;gap:6px}
+.plan-trip-field.full{grid-column:1/-1}
+.plan-trip-field.hidden{display:none}
+.plan-trip-field>label{font-size:12px;font-weight:700;color:#5d5148}
+.plan-trip-field>label span{font-weight:500;color:var(--muted)}
+.plan-trip-field>input,.plan-trip-field>select{
+  width:100%;min-height:46px;border:1px solid #dfd4c8;border-radius:13px;
+  padding:10px 12px;background:#fff;color:#2e2824;font:inherit;font-size:15px;outline:none;
+  transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.plan-trip-field>input:focus,.plan-trip-field>select:focus,.plan-budget-input:focus-within{
+  border-color:#c49337;box-shadow:0 0 0 3px rgba(196,147,55,.11)
+}
+.plan-trip-field>small{color:var(--muted);font-size:11px}
+.plan-budget-input{
+  display:flex;align-items:center;min-height:46px;padding:0 12px;border:1px solid #dfd4c8;
+  border-radius:13px;background:#fff;transition:border-color .16s ease,box-shadow .16s ease;
+}
+.plan-budget-input>span{font-weight:700;color:#75685e}
+.plan-budget-input>input{
+  width:100%;min-height:44px;border:0;outline:0;padding-left:8px;background:transparent;
+  font:inherit;font-size:16px;
+}
+.plan-date-toggle{
+  display:grid;grid-template-columns:minmax(0,1fr) auto 22px;align-items:center;gap:12px;
+  width:100%;min-height:62px;padding:10px 13px;border:1px solid #dfd4c8;border-radius:15px;
+  background:#fff;color:inherit;text-align:left;cursor:pointer;
+  transition:border-color .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.plan-date-toggle:hover,.plan-date-toggle.open{
+  border-color:#c49337;background:#fffdf8;box-shadow:0 8px 20px rgba(76,58,35,.06);
+}
+.plan-date-toggle span small,.plan-date-toggle span strong{display:block}
+.plan-date-toggle span small{margin-bottom:3px;color:var(--muted);font-size:10px}
+.plan-date-toggle span strong{font-size:15px}
+.plan-date-toggle>b{font-size:12px;color:#846420;font-weight:650}
+.plan-date-toggle>i{font-style:normal;font-size:17px;color:#9a722a;transition:transform .16s ease}
+.plan-date-toggle.open>i{transform:rotate(180deg)}
+
+.plan-calendar{
+  margin-top:9px;border:1px solid #dfd4c8;border-radius:18px;background:#fff;
+  box-shadow:0 18px 50px rgba(57,43,31,.11);overflow:hidden;animation:planCalendarIn .16s ease both;
+}
+.plan-calendar.hidden{display:none}
+@keyframes planCalendarIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.plan-cal-head{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;gap:8px;padding:13px 14px 8px}
+.plan-cal-head strong{text-align:center;font-size:17px}
+.plan-cal-head button{
+  width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:#302922;
+  font:inherit;font-size:25px;line-height:1;cursor:pointer;transition:background .15s ease,transform .15s ease;
+}
+.plan-cal-head button:hover{background:#f4efe8}.plan-cal-head button:active{transform:scale(.94)}
+.plan-cal-weekdays,.plan-cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+.plan-cal-weekdays{padding:4px 12px 5px}
+.plan-cal-weekdays span{text-align:center;color:#8a7d73;font-size:10px;font-weight:700}
+.plan-cal-grid{padding:2px 12px 13px;row-gap:2px}
+.plan-cal-empty{height:38px}
+.plan-cal-day{
+  height:38px;border:0;background:transparent;color:#2d2722;font:inherit;font-size:13px;font-weight:650;
+  cursor:pointer;transition:background .12s ease,color .12s ease,transform .12s ease;
+}
+.plan-cal-day:hover{background:#f8f3ea}
+.plan-cal-day.in-range{background:#f6e7b9;border-radius:0}
+.plan-cal-day.start,.plan-cal-day.end{background:#b98526;color:#fff;border-radius:50%}
+.plan-cal-day:active{transform:scale(.94)}
+.plan-cal-footer{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;
+  border-top:1px solid #eee5da;background:#fcfaf7;
+}
+.plan-cal-footer>div span,.plan-cal-footer>div strong,.plan-cal-footer>div small{display:block}
+.plan-cal-footer>div span{color:var(--muted);font-size:10px}
+.plan-cal-footer>div strong{margin:2px 0;font-size:13px}
+.plan-cal-footer>div small{color:#8a6a28;font-size:10px}
+.plan-cal-footer .btn{min-width:92px;border-radius:11px}
+.plan-cal-footer .btn:disabled{opacity:.42;cursor:default}
+.plan-trip-actions{
+  display:flex;justify-content:flex-end;gap:9px;margin-top:18px;padding-top:15px;border-top:1px solid #eee5da;
+}
+.plan-trip-actions .btn{
+  min-height:40px;border-radius:12px;font-family:'Crimson Pro',Georgia,serif;font-size:13px;
+}
+
+@media(max-width:700px){
+  #twCurrentTripsSection .tw-current-head{align-items:flex-start;flex-direction:column}
+  .tw-plan-trip-btn{width:100%}
+  .plan-trip-form{grid-template-columns:1fr}
+  .plan-trip-field.full{grid-column:auto}
+  .v5-budget-card{padding:20px 16px!important;border-radius:22px!important}
+  .plan-trip-modal-head h2{font-size:31px!important}
+  .plan-date-toggle{grid-template-columns:1fr}
+  .plan-date-toggle>i{display:none}
+  .plan-cal-footer{align-items:stretch;flex-direction:column}
+  .plan-cal-footer .btn{width:100%}
+}
