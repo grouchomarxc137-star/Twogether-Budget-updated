@@ -3,6 +3,7 @@
 // visible while new log-as-you-go expenses use the shared expenseEntries
 // collection on each budget plan.
 import { fmtDate } from '../lib/format.js';
+import { openTripExpenseLogger } from './expense-log.js';
 
 const names = ['Principessa', 'Principe'];
 const legacyKeys = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -19,6 +20,39 @@ const has = (v) => v !== '' && v != null;
 const n = (v) => Number(String(v ?? 0).replace(',', '.')) || 0;
 const money = (v) => '€' + n(v).toFixed(2);
 const today = () => { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 10); };
+const actorName = () => document.body.dataset.actor || 'Principessa';
+function asDate(value) { if (!value) return null; const d = new Date(value + 'T12:00:00'); return Number.isNaN(d.getTime()) ? null : d; }
+function dayDiff(a,b){ return Math.round((b-a)/86400000); }
+function timing(meta){
+  const start=asDate(meta?.start),end=asDate(meta?.end),now=asDate(today()); if(!start||!end)return'';
+  if(now<start){const days=Math.max(1,dayDiff(now,start));return `Starts in ${days} day${days===1?'':'s'}`;}
+  if(now<=end){const total=Math.max(1,dayDiff(start,end)+1),day=Math.max(1,Math.min(total,dayDiff(start,now)+1));return `Day ${day} of ${total}`;}
+  return 'Past trip';
+}
+function shortRange(start,end){const a=asDate(start),b=asDate(end);if(!a||!b)return'';const am=a.toLocaleDateString('en-GB',{month:'short'}),bm=b.toLocaleDateString('en-GB',{month:'short'});return am===bm?`${a.getDate()}–${b.getDate()} ${bm}`:`${a.getDate()} ${am}–${b.getDate()} ${bm}`;}
+function displayMoney(value,forceCents=false){const amount=n(value),whole=Math.abs(amount-Math.round(amount))<.005&&!forceCents;return '€'+amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});}
+function categoryInfo(entry){
+  if(entry?.category==='accommodation')return['Stay','🛏'];
+  if(entry?.category==='transport')return[entry?.transportType==='fuel'?'Fuel':entry?.transportType==='tolls'?'Tolls':'Transport',entry?.transportType==='fuel'?'⛽':'✈️'];
+  if(entry?.category==='food')return[entry?.foodType==='groceries'?'Groceries':entry?.foodType==='eating-out'?'Eating out':'Food',entry?.foodType==='groceries'?'🛒':'🍝'];
+  if(entry?.category==='activities')return['Activities','🎟'];
+  return[entry?.name||entry?.note||'Other','•'];
+}
+function settlementLine(plan){
+  const paid={Principessa:0,Principe:0},share={Principessa:0,Principe:0};
+  for(const entry of entries(plan)){const amount=Math.max(0,n(entry.amount)-n(entry.jarContribution));if(entry.paidBy==='both'){paid.Principessa+=amount/2;paid.Principe+=amount/2}else if(paid[entry.paidBy]!=null)paid[entry.paidBy]+=amount;if(entry.split==='personal')share[entry.forActor==='Principe'?'Principe':'Principessa']+=amount;else{share.Principessa+=amount/2;share.Principe+=amount/2}}
+  const d=paid.Principessa-share.Principessa,me=actorName();if(Math.abs(d)<.005)return 'You’re even';
+  const creditor=d>0?'Principessa':'Principe',debtor=d>0?'Principe':'Principessa',amount=Math.abs(d);
+  if(me===creditor)return `${debtor} owes you ${displayMoney(amount,true)}`;
+  if(me===debtor)return `You owe ${creditor} ${displayMoney(amount,true)}`;
+  return `${debtor} owes ${creditor} ${displayMoney(amount,true)}`;
+}
+function expenseTimeline(plan){
+  const list=entries(plan).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if(!list.length)return '<p class="overview-trip-empty">No expenses yet. Add them as they happen, it takes a few seconds.</p>';
+  const groups=new Map();for(const entry of list){const key=entry.date||today();if(!groups.has(key))groups.set(key,[]);groups.get(key).push(entry)}
+  return [...groups.entries()].map(([date,items])=>{const label=date===today()?'Today':fmtDate(date);return '<section class="overview-trip-day"><h3>'+esc(label)+'</h3>'+items.map(entry=>{const [label,icon]=categoryInfo(entry);const payer=entry.paidBy===actorName()?'you':entry.paidBy==='both'?'each paid half':entry.paidBy;const jar=entry.jarContribution?' · '+displayMoney(entry.jarContribution,true)+' from Jar':'';return '<button type="button" class="overview-trip-expense" data-trip-entry="'+esc(entry.id)+'"><span class="overview-trip-expense-icon">'+icon+'</span><span class="overview-trip-expense-copy"><strong>'+esc(entry.note||entry.name||label)+'</strong><small>'+esc(payer+jar)+'</small></span><b>'+displayMoney(entry.amount,true)+'</b></button>'}).join('')+'</section>'}).join('');
+}
 
 let latest = null, dialog = null, opened = null, refreshing = false, lastRefresh = 0, busy = false;
 
@@ -122,30 +156,27 @@ function close() { dialog?.remove(); dialog = null; opened = null; }
 export function open(plan) { if (!plan) return; opened = plan.id; draw(plan); }
 
 function hero(plan, trip) {
-  const locked = names.every((name) => trip?.confirmed?.[name]);
-  const country = plan.meta?.location === 'Other' ? (plan.meta?.otherLocation || 'Trip') : (plan.meta?.location || 'Trip');
-  return '<header class="overview-hero"><div class="overview-title-row"><div class="overview-title-copy"><span class="overview-country">' + esc(country) + '</span><h2>' + esc(plan.meta?.city || 'Current trip') + '</h2><p>' + fmtDate(plan.meta?.start) + ' – ' + fmtDate(plan.meta?.end) + '</p></div><span class="overview-status-pill ' + (locked ? 'confirmed' : '') + '">' + (locked ? 'Confirmed' : 'In progress') + '</span></div>' + budgetSplit(plan, trip) + '</header>';
+  const meta=plan?.meta||{},spent=total(plan,trip);
+  const splitBudget=names.reduce((sum,name)=>sum+(has(plan?.budgets?.[name])?n(plan.budgets[name]):0),0);
+  const available=splitBudget||(has(trip?.budget)?n(trip.budget):0),left=available-spent,pct=available>0?Math.max(0,Math.min(100,(spent/available)*100)):0;
+  const mine=plan?.budgets?.[actorName()];
+  return '<header class="overview-trip-head"><div class="overview-trip-nav"><button type="button" data-overview-close>‹ Trips</button><button type="button" data-overview-edit>Edit</button></div><h2>'+esc(meta.city||'Current trip')+'</h2><p>'+esc(shortRange(meta.start,meta.end))+(timing(meta)?' · '+esc(timing(meta)):'')+'</p></header>'+
+    '<section class="overview-trip-money"><div class="overview-trip-figures"><button type="button" data-overview-budget><span>Available ›</span><strong>'+(available>0?displayMoney(available):'Not set')+'</strong>'+(!has(mine)?'<small>+ add yours</small>':'')+'</button><div><span>Spent</span><strong>'+displayMoney(spent)+'</strong></div></div>'+(available>0?'<span class="overview-trip-progress"><i style="width:'+pct.toFixed(1)+'%"></i></span><div class="overview-trip-left '+(left<0?'over':'')+'"><strong>'+displayMoney(Math.abs(left))+'</strong><span>'+(left<0?'over budget':'left')+'</span></div>':'')+'</section>';
 }
 
 function draw(plan) {
   dialog?.remove();
-  dialog = document.createElement('dialog');
-  dialog.className = 'current-overview';
-  const trip = latest?.trips?.find((item) => item.id === plan.linkedTripId);
-  dialog.innerHTML = '<button class="trip-close" data-overview-close aria-label="Close overview">×</button><div class="overview-shell">' + hero(plan, trip) +
-    '<div class="overview-scroll"><button type="button" class="btn primary overview-log-expense" data-overview-log-expense>＋ Log expense</button><div class="overview-simple-table"><table><thead><tr><th>Expenses</th><th>Principessa</th><th>Principe</th></tr></thead><tbody>' +
-    rows.map((row) => '<tr><th><button type="button" class="overview-category-btn" data-category="' + row.key + '">' + esc(row.label) + '<span>›</span></button></th><td>' + money(rowPaid(plan, trip, row, 'Principessa')) + '</td><td>' + money(rowPaid(plan, trip, row, 'Principe')) + '</td></tr>').join('') +
-    '</tbody></table></div><p class="overview-table-hint">Select a category to view or edit its expenses.</p></div></div>';
-  document.body.appendChild(dialog);
-  dialog.showModal();
-  dialog.addEventListener('cancel', close);
-  dialog.querySelector('[data-overview-close]').onclick = close;
-  dialog.querySelector('[data-overview-log-expense]').onclick = () => {
-    const id = plan.id;
-    close();
-    window.TwogetherWorkflow?.start(id);
-  };
-  dialog.querySelectorAll('[data-category]').forEach((button) => button.onclick = () => drawCategory(plan, button.dataset.category));
+  dialog=document.createElement('dialog');
+  dialog.className='current-overview current-overview-trip';
+  const trip=latest?.trips?.find((item)=>item.id===plan.linkedTripId);
+  dialog.innerHTML='<div class="overview-trip-shell">'+hero(plan,trip)+'<button type="button" class="overview-trip-balance"><span>'+esc(settlementLine(plan))+'</span><b>›</b></button><div class="overview-trip-list">'+expenseTimeline(plan)+'</div><div class="overview-trip-dock"><button type="button" data-overview-add>＋ Add expense</button></div></div>';
+  document.body.appendChild(dialog);dialog.showModal();
+  dialog.addEventListener('cancel',close);
+  dialog.querySelector('[data-overview-close]').onclick=close;
+  dialog.querySelector('[data-overview-edit]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
+  dialog.querySelector('[data-overview-budget]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
+  dialog.querySelector('[data-overview-add]').onclick=()=>{close();openTripExpenseLogger(plan.id,{returnToTrip:true});};
+  dialog.querySelectorAll('[data-trip-entry]').forEach((button)=>button.onclick=()=>{const entry=entries(plan).find((item)=>item.id===button.dataset.tripEntry);if(!entry)return;const row=rows.find((item)=>item.category===entry.category)||rows[rows.length-1];drawCategory(plan,row.key,entry.id,true);});
 }
 
 function subtypeLabel(row, entry) {
