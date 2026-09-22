@@ -414,3 +414,41 @@ html body #twCurrentTripsSection.tv2-current-host{
   background:transparent;
   border-style:dashed;
 }
+
+
+/* Personal budget toggle colors */
+#twCurrentTripsSection .tv2-money[data-act="toggle-budget-view"]{
+  cursor:pointer;
+  transition:border-color .18s ease, background .18s ease;
+}
+#twCurrentTripsSection .tv2-money[data-act="toggle-budget-view"]:focus-visible{
+  outline:2px solid var(--tv2-primary);
+  outline-offset:2px;
+}
+#twCurrentTripsSection .tv2-money.is-personal .tv2-bar i,
+#twCurrentTripsSection .tv2-money.is-personal .tv2-left b,
+#twCurrentTripsSection .tv2-money.is-personal .tv2-left span{
+  transition:background .18s ease,color .18s ease;
+}
+#twCurrentTripsSection .tv2-money.is-personal.is-principessa .tv2-bar i{
+  background:#d4aa2a;
+}
+#twCurrentTripsSection .tv2-money.is-personal.is-principessa .tv2-left b,
+#twCurrentTripsSection .tv2-money.is-personal.is-principessa .tv2-left span{
+  color:#a77a08;
+}
+#twCurrentTripsSection .tv2-money.is-personal.is-principe .tv2-bar i{
+  background:#d77a2b;
+}
+#twCurrentTripsSection .tv2-money.is-personal.is-principe .tv2-left b,
+#twCurrentTripsSection .tv2-money.is-personal.is-principe .tv2-left span{
+  color:#b55b16;
+}
+#twCurrentTripsSection .tv2-money.is-personal.is-over .tv2-bar i,
+#twCurrentTripsSection .tv2-money.is-personal .tv2-bar.is-over i{
+  background:var(--tv2-over);
+}
+#twCurrentTripsSection .tv2-money.is-personal .tv2-left.is-over b,
+#twCurrentTripsSection .tv2-money.is-personal .tv2-left.is-over span{
+  color:var(--tv2-over);
+}
