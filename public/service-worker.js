@@ -1,8 +1,8 @@
-const CACHE = 'twogether-v2';
+const CACHE = 'twogether-v3';
 const FALLBACK = './index.html';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', FALLBACK, './manifest.webmanifest', './app-icon.svg', './app-icon.svg?v=2'])).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', FALLBACK, './manifest.webmanifest', './app-icon.svg', './app-icon.svg?v=3'])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {

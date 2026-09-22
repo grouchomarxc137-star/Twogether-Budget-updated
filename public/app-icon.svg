@@ -2,6 +2,6 @@
   <rect width="512" height="512" rx="118" fill="#f7f4ef"/>
   <rect x="42" y="42" width="428" height="428" rx="98" fill="#fffaf0" stroke="#d8b66c" stroke-width="10"/>
   <path d="M256 370C199 327 116 273 116 194c0-46 35-80 79-80 29 0 50 14 61 36 12-22 33-36 62-36 44 0 78 34 78 80 0 79-82 133-140 176Z" fill="none" stroke="#a87820" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M207 182c13-21 31-31 49-31 19 0 37 10 49 31" fill="none" stroke="#cfaa5a" stroke-width="11" stroke-linecap="round"/>
-  <text x="256" y="286" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="92" font-weight="700" fill="#a87820">€</text>
+  <path d="M286 168C278 157 267 151 254 151C234 151 218 167 218 188C218 208 234 224 254 224C267 224 278 218 286 208" fill="none" stroke="#cfaa5a" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M212 181H258M212 197H258" fill="none" stroke="#cfaa5a" stroke-width="11" stroke-linecap="round"/>
 </svg>
