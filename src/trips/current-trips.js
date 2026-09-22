@@ -197,7 +197,9 @@ function allSimplifiedItems() {
 }
 function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
-  return '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
+  const city = String(item.meta?.city || '').trim().toLowerCase(), country = item.meta?.location || '';
+  const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+  return '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" style="--tv2-card-photo:url(&quot;'+esc(image)+'&quot;)">'+
     '<span class="tv2-card-top"><strong>'+esc(item.meta?.city || locationLabel(item.meta))+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
     '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
     '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
