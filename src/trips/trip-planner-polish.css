@@ -26,7 +26,7 @@
 .plan-trip-field>input:focus,.plan-trip-field>select:focus,.plan-budget-input:focus-within,.plan-date-toggle.open{border-color:#c49337!important;box-shadow:0 0 0 4px rgba(196,147,55,.10),0 10px 24px rgba(70,52,32,.05)!important}
 .plan-date-toggle{min-height:68px!important;padding:12px 15px!important;border-radius:17px!important}
 .plan-date-toggle>b{padding:6px 10px;border-radius:999px;background:#fbf2dc;color:#8a6320!important;white-space:nowrap}
-.plan-calendar{margin-top:12px!important;overflow:hidden;border:1px solid rgba(181,145,88,.24)!important;border-radius:22px!important;background:rgba(255,254,251,.98)!important;box-shadow:0 26px 60px rgba(55,42,28,.13)!important;animation:planCalendarPolishIn .22s cubic-bezier(.22,.8,.25,1) both!important}
+.plan-calendar{width:min(100%,540px);margin:12px auto 0!important;overflow:hidden;border:1px solid rgba(181,145,88,.24)!important;border-radius:22px!important;background:rgba(255,254,251,.98)!important;box-shadow:0 26px 60px rgba(55,42,28,.13)!important;animation:planCalendarPolishIn .22s cubic-bezier(.22,.8,.25,1) both!important}
 @keyframes planCalendarPolishIn{from{opacity:0;transform:translateY(-7px) scale(.992)}to{opacity:1;transform:translateY(0) scale(1)}}
 .plan-cal-head{grid-template-columns:44px 1fr 44px!important;gap:10px!important;padding:18px 18px 6px!important}
 .plan-cal-head>div{display:grid;gap:2px;text-align:center}
@@ -72,7 +72,7 @@
 .plan-trip-modal-head{padding-right:24px}.plan-trip-modal-head h2{font-size:30px!important}.plan-trip-form{gap:14px!important}
 .plan-trip-field>input,.plan-trip-field>select,.plan-budget-input{min-height:50px!important;border-radius:15px!important}
 .plan-date-toggle{grid-template-columns:minmax(0,1fr) auto!important;min-height:72px!important}.plan-date-toggle>i{display:none!important}.plan-date-toggle>b{justify-self:end;max-width:118px;overflow:hidden;text-overflow:ellipsis}
-.plan-calendar{margin-left:-3px!important;margin-right:-3px!important;border-radius:20px!important}
+.plan-calendar{width:auto;max-width:none;margin-left:-3px!important;margin-right:-3px!important;border-radius:20px!important}
 .plan-cal-head{grid-template-columns:42px 1fr 42px!important;padding:15px 12px 5px!important}.plan-cal-hint{margin-inline:12px}.plan-cal-weekdays{padding:3px 8px 6px!important}.plan-cal-grid{padding:0 8px 14px!important;row-gap:4px!important}
 .plan-cal-empty,.plan-cal-day{height:42px!important}.plan-cal-day span{width:34px;height:34px}
 .plan-cal-footer{align-items:stretch!important;padding:13px 14px 14px!important}.plan-cal-footer .btn{width:100%;min-height:46px}
