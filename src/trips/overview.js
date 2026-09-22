@@ -273,7 +273,6 @@ export function renderDataViews() {
   renderTripGallery();
   renderMonthly();
   renderCompare();
-  renderActivity();
 }
 
 window.TwogetherApp = { open: openTripModal };
