@@ -34,6 +34,8 @@ let simplifiedView = { name: 'home', planId: '' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
+let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
+let deleteConfirmLayer = null;
 
 function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
@@ -79,6 +81,7 @@ function ensureCurrentTrips() {
     section.dataset.tv2Full = '1';
     section.addEventListener('click', handleSimplifiedClick);
     bindSimplifiedSwipe(section);
+    bindCardDeleteSwipe(section);
   }
   return section;
 }
@@ -201,12 +204,16 @@ function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
   const city = String(item.meta?.city || '').trim().toLowerCase(), country = item.meta?.location || '';
   const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
-  return '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" style="--tv2-card-photo:url(&quot;'+esc(image)+'&quot;)">'+
-    '<span class="tv2-card-top"><strong>'+esc(item.meta?.city || locationLabel(item.meta))+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
-    '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
-    '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
-    (item.available && item.available > 0?'<span class="tv2-bar"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
-  '</button>';
+  const name = item.meta?.city || locationLabel(item.meta);
+  return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
+    '<button type="button" class="tv2-delete-reveal" data-act="delete-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" aria-label="Delete '+esc(name)+'">Delete</button>'+
+    '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'" style="--tv2-card-photo:url(&quot;'+esc(image)+'&quot;)">'+
+      '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+      '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
+      '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
+      (item.available && item.available > 0?'<span class="tv2-bar"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
+    '</button>'+
+  '</div>';
 }
 function simplifiedHome(items) {
   return '<div class="tv2-page"><header class="tv2-home-head"><h1>Trips</h1></header>'+
@@ -391,6 +398,103 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   mount();
 }
 
+function closeCardSwipeRows(except = null) {
+  document.querySelectorAll('#twCurrentTrips .tv2-swipe-row.is-open').forEach((row) => {
+    if (row !== except) row.classList.remove('is-open');
+  });
+}
+function closeDeleteConfirm() {
+  deleteConfirmLayer?.remove();
+  deleteConfirmLayer = null;
+}
+function openDeleteConfirm(kind, id) {
+  closeDeleteConfirm();
+  const item = allSimplifiedItems().find((x) => x.kind === kind && x.id === id);
+  if (!item) return;
+  const name = item.meta?.city || locationLabel(item.meta) || 'this trip';
+  deleteConfirmLayer = document.createElement('div');
+  deleteConfirmLayer.className = 'tv2-confirm-layer';
+  deleteConfirmLayer.innerHTML =
+    '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2DeleteTitle">'+
+      '<h2 id="tv2DeleteTitle">Delete trip?</h2>'+
+      '<p>Are you sure you want to delete <strong>'+esc(name)+'</strong>?</p>'+
+      '<p class="tv2-confirm-note">This removes the trip and its logged expenses.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
+    '</div>';
+  document.body.appendChild(deleteConfirmLayer);
+  const cancel = () => closeDeleteConfirm();
+  deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', cancel));
+  deleteConfirmLayer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDeleteConfirm(); });
+  const deleteButton = deleteConfirmLayer.querySelector('[data-confirm-delete]');
+  deleteButton.addEventListener('click', async () => {
+    deleteButton.disabled = true;
+    deleteButton.textContent = 'Deleting…';
+    const error = deleteConfirmLayer.querySelector('.tv2-confirm-error');
+    error.textContent = '';
+    try {
+      await window.TwogetherAPI.post('deleteCurrentTrip', { kind, id }, actor());
+      closeDeleteConfirm();
+      closeCardSwipeRows();
+      await refreshState(true);
+      simplifiedSnack('Trip deleted');
+    } catch (err) {
+      deleteButton.disabled = false;
+      deleteButton.textContent = 'Delete';
+      error.textContent = err?.message || 'Could not delete this trip';
+    }
+  });
+  setTimeout(() => deleteButton.focus(), 0);
+}
+function bindCardDeleteSwipe(section) {
+  if (section.dataset.tv2DeleteSwipe === '1') return;
+  section.dataset.tv2DeleteSwipe = '1';
+  const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
+  const reset = () => { cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 }; };
+  section.addEventListener('touchstart', (e) => {
+    if (!mobile() || simplifiedView.name !== 'home' || deleteConfirmLayer || e.touches.length !== 1) return;
+    const row = e.target.closest('.tv2-swipe-row');
+    if (!row || e.target.closest('.tv2-delete-reveal')) return;
+    closeCardSwipeRows(row);
+    const t = e.touches[0];
+    cardSwipe = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX, row, ignoreClickUntil:cardSwipe.ignoreClickUntil || 0 };
+  }, { passive:true });
+  section.addEventListener('touchmove', (e) => {
+    if (!cardSwipe.tracking || !cardSwipe.row || e.touches.length !== 1) return;
+    const t = e.touches[0], dx = t.clientX - cardSwipe.startX, dy = Math.abs(t.clientY - cardSwipe.startY);
+    cardSwipe.lastX = t.clientX;
+    if (!cardSwipe.active) {
+      if (Math.abs(dx) < 8 && dy < 8) return;
+      if (dx < -10 && Math.abs(dx) > dy * 1.2) cardSwipe.active = true;
+      else if (dy >= Math.abs(dx) || dx > 0) { reset(); return; }
+    }
+    if (!cardSwipe.active) return;
+    e.preventDefault();
+    const card = cardSwipe.row.querySelector('.tv2-card');
+    if (!card) return;
+    const distance = Math.max(-84, Math.min(0, dx));
+    card.style.transition = 'none';
+    card.style.transform = 'translateX('+distance+'px)';
+  }, { passive:false });
+  section.addEventListener('touchend', () => {
+    if (!cardSwipe.tracking || !cardSwipe.row) { reset(); return; }
+    const row = cardSwipe.row, card = row.querySelector('.tv2-card');
+    const dx = cardSwipe.lastX - cardSwipe.startX;
+    if (card) { card.style.transition = ''; card.style.transform = ''; }
+    if (cardSwipe.active) {
+      cardSwipe.ignoreClickUntil = Date.now() + 450;
+      row.classList.toggle('is-open', dx <= -44);
+    }
+    reset();
+  }, { passive:true });
+  section.addEventListener('touchcancel', () => {
+    const card = cardSwipe.row?.querySelector('.tv2-card');
+    if (card) { card.style.transition = ''; card.style.transform = ''; }
+    reset();
+  }, { passive:true });
+}
+
 function bindSimplifiedSwipe(section) {
   if (section.dataset.tv2Swipe === '1') return;
   section.dataset.tv2Swipe = '1';
@@ -452,6 +556,8 @@ function bindSimplifiedSwipe(section) {
 
 function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
+  if (b.dataset.act === 'delete-trip') { openDeleteConfirm(b.dataset.kind, b.dataset.id); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
   if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:''}; renderCurrentTrips(); return; }
   if (b.dataset.act === 'open-trip') {
