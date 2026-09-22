@@ -152,7 +152,36 @@ body.tv2-locked { overflow: hidden; }
 .tv2-field { display: grid; gap: 6px; min-width: 0; font-size: 14px; color: var(--tv2-muted); }
 .tv2-field em { font-style: normal; color: var(--tv2-faint); }
 .tv2-field input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 46px; border: 1px solid var(--tv2-line); border-radius: 12px; background: var(--tv2-card); padding: 0 12px; font-size: 16px !important; color: var(--tv2-ink); }
-.tv2-field input[type="date"] { display: block; inline-size: 100%; min-inline-size: 0; max-inline-size: 100%; }
+.tv2-date-box {
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  min-height:46px;
+  overflow:hidden;
+  border:1px solid var(--tv2-line);
+  border-radius:12px;
+  background:var(--tv2-card);
+  contain:inline-size;
+}
+.tv2-date-box input[type="date"] {
+  display:block;
+  box-sizing:border-box;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  min-height:44px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  padding:0 12px;
+  color:var(--tv2-ink);
+  font-size:16px!important;
+  text-align:center;
+  -webkit-appearance:none;
+  appearance:none;
+}
 .tv2-big input { min-height: 52px; font-size: 18px !important; }
 .tv2-seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .tv2-seg button { min-height: 38px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--tv2-line) !important; background: var(--tv2-bg) !important; color: var(--tv2-ink); font-size: 14px !important; }
