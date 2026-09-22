@@ -556,8 +556,10 @@ function openSimplifiedChecklist(plan) {
     const scroller = input?.closest('[data-check-scroll]'); if (!input || !scroller) return;
     const style = getComputedStyle(input);
     if (textMeasureContext) {
-      textMeasureContext.font = style.font || [style.fontStyle,style.fontVariant,style.fontWeight,style.fontSize,style.fontFamily].filter(Boolean).join(' ');
-      const exact = Math.ceil(textMeasureContext.measureText(input.value || '').width);
+      textMeasureContext.font = [style.fontStyle,style.fontVariant,style.fontWeight,style.fontSize,style.fontFamily].filter(Boolean).join(' ');
+      const text = input.value || '';
+      const spacing = Number.parseFloat(style.letterSpacing) || 0;
+      const exact = Math.ceil(textMeasureContext.measureText(text).width + Math.max(0,text.length-1) * spacing);
       input.style.width = Math.max(scroller.clientWidth, exact)+'px';
     } else {
       input.style.width = '100%';
