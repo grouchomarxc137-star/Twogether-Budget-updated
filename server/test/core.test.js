@@ -441,3 +441,71 @@ test('deletes standalone unfinished trips but protects confirmed trips', () => {
   }
 });
 
+test('logs partial trip repayments without double-counting the trip expense', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Lonato', start: '2026-09-19', end: '2026-09-22' },
+      budget: 600,
+    });
+
+    const stay = action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: {
+        category: 'accommodation',
+        amount: 400,
+        paidBy: 'Principe',
+        split: 'shared',
+        date: '2026-09-20',
+        useJar: false,
+      },
+    }, 'Principe');
+    assert.equal(stay.ok, true);
+
+    const first = action(c.database, 'saveTripRepayment', {
+      planId: p.planId,
+      amount: 50,
+      date: '2026-09-30',
+    }, 'Principessa');
+    assert.equal(first.ok, true);
+    assert.equal(first.settlement.debtor, 'Principessa');
+    assert.equal(first.settlement.creditor, 'Principe');
+    assert.equal(first.settlement.amount, 150);
+
+    const second = action(c.database, 'saveTripRepayment', {
+      planId: p.planId,
+      amount: 100,
+      date: '2026-10-15',
+    }, 'Principessa');
+    assert.equal(second.ok, true);
+    assert.equal(second.settlement.amount, 50);
+
+    const final = action(c.database, 'saveTripRepayment', {
+      planId: p.planId,
+      amount: 50,
+      date: '2026-10-31',
+    }, 'Principessa');
+    assert.equal(final.ok, true);
+    assert.equal(final.settlement.amount, 0);
+    assert.equal(final.settlement.debtor, '');
+    assert.equal(final.settlement.creditor, '');
+
+    const state = getState();
+    const plan = state.plans.find((item) => item.id === p.planId);
+    assert.equal(plan.expenseEntries.length, 1);
+    assert.equal(plan.expenseEntries[0].amount, 400);
+    assert.equal(plan.repayments.length, 3);
+    assert.equal(plan.repayments.reduce((sum, item) => sum + Number(item.amount || 0), 0), 200);
+
+    const extra = action(c.database, 'saveTripRepayment', {
+      planId: p.planId,
+      amount: 1,
+      date: '2026-11-01',
+    }, 'Principessa');
+    assert.equal(extra.ok, false);
+    assert.match(extra.error, /do not owe anything/i);
+  } finally {
+    c.cleanup();
+  }
+});
+
