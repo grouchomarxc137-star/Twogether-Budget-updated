@@ -304,3 +304,16 @@ html body #twCurrentTripsSection.tv2-current-host{
     backdrop-filter:blur(4px);
   }
 }
+
+
+/* Mobile swipe-back support */
+@media(max-width:760px){
+  #twCurrentTrips.tv2-root.tv2-trip-view{
+    overflow-x:hidden;
+    touch-action:pan-y;
+  }
+  #twCurrentTrips.tv2-root.tv2-trip-view>.tv2-page{
+    will-change:transform,opacity;
+    backface-visibility:hidden;
+  }
+}
