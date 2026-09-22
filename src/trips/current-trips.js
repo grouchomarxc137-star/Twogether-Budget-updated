@@ -46,9 +46,15 @@ function ensureCurrentTrips() {
   let section = $('#twCurrentTripsSection');
   if (!section) {
     section = document.createElement('section'); section.id = 'twCurrentTripsSection'; section.className = 'tw-current-trips-section';
-    section.innerHTML = '<div class="tw-current-head"><div><span class="panel-kicker">NOW</span><h2 id="twCurrentTitle">Current Trips</h2><p>Trips being planned, logged or matched stay here.</p></div><button class="btn ghost" type="button" data-v18-new-trip>Plan a trip</button></div><div id="twCurrentTrips" class="tw-current-list"></div>';
+    section.innerHTML = '<div class="tw-current-head"><div><span class="panel-kicker">NOW</span><h2 id="twCurrentTitle">Current Trips</h2><p>Everything active stays here. Add expenses later from Open trip.</p></div><button class="btn primary tw-plan-trip-btn" type="button" data-plan-trip><span aria-hidden="true">＋</span>Plan a trip</button></div><div id="twCurrentTrips" class="tw-current-list"></div>';
     gallery.parentNode.insertBefore(section, gallery);
     section.addEventListener('click', (e) => {
+      const planButton = e.target.closest('[data-plan-trip]');
+      if (planButton) {
+        e.preventDefault();
+        document.dispatchEvent(new CustomEvent('twogether:budget-new-plan'));
+        return;
+      }
       const card = e.target.closest('[data-current-plan],[data-current-trip]'); if (!card) return;
       if (card.dataset.currentPlan) {
         const id = card.dataset.currentPlan; const plan = remoteState?.plans?.find((p) => p.id === id); if (!plan) return;

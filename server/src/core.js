@@ -196,6 +196,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const id = cleanText_(payload.id, 80);
       const now = new Date().toISOString();
       let idx = id ? state.plans.findIndex(x => x.id === id) : -1;
+      const creatingPlan = idx < 0;
       let plan;
 
       if (idx >= 0) {
@@ -228,12 +229,17 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       }
 
       const budget = cleanMoney_(payload.budget);
-      if (budget === '') throw new Error('Enter your individual budget');
-      plan.budgets[actor] = budget;
+      if (budget !== '') {
+        plan.budgets[actor] = budget;
+        addAudit_(state, actor, 'setIndividualBudget', plan.id);
+      } else if (!creatingPlan) {
+        throw new Error('Enter your individual budget');
+      } else {
+        addAudit_(state, actor, 'createTripPlan', plan.id);
+      }
       plan.updatedAt = now;
       plan.updatedBy = actor;
       state.plans[idx] = plan;
-      addAudit_(state, actor, 'setIndividualBudget', plan.id);
       saveState_(state);
       return output_({ok:true, planId:plan.id});
     }

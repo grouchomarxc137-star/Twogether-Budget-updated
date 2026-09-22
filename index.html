@@ -38,7 +38,7 @@
     <button class="hub-tab tab" data-hub="finances" data-sheet="finances" type="button">My finances</button>
   </nav>
   <nav class="tabs trip-subnav" id="tripSubnav" role="tablist" aria-label="Trip pages">
-    <button class="tab active" data-sheet="log" type="button">Log trip</button>
+    <button class="tab active" data-sheet="log" type="button">Trips</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
   </nav>
@@ -51,18 +51,6 @@
 
   <main class="main">
     <section id="log" class="sheet active">
-      <div class="hero-grid">
-        <div class="hero-copy">
-          <span class="eyebrow">SHARED BETWEEN PRINCIPE AND PRINCIPESSA</span>
-          <h1>Log your most recent trip</h1>
-          <p>One question at a time. Add the trip details and your budget if you have one. Expenses are handled later from <em>Open trip</em>.</p>
-        </div>
-        <div class="wizard-card" id="wizardCard">
-          <div class="wizard-top"><div class="progress-side"><div class="wizard-step" id="wizardStep">Question 1</div><div class="wizard-progress"><span id="wizardProgress"></span></div></div><button class="text-btn" id="restartWizard" type="button">Start over</button></div>
-          <div id="wizardBody" class="wizard-body"></div>
-        </div>
-      </div>
-
       <section class="trip-gallery-section">
         <div class="section-heading"><div><span class="panel-kicker">YOUR TRIPS</span><h2>Trip stories</h2><p>Tap any trip to compare your versions, edit calculations before confirmation, and review the final expenses.</p></div></div>
         <div id="tripGallery" class="trip-gallery"></div>
@@ -166,10 +154,6 @@
 <script type="module">
   import { initNavigation } from '/src/app/navigation.js';
   document.addEventListener('DOMContentLoaded', initNavigation);
-</script>
-<script type="module">
-  import { installWizardBridge } from '/src/trips/wizard-bridge.js';
-  document.addEventListener('DOMContentLoaded', installWizardBridge);
 </script>
 <script type="module">
   import { initSessionSwitch } from '/src/app/session-switch.js';

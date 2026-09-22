@@ -128,15 +128,7 @@ export function installUi() {
     const overlay = document.createElement('div'); overlay.id = 'workflowV5Overlay'; overlay.className = 'v5-overlay';
     card.appendChild(overlay);
   }
-  if (!document.querySelector('#budgetPlannerSection')) {
-    const gallery = document.querySelector('.trip-gallery-section');
-    if (gallery) {
-      const section = document.createElement('section'); section.id = 'budgetPlannerSection'; section.className = 'budget-planner-section hidden';
-      section.innerHTML = `<div class="budget-planner-head"><div><span class="panel-kicker">BEFORE THE TRIP</span><h2>Trip budgets</h2><p>Each of you sets your own budget. After the trip, actual expenses are compared individually and together.</p></div><button class="btn primary" type="button" data-v5-new-plan>Plan a trip budget</button></div><div id="budgetPlanGrid" class="budget-plan-grid"></div>`;
-      gallery.parentNode.insertBefore(section, gallery);
-      document.querySelector('[data-v5-new-plan]')?.addEventListener('click', () => document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')));
-    }
-  }
+  document.querySelector('#budgetPlannerSection')?.remove();
   if (!document.querySelector('#workflowBudgetModal')) {
     const modal = document.createElement('div'); modal.id = 'workflowBudgetModal'; modal.className = 'v5-budget-modal'; modal.setAttribute('aria-hidden', 'true');
     modal.innerHTML = '<div class="v5-budget-backdrop" data-v5-budget-close></div><div class="v5-budget-card"><button class="v5-budget-close" type="button" data-v5-budget-close>×</button><div id="workflowBudgetBody"></div></div>';

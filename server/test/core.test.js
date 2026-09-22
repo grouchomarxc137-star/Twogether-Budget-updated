@@ -40,6 +40,24 @@ test('starts with a complete empty state stored in SQLite tables', () => {
   }
 });
 
+test('creates a trip plan without a budget when budget is skipped', () => {
+  const context = setup();
+  try {
+    const created = action(context.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Desenzano', start: '2026-10-01', end: '2026-10-08' },
+      budget: '',
+    });
+    assert.equal(created.ok, true);
+    const plan = getState().plans.find((item) => item.id === created.planId);
+    assert.ok(plan);
+    assert.equal(plan.budgets.Principessa, '');
+    assert.equal(plan.meta.start, '2026-10-01');
+    assert.equal(plan.meta.end, '2026-10-08');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('persists plans, shared expenses, trip confirmation and rewards', () => {
   const context = setup();
   try {
