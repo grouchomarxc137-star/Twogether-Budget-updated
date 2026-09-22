@@ -534,3 +534,12 @@ body.dev-v21 #loggedUserBadge {
     touch-action:manipulation!important;
   }
 }
+
+
+/* Mobile picker replaces the old secondary tab bars completely. */
+@media(max-width:760px) {
+  #tripSubnav,
+  #financeSubnav {
+    display:none!important;
+  }
+}

@@ -140,10 +140,16 @@ function installDropdownRefinement() {
   wraps.forEach((w) => {
     if (w.dataset.v22Nav === '3') return; w.dataset.v22Nav = '3';
     const hub = w.querySelector('[data-hub]'), menu = w.querySelector('.tw-nav-menu');
-    w.addEventListener('pointerenter', () => { cancelTimers(w); if (suppressHover) return; if (pinned && pinned !== w) { const old = pinned; pinned = null; fadeClose(old); } openWrap(w); });
-    w.addEventListener('pointerleave', () => scheduleClose(w));
-    menu?.addEventListener('pointerenter', () => { cancelTimers(w); if (!suppressHover) openWrap(w); });
-    menu?.addEventListener('pointerleave', () => scheduleClose(w));
+    w.addEventListener('pointerenter', () => {
+      if (isMobile()) return;
+      cancelTimers(w);
+      if (suppressHover) return;
+      if (pinned && pinned !== w) { const old = pinned; pinned = null; fadeClose(old); }
+      openWrap(w);
+    });
+    w.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
+    menu?.addEventListener('pointerenter', () => { if (!isMobile()) { cancelTimers(w); if (!suppressHover) openWrap(w); } });
+    menu?.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
     hub?.addEventListener('click', () => {
       suppressHover = false;
       if (isMobile()) {
@@ -163,7 +169,16 @@ function installDropdownRefinement() {
   const onScroll = () => { if (scrollQueued) return; scrollQueued = true; requestAnimationFrame(() => { scrollQueued = false; closeForScroll(); }); };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('wheel', closeForScroll, { passive: true, capture: true });
-  document.addEventListener('pointermove', (e) => { const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2; lastPointer = { x: e.clientX, y: e.clientY }; if (suppressHover && moved) { suppressHover = false; const w = e.target.closest?.('.tw-nav-wrap'); if (w) openWrap(w); } }, { passive: true, capture: true });
+  document.addEventListener('pointermove', (e) => {
+    if (isMobile()) return;
+    const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2;
+    lastPointer = { x: e.clientX, y: e.clientY };
+    if (suppressHover && moved) {
+      suppressHover = false;
+      const w = e.target.closest?.('.tw-nav-wrap');
+      if (w) openWrap(w);
+    }
+  }, { passive: true, capture: true });
   document.addEventListener('pointerdown', (e) => { suppressHover = false; if (!e.target.closest?.('.tw-nav-wrap')) unpinAndFadeAll(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { suppressHover = false; unpinAndFadeAll(); } }, true);
 }
