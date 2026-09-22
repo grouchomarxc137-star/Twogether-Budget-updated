@@ -290,6 +290,21 @@ html body #twCurrentTripsSection.tv2-current-host{
 }
 #twCurrentTripsSection.tv2-current-host .tv2-root{width:100%}
 
+/* On the Trips home, keep New trip inside the section instead of floating
+   over Trip stories. The opened-trip action bar remains fixed. */
+#twCurrentTrips.tv2-root:not(.tv2-trip-view)>.tv2-page{
+  padding-bottom:10px;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-dock{
+  position:static;
+  z-index:auto;
+  padding:6px 0 0;
+  background:none;
+}
+#twCurrentTripsSection.tv2-current-host + .trip-gallery-section{
+  margin-top:22px!important;
+}
+
 /* Country flag emoji shown on trip cards on every screen size */
 .tv2-card-flag{
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
