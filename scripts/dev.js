@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const useProcessGroups = process.platform !== 'win32';
@@ -42,9 +43,23 @@ function stop(exitCode = 0) {
 process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
-// A stray ambient PORT env var (some hosting/tooling sets one expecting a
-// single dev server) would otherwise leak into both children and collide
-// with Vite's fixed port -- pin the API server's port explicitly here so
-// running both together is never at the mercy of the parent environment.
-start(['--prefix', 'server', 'run', 'dev'], { PORT: '4310' });
-start(['run', 'dev:frontend']);
+// The frontend (Vite) listens on PORT when one is given (e.g. a preview tool
+// assigning a free port so two copies can run side by side), else 5180. The
+// API server keeps 4310 for the default setup; with any other frontend port
+// it takes a free port, so a second copy never collides with the first. Both
+// ports are passed explicitly to each child, never inherited by accident.
+function freePort() {
+  return new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.on('error', reject);
+    probe.listen(0, () => { const { port } = probe.address(); probe.close(() => resolvePort(port)); });
+  });
+}
+
+const frontendPort = Number(process.env.PORT) || 5180;
+const apiPort = Number(process.env.API_PORT) || (frontendPort === 5180 ? 4310 : await freePort());
+const origins = `http://localhost:${frontendPort},http://127.0.0.1:${frontendPort}`;
+
+start(['--prefix', 'server', 'run', 'dev'], { PORT: String(apiPort), ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN || origins });
+start(['run', 'dev:frontend'], { PORT: String(frontendPort), VITE_API_PORT: String(apiPort) });

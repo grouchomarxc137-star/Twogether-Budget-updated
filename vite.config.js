@@ -4,7 +4,8 @@ export default defineConfig({
   root: '.',
   base: './',
   server: {
-    port: 5180,
+    // scripts/dev.js passes PORT; 5180 when run on its own.
+    port: Number(process.env.PORT) || 5180,
     strictPort: true
   }
 });

@@ -6,7 +6,7 @@
 // is empty and every request is same-origin.
 const ACTORS = ['Principessa', 'Principe'];
 const CACHE_KEY = 'twogether_state_cache_v2';
-const API_BASE = import.meta.env?.DEV ? 'http://localhost:4310' : '';
+const API_BASE = import.meta.env?.DEV ? `http://localhost:${import.meta.env.VITE_API_PORT || 4310}` : '';
 
 let queue = Promise.resolve();
 let warmCacheUsed = false;
