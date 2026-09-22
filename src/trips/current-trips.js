@@ -30,6 +30,9 @@ let remoteState = null;
 let refreshing = false;
 let overlayObserver = null;
 let storyObserver = null;
+let simplifiedView = { name: 'home', planId: '' };
+let simplifiedLayer = null;
+let simplifiedSnackTimer = null;
 
 function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
@@ -65,25 +68,15 @@ function ensureCurrentTrips() {
   const gallery = $('#log .trip-gallery-section'); if (!gallery) return null;
   let section = $('#twCurrentTripsSection');
   if (!section) {
-    section = document.createElement('section'); section.id = 'twCurrentTripsSection'; section.className = 'tw-current-trips-section';
-    section.innerHTML = '<div class="tw-current-head"><div><span class="panel-kicker">NOW</span><h2 id="twCurrentTitle">Trips</h2><p>Keep your active and upcoming trips together.</p></div></div><div id="twCurrentTrips" class="tw-current-list"></div><div class="tw-current-dock"><button class="btn primary tw-plan-trip-btn" type="button" data-plan-trip>＋ New trip</button></div>';
+    section = document.createElement('section');
+    section.id = 'twCurrentTripsSection';
     gallery.parentNode.insertBefore(section, gallery);
-    section.addEventListener('click', (e) => {
-      const planButton = e.target.closest('[data-plan-trip]');
-      if (planButton) {
-        e.preventDefault();
-        document.dispatchEvent(new CustomEvent('twogether:budget-new-plan'));
-        return;
-      }
-      const card = e.target.closest('[data-current-plan],[data-current-trip]'); if (!card) return;
-      if (card.dataset.currentPlan) {
-        const id = card.dataset.currentPlan; const plan = remoteState?.plans?.find((p) => p.id === id); if (!plan) return;
-        if (e.target.closest('[data-current-budget]')) return window.TwogetherWorkflow?.budget(id);
-        if (e.target.closest('[data-current-open],.tw-current-main')) return window.TwogetherOverview?.open(plan);
-      } else {
-        const id = card.dataset.currentTrip; if (e.target.closest('[data-current-open],.tw-current-main')) window.TwogetherApp?.open(id);
-      }
-    });
+  }
+  if (section.dataset.tv2Full !== '1') {
+    section.className = 'tv2-current-host';
+    section.innerHTML = '<div id="twCurrentTrips" class="tv2-root"></div>';
+    section.dataset.tv2Full = '1';
+    section.addEventListener('click', handleSimplifiedClick);
   }
   return section;
 }
@@ -98,31 +91,316 @@ function expenseTotal(plan, trip) {
     if (av != null && bv != null) return sum + Math.max(av, bv);
     return sum + (av ?? bv ?? 0);
   }, 0);
-  return legacy + (Array.isArray(plan?.expenseEntries) ? plan.expenseEntries.reduce((sum, entry) => sum + n(entry?.amount), 0) : 0);
+  return legacy + tripEntries(plan).reduce((sum, entry) => sum + n(entry?.amount), 0);
 }
 
-function planCard(plan, trip) {
-  const meta = plan?.meta || {}; const p = plan?.budgets?.Principessa, q = plan?.budgets?.Principe;
-  const available = (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0); const spent = expenseTotal(plan, trip);
-  const left = available - spent, pct = available > 0 ? Math.max(0, Math.min(100, (spent / available) * 100)) : 0;
-  return `<article class="tw-current-card tw-current-simple" data-current-plan="${esc(plan.id)}"><button class="tw-current-main" type="button"><div class="tw-current-card-top"><h3>${esc(meta.city || locationLabel(meta))}</h3><span>${esc(shortRange(meta.start, meta.end))}</span></div><p class="tw-current-timing">${esc(tripTiming(meta))}</p><div class="tw-current-money"><span>${cardMoney(spent)} spent</span>${available > 0 ? `<span>${cardMoney(left)} left</span>` : ''}</div>${available > 0 ? `<span class="tw-current-progress"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</button></article>`;
+function tripEntries(plan) {
+  return Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
+}
+function tripBudget(plan, trip) {
+  const p = plan?.budgets?.Principessa, q = plan?.budgets?.Principe;
+  if (has(p) || has(q)) return (has(p) ? n(p) : 0) + (has(q) ? n(q) : 0);
+  return has(trip?.budget) ? n(trip.budget) : null;
+}
+function tripPhase(meta) {
+  const start = localDate(meta?.start), end = localDate(meta?.end), now = localToday();
+  if (!start || !end) return 'unknown';
+  if (now < start) return 'upcoming';
+  if (now <= end) return 'now';
+  return 'past';
+}
+function statusLine(meta) {
+  const start = localDate(meta?.start), end = localDate(meta?.end), now = localToday();
+  if (!start || !end) return '';
+  if (now < start) { const days = Math.max(1, dayDiff(now, start)); return days === 1 ? 'Starts tomorrow' : \`Starts in \${days} days\`; }
+  if (now <= end) { const total = Math.max(1, dayDiff(start, end) + 1), day = Math.max(1, Math.min(total, dayDiff(start, now) + 1)); return \`Day \${day} of \${total}\`; }
+  return 'Ended · still open';
+}
+function dayLabel(value) {
+  if (!value) return 'No date';
+  const d = localDate(value), now = localToday(); if (!d) return '';
+  const diff = dayDiff(d, now);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return \`\${d.toLocaleDateString('en-GB',{weekday:'short'})} \${d.getDate()} \${d.toLocaleDateString('en-GB',{month:'short'})}\`;
+}
+function relativePayer(name) { return name === actor() ? 'you' : name; }
+function categoryInfo(entry) {
+  if (entry?.category === 'accommodation') return ['Stay', '🛏'];
+  if (entry?.category === 'transport') {
+    if (entry?.transportType === 'fuel') return ['Car', '⛽'];
+    return ['Transport', '✈️'];
+  }
+  if (entry?.category === 'food') {
+    if (entry?.foodType === 'groceries') return ['Groceries', '🛒'];
+    return ['Eating out', '🍝'];
+  }
+  if (entry?.category === 'activities') return ['Activities', '🎟'];
+  return [entry?.name || entry?.note || 'Other', '•'];
+}
+function entryTitle(entry) {
+  return entry?.note || entry?.name || categoryInfo(entry)[0];
+}
+function entryMeta(entry) {
+  const parts = [];
+  if (entry?.paidBy === 'both') parts.push('each paid half');
+  else if (entry?.paidBy) parts.push(relativePayer(entry.paidBy));
+  if (entry?.jarContribution) parts.push(\`\${displayMoney(entry.jarContribution,true)} from Jar\`);
+  if (entry?.uncertain) parts.push('estimate');
+  return parts.join(' · ');
+}
+function expenseTimeline(plan) {
+  const list = tripEntries(plan).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if (!list.length) return '<div class="tv2-empty-list">No expenses yet. Add them as they happen, it takes a few seconds.</div>';
+  const groups = new Map();
+  list.forEach((entry) => { const key = entry.date || ''; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(entry); });
+  return [...groups.entries()].map(([date, items]) => '<div class="tv2-day"><h2>'+esc(dayLabel(date))+'</h2>'+items.map((entry) => {
+    const [, icon] = categoryInfo(entry);
+    return '<button class="tv2-row" data-act="open-expense" data-id="'+esc(entry.id)+'"><span class="tv2-ic" aria-hidden="true">'+icon+'</span><span class="tv2-row-main"><strong>'+esc(entryTitle(entry))+'</strong><small>'+esc(entryMeta(entry))+'</small></span><span class="tv2-amt">'+displayMoney(entry.amount,true)+'</span></button>';
+  }).join('')+'</div>').join('');
+}
+function settlementLine(plan) {
+  const paid = { Principessa:0, Principe:0 }, share = { Principessa:0, Principe:0 };
+  for (const entry of tripEntries(plan)) {
+    const remaining = Math.max(0, n(entry.amount) - n(entry.jarContribution));
+    if (entry.paidBy === 'both') { paid.Principessa += remaining / 2; paid.Principe += remaining / 2; }
+    else if (paid[entry.paidBy] != null) paid[entry.paidBy] += remaining;
+    if (entry.split === 'personal') share[entry.forActor === 'Principe' ? 'Principe' : 'Principessa'] += remaining;
+    else { share.Principessa += remaining / 2; share.Principe += remaining / 2; }
+  }
+  const d = paid.Principessa - share.Principessa, me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
+  if (Math.abs(d) < .005) return 'You’re even';
+  const creditor = d > 0 ? 'Principessa' : 'Principe', debtor = d > 0 ? 'Principe' : 'Principessa', amount = Math.abs(d);
+  if (me === creditor) return \`\${debtor} owes you \${displayMoney(amount,true)}\`;
+  if (me === debtor) return \`You owe \${creditor} \${displayMoney(amount,true)}\`;
+  return \`\${debtor} owes \${creditor} \${displayMoney(amount,true)}\`;
+}
+function displayMoney(value, forceCents = false) {
+  const amount = n(value), whole = Math.abs(amount - Math.round(amount)) < .005 && !forceCents;
+  return '€' + amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});
 }
 
-function standaloneCard(trip) {
-  const meta = tripMeta(trip), spent = expenseTotal({}, trip), available = has(trip?.budget) ? n(trip.budget) : 0;
-  const left = available - spent, pct = available > 0 ? Math.max(0, Math.min(100, (spent / available) * 100)) : 0;
-  return `<article class="tw-current-card tw-current-simple" data-current-trip="${esc(trip.id)}"><button class="tw-current-main" type="button"><div class="tw-current-card-top"><h3>${esc(meta.city || locationLabel(meta))}</h3><span>${esc(shortRange(meta.start, meta.end))}</span></div><p class="tw-current-timing">${esc(tripTiming(meta))}</p><div class="tw-current-money"><span>${cardMoney(spent)} spent</span>${available > 0 ? `<span>${cardMoney(left)} left</span>` : ''}</div>${available > 0 ? `<span class="tw-current-progress"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</button></article>`;
+function planItem(plan, trip) {
+  const meta = plan?.meta || {}, available = tripBudget(plan, trip), spent = expenseTotal(plan, trip);
+  return { kind:'plan', id:plan.id, plan, trip, meta, available, spent, left:available == null ? null : available - spent, phase:tripPhase(meta) };
+}
+function standaloneItem(trip) {
+  const meta = tripMeta(trip), available = has(trip?.budget) ? n(trip.budget) : null, spent = expenseTotal({}, trip);
+  return { kind:'trip', id:trip.id, trip, meta, available, spent, left:available == null ? null : available - spent, phase:tripPhase(meta) };
+}
+function allSimplifiedItems() {
+  const trips = remoteState?.trips || [], plans = remoteState?.plans || [], tripMap = new Map(trips.map((t)=>[t.id,t])), linked = new Set(plans.map((p)=>p.linkedTripId).filter(Boolean));
+  const planItems = plans.filter((p)=>!isLocked(tripMap.get(p.linkedTripId))).map((p)=>planItem(p,tripMap.get(p.linkedTripId)));
+  const standalone = trips.filter((t)=>!isLocked(t)&&!linked.has(t.id)).map(standaloneItem);
+  const rank = { now:0, upcoming:1, past:2, unknown:3 };
+  return planItems.concat(standalone).sort((a,b)=>(rank[a.phase]-rank[b.phase])||String(a.meta?.start||'').localeCompare(String(b.meta?.start||'')));
+}
+function simplifiedCard(item) {
+  const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
+  return '<button class="tv2-card" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
+    '<span class="tv2-card-top"><strong>'+esc(item.meta?.city || locationLabel(item.meta))+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+    '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
+    '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
+    (item.available && item.available > 0?'<span class="tv2-bar"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
+  '</button>';
+}
+function simplifiedHome(items) {
+  return '<div class="tv2-page"><header class="tv2-home-head"><h1>Trips</h1></header>'+
+    (items.length?items.map(simplifiedCard).join(''):'<div class="tv2-empty-card"><strong>No trips yet</strong><span>Create one when you start planning. You can add expenses as they happen.</span></div>')+
+    '<div class="tv2-dock"><button class="tv2-primary" data-act="new-trip">＋ New trip</button></div></div>';
+}
+function simplifiedTrip(plan, trip) {
+  const meta = plan?.meta || {}, available = tripBudget(plan, trip), spent = expenseTotal(plan, trip), left = available == null ? null : available - spent;
+  const over = left != null && left < 0, pct = available && available > 0 ? Math.min(100, Math.max(0, (spent / available) * 100)) : 0;
+  const own = plan?.budgets?.[actor()];
+  return '<div class="tv2-page">'+
+    '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>'+
+      '<h1>'+esc(meta.city || locationLabel(meta))+'</h1><p>'+esc(shortRange(meta.start,meta.end))+(statusLine(meta)?' · '+esc(statusLine(meta)):'')+'</p></header>'+
+    '<section class="tv2-money" aria-label="Trip money"><div class="tv2-figs">'+
+      '<button class="tv2-fig" data-act="budgets"><span>Available</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!has(own)?'<small class="tv2-nudge">+ add yours</small>':'')+'</button>'+
+      '<div class="tv2-fig"><span>Spent</span><b>'+displayMoney(spent)+'</b></div></div>'+
+      (available && available > 0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>':'')+
+      (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
+    '</section>'+
+    '<button class="tv2-balance '+(settlementLine(plan)==='You’re even'?'is-even':'')+'" data-act="balance"><span>'+esc(settlementLine(plan))+'</span><span aria-hidden="true">›</span></button>'+
+    '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan)+'</section>'+
+    '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
+  '</div>';
 }
 
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
-  const trips = remoteState.trips || [], plans = remoteState.plans || []; const tripMap = new Map(trips.map((t) => [t.id, t])); const linked = new Set(plans.map((p) => p.linkedTripId).filter(Boolean));
-  const rankMeta = (meta) => { const start=localDate(meta?.start),end=localDate(meta?.end),now=localToday(); if(start&&end&&now>=start&&now<=end)return 0; if(start&&now<start)return 1; return 2; };
-  const activePlans = plans.filter((p) => !isLocked(tripMap.get(p.linkedTripId))).sort((a,b)=>rankMeta(a.meta)-rankMeta(b.meta)||String(a?.meta?.start||a.updatedAt||'').localeCompare(String(b?.meta?.start||b.updatedAt||'')));
-  const standalone = trips.filter((t) => !isLocked(t) && !linked.has(t.id)).sort((a,b)=>rankMeta(tripMeta(a))-rankMeta(tripMeta(b))||String(tripMeta(a).start||a.updatedAt||'').localeCompare(String(tripMeta(b).start||b.updatedAt||'')));
-  const count = activePlans.length + standalone.length; $('#twCurrentTitle').textContent = 'Trips';
-  root.innerHTML = count ? activePlans.map((p) => planCard(p, tripMap.get(p.linkedTripId))).join('') + standalone.map(standaloneCard).join('') : '<div class="tw-current-empty"><strong>No current trips</strong><span>Start a trip when you are ready.</span></div>';
-  document.dispatchEvent(new CustomEvent('twogether:v18-rendered'));
+  if (simplifiedView.name === 'trip') {
+    const plan = (remoteState.plans || []).find((p)=>p.id===simplifiedView.planId);
+    if (!plan) simplifiedView = { name:'home', planId:'' };
+    else {
+      const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
+      root.innerHTML = simplifiedTrip(plan, trip);
+      return;
+    }
+  }
+  root.innerHTML = simplifiedHome(allSimplifiedItems());
+}
+
+const EXPENSE_CATS = [
+  ['stay','Stay','🛏'],['transport','Transport','✈️'],['car','Car','⛽'],
+  ['groceries','Groceries','🛒'],['eating-out','Eating out','🍝'],['activities','Activities','🎟'],['other','Other','•'],
+];
+function uiCategoryFromEntry(entry) {
+  if (!entry) return '';
+  if (entry.category === 'accommodation') return 'stay';
+  if (entry.category === 'transport') return entry.transportType === 'fuel' ? 'car' : 'transport';
+  if (entry.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eating-out';
+  return entry.category || 'other';
+}
+function mapUiCategory(key) {
+  if (key === 'stay') return {category:'accommodation',foodType:'',transportType:'',useJar:true};
+  if (key === 'transport') return {category:'transport',foodType:'',transportType:'other',useJar:false};
+  if (key === 'car') return {category:'transport',foodType:'',transportType:'fuel',useJar:false};
+  if (key === 'groceries') return {category:'food',foodType:'groceries',transportType:'',useJar:false};
+  if (key === 'eating-out') return {category:'food',foodType:'eating-out',transportType:'',useJar:false};
+  if (key === 'activities') return {category:'activities',foodType:'',transportType:'',useJar:false};
+  return {category:'other',foodType:'',transportType:'',useJar:false};
+}
+function closeSimplifiedSheet() {
+  simplifiedLayer?.remove(); simplifiedLayer = null; document.body.classList.remove('tv2-locked');
+}
+function simplifiedSnack(message) {
+  let el = document.querySelector('.tv2-snack');
+  if (!el) { el = document.createElement('div'); el.className = 'tv2-snack'; el.setAttribute('role','status'); document.body.appendChild(el); }
+  el.innerHTML = '<span>'+esc(message)+'</span>'; el.classList.add('show'); clearTimeout(simplifiedSnackTimer);
+  simplifiedSnackTimer = setTimeout(()=>el.classList.remove('show'),2600);
+}
+function openSimplifiedExpenseSheet(plan, existing = null) {
+  closeSimplifiedSheet();
+  const me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
+  const oldJar = n(existing?.jarContribution), availableJar = () => n(remoteState?.sharedJar?.balance) + oldJar;
+  const state = {
+    amountText: existing ? String(existing.amount ?? '') : '',
+    category: uiCategoryFromEntry(existing),
+    paidBy: existing?.paidBy || me,
+    split: existing?.split || 'shared',
+    forActor: existing?.forActor || me,
+    date: existing?.date || new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
+    note: existing?.note || '',
+    uncertain: !!existing?.uncertain,
+    useJar: existing ? !!existing.useJar : true,
+    more: !!existing,
+    busy:false,error:'',mounted:false,
+  };
+  const amount = () => Number(String(state.amountText||'').replace(',','.'));
+  const validAmount = () => Number.isFinite(amount()) && amount() > 0;
+  const jarAmount = () => state.category === 'stay' && state.useJar && validAmount() ? amount() * .2 : 0;
+  const canSave = () => validAmount() && !!state.category && (state.category !== 'stay' || !state.useJar || jarAmount() <= availableJar()+.005);
+  const summary = () => {
+    const payer = state.paidBy === me ? 'Paid by you' : state.paidBy === 'both' ? 'Each paid half' : 'Paid by '+state.paidBy;
+    const split = state.paidBy === 'both' ? '' : state.split === 'shared' ? 'split 50/50' : state.forActor === me ? 'just you' : 'just '+other;
+    const date = state.date === new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10) ? 'today' : fmtDate(state.date);
+    return [payer,split,date,state.uncertain?'estimate':''].filter(Boolean).join(' · ');
+  };
+  const html = () => '<div class="tv2-sheet-head"><h2>'+(existing?'Edit expense':'Add expense')+'</h2><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+    '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
+    '<div class="tv2-cats" role="group" aria-label="Category">'+EXPENSE_CATS.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join('')+'</div>'+
+    '<div class="tv2-jar-slot"></div>'+
+    '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+    '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
+      '<div class="tv2-field"><span>Paid by</span><div class="tv2-seg">'+
+        [[me,'You'],[other,other],['both','Each paid half']].map(([k,l])=>'<button type="button" data-payer="'+k+'" class="'+(state.paidBy===k?'on':'')+'">'+esc(l)+'</button>').join('')+
+        '<button type="button" data-jar-payer>Shared Jar</button>'+
+      '</div></div>'+
+      '<div class="tv2-field" '+(state.paidBy==='both'?'hidden':'')+'><span>For</span><div class="tv2-seg">'+
+        [['shared','Shared 50/50'],[me,'Just you'],[other,'Just '+other]].map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
+      '</div></div>'+
+      '<label class="tv2-field"><span>Date</span><input type="date" id="tv2Date" value="'+esc(state.date)+'"></label>'+
+      '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
+      '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
+    '</div>'+
+    '<p class="tv2-hint" aria-live="polite"></p>'+
+    '<button type="button" class="tv2-primary tv2-save" data-save>'+(existing?'Save changes':'Save')+'</button>'+
+    (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
+  simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer';
+  simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet" role="dialog" aria-modal="true"></div>';
+  document.body.appendChild(simplifiedLayer); document.body.classList.add('tv2-locked');
+  const sheet = simplifiedLayer.querySelector('.tv2-sheet');
+  function refreshLive() {
+    const slot = sheet.querySelector('.tv2-jar-slot');
+    if (state.category === 'stay') {
+      if (availableJar() <= 0) slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar has '+displayMoney(availableJar(),true)+' available</span></div>';
+      else if (state.useJar) slot.innerHTML = '<div class="tv2-jar"><span>Shared Jar pays <b>'+(validAmount()?displayMoney(jarAmount(),true):'20%')+'</b> (20%)</span><button type="button" data-jar="off">Remove</button></div>';
+      else slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar not used</span><button type="button" data-jar="on">Use 20%</button></div>';
+    } else slot.innerHTML = '';
+    sheet.querySelector('.tv2-summary').textContent = summary();
+    const hint = sheet.querySelector('.tv2-hint'), save = sheet.querySelector('[data-save]');
+    save.disabled = !canSave() || state.busy; save.textContent = state.busy ? 'Saving…' : existing ? 'Save changes' : 'Save';
+    hint.textContent = state.error || (state.amountText && !validAmount() ? 'That amount doesn’t look right' : !validAmount() ? 'Enter the amount' : !state.category ? 'Pick a category' : state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005 ? 'Not enough in the Shared Jar.' : '');
+    hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()) || (state.category==='stay'&&state.useJar&&jarAmount()>availableJar()+.005));
+  }
+  function mount() {
+    sheet.innerHTML = html();
+    const input = sheet.querySelector('#tv2Amount');
+    input.addEventListener('input',()=>{state.amountText=input.value;state.error='';refreshLive();});
+    input.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();if(canSave())save();}});
+    sheet.querySelector('#tv2Date')?.addEventListener('change',(e)=>{state.date=e.target.value||state.date;refreshLive();});
+    sheet.querySelector('#tv2Note')?.addEventListener('input',(e)=>{state.note=e.target.value;});
+    sheet.querySelector('#tv2Est')?.addEventListener('change',(e)=>{state.uncertain=e.target.checked;refreshLive();});
+    sheet.onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.hasAttribute('data-close')) { closeSimplifiedSheet(); return; }
+      if (b.dataset.cat) { state.category=b.dataset.cat; if(state.category!=='stay')state.useJar=false; sheet.querySelectorAll('[data-cat]').forEach((x)=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));}); refreshLive(); return; }
+      if (b.dataset.jar) { state.useJar=b.dataset.jar==='on'; refreshLive(); return; }
+      if (b.hasAttribute('data-more')) { state.more=!state.more; mount(); return; }
+      if (b.dataset.payer) { state.paidBy=b.dataset.payer; if(state.paidBy==='both')state.split='shared'; mount(); return; }
+      if (b.hasAttribute('data-jar-payer')) { if(state.category!=='stay'){state.error='Shared Jar can only be used for Stay.';refreshLive();return;} state.useJar=true;state.error='Shared Jar contributes 20% to Stay; choose who paid the remaining amount.';refreshLive();return; }
+      if (b.dataset.split) { if(b.dataset.split==='shared'){state.split='shared';}else{state.split='personal';state.forActor=b.dataset.split;} mount(); return; }
+      if (b.hasAttribute('data-save')) { save(); return; }
+      if (b.hasAttribute('data-delete')) { remove(); }
+    };
+    refreshLive();
+    if (!state.mounted && !existing) { state.mounted=true; setTimeout(()=>input.focus(),0); }
+  }
+  async function save() {
+    if (!canSave() || state.busy) return;
+    state.busy=true; state.error=''; refreshLive();
+    const mapped=mapUiCategory(state.category);
+    try {
+      await window.TwogetherAPI.post('saveTripExpense',{planId:plan.id,expense:{
+        id:existing?.id||'',category:mapped.category,foodType:mapped.foodType,transportType:mapped.transportType,name:'',
+        amount:amount(),paidBy:state.paidBy,split:state.paidBy==='both'?'shared':state.split,forActor:state.split==='personal'?state.forActor:'',
+        date:state.date,note:state.note.trim(),uncertain:!!state.uncertain,useJar:state.category==='stay'&&!!state.useJar
+      }},actor());
+      const savedAmount=amount(), savedLabel=EXPENSE_CATS.find((x)=>x[0]===state.category)?.[1]||'Expense';
+      closeSimplifiedSheet(); await refreshState(true); simplifiedSnack(existing?'Saved':displayMoney(savedAmount,true)+' '+savedLabel.toLowerCase()+' added');
+    } catch (err) { state.busy=false; state.error=err?.message||'Could not save. Check your connection and try again.'; refreshLive(); }
+  }
+  async function remove() {
+    if (!existing || state.busy) return;
+    state.busy=true;
+    try {
+      await window.TwogetherAPI.post('deleteTripExpense',{planId:plan.id,expenseId:existing.id},actor());
+      closeSimplifiedSheet(); await refreshState(true); simplifiedSnack('Expense deleted');
+    } catch (err) { state.busy=false;state.error=err?.message||'Could not delete';refreshLive(); }
+  }
+  simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
+  simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
+  mount();
+}
+function handleSimplifiedClick(e) {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
+  if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:''}; renderCurrentTrips(); return; }
+  if (b.dataset.act === 'open-trip') {
+    if (b.dataset.kind === 'plan') { simplifiedView={name:'trip',planId:b.dataset.id}; renderCurrentTrips(); }
+    else window.TwogetherApp?.open(b.dataset.id);
+    return;
+  }
+  const plan = (remoteState?.plans || []).find((p)=>p.id===simplifiedView.planId); if (!plan) return;
+  if (b.dataset.act === 'budgets' || b.dataset.act === 'edit-trip') { window.TwogetherWorkflow?.budget(plan.id); return; }
+  if (b.dataset.act === 'add-expense') { openSimplifiedExpenseSheet(plan); return; }
+  if (b.dataset.act === 'open-expense') {
+    const entry = tripEntries(plan).find((x)=>x.id===b.dataset.id); if (entry) openSimplifiedExpenseSheet(plan,entry);
+    return;
+  }
+  if (b.dataset.act === 'balance') return;
 }
 
 function filterTripStories() {
