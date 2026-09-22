@@ -343,3 +343,74 @@ html body #twCurrentTripsSection.tv2-current-host{
   }
   .tv2-swipe-row.is-open>.tv2-card{transform:translateX(-84px)}
 }
+
+
+/* Owed money repayment */
+.tv2-owed-panel{
+  display:grid;
+  gap:12px;
+  padding:16px;
+  border:1px solid var(--tv2-line);
+  border-radius:16px;
+  background:var(--tv2-card);
+}
+.tv2-owed-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:12px;
+}
+.tv2-owed-head span{
+  color:var(--tv2-muted);
+  font-size:14px;
+}
+.tv2-owed-head strong{
+  font-size:24px;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+.tv2-owed-panel p{
+  margin:0;
+  color:var(--tv2-muted);
+  font-size:13.5px;
+  line-height:1.45;
+}
+.tv2-owed-field{
+  display:grid;
+  gap:6px;
+  color:var(--tv2-muted);
+  font-size:13px;
+}
+.tv2-owed-field>div{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:48px;
+  padding:0 12px;
+  border:1px solid var(--tv2-line);
+  border-radius:12px;
+  background:var(--tv2-bg);
+}
+.tv2-owed-field b{
+  color:var(--tv2-faint);
+  font-size:18px;
+}
+.tv2-owed-field input{
+  width:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--tv2-ink);
+  font-size:18px!important;
+  font-variant-numeric:tabular-nums;
+}
+.tv2-pay-full{
+  width:100%;
+  background:var(--tv2-good-soft)!important;
+  border-color:transparent!important;
+  font-weight:650;
+}
+.tv2-owed-panel.is-empty{
+  background:transparent;
+  border-style:dashed;
+}
