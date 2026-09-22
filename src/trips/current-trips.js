@@ -117,8 +117,9 @@ function standaloneCard(trip) {
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
   const trips = remoteState.trips || [], plans = remoteState.plans || []; const tripMap = new Map(trips.map((t) => [t.id, t])); const linked = new Set(plans.map((p) => p.linkedTripId).filter(Boolean));
-  const activePlans = plans.filter((p) => !isLocked(tripMap.get(p.linkedTripId))).sort((a, b) => String(b?.meta?.start || b.updatedAt || '').localeCompare(String(a?.meta?.start || a.updatedAt || '')));
-  const standalone = trips.filter((t) => !isLocked(t) && !linked.has(t.id)).sort((a, b) => String(tripMeta(b).start || b.updatedAt || '').localeCompare(String(tripMeta(a).start || a.updatedAt || '')));
+  const rankMeta = (meta) => { const start=localDate(meta?.start),end=localDate(meta?.end),now=localToday(); if(start&&end&&now>=start&&now<=end)return 0; if(start&&now<start)return 1; return 2; };
+  const activePlans = plans.filter((p) => !isLocked(tripMap.get(p.linkedTripId))).sort((a,b)=>rankMeta(a.meta)-rankMeta(b.meta)||String(a?.meta?.start||a.updatedAt||'').localeCompare(String(b?.meta?.start||b.updatedAt||'')));
+  const standalone = trips.filter((t) => !isLocked(t) && !linked.has(t.id)).sort((a,b)=>rankMeta(tripMeta(a))-rankMeta(tripMeta(b))||String(tripMeta(a).start||a.updatedAt||'').localeCompare(String(tripMeta(b).start||b.updatedAt||'')));
   const count = activePlans.length + standalone.length; $('#twCurrentTitle').textContent = 'Trips';
   root.innerHTML = count ? activePlans.map((p) => planCard(p, tripMap.get(p.linkedTripId))).join('') + standalone.map(standaloneCard).join('') : '<div class="tw-current-empty"><strong>No current trips</strong><span>Start a trip when you are ready.</span></div>';
   document.dispatchEvent(new CustomEvent('twogether:v18-rendered'));
