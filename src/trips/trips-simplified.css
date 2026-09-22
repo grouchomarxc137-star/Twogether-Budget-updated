@@ -237,6 +237,31 @@ html body #twCurrentTripsSection.tv2-current-host{
 }
 #twCurrentTripsSection.tv2-current-host .tv2-root{width:100%}
 
+/* City-photo trip cards: image only */
+#twCurrentTripsSection .tv2-card{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+}
+#twCurrentTripsSection .tv2-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background-image:var(--tv2-card-photo);
+  background-size:cover;
+  background-position:center;
+  opacity:.34;
+  pointer-events:none;
+}
+#twCurrentTripsSection .tv2-card>*{
+  position:relative;
+  z-index:1;
+}
+@media(max-width:760px){
+  #twCurrentTripsSection .tv2-card::before{opacity:.38}
+}
+
 /* Mobile swipe-back support */
 @media(max-width:760px){
   #twCurrentTrips.tv2-root.tv2-trip-view{
