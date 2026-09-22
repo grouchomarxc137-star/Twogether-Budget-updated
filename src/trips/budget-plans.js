@@ -35,7 +35,9 @@ export function renderBudgetPlans() {
   root.innerHTML = emptyActive + displayedPlans.map((plan) => {
     const meta = plan.meta || {}; const trip = tripForPlan(plan); const locked = isLocked(trip);
     const pBudget = plan?.budgets?.Principessa ?? ''; const qBudget = plan?.budgets?.Principe ?? '';
-    const pActual = trip?.submissions?.Principessa?.paid ?? ''; const qActual = trip?.submissions?.Principe?.paid ?? '';
+    const pLivePaid = liveTripPaid(plan, 'Principessa'), qLivePaid = liveTripPaid(plan, 'Principe');
+    const pActual = pLivePaid !== '' ? pLivePaid : (trip?.submissions?.Principessa?.paid ?? '');
+    const qActual = qLivePaid !== '' ? qLivePaid : (trip?.submissions?.Principe?.paid ?? '');
     const pPartial = plan?.partials?.Principessa || null; const qPartial = plan?.partials?.Principe || null;
     const pEarly = partialSummary(pPartial), qEarly = partialSummary(qPartial);
     const pv = variance(pBudget, pActual), qv = variance(qBudget, qActual);
@@ -57,6 +59,24 @@ export function renderBudgetPlans() {
       if (tripId) document.querySelector(`[data-open-trip="${CSS.escape(tripId)}"]`)?.click();
     });
   });
+}
+
+function liveTripPaid(plan, person) {
+  const entries = Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
+  const repayments = Array.isArray(plan?.repayments) ? plan.repayments : [];
+  if (!entries.length && !repayments.length) return '';
+  let total = 0;
+  entries.forEach((entry) => {
+    const remaining = Math.max(0, money2n(entry?.amount) - money2n(entry?.jarContribution));
+    if (entry?.paidBy === 'both') total += remaining / 2;
+    else if (entry?.paidBy === person) total += remaining;
+  });
+  repayments.forEach((repayment) => {
+    const amount = money2n(repayment?.amount);
+    if (repayment?.from === person) total += amount;
+    if (repayment?.to === person) total -= amount;
+  });
+  return Math.max(0, Math.round(total * 100) / 100);
 }
 
 function money2n(v) { const x = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(x) ? x : 0; }
