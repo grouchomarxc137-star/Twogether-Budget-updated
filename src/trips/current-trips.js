@@ -30,7 +30,7 @@ let remoteState = null;
 let refreshing = false;
 let overlayObserver = null;
 let storyObserver = null;
-let simplifiedView = { name: 'home', planId: '' };
+let simplifiedView = { name: 'home', planId: '', budgetMode: 'combined' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
 let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
@@ -250,14 +250,21 @@ function simplifiedHome(items) {
     '<div class="tv2-dock"><button class="tv2-primary" data-act="new-trip">＋ New trip</button></div></div>';
 }
 function simplifiedTrip(plan, trip) {
-  const meta = plan?.meta || {}, available = tripBudget(plan, trip), spent = expenseTotal(plan, trip), left = available == null ? null : available - spent;
+  const meta = plan?.meta || {}, me = actor(), personal = simplifiedView.budgetMode === 'personal';
+  const combinedAvailable = tripBudget(plan, trip), combinedSpent = expenseTotal(plan, trip);
+  const ownBudget = has(plan?.budgets?.[me]) ? n(plan.budgets[me]) : null;
+  const ownSpent = n(settlementState(plan).paid?.[me]);
+  const available = personal ? ownBudget : combinedAvailable;
+  const spent = personal ? ownSpent : combinedSpent;
+  const left = available == null ? null : available - spent;
   const over = left != null && left < 0, pct = available && available > 0 ? Math.min(100, Math.max(0, (spent / available) * 100)) : 0;
-  const own = plan?.budgets?.[actor()];
+  const personalClass = personal ? ' is-personal '+(me === 'Principe' ? 'is-principe' : 'is-principessa') : '';
+  const budgetLabel = personal ? 'Your budget' : 'Available';
   return '<div class="tv2-page">'+
     '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>'+
       '<h1>'+esc(meta.city || locationLabel(meta))+'</h1><p>'+esc(shortRange(meta.start,meta.end))+(statusLine(meta)?' · '+esc(statusLine(meta)):'')+'</p></header>'+
-    '<section class="tv2-money" aria-label="Trip money"><div class="tv2-figs">'+
-      '<button class="tv2-fig" data-act="budgets"><span>Available</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!has(own)?'<small class="tv2-nudge">+ add yours</small>':'')+'</button>'+
+    '<section class="tv2-money'+personalClass+'" data-act="toggle-budget-view" role="button" tabindex="0" aria-label="'+(personal?'Show combined trip budget':'Show your personal trip budget')+'"><div class="tv2-figs">'+
+      '<div class="tv2-fig"><span>'+budgetLabel+'</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!personal&&!has(plan?.budgets?.[me])?'<small class="tv2-nudge">+ add yours</small>':'')+'</div>'+
       '<div class="tv2-fig"><span>Spent</span><b>'+displayMoney(spent)+'</b></div></div>'+
       (available && available > 0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>':'')+
       (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
@@ -267,13 +274,12 @@ function simplifiedTrip(plan, trip) {
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
 }
-
 function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
   root.classList.toggle('tv2-trip-view', simplifiedView.name === 'trip');
   if (simplifiedView.name === 'trip') {
     const plan = (remoteState.plans || []).find((p)=>p.id===simplifiedView.planId);
-    if (!plan) simplifiedView = { name:'home', planId:'' };
+    if (!plan) simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
     else {
       const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
       root.innerHTML = simplifiedTrip(plan, trip);
@@ -637,7 +643,7 @@ function bindSimplifiedSwipe(section) {
       current.style.transform = 'translateX(100vw)';
       current.style.opacity = '.72';
       setTimeout(() => {
-        simplifiedView = { name:'home', planId:'' };
+        simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
         renderCurrentTrips();
         window.scrollTo({ top:0, behavior:'auto' });
       }, 170);
@@ -651,13 +657,18 @@ function handleSimplifiedClick(e) {
   if ((b.dataset.act === 'open-trip' || b.dataset.act === 'delete-trip') && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'delete-trip') { openDeleteConfirm(b.dataset.kind, b.dataset.id); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
-  if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:''}; renderCurrentTrips(); return; }
+  if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:'',budgetMode:'combined'}; renderCurrentTrips(); return; }
   if (b.dataset.act === 'open-trip') {
-    if (b.dataset.kind === 'plan') { simplifiedView={name:'trip',planId:b.dataset.id}; renderCurrentTrips(); }
+    if (b.dataset.kind === 'plan') { simplifiedView={name:'trip',planId:b.dataset.id,budgetMode:'combined'}; renderCurrentTrips(); }
     else window.TwogetherApp?.open(b.dataset.id);
     return;
   }
   const plan = (remoteState?.plans || []).find((p)=>p.id===simplifiedView.planId); if (!plan) return;
+  if (b.dataset.act === 'toggle-budget-view') {
+    simplifiedView.budgetMode = simplifiedView.budgetMode === 'personal' ? 'combined' : 'personal';
+    renderCurrentTrips();
+    return;
+  }
   if (b.dataset.act === 'budgets' || b.dataset.act === 'edit-trip') { window.TwogetherWorkflow?.budget(plan.id); return; }
   if (b.dataset.act === 'add-expense') { openSimplifiedExpenseSheet(plan); return; }
   if (b.dataset.act === 'open-expense') {
