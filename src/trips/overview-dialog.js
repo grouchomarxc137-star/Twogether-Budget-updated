@@ -3,6 +3,7 @@
 // visible while new log-as-you-go expenses use the shared expenseEntries
 // collection on each budget plan.
 import { fmtDate } from '../lib/format.js';
+import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 
 const names = ['Principessa', 'Principe'];
 const legacyKeys = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -84,13 +85,15 @@ function openExpenseSheet(plan){
     const date=state.date===today()?'today':fmtDate(state.date);
     return[payer,split,date,state.uncertain?'estimate':''].filter(Boolean).join(' · ');
   };
-  const head=()=>'<div class="tv2-sheet-head"><h2>Add expense</h2><button type="button" class="tv2-x" data-close aria-label="Close">✕</button></div>';
-  const html=()=>head()+
-    '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-    '<div class="tv2-cats" role="group" aria-label="Category">'+EXPENSE_CATS.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join('')+'</div>'+
-    '<div class="tv2-jar-slot"></div>'+
-    '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-    '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
+  const html=()=>tripSheetHtml({
+    title:'Add expense',
+    closeAttr:'data-close',
+    amountId:'tv2Amount',
+    amountValue:state.amountText,
+    categoriesHtml:EXPENSE_CATS.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join(''),
+    afterCategoriesHtml:'<div class="tv2-jar-slot"></div>',
+    defaultsHtml:'<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
+    moreHtml:'<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
       '<div class="tv2-field"><span>Paid by</span><div class="tv2-seg">'+
         [[me,'You'],[other,other],['both','Each paid half']].map(([k,l])=>'<button type="button" data-payer="'+k+'" class="'+(state.paidBy===k?'on':'')+'">'+esc(l)+'</button>').join('')+
       '</div></div>'+
@@ -100,9 +103,10 @@ function openExpenseSheet(plan){
       '<label class="tv2-field"><span>Date</span><input type="date" id="tv2Date" value="'+esc(state.date)+'"></label>'+
       '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
       '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
-    '</div>'+
-    '<p class="tv2-hint" aria-live="polite"></p>'+
-    '<button type="button" class="tv2-primary tv2-save" data-save>Save</button>';
+    '</div>',
+    saveAttr:'data-save',
+    saveLabel:'Save',
+  });
 
   expenseLayer=document.createElement('div');
   expenseLayer.className='tv2-layer';
@@ -170,9 +174,24 @@ function openExpenseSheet(plan){
 
 function expenseTimeline(plan){
   const list=entries(plan).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-  if(!list.length)return '<p class="overview-trip-empty">No expenses yet. Add them as they happen, it takes a few seconds.</p>';
-  const groups=new Map();for(const entry of list){const key=entry.date||today();if(!groups.has(key))groups.set(key,[]);groups.get(key).push(entry)}
-  return [...groups.entries()].map(([date,items])=>{const label=date===today()?'Today':fmtDate(date);return '<section class="overview-trip-day"><h3>'+esc(label)+'</h3>'+items.map(entry=>{const [label,icon]=categoryInfo(entry);const payer=entry.paidBy===actorName()?'you':entry.paidBy==='both'?'each paid half':entry.paidBy;const jar=entry.jarContribution?' · '+displayMoney(entry.jarContribution,true)+' from Jar':'';return '<button type="button" class="overview-trip-expense" data-trip-entry="'+esc(entry.id)+'"><span class="overview-trip-expense-icon">'+icon+'</span><span class="overview-trip-expense-copy"><strong>'+esc(entry.note||entry.name||label)+'</strong><small>'+esc(payer+jar)+'</small></span><b>'+displayMoney(entry.amount,true)+'</b></button>'}).join('')+'</section>'}).join('');
+  const grouped=new Map();
+  for(const entry of list){const key=entry.date||today();if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(entry);}
+  const groups=[...grouped.entries()].map(([date,items])=>({label:date===today()?'Today':fmtDate(date),items}));
+  return tripTimelineHtml(groups,{
+    emptyText:'No expenses yet. Add them as they happen, it takes a few seconds.',
+    rowHtml:(entry)=>{
+      const [label,icon]=categoryInfo(entry);
+      const payer=entry.paidBy===actorName()?'you':entry.paidBy==='both'?'each paid half':entry.paidBy;
+      const jar=entry.jarContribution?' · '+displayMoney(entry.jarContribution,true)+' from Jar':'';
+      return tripExpenseRowHtml({
+        attr:'data-trip-entry="'+esc(entry.id)+'"',
+        icon,
+        title:entry.note||entry.name||label,
+        meta:payer+jar,
+        amount:displayMoney(entry.amount,true),
+      });
+    },
+  });
 }
 
 let latest = null, dialog = null, opened = null, refreshing = false, lastRefresh = 0, busy = false, expenseLayer = null, snackTimer = null;
@@ -290,8 +309,29 @@ function draw(plan) {
   dialog=document.createElement('dialog');
   dialog.className='current-overview current-overview-trip';
   const trip=latest?.trips?.find((item)=>item.id===plan.linkedTripId);
+  const meta=plan?.meta||{},spent=total(plan,trip);
+  const splitBudget=names.reduce((sum,name)=>sum+(has(plan?.budgets?.[name])?n(plan.budgets[name]):0),0);
+  const available=splitBudget||(has(trip?.budget)?n(trip.budget):0);
+  const left=available-spent;
+  const pct=available>0?Math.max(0,Math.min(100,(spent/available)*100)):null;
+  const mine=plan?.budgets?.[actorName()];
   const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?' is-even':balanceLine.startsWith('You owe ')?' is-debtor':'';
-  dialog.innerHTML='<div class="overview-trip-shell">'+hero(plan,trip)+'<button type="button" class="overview-trip-balance'+balanceClass+'"><span>'+esc(balanceLine)+'</span><b>›</b></button><div class="overview-trip-list">'+expenseTimeline(plan)+'</div><div class="overview-trip-dock"><button type="button" data-overview-add>＋ Add expense</button></div></div>';
+
+  dialog.innerHTML=tripDetailShellHtml({
+    back:{attr:'data-overview-close',label:'‹ Trips'},
+    right:{attr:'data-overview-edit',label:'Edit'},
+    title:meta.city||'Current trip',
+    subtitle:shortRange(meta.start,meta.end)+(timing(meta)?' · '+timing(meta):''),
+    moneyHtml:tripDetailMoneyHtml({
+      first:{label:'Available ›',value:available>0?displayMoney(available):'Not set',button:true,attr:'data-overview-budget',extraHtml:!has(mine)?'<small>+ add yours</small>':''},
+      second:{label:'Spent',value:displayMoney(spent)},
+      progress:pct,
+      summary:available>0?{value:displayMoney(Math.abs(left)),label:left<0?'over budget':'left',over:left<0}:null,
+    }),
+    middleHtml:'<button type="button" class="overview-trip-balance'+balanceClass+'"><span>'+esc(balanceLine)+'</span><b>›</b></button>',
+    listHtml:expenseTimeline(plan),
+    dock:{attr:'data-overview-add',label:'＋ Add expense'},
+  });
   document.body.appendChild(dialog);dialog.showModal();
   dialog.addEventListener('cancel',close);
   dialog.querySelector('[data-overview-close]').onclick=close;
