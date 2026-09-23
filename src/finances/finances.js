@@ -895,6 +895,7 @@ function financeGroupForTone(tone, name = '') {
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
   document.body.classList.remove('tv2-locked');
+  document.body.classList.remove('trip-expense-open');
 }
 async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
   const next = cloneRecord(rec);
@@ -919,11 +920,11 @@ function openFinanceTransactionSheet(rec) {
   const categories=financeLogCategories(rec);
   const state={amountText:'',category:'',selectedItemId:'',name:'',group:'',date:'',more:false,busy:false,error:''};
   const layer=document.createElement('div');
-  layer.className='tv2-layer finance-log-layer';
-  layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="dialog" aria-modal="true" aria-label="Add expense"></div>';
+  layer.className='finance-log-layer trip-expense-mode';
+  layer.innerHTML='<div class="finance-log-backdrop" data-fin-log-close></div><div class="trip-expense-workspace finance-expense-workspace" role="dialog" aria-modal="true" aria-label="Log finance"></div>';
   document.body.appendChild(layer);
-  document.body.classList.add('tv2-locked');
-  const sheet=layer.querySelector('.finance-log-sheet');
+  document.body.classList.add('trip-expense-open');
+  const sheet=layer.querySelector('.finance-expense-workspace');
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
   const selectedCategory=()=>categories.find((item)=>item.key===state.category);
@@ -935,7 +936,6 @@ function openFinanceTransactionSheet(rec) {
     state.selectedItemId='';
     state.name='';
     state.group='';
-    state.amountText='';
     state.date='';
     state.more=false;
     state.error='';
@@ -948,19 +948,20 @@ function openFinanceTransactionSheet(rec) {
     if (hint) {
       const noItems=state.category&&state.category!=='other'&&!selectedItems().length;
       hint.textContent=state.error
-        || (noItems?'No items are set for this category in Edit items.'
+        || (noItems?'No items are set for this category in Manage recurring items.'
           : state.amountText&&!validAmount()?'That amount doesn’t look right':'');
       hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()));
     }
   }
 
-  function categoryTile(item, back=false) {
-    return '<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+' on '+(back?'finance-tv2-mode-tile':'')+'" '+(back?'data-fin-log-cat-back':'data-fin-log-cat="'+item.key+'"')+' aria-pressed="true"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>';
+  function categoryButton(item, back=false) {
+    const attrs=back?'data-fin-log-cat-back':'data-fin-log-cat="'+item.key+'"';
+    return '<button type="button" class="finance-expense-category finance-tv2-tone-'+item.tone+' '+(back?'active finance-expense-mode-tile':'')+'" '+attrs+' aria-pressed="'+(back?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span><strong>'+esc(item.label)+'</strong></button>';
   }
 
-  function itemTile(item,index,tone,icon) {
+  function itemButton(item,index,tone,icon) {
     const active=state.selectedItemId===String(item.id);
-    return '<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-item-tile finance-tv2-tone-'+tone+' '+(active?'on':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(active?'true':'false')+'"><span aria-hidden="true">'+icon+'</span>'+esc(item.name)+'</button>';
+    return '<button type="button" class="finance-expense-category finance-expense-item finance-tv2-tone-'+tone+' '+(active?'active':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(active?'true':'false')+'"><span aria-hidden="true">'+icon+'</span><strong>'+esc(item.name)+'</strong></button>';
   }
 
   function render() {
@@ -970,25 +971,28 @@ function openFinanceTransactionSheet(rec) {
     const isOther=state.category==='other';
     const drillDown=!!state.category;
 
-    const gridHtml=!drillDown
-      ? categories.map((item)=>'<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+'" data-fin-log-cat="'+item.key+'" aria-pressed="false"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')
+    const categoryHtml=!drillDown
+      ? categories.map((item)=>categoryButton(item,false)).join('')
       : isOther
-        ? categoryTile(selected,true)
-        : categoryTile(selected,true)+items.map((item,index)=>itemTile(item,index,selected?.tone||'other',selected?.icon||'•')).join('');
+        ? categoryButton(selected,true)
+        : categoryButton(selected,true)+items.map((item,index)=>itemButton(item,index,selected?.tone||'other',selected?.icon||'•')).join('');
+
+    const dateSummary=state.date?financeDateLabel(state.date):'Add date · optional';
+    const title=selected?esc(selected.label):'Log finance';
 
     sheet.innerHTML=
-      '<div class="tv2-sheet-head"><h2>'+(selected?esc(selected.label):'Add expense')+'</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
-      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-      '<div class="tv2-cats finance-tv2-cats '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+gridHtml+'</div>'+
+      '<header class="trip-expense-head"><h2>'+title+'</h2><button type="button" class="trip-expense-done" data-fin-log-close aria-label="Close">×</button></header>'+
+      '<label class="trip-expense-amount trip-expense-amount-hero"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
+      '<div class="trip-expense-categories finance-expense-categories '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+categoryHtml+'</div>'+
       (isOther
-        ? '<label class="tv2-field finance-tv2-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
+        ? '<div class="trip-expense-more-fields finance-expense-name-fields"><label>Expense name<input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label></div>'
         : '')+
       ((state.selectedItemId || isOther)
-        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-          '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></span></label></div>'
+        ? '<button type="button" class="trip-expense-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="trip-expense-default-summary">'+esc(dateSummary)+'</span><span class="trip-expense-chevron" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+          '<div class="trip-expense-more-fields '+(state.more?'':'hidden')+'><label>Date<input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
         : '')+
-      '<p class="tv2-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
-      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Log item')+'</button>';
+      '<p class="trip-expense-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
+      '<div class="trip-expense-actions"><button type="button" class="btn primary big" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button></div>';
 
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
@@ -1015,10 +1019,9 @@ function openFinanceTransactionSheet(rec) {
       state.selectedItemId='';
       state.name='';
       state.group=state.category==='other'?'other':'';
-      state.amountText='';
       state.date='';
       state.error='';
-      state.more=false;
+      state.more=state.category==='other';
       render();
       if (state.category==='other') setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
       return;
@@ -1061,14 +1064,14 @@ function openFinanceTransactionSheet(rec) {
       } catch(err) {
         state.busy=false;
         state.error=err?.message||'Could not save this item.';
-        document.body.classList.add('tv2-locked');
+        document.body.classList.add('trip-expense-open');
         if (!layer.isConnected) document.body.appendChild(layer);
         render();
       }
     }
   });
 
-  layer.querySelector('.tv2-backdrop').addEventListener('click',closeFinanceTransactionSheet);
+  layer.querySelector('.finance-log-backdrop')?.addEventListener('click',closeFinanceTransactionSheet);
   layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeFinanceTransactionSheet();});
   render();
   setTimeout(()=>sheet.querySelector('#financeLogAmount')?.focus(),0);
@@ -1158,7 +1161,7 @@ function renderDetail(rec) {
         '</section>'+
         extraNote+carryNote+confirmHtml+
         '<section class="tv2-list" aria-label="Monthly finances">'+financeMonthTimeline(rec)+'</section>'+
-        (!rec.finalized?'<div class="tv2-dock"><button type="button" class="tv2-primary" data-fin-add-transaction>＋ Add expense</button></div>':'')+
+        (!rec.finalized?'<div class="tv2-dock"><button type="button" class="tv2-primary" data-fin-add-transaction>＋ Log finance</button></div>':'')+
       '</div>'+
     '</div>',
     'month-detail'
