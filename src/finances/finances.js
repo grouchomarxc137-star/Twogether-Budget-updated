@@ -936,6 +936,8 @@ function financeGroupForTone(tone, name = '') {
 }
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
+  document.documentElement.classList.remove('finance-log-locked');
+  document.body.classList.remove('finance-log-locked');
   document.body.classList.remove('tv2-locked');
   document.body.classList.remove('trip-expense-open');
 }
@@ -997,6 +999,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
   layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="document"></div>';
   document.body.appendChild(layer);
   layer.showModal();
+  document.documentElement.classList.add('finance-log-locked');
+  document.body.classList.add('finance-log-locked');
   document.body.classList.add('tv2-locked');
   document.body.classList.add('trip-expense-open');
   const sheet=layer.querySelector('.finance-log-sheet');
@@ -1201,6 +1205,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
         state.error=error?.message||'Could not save this item.';
         if(!layer.isConnected) document.body.appendChild(layer);
         if(!layer.open) layer.showModal();
+        document.documentElement.classList.add('finance-log-locked');
+        document.body.classList.add('finance-log-locked');
         document.body.classList.add('tv2-locked');
         document.body.classList.add('trip-expense-open');
         render();
@@ -1369,7 +1375,7 @@ function bindFinanceMonthSwipe(rec) {
   let rowSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
   const resetRowState=()=>{rowSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};};
 
-  // Whole-page back gestures: left edge -> right, or bottom Log finance button -> up.
+  // Same Trips page-back gestures: left edge -> right, or top -> down.
   let pageSwipe={tracking:false,active:false,mode:'',startX:0,startY:0,lastX:0,lastY:0};
   const resetPageState=()=>{pageSwipe={tracking:false,active:false,mode:'',startX:0,startY:0,lastX:0,lastY:0};};
 
@@ -1390,7 +1396,7 @@ function bindFinanceMonthSwipe(rec) {
     root.style.transition='transform .22s cubic-bezier(.22,.8,.28,1), opacity .18s ease';
     const target=mode==='right'
       ? 'translate(calc(-50% + 100vw),-50%)'
-      : 'translate(-50%,calc(-50% - 100dvh))';
+      : 'translate(-50%,calc(-50% + 100dvh))';
     root.style.setProperty('transform',target,'important');
     root.style.opacity='.7';
     resetPageState();
@@ -1429,25 +1435,26 @@ function bindFinanceMonthSwipe(rec) {
   root.addEventListener('touchstart',(event)=>{
     if(!mobile()||financeMonthDeleteConfirmLayer||event.touches.length!==1)return;
     const touch=event.touches[0];
-    const dock=event.target.closest('.overview-trip-dock');
+    const scrollRoot=root.querySelector('.overview-trip-shell')||root;
     const canRight=touch.clientX<=46;
-    const canUp=!!dock;
+    const canDown=scrollRoot.scrollTop<=1;
+    const row=event.target.closest('.finance-month-swipe-row');
 
-    if(canRight||canUp){
+    if(canRight||canDown){
       closeFinanceMonthSwipeRows();
       pageSwipe={
-        tracking:true,active:false,mode:canRight?'right':'up',
+        tracking:true,active:false,mode:canRight?'right':'down',
         startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,lastY:touch.clientY
       };
-      resetRowState();
-      return;
     }
 
-    const row=event.target.closest('.finance-month-swipe-row');
-    if(!row)return;
-    closeFinanceMonthSwipeRows(row);
-    resetFinanceMonthSwipeVisual(row,false);
-    rowSwipe={tracking:true,active:false,startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,row};
+    if(row){
+      closeFinanceMonthSwipeRows(row);
+      resetFinanceMonthSwipeVisual(row,false);
+      rowSwipe={tracking:true,active:false,startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,row};
+    }else{
+      resetRowState();
+    }
   },{passive:true,signal});
 
   root.addEventListener('touchmove',(event)=>{
@@ -1465,25 +1472,28 @@ function bindFinanceMonthSwipe(rec) {
         if(ax<9&&ay<9)return;
         if(pageSwipe.mode==='right'){
           if(dx>10&&ax>ay*1.25)pageSwipe.active=true;
-          else if(ay>=ax||dx<0){resetPageState();return;}
+          else if(ay>=ax||dx<0)resetPageState();
         }else{
-          if(dy<-10&&ay>ax*1.15)pageSwipe.active=true;
-          else if(ax>=ay||dy>0){resetPageState();return;}
+          const scrollRoot=root.querySelector('.overview-trip-shell')||root;
+          if(dy>10&&ay>ax*1.15&&scrollRoot.scrollTop<=1)pageSwipe.active=true;
+          else if(ax>=ay||dy<0)resetPageState();
         }
       }
-      if(!pageSwipe.active)return;
-      event.preventDefault();
-      root.style.transition='none';
-      if(pageSwipe.mode==='right'){
-        const distance=Math.max(0,Math.min(dx,window.innerWidth*.78));
-        root.style.setProperty('transform','translate(calc(-50% + '+distance+'px),-50%)','important');
-        root.style.opacity=String(Math.max(.82,1-distance/(window.innerWidth*2.5)));
-      }else{
-        const distance=Math.max(0,Math.min(-dy,window.innerHeight*.62));
-        root.style.setProperty('transform','translate(-50%,calc(-50% - '+distance+'px))','important');
-        root.style.opacity=String(Math.max(.82,1-distance/(window.innerHeight*2.2)));
+      if(pageSwipe.active){
+        event.preventDefault();
+        root.style.transition='none';
+        if(pageSwipe.mode==='right'){
+          const distance=Math.max(0,Math.min(dx,window.innerWidth*.78));
+          root.style.setProperty('transform','translate(calc(-50% + '+distance+'px),-50%)','important');
+          root.style.opacity=String(Math.max(.82,1-distance/(window.innerWidth*2.5)));
+        }else{
+          const distance=Math.max(0,Math.min(dy,window.innerHeight*.62));
+          root.style.setProperty('transform','translate(-50%,calc(-50% + '+distance+'px))','important');
+          root.style.opacity=String(Math.max(.82,1-distance/(window.innerHeight*2.2)));
+        }
+        resetRowState();
+        return;
       }
-      return;
     }
 
     if(!rowSwipe.tracking||!rowSwipe.row)return;
@@ -1508,7 +1518,7 @@ function bindFinanceMonthSwipe(rec) {
       const dy=pageSwipe.lastY-pageSwipe.startY;
       const goBack=pageSwipe.active&&(
         (mode==='right'&&dx>=Math.min(92,window.innerWidth*.24))||
-        (mode==='up'&&-dy>=Math.min(110,window.innerHeight*.16))
+        (mode==='down'&&dy>=Math.min(110,window.innerHeight*.16))
       );
       if(goBack)finishBack(mode);
       else{resetPageState();clearPageVisual(true);}
