@@ -97,6 +97,9 @@ let recurringSwipeAbort = null;
 let recurringSwipeIgnoreUntil = 0;
 let recurringDeleteConfirmLayer = null;
 let financeMonthDialog = null;
+let financeMonthSwipeAbort = null;
+let financeMonthSwipeIgnoreUntil = 0;
+let financeMonthDeleteConfirmLayer = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1257,7 +1260,7 @@ function financeMonthTimeline(rec) {
       const tone=income?'income':row.tone;
       const meta=income?'Income':categoryLabel(tone);
       const editable=row.kind!=='summary';
-      return tripExpenseRowHtml({
+      const rowHtml=tripExpenseRowHtml({
         attr:editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable,
         icon:financeMonthToneIcon(tone,income?'income':'expense'),
@@ -1267,11 +1270,200 @@ function financeMonthTimeline(rec) {
         amount:money(item.amount),
         amountClass:income?'finance-tv2-income-amt':'',
       });
+      if(!editable) return rowHtml;
+      return '<div class="finance-month-swipe-row" data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'">'+
+        '<div class="finance-month-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
+        '<div class="finance-month-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
+        rowHtml+
+      '</div>';
     },
   });
 }
 
+function resetFinanceMonthSwipeVisual(row, animate = true) {
+  if (!row) return;
+  const card=row.querySelector('.overview-trip-expense');
+  const edit=row.querySelector('.finance-month-edit-reveal');
+  const remove=row.querySelector('.finance-month-delete-reveal');
+  [edit,remove].forEach((action)=>{
+    if(!action)return;
+    action.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+    action.style.width='0px';
+    action.style.opacity='0';
+  });
+  if(card){
+    card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+    card.style.transform='translateX(0)';
+    card.style.opacity='1';
+  }
+  if(animate)setTimeout(()=>{[card,edit,remove].forEach((el)=>{if(el?.isConnected)el.style.transition='';});},220);
+}
+
+function closeFinanceMonthSwipeRows(except = null) {
+  financeMonthDialog?.querySelectorAll('.finance-month-swipe-row').forEach((row)=>{
+    if(row!==except) resetFinanceMonthSwipeVisual(row,true);
+  });
+}
+
+function closeFinanceMonthDeleteConfirm() {
+  financeMonthDeleteConfirmLayer?.remove();
+  financeMonthDeleteConfirmLayer=null;
+}
+
+function openFinanceMonthDeleteConfirm(rec, kind, index) {
+  closeFinanceMonthDeleteConfirm();
+  const list=kind==='income'?(rec.incomes||[]):(rec.expenses||[]);
+  const item=list[index];
+  if(!item)return;
+
+  financeMonthDeleteConfirmLayer=document.createElement('div');
+  financeMonthDeleteConfirmLayer.className='tv2-confirm-layer';
+  financeMonthDeleteConfirmLayer.innerHTML=
+    '<div class="tv2-confirm-backdrop" data-fin-month-confirm-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finMonthDeleteTitle">'+
+      '<h2 id="finMonthDeleteTitle">Delete finance?</h2>'+
+      '<p>Are you sure you want to delete <strong>'+esc(item.name||(kind==='income'?'Income':groupLabel(item.group)))+'</strong> · '+money(item.amount)+'?</p>'+
+      '<p class="tv2-confirm-note">This removes it from '+esc(monthLabel(rec.month))+'.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-fin-month-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-month-confirm-delete>Delete</button></div>'+
+    '</div>';
+  document.body.appendChild(financeMonthDeleteConfirmLayer);
+
+  const cancel=()=>{closeFinanceMonthDeleteConfirm();closeFinanceMonthSwipeRows();};
+  financeMonthDeleteConfirmLayer.querySelectorAll('[data-fin-month-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+  financeMonthDeleteConfirmLayer.addEventListener('keydown',(event)=>{if(event.key==='Escape')cancel();});
+
+  const deleteButton=financeMonthDeleteConfirmLayer.querySelector('[data-fin-month-confirm-delete]');
+  deleteButton.addEventListener('click',async()=>{
+    deleteButton.disabled=true;
+    deleteButton.textContent='Deleting…';
+    const error=financeMonthDeleteConfirmLayer.querySelector('.tv2-confirm-error');
+    error.textContent='';
+    try{
+      const next=cloneRecord(rec);
+      next.incomes=[...(next.incomes||[])];
+      next.expenses=[...(next.expenses||[])];
+      const target=kind==='income'?next.incomes:next.expenses;
+      if(!target[index]) throw new Error('This finance item no longer exists');
+      target.splice(index,1);
+      closeFinanceMonthDeleteConfirm();
+      closeFinanceMonthSwipeRows();
+      await saveDirectMonthRecord(next,'Finance deleted');
+    }catch(err){
+      deleteButton.disabled=false;
+      deleteButton.textContent='Delete';
+      error.textContent=err?.message||'Could not delete this finance item';
+    }
+  });
+  setTimeout(()=>deleteButton.focus(),0);
+}
+
+function bindFinanceMonthSwipe(rec) {
+  financeMonthSwipeAbort?.abort();
+  const controller=new AbortController();
+  financeMonthSwipeAbort=controller;
+  const signal=controller.signal;
+  const root=financeMonthDialog;
+  if(!root)return;
+
+  const mobile=()=>window.matchMedia?.('(max-width:760px)')?.matches??window.innerWidth<=760;
+  let swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};
+
+  const resetState=()=>{swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};};
+  const paint=(row,distance,direction)=>{
+    const card=row.querySelector('.overview-trip-expense');
+    const action=row.querySelector(direction==='edit'?'.finance-month-edit-reveal':'.finance-month-delete-reveal');
+    const other=row.querySelector(direction==='edit'?'.finance-month-delete-reveal':'.finance-month-edit-reveal');
+    if(!card||!action)return;
+    const exposed=Math.abs(distance);
+    card.style.transition='none';
+    card.style.transform='translateX('+distance+'px)';
+    action.style.transition='none';
+    action.style.width=exposed+'px';
+    action.style.opacity=String(Math.min(1,.35+exposed/120));
+    if(other){other.style.width='0px';other.style.opacity='0';}
+  };
+  const finish=(row,direction)=>{
+    const card=row.querySelector('.overview-trip-expense');
+    const action=row.querySelector(direction==='edit'?'.finance-month-edit-reveal':'.finance-month-delete-reveal');
+    const width=row.getBoundingClientRect().width||window.innerWidth-32;
+    const distance=direction==='edit'?width:-width;
+    if(card){
+      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform='translateX('+distance+'px)';
+      card.style.opacity='.76';
+    }
+    if(action){
+      action.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      action.style.width=width+'px';
+      action.style.opacity='1';
+    }
+  };
+
+  root.addEventListener('touchstart',(event)=>{
+    if(!mobile()||financeMonthDeleteConfirmLayer||event.touches.length!==1)return;
+    const row=event.target.closest('.finance-month-swipe-row');
+    if(!row)return;
+    closeFinanceMonthSwipeRows(row);
+    resetFinanceMonthSwipeVisual(row,false);
+    const touch=event.touches[0];
+    swipe={tracking:true,active:false,startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,row,direction:''};
+  },{passive:true,signal});
+
+  root.addEventListener('touchmove',(event)=>{
+    if(!swipe.tracking||!swipe.row||event.touches.length!==1)return;
+    const touch=event.touches[0],dx=touch.clientX-swipe.startX,dy=Math.abs(touch.clientY-swipe.startY);
+    swipe.lastX=touch.clientX;
+    if(!swipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      const horizontal=Math.abs(dx)>dy*1.2;
+      const direction=dx>10?'edit':dx<-10?'delete':'';
+      if(horizontal&&direction){swipe.active=true;swipe.direction=direction;}
+      else if(dy>=Math.abs(dx)||(horizontal&&Math.abs(dx)>10&&!direction)){resetState();return;}
+    }
+    if(!swipe.active)return;
+    event.preventDefault();
+    const width=swipe.row.getBoundingClientRect().width||window.innerWidth-32;
+    const maxDistance=width*.94;
+    const distance=swipe.direction==='edit'
+      ? Math.max(0,Math.min(maxDistance,dx))
+      : Math.min(0,Math.max(-maxDistance,dx));
+    paint(swipe.row,distance,swipe.direction);
+  },{passive:false,signal});
+
+  root.addEventListener('touchend',()=>{
+    if(!swipe.tracking||!swipe.row){resetState();return;}
+    const row=swipe.row,dx=swipe.lastX-swipe.startX,direction=swipe.direction;
+    const width=row.getBoundingClientRect().width||window.innerWidth-32;
+    const threshold=Math.max(180,width*.62);
+    const fullSwipe=swipe.active&&((direction==='edit'&&dx>=threshold)||(direction==='delete'&&-dx>=threshold));
+    if(!swipe.active||!fullSwipe){
+      resetFinanceMonthSwipeVisual(row,true);
+      resetState();
+      return;
+    }
+
+    financeMonthSwipeIgnoreUntil=Date.now()+550;
+    const kind=row.dataset.finEntryKind,index=Number(row.dataset.finEntryIndex);
+    finish(row,direction);
+    resetState();
+    setTimeout(()=>{
+      resetFinanceMonthSwipeVisual(row,false);
+      if(direction==='edit') openFinanceTransactionSheet(rec,{kind,index});
+      else openFinanceMonthDeleteConfirm(rec,kind,index);
+    },180);
+  },{passive:true,signal});
+
+  root.addEventListener('touchcancel',()=>{
+    resetFinanceMonthSwipeVisual(swipe.row,true);
+    resetState();
+  },{passive:true,signal});
+}
+
 function closeFinanceMonthDialog() {
+  financeMonthSwipeAbort?.abort();
+  financeMonthSwipeAbort=null;
+  closeFinanceMonthDeleteConfirm();
   financeMonthDialog?.remove();
   financeMonthDialog=null;
 }
@@ -1325,11 +1517,15 @@ function renderDetail(rec) {
   financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',closeFinanceMonthDialog);
   financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
   financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
+  bindFinanceMonthSwipe(rec);
   financeMonthDialog.querySelectorAll('[data-fin-entry-kind]').forEach((button)=>{
-    button.addEventListener('click',()=>openFinanceTransactionSheet(rec,{
-      kind:button.dataset.finEntryKind,
-      index:Number(button.dataset.finEntryIndex),
-    }));
+    button.addEventListener('click',(event)=>{
+      if(Date.now()<financeMonthSwipeIgnoreUntil){event.preventDefault();return;}
+      openFinanceTransactionSheet(rec,{
+        kind:button.dataset.finEntryKind,
+        index:Number(button.dataset.finEntryIndex),
+      });
+    });
   });
 }
 
