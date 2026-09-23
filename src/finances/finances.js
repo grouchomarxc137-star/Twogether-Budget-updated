@@ -239,6 +239,13 @@ function post(action, payload) { return window.TwogetherAPI.post(action, payload
 
 function ownMonths() { return financeState.finances?.[actor()] || []; }
 function recordFor(month) { return ownMonths().find((x) => x.month === month) || null; }
+function directMonthRecord(month) {
+  const existing = recordFor(month);
+  if (existing) return cloneRecord(existing);
+  const fresh = freshRecord(month);
+  fresh.partialOnly = true;
+  return fresh;
+}
 function hasValue(v) { return v !== '' && v != null; }
 function normalizeFinanceRecord(rec, owner = actor()) {
   const copy = JSON.parse(JSON.stringify(rec || {}));
@@ -465,9 +472,7 @@ function renderPage() {
   }).join('');
   $$('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectedMonth = btn.dataset.finMonth;
-    const rec = recordFor(selectedMonth);
-    if (rec) renderDetail(rec);
-    else { flow = null; renderWizard(); }
+    renderDetail(directMonthRecord(selectedMonth));
   }));
   const detail = $('#financeDetail'); if (detail && !recordFor(selectedMonth)) detail.innerHTML = '';
 }
@@ -603,6 +608,133 @@ function openScenarioModal(index) {
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.scenarios.splice(index, 1); saveProfile(next, 'Scenario removed'); });
 }
 
+function financeLogCategories(rec) {
+  const tones = new Set();
+  recurringConfig().expenses.forEach((item)=>tones.add(groupTone(item.group)));
+  (rec?.expenses || []).forEach((item)=>tones.add(groupTone(item.group)));
+  manualGroups().forEach((group)=>tones.add(group.tone));
+  return [
+    { key:'income', label:'Income', tone:'income', icon:'€' },
+    ...categoryOrder().filter((tone)=>tones.has(tone)).map((tone)=>({
+      key:tone,
+      label:categoryLabel(tone),
+      tone,
+      icon:financeMonthToneIcon(tone),
+    })),
+  ];
+}
+function financeGroupForTone(tone, name = '') {
+  const lower = String(name || '').trim().toLowerCase();
+  if (tone === 'fixed') return 'fixed';
+  if (tone === 'medical') return 'medical';
+  if (tone === 'subscriptions') return 'subscriptions';
+  if (tone === 'budgets') {
+    if (lower === 'extra') return 'extra';
+    if (lower.includes('grocer')) return 'groceries';
+    return 'variable';
+  }
+  if (tone === 'wealth') return lower.includes('invest') ? 'investments' : 'savings';
+  return 'other';
+}
+function closeFinanceTransactionSheet() {
+  document.querySelector('.finance-log-layer')?.remove();
+  document.body.classList.remove('finance-log-locked');
+}
+async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
+  const next = cloneRecord(rec);
+  next.finalized = false;
+  next.finalizedAt = '';
+  const result = await post('saveFinanceMonth',{monthData:next});
+  if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
+  const list = financeState.finances[actor()] || [];
+  const idx = list.findIndex((item)=>item.month===next.month);
+  const saved = normalizeFinanceRecord({...next,updatedAt:new Date().toISOString(),updatedBy:actor()},actor());
+  if (idx >= 0) list[idx]=saved; else list.push(saved);
+  list.sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+  selectedMonth=saved.month;
+  renderPage();
+  renderDetail(saved);
+  toast(message);
+  setTimeout(loadState,800);
+}
+function openFinanceTransactionSheet(rec) {
+  if (!rec || rec.finalized) return;
+  closeFinanceTransactionSheet();
+  const categories=financeLogCategories(rec);
+  const state={amountText:'',category:'',name:'',date:'',more:false,busy:false,error:''};
+  const layer=document.createElement('div');
+  layer.className='finance-log-layer';
+  layer.innerHTML='<div class="finance-log-backdrop" data-fin-log-close></div><div class="finance-log-sheet" role="dialog" aria-modal="true" aria-label="Add finance transaction"></div>';
+  document.body.appendChild(layer);
+  document.body.classList.add('finance-log-locked');
+  const sheet=layer.querySelector('.finance-log-sheet');
+  const amount=()=>Number(String(state.amountText||'').replace(',','.'));
+  const validAmount=()=>Number.isFinite(amount())&&amount()>0;
+  const valid=()=>validAmount()&&!!state.category&&!!state.name.trim();
+
+  function render() {
+    const selected=categories.find((item)=>item.key===state.category);
+    const tone=selected?.tone||'';
+    const bounds=financeDateBounds(rec.month);
+    sheet.innerHTML=
+      '<div class="finance-log-head"><h2>Add transaction</h2><button type="button" data-fin-log-close aria-label="Close">✕</button></div>'+
+      '<label class="finance-log-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
+      '<div class="finance-log-cats" role="group" aria-label="Transaction category">'+
+        categories.map((item)=>'<button type="button" class="finance-log-cat finance-log-tone-'+item.tone+' '+(state.category===item.key?'on':'')+'" data-fin-log-cat="'+item.key+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')+
+      '</div>'+
+      '<label class="finance-log-name '+(tone?'finance-log-name-'+tone:'')+'"><span>'+(state.category==='income'?'Income name':'Transaction name')+'</span><input id="financeLogName" maxlength="100" placeholder="'+(state.category==='income'?'e.g. Salary':'e.g. Rent, Spotify, Groceries')+'" value="'+esc(state.name)+'"></label>'+
+      '<button type="button" class="finance-log-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span>'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><i aria-hidden="true">'+(state.more?'⌃':'⌄')+'</i></button>'+
+      '<div class="finance-log-more" '+(state.more?'':'hidden')+'><label><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'+
+      '<p class="finance-log-hint '+(state.error?'is-error':'')+'">'+esc(state.error)+'</p>'+
+      '<button type="button" class="finance-log-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button>';
+
+    const amountInput=sheet.querySelector('#financeLogAmount');
+    amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';render();});
+    const nameInput=sheet.querySelector('#financeLogName');
+    nameInput?.addEventListener('input',(e)=>{state.name=e.target.value;state.error='';});
+    sheet.querySelector('#financeLogDate')?.addEventListener('change',(e)=>{state.date=normalizeFinanceDate(e.target.value,rec.month);render();});
+  }
+
+  layer.addEventListener('click',async(e)=>{
+    const button=e.target.closest('button');
+    if (!button) return;
+    if (button.hasAttribute('data-fin-log-close')) { closeFinanceTransactionSheet(); return; }
+    if (button.dataset.finLogCat) {
+      state.category=button.dataset.finLogCat;
+      state.error='';
+      render();
+      setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
+      return;
+    }
+    if (button.hasAttribute('data-fin-log-more')) { state.more=!state.more; render(); return; }
+    if (button.hasAttribute('data-fin-log-save')) {
+      if (!valid()||state.busy) return;
+      state.busy=true; state.error=''; render();
+      const next=cloneRecord(rec);
+      if (state.category==='income') {
+        next.incomes=[...(next.incomes||[]),{name:state.name.trim(),amount:amount(),date:state.date}];
+      } else {
+        next.expenses=[...(next.expenses||[]),{group:financeGroupForTone(state.category,state.name),name:state.name.trim(),amount:amount(),date:state.date}];
+      }
+      if (!recordFor(rec.month)) next.partialOnly=true;
+      try {
+        closeFinanceTransactionSheet();
+        await saveDirectMonthRecord(next,state.category==='income'?'Income added':'Expense added');
+      } catch(err) {
+        state.busy=false;
+        state.error=err?.message||'Could not save this transaction.';
+        document.body.classList.add('finance-log-locked');
+        if (!layer.isConnected) document.body.appendChild(layer);
+        render();
+      }
+    }
+  });
+  layer.querySelector('.finance-log-backdrop').addEventListener('click',closeFinanceTransactionSheet);
+  layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeFinanceTransactionSheet();});
+  render();
+  setTimeout(()=>sheet.querySelector('#financeLogAmount')?.focus(),0);
+}
+
 function financeMonthToneIcon(tone, kind = 'expense') {
   if (kind === 'income') return '€';
   return { fixed:'⌂', medical:'✚', subscriptions:'▣', budgets:'◌', wealth:'◇', other:'•' }[tone] || '•';
@@ -671,7 +803,8 @@ function renderDetail(rec) {
     ? '<div class="finance-month-alert is-bad">⚠ '+money(c.extraOver)+' spent beyond this month’s Extra budget.</div>' : '';
   const debtStatus = rules.extraTracking && carry.debt > 0
     ? '<div class="finance-month-alert">You still owe yourself '+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+'.</div>' : '';
-  const status = rec.finalized ? 'Locked' : 'Draft';
+  const stored = recordFor(rec.month);
+  const status = rec.finalized ? 'Locked' : stored ? 'Draft' : 'Not logged';
 
   showMini(
     '<div class="finance-month-detail-window">'+
@@ -693,7 +826,7 @@ function renderDetail(rec) {
       (expenseRows ? '<section class="finance-month-list"><h3>Monthly outflow</h3>'+expenseRows+'</section>' : '')+
       (!incomeRows && !expenseRows ? '<div class="finance-month-empty">Nothing logged for this month yet.</div>' : '')+
       (!rec.finalized
-        ? '<div class="finance-month-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'
+        ? '<div class="finance-month-actions"><button class="btn primary finance-month-add" type="button" data-fin-add-transaction>＋ Add transaction</button><button class="btn ghost" type="button" data-fin-finalize-existing>Confirm month</button></div>'
         : '<div class="finance-month-locked">✓ This month is locked</div>')+
     '</div>',
     'month-detail'
@@ -701,7 +834,7 @@ function renderDetail(rec) {
 
   const modalBody = $('#financeMiniBody');
   $('[data-fin-month-close]', modalBody)?.addEventListener('click', closeMini);
-  $('[data-fin-edit]', modalBody)?.addEventListener('click', () => { closeMini(); startEdit(rec); });
+  $('[data-fin-add-transaction]', modalBody)?.addEventListener('click', () => openFinanceTransactionSheet(rec));
   $('[data-fin-finalize-existing]', modalBody)?.addEventListener('click', () => confirmExistingMonth(rec));
 }
 
@@ -1386,14 +1519,13 @@ async function saveMonth(finalize = false) {
 function init() {
   const tab = $('.tab[data-sheet="finances"]'); if (!tab) return;
   ensureMiniModal();
-  tab.addEventListener('click', () => { renderWizard(); renderPage(); setTimeout(loadState, 50); });
-  $('#restartFinanceWizard')?.addEventListener('click', resetWizard);
+  tab.addEventListener('click', () => { renderPage(); setTimeout(loadState, 50); });
   $('#financeManageRecurring')?.addEventListener('click', openRecurringManager);
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });
-  const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderWizard(); renderPage(); setTimeout(loadState, 40); } });
+  const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderPage(); setTimeout(loadState, 40); } });
   obs.observe(document.body, { attributes: true, attributeFilter: ['data-actor'] });
-  renderWizard(); renderPage();
+  renderPage();
 }
 
 document.addEventListener('DOMContentLoaded', init);
