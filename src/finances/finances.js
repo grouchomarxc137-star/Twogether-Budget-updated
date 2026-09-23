@@ -798,7 +798,6 @@ function openRecurringEditor(kind,index) {
           '<label class="tv2-field tv2-date-field"><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
         '</section>'+
         '<div class="finance-recurring-editor-actions">'+
-          (item?'<button type="button" class="tv2-btn finance-recurring-remove" data-fin-recurring-delete>Remove</button>':'<span></span>')+
           '<button type="button" class="tv2-primary" data-fin-recurring-save>Save</button>'+
         '</div>'+
       '</div>'+
@@ -827,15 +826,6 @@ function openRecurringEditor(kind,index) {
     await saveProfile(next,'Recurring item saved');
   });
 
-  $('[data-fin-recurring-delete]')?.addEventListener('click',async()=>{
-    const next=profile();
-    const nextConfig=recurringConfig();
-    nextConfig.custom=true;
-    const target=isExpense?nextConfig.expenses:nextConfig.incomes;
-    target.splice(index,1);
-    next.recurring=nextConfig;
-    await saveProfile(next,'Recurring item removed');
-  });
 }
 
 function openScenarioModal(index) {
