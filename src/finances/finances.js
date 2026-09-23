@@ -603,19 +603,104 @@ function openScenarioModal(index) {
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.scenarios.splice(index, 1); saveProfile(next, 'Scenario removed'); });
 }
 
+function financeMonthToneIcon(tone, kind = 'expense') {
+  if (kind === 'income') return '€';
+  return { fixed:'⌂', medical:'✚', subscriptions:'▣', budgets:'◌', wealth:'◇', other:'•' }[tone] || '•';
+}
+
+function financeMonthIncomeRows(rec) {
+  return (rec.incomes || []).map((item) => {
+    const date = financeDateLabel(item.date);
+    const meta = ['Income', date].filter(Boolean).join(' · ');
+    return '<div class="finance-month-row is-income">'+
+      '<span class="finance-month-row-icon" aria-hidden="true">'+financeMonthToneIcon('income','income')+'</span>'+
+      '<span class="finance-month-row-main"><strong>'+esc(item.name || 'Income')+'</strong><small>'+esc(meta)+'</small></span>'+
+      '<b>'+money(item.amount)+'</b>'+
+    '</div>';
+  }).join('');
+}
+
+function financeMonthExpenseRows(rec) {
+  const rows = (rec.expenses || []).map((item,index) => ({
+    ...item,
+    index,
+    group: normalizeGroup(item.group),
+    tone: groupTone(item.group),
+    isExtraSpend:false,
+  }));
+  extraSpendSummary({ extraSpends: rec.extraSpends || [] }).forEach((item) => {
+    const savedUpOnly = actor() === 'Principe' && item.source === 'savings';
+    rows.push({
+      group:savedUpOnly ? 'savings' : 'extra',
+      tone:savedUpOnly ? 'wealth' : 'budgets',
+      name:extraSourceLabel(item.source),
+      amount:item.amount,
+      date:'',
+      isExtraSpend:true,
+    });
+  });
+  const order = categoryOrder();
+  rows.sort((a,b) => {
+    const ai=order.indexOf(a.tone), bi=order.indexOf(b.tone);
+    if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    return 0;
+  });
+  return rows.map((item) => {
+    const date = financeDateLabel(item.date);
+    const meta = [categoryLabel(item.tone), date].filter(Boolean).join(' · ');
+    return '<div class="finance-month-row finance-tone-row-'+item.tone+'">'+
+      '<span class="finance-month-row-icon" aria-hidden="true">'+financeMonthToneIcon(item.tone)+'</span>'+
+      '<span class="finance-month-row-main"><strong>'+esc(item.name || groupLabel(item.group))+'</strong><small>'+esc(meta)+'</small></span>'+
+      '<b>'+money(item.amount)+'</b>'+
+    '</div>';
+  }).join('');
+}
+
 function renderDetail(rec) {
   if (!rec) return;
   const legacyRoot = $('#financeDetail');
   if (legacyRoot) legacyRoot.innerHTML = '';
+
   const rules = financeRules();
-  const c = calc(rec), gl = rules.investmentTracking ? investmentGL(rec) : null, carry = extraCarryInfo(rec.month);
-  const expenses = groupedExpenseHtml(rec.expenses || [], false, rec.extraSpends || []);
-  const incomes = (rec.incomes || []).map((x) => `<div class="finance-breakdown-row"><span>${esc(x.name)}${financeDateMeta(x.date)}</span><strong>${money(x.amount)}</strong></div>`).join('');
-  const extraStatus = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
-  const debtStatus = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
-  const investmentBlock = rules.investmentTracking && c.investmentTotal != null ? `<div class="finance-review-section"><h3>Investment snapshot</h3><div class="finance-breakdown-row finance-tone-wealth"><span>Total investment account</span><strong>${money(c.investmentTotal)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div><div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div>` : '';
-  showMini(`<div class="finance-month-detail-window"><div class="finance-detail-head"><div><span class="panel-kicker">${esc(actor())}</span><h2>${esc(monthLabel(rec.month))}</h2></div>${rec.finalized ? '<span class="finance-final-badge">Locked</span>' : '<div class="finance-detail-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'}</div><div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraStatus}${debtStatus}${incomes ? `<div class="finance-review-section"><h3>Income</h3>${incomes}</div>` : ''}${expenses ? `<div class="finance-review-section"><h3>Monthly outflow</h3>${expenses}</div>` : ''}${investmentBlock}</div>`);
+  const c = calc(rec), carry = extraCarryInfo(rec.month);
+  const incomeRows = financeMonthIncomeRows(rec);
+  const expenseRows = financeMonthExpenseRows(rec);
+  const leftoverNegative = c.leftover < 0;
+  const progress = c.income > 0 ? Math.min(100, Math.max(0, (c.outflow / c.income) * 100)) : 0;
+  const extraStatus = rules.extraTracking && c.extraOver > 0
+    ? '<div class="finance-month-alert is-bad">⚠ '+money(c.extraOver)+' spent beyond this month’s Extra budget.</div>' : '';
+  const debtStatus = rules.extraTracking && carry.debt > 0
+    ? '<div class="finance-month-alert">You still owe yourself '+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+'.</div>' : '';
+  const status = rec.finalized ? 'Locked' : 'Draft';
+
+  showMini(
+    '<div class="finance-month-detail-window">'+
+      '<header class="finance-month-trip-head">'+
+        '<div class="finance-month-trip-nav"><button type="button" class="finance-month-back" data-fin-month-close>‹ 2026</button></div>'+
+        '<h2>'+esc(monthLabel(rec.month))+'</h2>'+
+        '<p>'+esc(actor())+' · '+status+'</p>'+
+      '</header>'+
+      '<section class="finance-month-money '+(leftoverNegative?'is-over':'')+'">'+
+        '<div class="finance-month-figs">'+
+          '<div><span>Total income</span><strong>'+money(c.income)+'</strong></div>'+
+          '<div><span>Total outflow</span><strong>'+money(c.outflow)+'</strong></div>'+
+        '</div>'+
+        (c.income > 0 ? '<div class="finance-month-progress"><i style="width:'+progress.toFixed(1)+'%"></i></div>' : '')+
+        '<div class="finance-month-left"><strong>'+money(Math.abs(c.leftover))+'</strong><span>'+(leftoverNegative?'overspent':'leftover')+'</span></div>'+
+      '</section>'+
+      extraStatus+debtStatus+
+      (incomeRows ? '<section class="finance-month-list"><h3>Income</h3>'+incomeRows+'</section>' : '')+
+      (expenseRows ? '<section class="finance-month-list"><h3>Monthly outflow</h3>'+expenseRows+'</section>' : '')+
+      (!incomeRows && !expenseRows ? '<div class="finance-month-empty">Nothing logged for this month yet.</div>' : '')+
+      (!rec.finalized
+        ? '<div class="finance-month-actions"><button class="btn ghost" type="button" data-fin-edit>Edit draft</button><button class="btn primary" type="button" data-fin-finalize-existing>Confirm month</button></div>'
+        : '<div class="finance-month-locked">✓ This month is locked</div>')+
+    '</div>',
+    'month-detail'
+  );
+
   const modalBody = $('#financeMiniBody');
+  $('[data-fin-month-close]', modalBody)?.addEventListener('click', closeMini);
   $('[data-fin-edit]', modalBody)?.addEventListener('click', () => { closeMini(); startEdit(rec); });
   $('[data-fin-finalize-existing]', modalBody)?.addEventListener('click', () => confirmExistingMonth(rec));
 }
@@ -628,8 +713,19 @@ function ensureMiniModal() {
   document.body.appendChild(modal);
   $$('[data-fin-mini-close]', modal).forEach((el) => el.addEventListener('click', closeMini));
 }
-function showMini(html) { ensureMiniModal(); $('#financeMiniBody').innerHTML = html; $('#financeMiniModal').classList.add('show'); $('#financeMiniModal').setAttribute('aria-hidden', 'false'); }
-function closeMini() { const modal = $('#financeMiniModal'); modal?.classList.remove('show'); modal?.setAttribute('aria-hidden', 'true'); }
+function showMini(html, mode = '') {
+  ensureMiniModal();
+  const modal = $('#financeMiniModal');
+  $('#financeMiniBody').innerHTML = html;
+  modal.classList.toggle('is-month-detail', mode === 'month-detail');
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden', 'false');
+}
+function closeMini() {
+  const modal = $('#financeMiniModal');
+  modal?.classList.remove('show','is-month-detail');
+  modal?.setAttribute('aria-hidden', 'true');
+}
 
 async function saveProfile(next, message = 'Balances updated') {
   const a = actor(); if (!a) return;
