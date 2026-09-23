@@ -89,7 +89,7 @@ function ensureCurrentTrips() {
         section.querySelector('[data-act="save-my-budget"]')?.click();
         return;
       }
-      if (e.target.closest('[data-act="add-my-budget"], [data-act="save-my-budget"], [data-act="cancel-budget-editor"]')) return;
+      if (e.target.closest('[data-act="add-my-budget"], [data-act="edit-my-budget"], [data-act="save-my-budget"], [data-act="cancel-budget-editor"]')) return;
       const card = e.target.closest('[data-act="toggle-budget-view"]');
       if (!card || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
@@ -295,7 +295,7 @@ function simplifiedTrip(plan, trip) {
   const personalClass = personal ? ' is-personal '+(me === 'Principe' ? 'is-principe' : 'is-principessa') : '';
   const budgetLabel = 'Available';
   return '<div class="tv2-page">'+
-    '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>'+
+    '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button>'+(ownBudget != null?'<button class="tv2-link" data-act="edit-my-budget">Edit my budget</button>':'<span></span>')+'</div>'+
       '<h1>'+esc(meta.city || locationLabel(meta))+'</h1><p>'+esc(shortRange(meta.start,meta.end))+(statusLine(meta)?' · '+esc(statusLine(meta)):'')+'</p></header>'+
     '<section class="tv2-money'+personalClass+'" data-act="toggle-budget-view" role="button" tabindex="0" aria-label="'+(personal?'Show combined trip budget':'Show your personal trip budget')+'"><div class="tv2-figs">'+
       '<div class="tv2-fig"><span>'+budgetLabel+'</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!personal&&!has(plan?.budgets?.[me])?'<button type="button" class="tv2-nudge" data-act="add-my-budget">+ add yours</button>':'')+'</div>'+
@@ -311,16 +311,17 @@ function simplifiedTrip(plan, trip) {
 }
 function simplifiedPersonalBudgetEditor(plan) {
   const me = actor(), meta = plan?.meta || {};
+  const existing = has(plan?.budgets?.[me]), value = existing ? String(plan.budgets[me]) : '';
   return '<div class="tv2-page tv2-budget-edit-page">'+
     '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="cancel-budget-editor">‹ '+esc(meta.city || 'Trip')+'</button></div>'+
-      '<h1>Add my budget</h1><p>'+esc(shortRange(meta.start,meta.end))+' · Only your personal trip budget</p></header>'+
+      '<h1>'+(existing?'Edit my budget':'Add my budget')+'</h1><p>'+esc(shortRange(meta.start,meta.end))+' · Only your personal trip budget</p></header>'+
     '<section class="tv2-budget-editor-card">'+
       '<label class="tv2-budget-editor-label" for="tv2PersonalBudgetInput">How much do you want available for this trip?</label>'+
-      '<div class="tv2-budget-editor-amount"><span aria-hidden="true">€</span><input id="tv2PersonalBudgetInput" data-personal-budget-input inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Your personal trip budget"></div>'+
+      '<div class="tv2-budget-editor-amount"><span aria-hidden="true">€</span><input id="tv2PersonalBudgetInput" data-personal-budget-input inputmode="decimal" autocomplete="off" placeholder="0" value="'+esc(value)+'" aria-label="Your personal trip budget"></div>'+
       '<p class="tv2-budget-editor-help">This is your own budget. '+esc(me === 'Principessa' ? 'Principe' : 'Principessa')+' keeps their own separately.</p>'+
       '<p class="tv2-budget-editor-error" data-budget-error aria-live="polite"></p>'+
     '</section>'+
-    '<button type="button" class="tv2-primary tv2-budget-editor-save" data-act="save-my-budget">Save my budget</button>'+
+    '<button type="button" class="tv2-primary tv2-budget-editor-save" data-act="save-my-budget">'+(existing?'Update my budget':'Save my budget')+'</button>'+
   '</div>';
 }
 
@@ -1252,7 +1253,7 @@ async function handleSimplifiedClick(e) {
     return;
   }
   const plan = (remoteState?.plans || []).find((p)=>p.id===simplifiedView.planId); if (!plan) return;
-  if (b.dataset.act === 'add-my-budget') {
+  if (b.dataset.act === 'add-my-budget' || b.dataset.act === 'edit-my-budget') {
     e.preventDefault();
     e.stopPropagation();
     simplifiedView.budgetEditor = true;
@@ -1276,6 +1277,7 @@ async function handleSimplifiedClick(e) {
       input?.focus();
       return;
     }
+    const editing = has(plan?.budgets?.[actor()]);
     b.disabled = true;
     b.textContent = 'Saving…';
     if (error) error.textContent = '';
@@ -1283,10 +1285,10 @@ async function handleSimplifiedClick(e) {
       await window.TwogetherAPI.post('savePlan',{id:plan.id,budget:value},actor());
       simplifiedView.budgetEditor = false;
       await refreshState(true);
-      simplifiedSnack('Your trip budget was added');
+      simplifiedSnack(editing ? 'Your trip budget was updated' : 'Your trip budget was added');
     } catch (err) {
       b.disabled = false;
-      b.textContent = 'Save my budget';
+      b.textContent = editing ? 'Update my budget' : 'Save my budget';
       if (error) error.textContent = err?.message || 'Could not save your budget.';
     }
     return;
@@ -1296,7 +1298,7 @@ async function handleSimplifiedClick(e) {
     renderCurrentTrips();
     return;
   }
-  if (b.dataset.act === 'budgets' || b.dataset.act === 'edit-trip') { window.TwogetherWorkflow?.budget(plan.id); return; }
+  if (b.dataset.act === 'budgets') { window.TwogetherWorkflow?.budget(plan.id); return; }
   if (b.dataset.act === 'confirm-trip') {
     if (tripPhase(plan.meta) !== 'past' || b.disabled) return;
     const other = actor() === 'Principessa' ? 'Principe' : 'Principessa';
