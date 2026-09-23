@@ -3652,3 +3652,29 @@ dialog.finance-log-host .tv2-sheet {
   -webkit-overflow-scrolling:touch;
   touch-action:pan-y;
 }
+
+
+/* Keep the finance delete confirmation in the top layer above the month dialog. */
+dialog.finance-month-delete-confirm-host {
+  box-sizing:border-box!important;
+  width:100vw!important;
+  max-width:none!important;
+  height:100dvh!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  inset:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+}
+
+dialog.finance-month-delete-confirm-host::backdrop {
+  background:transparent!important;
+}
+
+dialog.finance-month-delete-confirm-host .tv2-confirm-layer {
+  position:absolute;
+  inset:0;
+}
