@@ -3628,7 +3628,27 @@ dialog.finance-log-host .tv2-sheet {
     font:inherit;
   }
 
-  .finance-month-overview .overview-trip-dock {
-    touch-action:pan-x;
-  }
+}
+
+
+/* Lock the page behind the Log finance Trips-style sheet. */
+html.finance-log-locked,
+body.finance-log-locked {
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+
+body.finance-log-locked .finance-month-overview .overview-trip-shell {
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+
+dialog.finance-log-host {
+  overscroll-behavior:none!important;
+}
+
+dialog.finance-log-host .tv2-sheet {
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
 }
