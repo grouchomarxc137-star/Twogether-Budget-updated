@@ -406,7 +406,15 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     overflow-x:hidden;
     touch-action:pan-y;
   }
+  #twCurrentTrips.tv2-root.tv2-trip-view{
+    will-change:transform,opacity;
+    backface-visibility:hidden;
+  }
   #twCurrentTrips.tv2-root.tv2-trip-view>.tv2-page{
+    will-change:transform,opacity;
+    backface-visibility:hidden;
+  }
+  .tv2-checklist-sheet{
     will-change:transform,opacity;
     backface-visibility:hidden;
   }
