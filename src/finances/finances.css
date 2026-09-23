@@ -1213,27 +1213,28 @@ body.finance-month-focus {
   color:var(--tv2-faint);
   font-size:18px;
 }
-.finance-recurring-amount input {
+.finance-recurring-amount:focus-within {
+  border-color:var(--tv2-primary);
+}
+
+.finance-recurring-amount input,
+.finance-recurring-amount input:focus,
+.finance-recurring-amount input:focus-visible {
   flex:1;
   min-width:0;
   border:0!important;
+  border-radius:0!important;
   padding:0!important;
   background:transparent!important;
-  outline:0;
+  outline:none!important;
+  box-shadow:none!important;
   font-size:18px!important;
 }
 .finance-recurring-editor-actions {
   display:grid;
-  grid-template-columns:auto minmax(0,1fr);
+  grid-template-columns:1fr;
   gap:10px;
   align-items:center;
-}
-.finance-recurring-editor-actions>span {
-  display:block;
-}
-.finance-recurring-remove {
-  color:var(--tv2-over)!important;
-  border-color:#efcfc6!important;
 }
 @media(max-width:760px) {
   .finance-mini-modal.is-recurring-manager {
