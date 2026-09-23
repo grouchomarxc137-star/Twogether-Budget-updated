@@ -8,6 +8,7 @@ import { $, $$ } from '../lib/dom.js';
 import { esc, n, money, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
+import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 
 const MONTHS = [
   ['2026-01', 'Jan 2026'], ['2026-02', 'Feb 2026'], ['2026-03', 'Mar 2026'], ['2026-04', 'Apr 2026'],
@@ -1045,19 +1046,29 @@ function openFinanceTransactionSheet(rec, edit = null) {
       ? categories.map((item)=>categoryTile(item,false)).join('')
       : categoryTile(category,true)+items.map((item,index)=>itemTile(item,index,category)).join('');
 
-    sheet.innerHTML=
-      '<div class="tv2-sheet-head"><h2>'+esc(title())+'</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
-      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-      '<div class="tv2-cats finance-log-categories '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+tiles+'</div>'+
-      (isOther()
+    sheet.innerHTML=tripSheetHtml({
+      title:title(),
+      closeAttr:'data-fin-log-close',
+      amountId:'financeLogAmount',
+      amountValue:state.amountText,
+      categoriesHtml:tiles,
+      categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
+      categoriesLabel:drillDown?'Items':'Category',
+      afterCategoriesHtml:isOther()
         ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
-        : '')+
-      (hasChosenItem()
-        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-          '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
-        : '')+
-      '<p class="tv2-hint '+(state.error?'is-error':'')+'" data-fin-log-hint aria-live="polite"></p>'+
-      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!canSave()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':editingItem?'Save changes':'Save')+'</button>';
+        : '',
+      defaultsHtml:hasChosenItem()
+        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'
+        : '',
+      moreHtml:hasChosenItem()
+        ? '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
+        : '',
+      hintAttr:'data-fin-log-hint',
+      hintClass:state.error?'is-error':'',
+      saveAttr:'data-fin-log-save',
+      saveLabel:state.busy?'Saving…':editingItem?'Save changes':'Save',
+      saveDisabled:!canSave()||state.busy,
+    });
 
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',()=>{
@@ -1236,25 +1247,31 @@ function financeMonthTimeline(rec) {
     });
   });
   rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || a.kind.localeCompare(b.kind));
-  if (!rows.length) return '<p class="overview-trip-empty">No finances yet. Add them as they happen, it takes a few seconds.</p>';
-  const groups=new Map();
-  rows.forEach((row)=>{const key=row.date||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);});
-  return [...groups.entries()].map(([date,items])=>
-    '<section class="overview-trip-day"><h3>'+esc(financeMonthDayLabel(date))+'</h3>'+
-      items.map((row)=>{
-        const item=row.item;
-        const income=row.kind==='income';
-        const tone=income?'income':row.tone;
-        const meta=income?'Income':categoryLabel(tone);
-        const editable=row.kind!=='summary';
-        return '<button type="button" class="overview-trip-expense finance-month-entry" '+(editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'disabled')+'>'+
-          '<span class="overview-trip-expense-icon finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,income?'income':'expense')+'</span>'+
-          '<span class="overview-trip-expense-copy"><strong>'+esc(item.name||(income?'Income':groupLabel(item.group)))+'</strong><small>'+esc(meta)+'</small></span>'+
-          '<b class="'+(income?'finance-tv2-income-amt':'')+'">'+money(item.amount)+'</b>'+
-        '</button>';
-      }).join('')+
-    '</section>'
-  ).join('');
+
+  const grouped=new Map();
+  rows.forEach((row)=>{const key=row.date||'';if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(row);});
+  const groups=[...grouped.entries()].map(([date,items])=>({label:financeMonthDayLabel(date),items}));
+
+  return tripTimelineHtml(groups,{
+    emptyText:'No finances yet. Add them as they happen, it takes a few seconds.',
+    rowHtml:(row)=>{
+      const item=row.item;
+      const income=row.kind==='income';
+      const tone=income?'income':row.tone;
+      const meta=income?'Income':categoryLabel(tone);
+      const editable=row.kind!=='summary';
+      return tripExpenseRowHtml({
+        attr:editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
+        disabled:!editable,
+        icon:financeMonthToneIcon(tone,income?'income':'expense'),
+        iconClass:'finance-tv2-tone-'+tone,
+        title:item.name||(income?'Income':groupLabel(item.group)),
+        meta,
+        amount:money(item.amount),
+        amountClass:income?'finance-tv2-income-amt':'',
+      });
+    },
+  });
 }
 
 function closeFinanceMonthDialog() {
@@ -1270,41 +1287,40 @@ function renderDetail(rec) {
   if ($('#financeMiniModal')?.classList.contains('is-month-detail')) closeMini();
 
   const rules=financeRules();
-  const c=calc(rec), carry=extraCarryInfo(rec.month);
-  const over=c.leftover<0;
-  const progress=c.income>0?Math.min(100,Math.max(0,(c.outflow/c.income)*100)):0;
+  const totals=calc(rec), carry=extraCarryInfo(rec.month);
+  const over=totals.leftover<0;
+  const progress=totals.income>0?Math.min(100,Math.max(0,(totals.outflow/totals.income)*100)):null;
   const stored=recordFor(rec.month);
   const status=rec.finalized?'Locked':stored?'Draft':'Not logged';
   const year=String(rec.month||'').slice(0,4)||String(financeViewYear);
-  const confirmControl=stored&&!rec.finalized
-    ? '<button type="button" data-fin-finalize-existing>Confirm</button>'
-    : '<span></span>';
-  const extraNote=rules.extraTracking&&c.extraOver>0
-    ? '<div class="overview-trip-balance is-debtor finance-month-note"><span>Extra budget exceeded · '+money(c.extraOver)+' over</span></div>' : '';
-  const carryNote=rules.extraTracking&&carry.debt>0
-    ? '<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>' : '';
+  const right=stored&&!rec.finalized
+    ? {attr:'data-fin-finalize-existing',label:'Confirm'}
+    : null;
+  const notes=[];
+  if(rules.extraTracking&&totals.extraOver>0){
+    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>Extra budget exceeded · '+money(totals.extraOver)+' over</span></div>');
+  }
+  if(rules.extraTracking&&carry.debt>0){
+    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>');
+  }
 
   financeMonthDialog=document.createElement('dialog');
   financeMonthDialog.className='current-overview current-overview-trip finance-month-overview';
-  financeMonthDialog.innerHTML=
-    '<div class="overview-trip-shell">'+
-      '<header class="overview-trip-head">'+
-        '<div class="overview-trip-nav"><button type="button" data-fin-month-close>‹ '+esc(year)+'</button>'+confirmControl+'</div>'+
-        '<h2>'+esc(monthLabel(rec.month))+'</h2>'+
-        '<p>'+esc(actor())+' · '+esc(status)+'</p>'+
-      '</header>'+
-      '<section class="overview-trip-money">'+
-        '<div class="overview-trip-figures">'+
-          '<div><span>Total income</span><strong>'+money(c.income)+'</strong></div>'+
-          '<div><span>Total outflow</span><strong>'+money(c.outflow)+'</strong></div>'+
-        '</div>'+
-        (c.income>0?'<span class="overview-trip-progress"><i style="width:'+progress.toFixed(1)+'%"></i></span>':'')+
-        '<div class="overview-trip-left '+(over?'over':'')+'"><strong>'+money(Math.abs(c.leftover))+'</strong><span>'+(over?'overspent':'leftover')+'</span></div>'+
-      '</section>'+
-      extraNote+carryNote+
-      '<div class="overview-trip-list">'+financeMonthTimeline(rec)+'</div>'+
-      (!rec.finalized?'<div class="overview-trip-dock"><button type="button" data-fin-add-transaction>＋ Log finance</button></div>':'')+
-    '</div>';
+  financeMonthDialog.innerHTML=tripDetailShellHtml({
+    back:{attr:'data-fin-month-close',label:'‹ '+year},
+    right,
+    title:monthLabel(rec.month),
+    subtitle:actor()+' · '+status,
+    moneyHtml:tripDetailMoneyHtml({
+      first:{label:'Total income',value:money(totals.income)},
+      second:{label:'Total outflow',value:money(totals.outflow)},
+      progress,
+      summary:{value:money(Math.abs(totals.leftover)),label:over?'overspent':'leftover',over},
+    }),
+    middleHtml:notes.join(''),
+    listHtml:financeMonthTimeline(rec),
+    dock:rec.finalized?null:{attr:'data-fin-add-transaction',label:'＋ Log finance'},
+  });
 
   document.body.appendChild(financeMonthDialog);
   financeMonthDialog.showModal();
