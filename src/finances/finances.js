@@ -467,13 +467,19 @@ function renderPage() {
 
   const root = $('#financeMonths'); if (!root) return;
   root.innerHTML = MONTHS.map(([key, label]) => {
-    const rec = recordFor(key), c = calc(rec || {}), gl = rec ? investmentGL(rec) : null;
-    const statusClass = rec ? (rec.finalized ? 'status-final' : 'status-draft') : 'status-empty';
-    const extraWarn = rec && c.extraOver > 0 ? `<em class="finance-warning">⚠ Extra ${money(c.extraOver)} over</em>` : '';
-    const glText = gl ? `<em class="finance-month-gl ${gl.value < 0 ? 'down' : 'up'}">${gl.value < 0 ? '▼' : '▲'} ${money(Math.abs(gl.value))}</em>` : '';
-    return `<button class="finance-month ${rec ? 'saved' : ''} ${statusClass} ${key === '2026-09' ? 'current' : ''}" type="button" data-fin-month="${key}"><span>${esc(label)}</span><strong>${rec ? money(c.leftover) : 'Not logged'}</strong><small>${rec ? `${money(c.income)} in · ${money(c.outflow)} out` : 'Tap to start'}</small>${extraWarn}${glText}</button>`;
+    const rec = recordFor(key), c = calc(rec || {});
+    const current = key === '2026-09';
+    const pillText = rec ? (rec.finalized ? 'Confirmed' : 'Draft') : (current ? 'Current' : 'Not logged');
+    const pillClass = rec?.finalized ? 'is-closed' : 'is-open';
+    const amountText = rec ? money(Math.abs(c.leftover)) : '—';
+    const amountLabel = rec ? (c.leftover < 0 ? 'over' : 'left') : 'Tap to start';
+    const meta = rec ? `${money(c.income)} in · ${money(c.outflow)} out` : 'No finances logged yet';
+    return `<button class="tv2-card finance-month-tv2-card ${rec ? '' : 'is-empty'}" type="button" data-fin-month="${key}">
+      <div class="tv2-card-top"><strong>${esc(label)}</strong><span class="tv2-pill ${pillClass}">${esc(pillText)}</span></div>
+      <div class="tv2-card-money"><span>${esc(meta)}</span><b class="${rec && c.leftover < 0 ? 'is-over' : ''}">${amountText} ${esc(amountLabel)}</b></div>
+    </button>`;
   }).join('');
-  $$('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectedMonth = btn.dataset.finMonth;
     renderDetail(directMonthRecord(selectedMonth));
   }));
