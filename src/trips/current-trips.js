@@ -250,6 +250,7 @@ function cardCountryEmoji(meta) {
 }
 function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
+  const over = item.left != null && item.left < 0;
   const name = item.meta?.city || locationLabel(item.meta);
   const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
@@ -258,8 +259,8 @@ function simplifiedCard(item) {
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
       '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
       '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
-      '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span>'+displayMoney(item.left)+' left</span>':'')+'</span>'+
-      (item.available && item.available > 0?'<span class="tv2-bar"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
+      '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span class="'+(over?'is-over':'')+'">'+displayMoney(item.left)+' left</span>':'')+'</span>'+
+      (item.available && item.available > 0?'<span class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
     '</button>'+
   '</div>';
 }

@@ -109,6 +109,8 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-card-top strong { font-size: 20px; font-weight: 650; }
 .tv2-card-top small, .tv2-card-sub { color: var(--tv2-muted); font-size: 14px; }
 .tv2-card-money { display: flex; justify-content: space-between; font-size: 15px; font-variant-numeric: tabular-nums; }
+.tv2-card-money .is-over { color: var(--tv2-over); font-weight: 600; }
+.tv2-card .tv2-bar.is-over i { background: var(--tv2-over); }
 
 /* ---- home groups: Now / Upcoming / Past ---- */
 .tv2-group { display: grid; gap: 10px; }
