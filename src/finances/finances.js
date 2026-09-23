@@ -988,10 +988,12 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const hasChosenItem=()=>!!state.selectedItemId || isOther();
   const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim();
 
-  const layer=document.createElement('div');
-  layer.className='tv2-layer finance-log-layer';
-  layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="dialog" aria-modal="true" aria-label="Log finance"></div>';
-  (financeMonthDialog || document.body).appendChild(layer);
+  const layer=document.createElement('dialog');
+  layer.className='tv2-layer finance-log-layer finance-log-host';
+  layer.setAttribute('aria-label','Log finance');
+  layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="document"></div>';
+  document.body.appendChild(layer);
+  layer.showModal();
   document.body.classList.add('tv2-locked');
   document.body.classList.add('trip-expense-open');
   const sheet=layer.querySelector('.finance-log-sheet');
@@ -1016,13 +1018,11 @@ function openFinanceTransactionSheet(rec, edit = null) {
   }
 
   function title() {
-    const selected=selectedCategory();
-    if (editingItem && !selected) return 'Edit finance';
-    return selected ? selected.label : (editingItem?'Edit finance':'Log finance');
+    return editingItem?'Edit finance':'Log finance';
   }
 
   function dateSummary() {
-    return state.date ? financeDateLabel(state.date) : 'Add date · optional';
+    return state.date ? 'Date · '+financeDateLabel(state.date) : 'Select date';
   }
 
   function hintText() {
@@ -1057,12 +1057,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
       afterCategoriesHtml:isOther()
         ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
         : '',
-      defaultsHtml:hasChosenItem()
-        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'
-        : '',
-      moreHtml:hasChosenItem()
-        ? '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
-        : '',
+      defaultsHtml:'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
+      moreHtml:'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
       hintClass:state.error?'is-error':'',
       saveAttr:'data-fin-log-save',
@@ -1200,7 +1196,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
       } catch(error) {
         state.busy=false;
         state.error=error?.message||'Could not save this item.';
-        if(!layer.isConnected) (financeMonthDialog || document.body).appendChild(layer);
+        if(!layer.isConnected) document.body.appendChild(layer);
+        if(!layer.open) layer.showModal();
         document.body.classList.add('tv2-locked');
         document.body.classList.add('trip-expense-open');
         render();
