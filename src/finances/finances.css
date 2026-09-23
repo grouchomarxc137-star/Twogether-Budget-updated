@@ -3395,3 +3395,148 @@ body.finance-month-focus {
     margin:0 28px!important;
   }
 }
+
+
+/* Trips logger parity: finance categories drill down in-place with category tint. */
+.finance-log-layer .finance-log-sheet {
+  transition:background .18s ease;
+}
+
+.finance-log-layer .finance-log-sheet-tone-income {
+  background:#eef7ee;
+}
+
+.finance-log-layer .finance-log-sheet-tone-fixed {
+  background:#f9efeb;
+}
+
+.finance-log-layer .finance-log-sheet-tone-medical {
+  background:#eef4fa;
+}
+
+.finance-log-layer .finance-log-sheet-tone-subscriptions {
+  background:#faeeee;
+}
+
+.finance-log-layer .finance-log-sheet-tone-budgets {
+  background:#f7f3e5;
+}
+
+.finance-log-layer .finance-log-sheet-tone-wealth {
+  background:#f1f6e9;
+}
+
+.finance-log-layer .finance-log-sheet-tone-other {
+  background:#f5f2ef;
+}
+
+.finance-log-layer .finance-log-categories.is-drilled {
+  align-items:stretch;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-income {
+  color:#4e7352!important;
+  background:#edf3df!important;
+  border-color:#d5dfbc!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-fixed {
+  color:#8b5c4f!important;
+  background:#f3e2dc!important;
+  border-color:#e3c7bc!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-medical {
+  color:#536f90!important;
+  background:#e7eef7!important;
+  border-color:#c9d8e9!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-subscriptions {
+  color:#945f66!important;
+  background:#f5e7e7!important;
+  border-color:#e8cccc!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-budgets {
+  color:#7c7048!important;
+  background:#eee9d5!important;
+  border-color:#ded4ad!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-wealth {
+  color:#64784a!important;
+  background:#edf3df!important;
+  border-color:#d5dfbc!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-other {
+  color:#6f655c!important;
+  background:#f3f0ec!important;
+  border-color:#e0d8d0!important;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-income.on {
+  border-color:#628261!important;
+  box-shadow:inset 0 0 0 1px #628261;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-fixed.on {
+  border-color:#b77e6e!important;
+  box-shadow:inset 0 0 0 1px #b77e6e;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-medical.on {
+  border-color:#7192b7!important;
+  box-shadow:inset 0 0 0 1px #7192b7;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-subscriptions.on {
+  border-color:#b77a82!important;
+  box-shadow:inset 0 0 0 1px #b77a82;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-budgets.on {
+  border-color:#9b8b52!important;
+  box-shadow:inset 0 0 0 1px #9b8b52;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-wealth.on {
+  border-color:#7c955b!important;
+  box-shadow:inset 0 0 0 1px #7c955b;
+}
+
+.finance-log-layer .tv2-cat.finance-tv2-tone-other.on {
+  border-color:#8c8178!important;
+  box-shadow:inset 0 0 0 1px #8c8178;
+}
+
+.finance-log-layer .finance-log-category.on {
+  position:relative;
+}
+
+.finance-log-layer .finance-log-category.on::after {
+  content:"↩";
+  position:absolute;
+  top:5px;
+  right:7px;
+  font-size:10px;
+  opacity:.58;
+}
+
+.finance-log-layer .finance-log-item {
+  min-width:0;
+  overflow:hidden;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.finance-log-layer .finance-log-name {
+  margin:0;
+}
+
+@media(max-width:760px) {
+  .finance-log-layer .tv2-cats {
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+}
