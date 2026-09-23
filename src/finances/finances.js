@@ -955,6 +955,7 @@ async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
 function openFinanceTransactionSheet(rec, edit = null) {
   if (!rec || rec.finalized) return;
   closeFinanceTransactionSheet();
+
   const categories=financeLogCategories(rec);
   const editingKind=edit?.kind==='income'?'income':edit?.kind==='expense'?'expense':'';
   const editingIndex=Number.isInteger(edit?.index)?edit.index:-1;
@@ -964,6 +965,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       ? (rec.expenses||[])[editingIndex]
       : null;
   const editingCategory=editingKind==='income'?'income':editingItem?groupTone(editingItem.group):'';
+
   const state={
     amountText:editingItem?String(n(editingItem.amount)):'',
     category:editingCategory,
@@ -974,18 +976,24 @@ function openFinanceTransactionSheet(rec, edit = null) {
     more:!!editingItem,
     busy:false,
     error:'',
+    mounted:false,
   };
-  const layer=document.createElement('div');
-  layer.className='finance-log-layer trip-expense-mode';
-  layer.innerHTML='<div class="finance-log-backdrop" data-fin-log-close></div><div class="trip-expense-workspace finance-expense-workspace" role="dialog" aria-modal="true" aria-label="Log finance"></div>';
-  document.body.appendChild(layer);
-  document.body.classList.add('trip-expense-open');
-  const sheet=layer.querySelector('.finance-expense-workspace');
+
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
-  const selectedCategory=()=>categories.find((item)=>item.key===state.category);
+  const selectedCategory=()=>categories.find((item)=>item.key===state.category)||null;
   const selectedItems=()=>financeRecurringItemsForCategory(state.category);
-  const valid=()=>validAmount()&&!!state.category&&!!state.name.trim();
+  const isOther=()=>state.category==='other';
+  const hasChosenItem=()=>!!state.selectedItemId || isOther();
+  const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim();
+
+  const layer=document.createElement('div');
+  layer.className='tv2-layer finance-log-layer';
+  layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="dialog" aria-modal="true" aria-label="Log finance"></div>';
+  (financeMonthDialog || document.body).appendChild(layer);
+  document.body.classList.add('tv2-locked');
+  document.body.classList.add('trip-expense-open');
+  const sheet=layer.querySelector('.finance-log-sheet');
 
   function resetToCategories() {
     state.category='';
@@ -997,101 +1005,141 @@ function openFinanceTransactionSheet(rec, edit = null) {
     state.error='';
   }
 
-  function refreshSave() {
-    const save=sheet.querySelector('[data-fin-log-save]');
-    if (save) save.disabled=!valid()||state.busy;
-    const hint=sheet.querySelector('.finance-log-hint');
-    if (hint) {
-      const noItems=state.category&&state.category!=='other'&&!selectedItems().length;
-      hint.textContent=state.error
-        || (noItems?'No items are set for this category in Manage recurring items.'
-          : state.amountText&&!validAmount()?'That amount doesn’t look right':'');
-      hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()));
-    }
+  function categoryTile(item,selected=false) {
+    return '<button type="button" class="tv2-cat finance-log-category finance-tv2-tone-'+item.tone+' '+(selected?'on':'')+'" data-fin-log-cat="'+item.key+'" aria-pressed="'+(selected?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>';
   }
 
-  function categoryButton(item, back=false) {
-    const attrs=back?'data-fin-log-cat-back':'data-fin-log-cat="'+item.key+'"';
-    return '<button type="button" class="finance-expense-category finance-tv2-tone-'+item.tone+' '+(back?'active finance-expense-mode-tile':'')+'" '+attrs+' aria-pressed="'+(back?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span><strong>'+esc(item.label)+'</strong></button>';
+  function itemTile(item,index,category) {
+    const selected=state.selectedItemId===String(item.id);
+    return '<button type="button" class="tv2-cat finance-log-item finance-tv2-tone-'+category.tone+' '+(selected?'on':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(selected?'true':'false')+'"><span aria-hidden="true">'+category.icon+'</span>'+esc(item.name)+'</button>';
   }
 
-  function itemButton(item,index,tone,icon) {
-    const active=state.selectedItemId===String(item.id);
-    return '<button type="button" class="finance-expense-category finance-expense-item finance-tv2-tone-'+tone+' '+(active?'active':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(active?'true':'false')+'"><span aria-hidden="true">'+icon+'</span><strong>'+esc(item.name)+'</strong></button>';
+  function title() {
+    const selected=selectedCategory();
+    if (editingItem && !selected) return 'Edit finance';
+    return selected ? selected.label : (editingItem?'Edit finance':'Log finance');
+  }
+
+  function dateSummary() {
+    return state.date ? financeDateLabel(state.date) : 'Add date · optional';
+  }
+
+  function hintText() {
+    if (state.error) return state.error;
+    if (state.amountText&&!validAmount()) return 'That amount doesn’t look right';
+    if (!validAmount()) return 'Enter the amount';
+    if (!state.category) return 'Pick a category';
+    if (!hasChosenItem()) return 'Pick an item';
+    if (!state.name.trim()) return 'Add a name';
+    return '';
   }
 
   function render() {
-    const selected=selectedCategory();
+    const category=selectedCategory();
     const items=selectedItems();
+    const drillDown=!!category;
     const bounds=financeDateBounds(rec.month);
-    const isOther=state.category==='other';
-    const drillDown=!!state.category;
-
-    const categoryHtml=!drillDown
-      ? categories.map((item)=>categoryButton(item,false)).join('')
-      : isOther
-        ? categoryButton(selected,true)
-        : categoryButton(selected,true)+items.map((item,index)=>itemButton(item,index,selected?.tone||'other',selected?.icon||'•')).join('');
-
-    const dateSummary=state.date?financeDateLabel(state.date):'Add date · optional';
-    const title=editingItem?'Edit finance':selected?esc(selected.label):'Log finance';
+    const tone=category?.tone||'';
+    sheet.className='tv2-sheet finance-log-sheet'+(tone?' finance-log-sheet-tone-'+tone:'');
+    const tiles=!drillDown
+      ? categories.map((item)=>categoryTile(item,false)).join('')
+      : categoryTile(category,true)+items.map((item,index)=>itemTile(item,index,category)).join('');
 
     sheet.innerHTML=
-      '<header class="trip-expense-head"><h2>'+title+'</h2><button type="button" class="trip-expense-done" data-fin-log-close aria-label="Close">×</button></header>'+
-      '<label class="trip-expense-amount trip-expense-amount-hero"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-      '<div class="trip-expense-categories finance-expense-categories '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+categoryHtml+'</div>'+
-      (isOther
-        ? '<div class="trip-expense-more-fields finance-expense-name-fields"><label>Expense name<input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label></div>'
+      '<div class="tv2-sheet-head"><h2>'+esc(title())+'</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
+      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
+      '<div class="tv2-cats finance-log-categories '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+tiles+'</div>'+
+      (isOther()
+        ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
         : '')+
-      ((state.selectedItemId || isOther)
-        ? '<button type="button" class="trip-expense-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="trip-expense-default-summary">'+esc(dateSummary)+'</span><span class="trip-expense-chevron" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-          '<div class="trip-expense-more-fields '+(state.more?'':'hidden')+'><label>Date<input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
+      (hasChosenItem()
+        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+          '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
         : '')+
-      '<p class="trip-expense-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
-      '<div class="trip-expense-actions">'+(editingItem?'<button type="button" class="btn ghost" data-fin-log-cancel-edit>Cancel edit</button>':'')+'<button type="button" class="btn primary big" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':editingItem?'Save changes':'Save')+'</button></div>';
+      '<p class="tv2-hint '+(state.error?'is-error':'')+'" data-fin-log-hint aria-live="polite"></p>'+
+      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!canSave()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':editingItem?'Save changes':'Save')+'</button>';
 
     const amountInput=sheet.querySelector('#financeLogAmount');
-    amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
-    amountInput?.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&valid()){e.preventDefault();sheet.querySelector('[data-fin-log-save]')?.click();}});
-    const nameInput=sheet.querySelector('#financeLogName');
-    nameInput?.addEventListener('input',(e)=>{state.name=e.target.value;state.error='';refreshSave();});
-    sheet.querySelector('#financeLogDate')?.addEventListener('change',(e)=>{state.date=normalizeFinanceDate(e.target.value,rec.month);render();});
-    refreshSave();
+    amountInput?.addEventListener('input',()=>{
+      state.amountText=amountInput.value;
+      state.error='';
+      refreshLive();
+    });
+    amountInput?.addEventListener('keydown',(event)=>{
+      if(event.key==='Enter'){
+        event.preventDefault();
+        if(canSave()) sheet.querySelector('[data-fin-log-save]')?.click();
+      }
+    });
+    sheet.querySelector('#financeLogName')?.addEventListener('input',(event)=>{
+      state.name=event.target.value;
+      state.error='';
+      refreshLive();
+    });
+    sheet.querySelector('#financeLogDate')?.addEventListener('change',(event)=>{
+      state.date=normalizeFinanceDate(event.target.value,rec.month);
+      refreshLive();
+    });
+
+    refreshLive();
+    if(!state.mounted){
+      state.mounted=true;
+      setTimeout(()=>amountInput?.focus(),0);
+    }
   }
 
-  layer.addEventListener('click',async(e)=>{
-    const button=e.target.closest('button');
-    if (!button) return;
-    if (button.hasAttribute('data-fin-log-close') || button.hasAttribute('data-fin-log-cancel-edit')) { closeFinanceTransactionSheet(); return; }
+  function refreshLive() {
+    const hint=sheet.querySelector('[data-fin-log-hint]');
+    if(hint){
+      hint.textContent=hintText();
+      hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()));
+    }
+    const save=sheet.querySelector('[data-fin-log-save]');
+    if(save){
+      save.disabled=!canSave()||state.busy;
+      save.textContent=state.busy?'Saving…':editingItem?'Save changes':'Save';
+    }
+    const summary=sheet.querySelector('.tv2-summary');
+    if(summary) summary.textContent=dateSummary();
+  }
 
-    if (button.hasAttribute('data-fin-log-cat-back')) {
-      resetToCategories();
-      render();
+  layer.addEventListener('click',async(event)=>{
+    const button=event.target.closest('button');
+    if(!button) return;
+
+    if(button.hasAttribute('data-fin-log-close')){
+      closeFinanceTransactionSheet();
       return;
     }
 
-    if (button.dataset.finLogCat) {
-      state.category=button.dataset.finLogCat;
+    if(button.dataset.finLogCat){
+      const clicked=button.dataset.finLogCat;
+      if(state.category===clicked){
+        resetToCategories();
+        render();
+        return;
+      }
+      state.category=clicked;
       state.selectedItemId='';
       state.name='';
-      state.group=state.category==='other'?'other':'';
+      state.group=clicked==='other'?'other':'';
       state.date='';
+      state.more=false;
       state.error='';
-      state.more=state.category==='other';
       render();
-      if (state.category==='other') setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
       return;
     }
 
-    if (button.dataset.finLogItem != null) {
+    if(button.dataset.finLogItem!=null){
       const items=selectedItems();
       const item=items[Number(button.dataset.finLogItem)];
-      if (!item) return;
+      if(!item) return;
       state.selectedItemId=String(item.id);
       state.name=item.name;
-      state.group=item.group;
+      state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
       state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
       state.date=financeDateForDay(rec.month,item.day);
+      state.more=false;
       state.error='';
       render();
       setTimeout(()=>{
@@ -1102,15 +1150,23 @@ function openFinanceTransactionSheet(rec, edit = null) {
       return;
     }
 
-    if (button.hasAttribute('data-fin-log-more')) { state.more=!state.more; render(); return; }
+    if(button.hasAttribute('data-fin-log-more')){
+      state.more=!state.more;
+      render();
+      return;
+    }
 
-    if (button.hasAttribute('data-fin-log-save')) {
-      if (!valid()||state.busy) return;
-      state.busy=true; state.error=''; render();
+    if(button.hasAttribute('data-fin-log-save')){
+      if(!canSave()||state.busy) return;
+      state.busy=true;
+      state.error='';
+      refreshLive();
+
       const next=cloneRecord(rec);
       next.incomes=[...(next.incomes||[])];
       next.expenses=[...(next.expenses||[])];
-      if (state.category==='income') {
+
+      if(state.category==='income'){
         const row={name:state.name.trim(),amount:amount(),date:state.date};
         if(editingKind==='income'&&editingIndex>=0) next.incomes[editingIndex]=row;
         else {
@@ -1118,32 +1174,37 @@ function openFinanceTransactionSheet(rec, edit = null) {
           next.incomes.push(row);
         }
       } else {
-        const row={group:state.group||'other',name:state.name.trim(),amount:amount(),date:state.date};
+        const row={group:state.group||financeGroupForTone(state.category,state.name),name:state.name.trim(),amount:amount(),date:state.date};
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
         else {
           if(editingKind==='income'&&editingIndex>=0) next.incomes.splice(editingIndex,1);
           next.expenses.push(row);
         }
       }
-      if (!recordFor(rec.month)) next.partialOnly=true;
+
+      if(!recordFor(rec.month)) next.partialOnly=true;
       try {
         closeFinanceTransactionSheet();
         await saveDirectMonthRecord(next,editingItem?'Finance updated':state.category==='income'?'Income added':'Expense added');
-      } catch(err) {
+      } catch(error) {
         state.busy=false;
-        state.error=err?.message||'Could not save this item.';
+        state.error=error?.message||'Could not save this item.';
+        if(!layer.isConnected) (financeMonthDialog || document.body).appendChild(layer);
+        document.body.classList.add('tv2-locked');
         document.body.classList.add('trip-expense-open');
-        if (!layer.isConnected) document.body.appendChild(layer);
         render();
       }
     }
   });
 
-  layer.querySelector('.finance-log-backdrop')?.addEventListener('click',closeFinanceTransactionSheet);
-  layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeFinanceTransactionSheet();});
+  layer.querySelector('.tv2-backdrop')?.addEventListener('click',closeFinanceTransactionSheet);
+  layer.addEventListener('keydown',(event)=>{
+    if(event.key==='Escape') closeFinanceTransactionSheet();
+  });
+
   render();
-  setTimeout(()=>sheet.querySelector('#financeLogAmount')?.focus(),0);
 }
+
 
 function financeMonthToneIcon(tone, kind = 'expense') {
   if (kind === 'income') return '€';
