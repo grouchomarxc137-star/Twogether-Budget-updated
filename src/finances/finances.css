@@ -3305,3 +3305,93 @@ body.finance-month-focus {
     font-size:10px;
   }
 }
+
+
+/* Exact Trips UI parity for monthly finance detail + logger. */
+.finance-month-overview .finance-month-entry:disabled {
+  opacity:1;
+  cursor:default;
+}
+
+.finance-month-overview .finance-month-note {
+  min-height:54px;
+}
+
+.finance-log-layer .trip-expense-workspace {
+  background:#f8f5ef!important;
+  color:#26221e!important;
+}
+
+.finance-log-layer .trip-expense-head h2 {
+  font-size:28px!important;
+  font-weight:760!important;
+  line-height:1.1!important;
+  letter-spacing:0!important;
+}
+
+.finance-log-layer .trip-expense-amount-hero:focus-within {
+  border-color:#2f2a25!important;
+}
+
+.finance-log-layer .trip-expense-categories {
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+
+.finance-log-layer .trip-expense-categories button {
+  min-height:72px!important;
+  padding:8px 4px!important;
+  border-radius:14px!important;
+  font-family:inherit!important;
+}
+
+.finance-log-layer .trip-expense-categories button strong {
+  font-size:12px!important;
+  font-weight:600!important;
+}
+
+.finance-log-layer .trip-expense-defaults {
+  margin-top:4px;
+  font-size:14.5px!important;
+}
+
+.finance-log-layer .trip-expense-more-fields>label input:focus {
+  border-color:#2f2a25!important;
+}
+
+.finance-log-layer .trip-expense-actions .btn.primary {
+  background:#302a25!important;
+  border-color:#302a25!important;
+  color:#fff!important;
+}
+
+.finance-log-layer .trip-expense-actions .btn.primary:disabled {
+  background:#b8b4ae!important;
+  border-color:#b8b4ae!important;
+  color:#fff!important;
+  opacity:1!important;
+}
+
+.finance-log-layer .trip-expense-actions .btn.ghost {
+  order:2;
+}
+
+@media(max-width:760px) {
+  .finance-log-layer .trip-expense-workspace {
+    width:100%!important;
+    max-width:560px!important;
+    max-height:92dvh!important;
+    padding:12px 14px calc(16px + env(safe-area-inset-bottom,0px))!important;
+    border-left:0!important;
+    border-right:0!important;
+    border-radius:22px 22px 0 0!important;
+  }
+
+  .finance-log-layer .trip-expense-categories {
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  }
+
+  .finance-log-layer .trip-expense-amount-hero {
+    margin:0 28px!important;
+  }
+}
