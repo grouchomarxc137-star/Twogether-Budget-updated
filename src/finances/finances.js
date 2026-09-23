@@ -688,10 +688,19 @@ function openFinanceTransactionSheet(rec) {
       '<p class="finance-log-hint '+(state.error?'is-error':'')+'">'+esc(state.error)+'</p>'+
       '<button type="button" class="finance-log-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button>';
 
+    const refreshSave=()=>{
+      const save=sheet.querySelector('[data-fin-log-save]');
+      if (save) save.disabled=!valid()||state.busy;
+      const hint=sheet.querySelector('.finance-log-hint');
+      if (hint) {
+        hint.textContent=state.error;
+        hint.classList.toggle('is-error',!!state.error);
+      }
+    };
     const amountInput=sheet.querySelector('#financeLogAmount');
-    amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';render();});
+    amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
     const nameInput=sheet.querySelector('#financeLogName');
-    nameInput?.addEventListener('input',(e)=>{state.name=e.target.value;state.error='';});
+    nameInput?.addEventListener('input',(e)=>{state.name=e.target.value;state.error='';refreshSave();});
     sheet.querySelector('#financeLogDate')?.addEventListener('change',(e)=>{state.date=normalizeFinanceDate(e.target.value,rec.month);render();});
   }
 
