@@ -90,13 +90,29 @@ let financeState = {
 };
 let flow = null;
 let selectedMonth = '2026-09';
+let financeViewYear = Number(selectedMonth.slice(0,4));
 let loading = false;
 let recurringSwipeAbort = null;
 let recurringSwipeIgnoreUntil = 0;
 let recurringDeleteConfirmLayer = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
-const monthLabel = (m) => MONTHS.find((x) => x[0] === m)?.[1] || m;
+const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const financeMonthsForYear = (year) => FINANCE_MONTH_NAMES.map((label,index)=>[`${year}-${String(index+1).padStart(2,'0')}`,label]);
+const monthLabel = (m) => {
+  const match=/^(\d{4})-(\d{2})$/.exec(String(m||''));
+  if (!match) return String(m||'');
+  const index=Number(match[2])-1;
+  return `${FINANCE_MONTH_NAMES[index]?.slice(0,3)||match[2]} ${match[1]}`;
+};
+function financeYearBounds() {
+  const years=ownMonths().map((item)=>Number(String(item.month||'').slice(0,4))).filter(Number.isFinite);
+  const currentYear=new Date().getFullYear();
+  return {
+    min:Math.min(2026,currentYear,...years),
+    max:Math.max(currentYear,...years),
+  };
+}
 
 function normalizeRecurringDay(value) {
   if (value === '' || value == null) return '';
@@ -466,23 +482,38 @@ function renderPage() {
   renderScenarioPanel();
 
   const root = $('#financeMonths'); if (!root) return;
-  root.innerHTML = MONTHS.map(([key, label]) => {
+  const yearBounds=financeYearBounds();
+  financeViewYear=Math.min(yearBounds.max,Math.max(yearBounds.min,financeViewYear));
+  const now=new Date();
+  const currentKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const yearControls=`<div class="finance-year-switcher" aria-label="Finance year">
+    <button type="button" data-fin-year-prev aria-label="Previous year" ${financeViewYear<=yearBounds.min?'disabled':''}>‹</button>
+    <strong>${financeViewYear}</strong>
+    <button type="button" data-fin-year-next aria-label="Next year" ${financeViewYear>=yearBounds.max?'disabled':''}>›</button>
+  </div>`;
+  const monthCards=financeMonthsForYear(financeViewYear).map(([key, label]) => {
     const rec = recordFor(key), c = calc(rec || {});
-    const current = key === '2026-09';
-    const pillText = rec ? (rec.finalized ? 'Confirmed' : 'Draft') : (current ? 'Current' : 'Not logged');
-    const pillClass = rec?.finalized ? 'is-closed' : 'is-open';
-    const amountText = rec ? money(Math.abs(c.leftover)) : '—';
-    const amountLabel = rec ? (c.leftover < 0 ? 'over' : 'left') : 'Tap to start';
-    const meta = rec ? `${money(c.income)} in · ${money(c.outflow)} out` : 'No finances logged yet';
-    return `<button class="tv2-card finance-month-tv2-card ${rec ? '' : 'is-empty'}" type="button" data-fin-month="${key}">
-      <div class="tv2-card-top"><strong>${esc(label)}</strong><span class="tv2-pill ${pillClass}">${esc(pillText)}</span></div>
-      <div class="tv2-card-money"><span>${esc(meta)}</span><b class="${rec && c.leftover < 0 ? 'is-over' : ''}">${amountText} ${esc(amountLabel)}</b></div>
+    const status=rec ? (rec.finalized?'final':'draft') : 'empty';
+    const pillText=rec ? (rec.finalized?'Locked':'Draft') : (key===currentKey?'Current':'Not logged');
+    const amountText=rec ? money(Math.abs(c.leftover)) : '';
+    const amountLabel=rec ? (c.leftover<0?'over':'left') : 'Tap to start';
+    const meta=rec ? `${money(c.income)} in · ${money(c.outflow)} out` : '';
+    return `<button class="tv2-card finance-month-tv2-card status-${status}" type="button" data-fin-month="${key}">
+      <div class="tv2-card-top"><strong>${esc(label)}</strong><span class="tv2-pill">${esc(pillText)}</span></div>
+      <div class="tv2-card-money">${meta?`<span>${esc(meta)}</span>`:''}<b class="${rec&&c.leftover<0?'is-over':''}">${amountText?amountText+' ':''}${esc(amountLabel)}</b></div>
     </button>`;
   }).join('');
-  $('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
+  root.innerHTML=yearControls+monthCards;
+  $$('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectedMonth = btn.dataset.finMonth;
     renderDetail(directMonthRecord(selectedMonth));
   }));
+  $('[data-fin-year-prev]',root)?.addEventListener('click',()=>{
+    if(financeViewYear>yearBounds.min){financeViewYear-=1;renderPage();}
+  });
+  $('[data-fin-year-next]',root)?.addEventListener('click',()=>{
+    if(financeViewYear<yearBounds.max){financeViewYear+=1;renderPage();}
+  });
   const detail = $('#financeDetail'); if (detail && !recordFor(selectedMonth)) detail.innerHTML = '';
 }
 
