@@ -3540,3 +3540,37 @@ body.finance-month-focus {
     grid-template-columns:repeat(4,minmax(0,1fr))!important;
   }
 }
+
+
+/* Finance logger uses the same viewport-level Trips sheet on phone and desktop. */
+dialog.finance-log-host {
+  box-sizing:border-box!important;
+  width:100vw!important;
+  max-width:none!important;
+  min-width:0!important;
+  height:100dvh!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  inset:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  overflow:hidden!important;
+}
+
+dialog.finance-log-host::backdrop {
+  background:transparent!important;
+}
+
+dialog.finance-log-host .tv2-sheet {
+  width:100%!important;
+  max-width:560px!important;
+  margin:0!important;
+}
+
+@media(max-width:760px) {
+  dialog.finance-log-host .tv2-sheet {
+    max-height:94dvh!important;
+  }
+}
