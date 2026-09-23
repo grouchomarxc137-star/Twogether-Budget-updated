@@ -1498,40 +1498,126 @@ function tripCategorySettlement_(plan, category) {
 }
 
 function tripCategoryOwedBreakdown_(plan, actor) {
+  const safe = plan && plan.expenseEntries ? plan : sanitizePlan_(plan);
   const keys = ['stay','transport','car','groceries','eating-out','activities','other'];
-  const out = {};
-  keys.forEach(function(key){ out[key] = 0; });
+  const balances = {}, opened = {};
+  keys.forEach(function(key){ balances[key]=0; opened[key]=''; });
+  let pendingPositive = 0, pendingNegative = 0;
 
-  const overall = tripSettlement_(plan);
-  const targetCents = overall.debtor === actor ? Math.max(0, Math.round(Number(overall.amount || 0) * 100)) : 0;
-  if (!targetCents) return out;
-
-  const raw = {};
-  let rawTotal = 0;
-  keys.forEach(function(key){
-    const category = tripCategorySettlement_(plan,key);
-    const value = category.debtor === actor ? Math.max(0, Number(category.amount || 0)) : 0;
-    raw[key] = value;
-    rawTotal += value;
-  });
-
-  if (rawTotal <= .005) {
-    out.other = money2_(targetCents / 100);
-    return out;
+  function sign_(value) { return value > .005 ? 1 : value < -.005 ? -1 : 0; }
+  function applyDelta_(key, delta, stamp) {
+    const before = Number(balances[key] || 0), beforeSign = sign_(before);
+    balances[key] = before + Number(delta || 0);
+    const afterSign = sign_(balances[key]);
+    if (!afterSign) {
+      balances[key] = 0;
+      opened[key] = '';
+    } else if (afterSign !== beforeSign) {
+      opened[key] = stamp;
+    }
+  }
+  function consumePending_(key, stamp) {
+    if (balances[key] < -.005 && pendingPositive > .005) {
+      const used = Math.min(pendingPositive,-balances[key]);
+      applyDelta_(key,used,stamp);
+      pendingPositive -= used;
+    }
+    if (balances[key] > .005 && pendingNegative > .005) {
+      const used = Math.min(pendingNegative,balances[key]);
+      applyDelta_(key,-used,stamp);
+      pendingNegative -= used;
+    }
+  }
+  function consumeLegacy_(effect, stamp) {
+    const wantsNegative = effect > 0;
+    let remaining = Math.abs(effect);
+    const eligible = keys.filter(function(key){ return wantsNegative ? balances[key] < -.005 : balances[key] > .005; })
+      .sort(function(a,b){
+        const dateCompare = String(opened[a] || '').localeCompare(String(opened[b] || ''));
+        return dateCompare || keys.indexOf(a)-keys.indexOf(b);
+      });
+    eligible.forEach(function(key){
+      if (remaining <= .005) return;
+      const due = wantsNegative ? -balances[key] : balances[key];
+      const used = Math.min(remaining,due);
+      applyDelta_(key,wantsNegative ? used : -used,stamp);
+      remaining -= used;
+    });
+    if (remaining > .005) {
+      if (wantsNegative) pendingPositive += remaining;
+      else pendingNegative += remaining;
+    }
+  }
+  function eventStamp_(item,index,kind) {
+    const created = String(item && item.createdAt || '');
+    const day = String(item && item.date || created.slice(0,10) || '9999-12-31');
+    const time = created.indexOf('T') >= 0 ? created.slice(11) : (kind === 'expense' ? '00:00:00' : '23:59:59');
+    return day+'T'+time+'|'+String(index).padStart(5,'0')+'|'+kind;
   }
 
-  const active = keys.filter(function(key){ return raw[key] > .005; });
-  let remaining = targetCents;
-  active.forEach(function(key,index){
-    const cents = index === active.length - 1
-      ? remaining
-      : Math.max(0, Math.min(remaining, Math.round(targetCents * (raw[key] / rawTotal))));
-    out[key] = money2_(cents / 100);
-    remaining -= cents;
+  const events = (safe.expenseEntries || []).map(function(entry,index){
+    return {kind:'expense',entry:entry,stamp:eventStamp_(entry,index,'expense')};
+  }).concat((safe.repayments || []).map(function(repayment,index){
+    return {kind:'repayment',repayment:repayment,stamp:eventStamp_(repayment,index,'repayment')};
+  })).sort(function(a,b){ return a.stamp.localeCompare(b.stamp); });
+
+  events.forEach(function(event){
+    if (event.kind === 'expense') {
+      const entry = event.entry, key = tripExpenseCategoryKey_(entry);
+      const remaining = Math.max(0,Number(entry.amount || 0)-Number(entry.jarContribution || 0));
+      const paidPrincipessa = entry.paidBy === 'both' ? remaining/2 : entry.paidBy === 'Principessa' ? remaining : 0;
+      const owner = ACTORS.includes(entry.forActor) ? entry.forActor : entry.paidBy;
+      const sharePrincipessa = entry.split === 'personal' ? (owner === 'Principessa' ? remaining : 0) : remaining/2;
+      applyDelta_(key,paidPrincipessa-sharePrincipessa,event.stamp);
+      consumePending_(key,event.stamp);
+      return;
+    }
+    const repayment = event.repayment, value = Number(repayment.amount || 0);
+    const effect = repayment.from === 'Principessa' && repayment.to === 'Principe'
+      ? value
+      : repayment.from === 'Principe' && repayment.to === 'Principessa'
+        ? -value : 0;
+    if (!effect) return;
+    if (repayment.category && keys.indexOf(repayment.category) >= 0) {
+      applyDelta_(repayment.category,effect,event.stamp);
+    } else {
+      consumeLegacy_(effect,event.stamp);
+    }
   });
+
+  if (pendingPositive > .005) applyDelta_('other',pendingPositive,'9999-12-31T23:59:59|legacy');
+  if (pendingNegative > .005) applyDelta_('other',-pendingNegative,'9999-12-31T23:59:59|legacy');
+
+  const overall = tripSettlement_(safe);
+  const targetCents = overall.debtor === actor ? Math.max(0,Math.round(Number(overall.amount || 0)*100)) : 0;
+  const out = {};
+  keys.forEach(function(key){ out[key]=0; });
+  if (!targetCents) return out;
+
+  const wantsNegative = actor === 'Principessa';
+  const debts = keys.map(function(key){
+    return {
+      key:key,
+      cents:Math.max(0,Math.round((wantsNegative ? -balances[key] : balances[key])*100)),
+      opened:opened[key] || '9999-12-31T23:59:59'
+    };
+  }).filter(function(item){ return item.cents > 0; });
+
+  let excess = Math.max(0,debts.reduce(function(sum,item){ return sum+item.cents; },0)-targetCents);
+  debts.sort(function(a,b){
+    const dateCompare = a.opened.localeCompare(b.opened);
+    return dateCompare || keys.indexOf(a.key)-keys.indexOf(b.key);
+  });
+  debts.forEach(function(item){
+    const reduce = Math.min(excess,item.cents);
+    item.cents -= reduce;
+    excess -= reduce;
+  });
+  debts.forEach(function(item){ out[item.key]=money2_(item.cents/100); });
+  const assigned = debts.reduce(function(sum,item){ return sum+item.cents; },0);
+  if (assigned < targetCents) out.other = money2_(Number(out.other || 0)+(targetCents-assigned)/100);
   return out;
 }
-
 function tripRepaymentCategoryLabel_(category) {
   const labels = {stay:'Stay',transport:'Transport',car:'Car',groceries:'Groceries','eating-out':'Eating out',activities:'Activities',other:'Other'};
   return labels[category] || 'this category';

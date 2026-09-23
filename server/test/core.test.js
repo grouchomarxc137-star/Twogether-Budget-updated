@@ -685,3 +685,65 @@ test('legacy uncategorized repayments reduce the current category debt instead o
     c.cleanup();
   }
 });
+
+
+test('legacy repayment stays with the debt that existed before a later grocery expense', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2026-09-19', end:'2026-09-22' },
+      budget:600,
+    });
+
+    action(c.database, 'saveTripExpense', {
+      planId:p.planId,
+      expense:{ category:'accommodation', amount:281.60, paidBy:'Principessa', split:'shared', date:'2026-09-20', useJar:false },
+    }, 'Principessa');
+
+    const state = getState();
+    const plan = state.plans.find((item)=>item.id===p.planId);
+    plan.repayments.push({
+      id:'legacy-stay-paid',
+      from:'Principe',
+      to:'Principessa',
+      amount:140.80,
+      date:'2026-09-21',
+      createdAt:'2026-09-21T10:00:00.000Z',
+    });
+    c.database.store.write(state);
+
+    action(c.database, 'saveTripExpense', {
+      planId:p.planId,
+      expense:{ category:'food', foodType:'groceries', amount:60, paidBy:'Principessa', split:'shared', date:'2026-09-22' },
+    }, 'Principessa');
+
+    const stay = action(c.database, 'saveTripRepayment', {
+      planId:p.planId,
+      amount:1,
+      date:'2026-09-23',
+      category:'stay',
+    }, 'Principe');
+    assert.equal(stay.ok,false);
+    assert.match(stay.error,/do not owe anything for Stay/i);
+
+    const groceriesTooMuch = action(c.database, 'saveTripRepayment', {
+      planId:p.planId,
+      amount:30.01,
+      date:'2026-09-23',
+      category:'groceries',
+    }, 'Principe');
+    assert.equal(groceriesTooMuch.ok,false);
+    assert.match(groceriesTooMuch.error,/only owe €30\.00 for Groceries/i);
+
+    const groceries = action(c.database, 'saveTripRepayment', {
+      planId:p.planId,
+      amount:30,
+      date:'2026-09-23',
+      category:'groceries',
+    }, 'Principe');
+    assert.equal(groceries.ok,true);
+    assert.equal(groceries.settlement.amount,0);
+  } finally {
+    c.cleanup();
+  }
+});
