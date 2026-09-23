@@ -105,7 +105,7 @@ function ensureNavigation() {
   const hub = $('.hub-tabs'); if (!hub) return;
   const defs = [
     { key: 'trips', items: [['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
-    { key: 'finances', items: [['Overview', () => $('.finance-subnav [data-fin-subview="overview"]')], ['Monthly finances', () => $('.finance-subnav [data-fin-subview="monthly"]')], ['Balances & loans', () => $('.finance-subnav [data-fin-subview="balances"]')], ['Test scenarios', () => $('.finance-subnav [data-fin-subview="scenarios"]')]] },
+    { key: 'finances', items: [['Log Finances', () => $('.finance-subnav [data-fin-subview="monthly"]')], ['Monthly', () => $('.finance-subnav [data-fin-subview="overview"]')], ['Wallet', () => $('.finance-subnav [data-fin-subview="balances"]')], ['Test scenarios', () => $('.finance-subnav [data-fin-subview="scenarios"]')]] },
   ];
   defs.forEach((def) => {
     const main = $(`[data-hub="${def.key}"]`, hub); if (!main) return;
