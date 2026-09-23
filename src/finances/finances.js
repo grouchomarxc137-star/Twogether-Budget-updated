@@ -1272,7 +1272,6 @@ function financeMonthTimeline(rec) {
       });
       if(!editable) return rowHtml;
       return '<div class="finance-month-swipe-row" data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'">'+
-        '<div class="finance-month-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
         '<div class="finance-month-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
         rowHtml+
       '</div>';
@@ -1283,20 +1282,18 @@ function financeMonthTimeline(rec) {
 function resetFinanceMonthSwipeVisual(row, animate = true) {
   if (!row) return;
   const card=row.querySelector('.overview-trip-expense');
-  const edit=row.querySelector('.finance-month-edit-reveal');
   const remove=row.querySelector('.finance-month-delete-reveal');
-  [edit,remove].forEach((action)=>{
-    if(!action)return;
-    action.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
-    action.style.width='0px';
-    action.style.opacity='0';
-  });
+  if(remove){
+    remove.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+    remove.style.width='0px';
+    remove.style.opacity='0';
+  }
   if(card){
     card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
     card.style.transform='translateX(0)';
     card.style.opacity='1';
   }
-  if(animate)setTimeout(()=>{[card,edit,remove].forEach((el)=>{if(el?.isConnected)el.style.transition='';});},220);
+  if(animate)setTimeout(()=>{[card,remove].forEach((el)=>{if(el?.isConnected)el.style.transition='';});},220);
 }
 
 function closeFinanceMonthSwipeRows(except = null) {
@@ -1367,98 +1364,187 @@ function bindFinanceMonthSwipe(rec) {
   if(!root)return;
 
   const mobile=()=>window.matchMedia?.('(max-width:760px)')?.matches??window.innerWidth<=760;
-  let swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};
 
-  const resetState=()=>{swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};};
-  const paint=(row,distance,direction)=>{
+  // Same Trips-style row delete: only right-to-left.
+  let rowSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  const resetRowState=()=>{rowSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};};
+
+  // Whole-page back gestures: left edge -> right, or bottom Log finance button -> up.
+  let pageSwipe={tracking:false,active:false,mode:'',startX:0,startY:0,lastX:0,lastY:0};
+  const resetPageState=()=>{pageSwipe={tracking:false,active:false,mode:'',startX:0,startY:0,lastX:0,lastY:0};};
+
+  const clearPageVisual=(animate=true)=>{
+    if(!root?.isConnected){resetPageState();return;}
+    root.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .18s ease':'none';
+    root.style.removeProperty('transform');
+    root.style.opacity='1';
+    if(animate)setTimeout(()=>{
+      if(!root?.isConnected)return;
+      root.style.transition='';
+      root.style.removeProperty('opacity');
+    },220);
+  };
+
+  const finishBack=(mode)=>{
+    if(!root?.isConnected){resetPageState();return;}
+    root.style.transition='transform .22s cubic-bezier(.22,.8,.28,1), opacity .18s ease';
+    const target=mode==='right'
+      ? 'translate(calc(-50% + 100vw),-50%)'
+      : 'translate(-50%,calc(-50% - 100dvh))';
+    root.style.setProperty('transform',target,'important');
+    root.style.opacity='.7';
+    resetPageState();
+    resetRowState();
+    setTimeout(()=>closeFinanceMonthDialog(),185);
+  };
+
+  const paintDelete=(row,distance)=>{
     const card=row.querySelector('.overview-trip-expense');
-    const action=row.querySelector(direction==='edit'?'.finance-month-edit-reveal':'.finance-month-delete-reveal');
-    const other=row.querySelector(direction==='edit'?'.finance-month-delete-reveal':'.finance-month-edit-reveal');
-    if(!card||!action)return;
+    const remove=row.querySelector('.finance-month-delete-reveal');
+    if(!card||!remove)return;
     const exposed=Math.abs(distance);
     card.style.transition='none';
     card.style.transform='translateX('+distance+'px)';
-    action.style.transition='none';
-    action.style.width=exposed+'px';
-    action.style.opacity=String(Math.min(1,.35+exposed/120));
-    if(other){other.style.width='0px';other.style.opacity='0';}
+    remove.style.transition='none';
+    remove.style.width=exposed+'px';
+    remove.style.opacity=String(Math.min(1,.35+exposed/120));
   };
-  const finish=(row,direction)=>{
+
+  const finishDelete=(row)=>{
     const card=row.querySelector('.overview-trip-expense');
-    const action=row.querySelector(direction==='edit'?'.finance-month-edit-reveal':'.finance-month-delete-reveal');
+    const remove=row.querySelector('.finance-month-delete-reveal');
     const width=row.getBoundingClientRect().width||window.innerWidth-32;
-    const distance=direction==='edit'?width:-width;
     if(card){
       card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-      card.style.transform='translateX('+distance+'px)';
+      card.style.transform='translateX(-'+width+'px)';
       card.style.opacity='.76';
     }
-    if(action){
-      action.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-      action.style.width=width+'px';
-      action.style.opacity='1';
+    if(remove){
+      remove.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      remove.style.width=width+'px';
+      remove.style.opacity='1';
     }
   };
 
   root.addEventListener('touchstart',(event)=>{
     if(!mobile()||financeMonthDeleteConfirmLayer||event.touches.length!==1)return;
+    const touch=event.touches[0];
+    const dock=event.target.closest('.overview-trip-dock');
+    const canRight=touch.clientX<=46;
+    const canUp=!!dock;
+
+    if(canRight||canUp){
+      closeFinanceMonthSwipeRows();
+      pageSwipe={
+        tracking:true,active:false,mode:canRight?'right':'up',
+        startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,lastY:touch.clientY
+      };
+      resetRowState();
+      return;
+    }
+
     const row=event.target.closest('.finance-month-swipe-row');
     if(!row)return;
     closeFinanceMonthSwipeRows(row);
     resetFinanceMonthSwipeVisual(row,false);
-    const touch=event.touches[0];
-    swipe={tracking:true,active:false,startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,row,direction:''};
+    rowSwipe={tracking:true,active:false,startX:touch.clientX,startY:touch.clientY,lastX:touch.clientX,row};
   },{passive:true,signal});
 
   root.addEventListener('touchmove',(event)=>{
-    if(!swipe.tracking||!swipe.row||event.touches.length!==1)return;
-    const touch=event.touches[0],dx=touch.clientX-swipe.startX,dy=Math.abs(touch.clientY-swipe.startY);
-    swipe.lastX=touch.clientX;
-    if(!swipe.active){
-      if(Math.abs(dx)<8&&dy<8)return;
-      const horizontal=Math.abs(dx)>dy*1.2;
-      const direction=dx>10?'edit':dx<-10?'delete':'';
-      if(horizontal&&direction){swipe.active=true;swipe.direction=direction;}
-      else if(dy>=Math.abs(dx)||(horizontal&&Math.abs(dx)>10&&!direction)){resetState();return;}
+    if(!mobile()||event.touches.length!==1)return;
+    const touch=event.touches[0];
+
+    if(pageSwipe.tracking){
+      const dx=touch.clientX-pageSwipe.startX;
+      const dy=touch.clientY-pageSwipe.startY;
+      const ax=Math.abs(dx),ay=Math.abs(dy);
+      pageSwipe.lastX=touch.clientX;
+      pageSwipe.lastY=touch.clientY;
+
+      if(!pageSwipe.active){
+        if(ax<9&&ay<9)return;
+        if(pageSwipe.mode==='right'){
+          if(dx>10&&ax>ay*1.25)pageSwipe.active=true;
+          else if(ay>=ax||dx<0){resetPageState();return;}
+        }else{
+          if(dy<-10&&ay>ax*1.15)pageSwipe.active=true;
+          else if(ax>=ay||dy>0){resetPageState();return;}
+        }
+      }
+      if(!pageSwipe.active)return;
+      event.preventDefault();
+      root.style.transition='none';
+      if(pageSwipe.mode==='right'){
+        const distance=Math.max(0,Math.min(dx,window.innerWidth*.78));
+        root.style.setProperty('transform','translate(calc(-50% + '+distance+'px),-50%)','important');
+        root.style.opacity=String(Math.max(.82,1-distance/(window.innerWidth*2.5)));
+      }else{
+        const distance=Math.max(0,Math.min(-dy,window.innerHeight*.62));
+        root.style.setProperty('transform','translate(-50%,calc(-50% - '+distance+'px))','important');
+        root.style.opacity=String(Math.max(.82,1-distance/(window.innerHeight*2.2)));
+      }
+      return;
     }
-    if(!swipe.active)return;
+
+    if(!rowSwipe.tracking||!rowSwipe.row)return;
+    const dx=touch.clientX-rowSwipe.startX,dy=Math.abs(touch.clientY-rowSwipe.startY);
+    rowSwipe.lastX=touch.clientX;
+    if(!rowSwipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      if(dx<-10&&Math.abs(dx)>dy*1.2)rowSwipe.active=true;
+      else if(dy>=Math.abs(dx)||dx>0){resetFinanceMonthSwipeVisual(rowSwipe.row,true);resetRowState();return;}
+    }
+    if(!rowSwipe.active)return;
     event.preventDefault();
-    const width=swipe.row.getBoundingClientRect().width||window.innerWidth-32;
-    const maxDistance=width*.94;
-    const distance=swipe.direction==='edit'
-      ? Math.max(0,Math.min(maxDistance,dx))
-      : Math.min(0,Math.max(-maxDistance,dx));
-    paint(swipe.row,distance,swipe.direction);
+    const width=rowSwipe.row.getBoundingClientRect().width||window.innerWidth-32;
+    const distance=Math.min(0,Math.max(-width*.94,dx));
+    paintDelete(rowSwipe.row,distance);
   },{passive:false,signal});
 
   root.addEventListener('touchend',()=>{
-    if(!swipe.tracking||!swipe.row){resetState();return;}
-    const row=swipe.row,dx=swipe.lastX-swipe.startX,direction=swipe.direction;
+    if(pageSwipe.tracking){
+      const mode=pageSwipe.mode;
+      const dx=pageSwipe.lastX-pageSwipe.startX;
+      const dy=pageSwipe.lastY-pageSwipe.startY;
+      const goBack=pageSwipe.active&&(
+        (mode==='right'&&dx>=Math.min(92,window.innerWidth*.24))||
+        (mode==='up'&&-dy>=Math.min(110,window.innerHeight*.16))
+      );
+      if(goBack)finishBack(mode);
+      else{resetPageState();clearPageVisual(true);}
+      return;
+    }
+
+    if(!rowSwipe.tracking||!rowSwipe.row){resetRowState();return;}
+    const row=rowSwipe.row,dx=rowSwipe.lastX-rowSwipe.startX;
     const width=row.getBoundingClientRect().width||window.innerWidth-32;
-    const threshold=Math.max(180,width*.62);
-    const fullSwipe=swipe.active&&((direction==='edit'&&dx>=threshold)||(direction==='delete'&&-dx>=threshold));
-    if(!swipe.active||!fullSwipe){
+    const fullSwipe=rowSwipe.active&&-dx>=Math.max(180,width*.62);
+    if(!fullSwipe){
       resetFinanceMonthSwipeVisual(row,true);
-      resetState();
+      resetRowState();
       return;
     }
 
     financeMonthSwipeIgnoreUntil=Date.now()+550;
     const kind=row.dataset.finEntryKind,index=Number(row.dataset.finEntryIndex);
-    finish(row,direction);
-    resetState();
+    finishDelete(row);
+    resetRowState();
     setTimeout(()=>{
       resetFinanceMonthSwipeVisual(row,false);
-      if(direction==='edit') openFinanceTransactionSheet(rec,{kind,index});
-      else openFinanceMonthDeleteConfirm(rec,kind,index);
+      openFinanceMonthDeleteConfirm(rec,kind,index);
     },180);
   },{passive:true,signal});
 
   root.addEventListener('touchcancel',()=>{
-    resetFinanceMonthSwipeVisual(swipe.row,true);
-    resetState();
+    if(pageSwipe.tracking||pageSwipe.active){
+      resetPageState();
+      clearPageVisual(true);
+    }
+    resetFinanceMonthSwipeVisual(rowSwipe.row,true);
+    resetRowState();
   },{passive:true,signal});
 }
+
 
 function closeFinanceMonthDialog() {
   financeMonthSwipeAbort?.abort();
