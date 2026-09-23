@@ -3170,3 +3170,138 @@ body.finance-month-focus {
 .finance-month-tv2-card.is-empty {
   background:transparent;
 }
+
+
+/* Compact two-column month grid with legacy finance status colors. */
+.finance-log-home-head {
+  gap:0;
+}
+
+.finance-months-tv2 {
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+
+.finance-year-switcher {
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:40px 1fr 40px;
+  align-items:center;
+  width:100%;
+  min-height:44px;
+  margin:0 0 2px;
+}
+
+.finance-year-switcher strong {
+  text-align:center;
+  font-size:20px;
+  font-weight:650;
+  color:var(--tv2-ink);
+}
+
+.finance-year-switcher button {
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:var(--tv2-muted);
+  font:inherit;
+  font-size:24px;
+}
+
+.finance-year-switcher button:not(:disabled):hover {
+  background:#f0ebe4;
+}
+
+.finance-year-switcher button:disabled {
+  opacity:.25;
+  cursor:default;
+}
+
+.finance-month-tv2-card {
+  min-height:112px;
+  padding:13px;
+  align-content:start;
+  gap:8px;
+}
+
+.finance-month-tv2-card.status-final {
+  background:#eaf3e8!important;
+  border-color:#cbdcc7!important;
+}
+
+.finance-month-tv2-card.status-draft {
+  background:#fbefdf!important;
+  border-color:#ead2b3!important;
+}
+
+.finance-month-tv2-card.status-empty {
+  background:#fff!important;
+  border-color:var(--tv2-line)!important;
+}
+
+.finance-month-tv2-card .tv2-card-top {
+  align-items:start;
+}
+
+.finance-month-tv2-card .tv2-card-top strong {
+  font-size:18px;
+}
+
+.finance-month-tv2-card .tv2-pill {
+  padding:2px 7px;
+  background:rgba(255,255,255,.48);
+  color:var(--tv2-muted);
+  font-size:11px;
+  white-space:nowrap;
+}
+
+.finance-month-tv2-card.status-final .tv2-pill {
+  background:rgba(255,255,255,.52);
+  color:#4f6f4a;
+}
+
+.finance-month-tv2-card.status-draft .tv2-pill {
+  background:rgba(255,255,255,.5);
+  color:#8a6842;
+}
+
+.finance-month-tv2-card .tv2-card-money {
+  display:grid;
+  gap:2px;
+  align-items:start;
+}
+
+.finance-month-tv2-card .tv2-card-money span {
+  white-space:normal;
+  font-size:12px;
+  line-height:1.25;
+}
+
+.finance-month-tv2-card .tv2-card-money b {
+  text-align:left;
+  font-size:14px;
+}
+
+@media(max-width:390px) {
+  .finance-month-tv2-card {
+    min-height:108px;
+    padding:12px 10px;
+  }
+
+  .finance-month-tv2-card .tv2-card-top {
+    gap:5px;
+  }
+
+  .finance-month-tv2-card .tv2-card-top strong {
+    font-size:17px;
+  }
+
+  .finance-month-tv2-card .tv2-pill {
+    padding:2px 5px;
+    font-size:10px;
+  }
+}
