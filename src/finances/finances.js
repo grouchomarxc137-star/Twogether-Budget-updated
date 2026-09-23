@@ -91,6 +91,9 @@ let financeState = {
 let flow = null;
 let selectedMonth = '2026-09';
 let loading = false;
+let recurringSwipeAbort = null;
+let recurringSwipeIgnoreUntil = 0;
+let recurringDeleteConfirmLayer = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const monthLabel = (m) => MONTHS.find((x) => x[0] === m)?.[1] || m;
@@ -531,11 +534,193 @@ function recurringRow(kind, item, index) {
   const day = normalizeRecurringDay(item.day);
   const timing = day === '' ? '' : 'Usually '+ordinalDay(day);
   const detail = [sub,timing].filter(Boolean).join(' · ');
-  return '<button class="tv2-row finance-recurring-tv2-row" type="button" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
-    '<span class="tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,kind)+'</span>'+
-    '<span class="tv2-row-main"><strong>'+esc(item.name)+'</strong><small>'+esc(detail)+'</small></span>'+
-    '<span class="tv2-amt">'+money(item.amount)+'</span>'+
-  '</button>';
+  return '<div class="finance-recurring-swipe-row" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
+    '<div class="finance-recurring-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
+    '<div class="finance-recurring-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
+    '<button class="tv2-row finance-recurring-tv2-row" type="button" data-fin-recurring-open>'+
+      '<span class="tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,kind)+'</span>'+
+      '<span class="tv2-row-main"><strong>'+esc(item.name)+'</strong><small>'+esc(detail)+'</small></span>'+
+      '<span class="tv2-amt">'+money(item.amount)+'</span>'+
+    '</button>'+
+  '</div>';
+}
+
+function resetRecurringSwipeVisual(row, animate = true) {
+  if (!row) return;
+  const card = row.querySelector('.finance-recurring-tv2-row');
+  const edit = row.querySelector('.finance-recurring-edit-reveal');
+  const remove = row.querySelector('.finance-recurring-delete-reveal');
+  [edit,remove].forEach((action)=>{
+    if(!action)return;
+    action.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+    action.style.width='0px';
+    action.style.opacity='0';
+  });
+  if(card){
+    card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+    card.style.transform='translateX(0)';
+    card.style.opacity='1';
+  }
+  if(animate)setTimeout(()=>{[card,edit,remove].forEach((el)=>{if(el?.isConnected)el.style.transition='';});},220);
+}
+function closeRecurringSwipeRows(except = null) {
+  document.querySelectorAll('#financeMiniBody .finance-recurring-swipe-row').forEach((row)=>{
+    if(row!==except) resetRecurringSwipeVisual(row,true);
+  });
+}
+function closeRecurringDeleteConfirm() {
+  recurringDeleteConfirmLayer?.remove();
+  recurringDeleteConfirmLayer=null;
+}
+function openRecurringDeleteConfirm(kind,index) {
+  closeRecurringDeleteConfirm();
+  const config=recurringConfig();
+  const list=kind==='income'?config.incomes:config.expenses;
+  const item=list[index];
+  if(!item)return;
+  recurringDeleteConfirmLayer=document.createElement('div');
+  recurringDeleteConfirmLayer.className='tv2-confirm-layer';
+  recurringDeleteConfirmLayer.innerHTML=
+    '<div class="tv2-confirm-backdrop" data-fin-recurring-confirm-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finRecurringDeleteTitle">'+
+      '<h2 id="finRecurringDeleteTitle">Delete item?</h2>'+
+      '<p>Are you sure you want to delete <strong>'+esc(item.name)+'</strong>?</p>'+
+      '<p class="tv2-confirm-note">This removes it from future recurring finance items. Already logged months stay unchanged.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-fin-recurring-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-recurring-confirm-delete>Delete</button></div>'+
+    '</div>';
+  document.body.appendChild(recurringDeleteConfirmLayer);
+
+  const cancel=()=>{closeRecurringDeleteConfirm();closeRecurringSwipeRows();};
+  recurringDeleteConfirmLayer.querySelectorAll('[data-fin-recurring-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+  recurringDeleteConfirmLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+
+  const deleteButton=recurringDeleteConfirmLayer.querySelector('[data-fin-recurring-confirm-delete]');
+  deleteButton.addEventListener('click',async()=>{
+    deleteButton.disabled=true;
+    deleteButton.textContent='Deleting…';
+    const error=recurringDeleteConfirmLayer.querySelector('.tv2-confirm-error');
+    error.textContent='';
+    try{
+      const next=profile();
+      const nextConfig=recurringConfig();
+      nextConfig.custom=true;
+      const target=kind==='income'?nextConfig.incomes:nextConfig.expenses;
+      if(!target[index]) throw new Error('This recurring item no longer exists');
+      target.splice(index,1);
+      next.recurring=nextConfig;
+      const normalized=normalizeProfile(next);
+      financeState.financeProfiles[actor()]=normalized;
+      await post('saveFinanceProfile',{profile:normalized});
+      closeRecurringDeleteConfirm();
+      renderPage();
+      openRecurringManager();
+      toast('Recurring item removed');
+      setTimeout(loadState,800);
+    }catch(err){
+      deleteButton.disabled=false;
+      deleteButton.textContent='Delete';
+      error.textContent=err?.message||'Could not delete this recurring item';
+    }
+  });
+  setTimeout(()=>deleteButton.focus(),0);
+}
+function bindRecurringItemSwipe(root) {
+  recurringSwipeAbort?.abort();
+  const controller=new AbortController();
+  recurringSwipeAbort=controller;
+  const signal=controller.signal;
+  const mobile=()=>window.matchMedia?.('(max-width:760px)')?.matches??window.innerWidth<=760;
+  let swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};
+
+  const resetState=()=>{swipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null,direction:''};};
+  const paint=(row,distance,direction)=>{
+    const card=row.querySelector('.finance-recurring-tv2-row');
+    const action=row.querySelector(direction==='edit'?'.finance-recurring-edit-reveal':'.finance-recurring-delete-reveal');
+    const other=row.querySelector(direction==='edit'?'.finance-recurring-delete-reveal':'.finance-recurring-edit-reveal');
+    if(!card||!action)return;
+    const exposed=Math.abs(distance);
+    card.style.transition='none';
+    card.style.transform='translateX('+distance+'px)';
+    action.style.transition='none';
+    action.style.width=exposed+'px';
+    action.style.opacity=String(Math.min(1,.35+exposed/120));
+    if(other){other.style.width='0px';other.style.opacity='0';}
+  };
+  const finish=(row,direction)=>{
+    const card=row.querySelector('.finance-recurring-tv2-row');
+    const action=row.querySelector(direction==='edit'?'.finance-recurring-edit-reveal':'.finance-recurring-delete-reveal');
+    const width=row.getBoundingClientRect().width||window.innerWidth-32;
+    const distance=direction==='edit'?width:-width;
+    if(card){
+      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform='translateX('+distance+'px)';
+      card.style.opacity='.76';
+    }
+    if(action){
+      action.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      action.style.width=width+'px';
+      action.style.opacity='1';
+    }
+  };
+
+  root.addEventListener('touchstart',(e)=>{
+    if(!mobile()||recurringDeleteConfirmLayer||e.touches.length!==1)return;
+    const row=e.target.closest('.finance-recurring-swipe-row');
+    if(!row)return;
+    closeRecurringSwipeRows(row);
+    resetRecurringSwipeVisual(row,false);
+    const t=e.touches[0];
+    swipe={tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,row,direction:''};
+  },{passive:true,signal});
+
+  root.addEventListener('touchmove',(e)=>{
+    if(!swipe.tracking||!swipe.row||e.touches.length!==1)return;
+    const t=e.touches[0],dx=t.clientX-swipe.startX,dy=Math.abs(t.clientY-swipe.startY);
+    swipe.lastX=t.clientX;
+    if(!swipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      const horizontal=Math.abs(dx)>dy*1.2;
+      const direction=dx>10?'edit':dx<-10?'delete':'';
+      if(horizontal&&direction){swipe.active=true;swipe.direction=direction;}
+      else if(dy>=Math.abs(dx)||(horizontal&&Math.abs(dx)>10&&!direction)){resetState();return;}
+    }
+    if(!swipe.active)return;
+    e.preventDefault();
+    const width=swipe.row.getBoundingClientRect().width||window.innerWidth-32;
+    const maxDistance=width*.94;
+    const distance=swipe.direction==='edit'
+      ? Math.max(0,Math.min(maxDistance,dx))
+      : Math.min(0,Math.max(-maxDistance,dx));
+    paint(swipe.row,distance,swipe.direction);
+  },{passive:false,signal});
+
+  root.addEventListener('touchend',()=>{
+    if(!swipe.tracking||!swipe.row){resetState();return;}
+    const row=swipe.row,dx=swipe.lastX-swipe.startX,direction=swipe.direction;
+    const width=row.getBoundingClientRect().width||window.innerWidth-32;
+    const threshold=Math.max(180,width*.62);
+    const fullSwipe=swipe.active&&((direction==='edit'&&dx>=threshold)||(direction==='delete'&&-dx>=threshold));
+    if(!swipe.active||!fullSwipe){
+      resetRecurringSwipeVisual(row,true);
+      resetState();
+      return;
+    }
+    recurringSwipeIgnoreUntil=Date.now()+550;
+    const kind=row.dataset.finRecurringKind,index=Number(row.dataset.finRecurringIndex);
+    finish(row,direction);
+    resetState();
+    setTimeout(()=>{
+      resetRecurringSwipeVisual(row,false);
+      if(direction==='edit') openRecurringEditor(kind,index);
+      else openRecurringDeleteConfirm(kind,index);
+    },180);
+  },{passive:true,signal});
+
+  root.addEventListener('touchcancel',()=>{
+    resetRecurringSwipeVisual(swipe.row,true);
+    resetState();
+  },{passive:true,signal});
 }
 
 function openRecurringManager() {
@@ -571,8 +756,10 @@ function openRecurringManager() {
   const modalBody=$('#financeMiniBody');
   $('[data-fin-recurring-close]',modalBody)?.addEventListener('click',closeMini);
   if (modalBody) {
+    bindRecurringItemSwipe(modalBody);
     modalBody.onclick=(e)=>{
-      const edit=e.target.closest?.('[data-fin-recurring-kind]');
+      if(Date.now()<recurringSwipeIgnoreUntil)return;
+      const edit=e.target.closest?.('.finance-recurring-swipe-row');
       if(edit){openRecurringEditor(edit.dataset.finRecurringKind,Number(edit.dataset.finRecurringIndex));return;}
       const add=e.target.closest?.('[data-fin-recurring-add]');
       if(add) openRecurringEditor(add.dataset.finRecurringAdd,-1);
@@ -1016,6 +1203,9 @@ function closeMini() {
   modal?.setAttribute('aria-hidden', 'true');
   document.documentElement.classList.remove('finance-month-focus');
   document.body.classList.remove('finance-month-focus');
+  recurringSwipeAbort?.abort();
+  recurringSwipeAbort=null;
+  closeRecurringDeleteConfirm();
 }
 
 async function saveProfile(next, message = 'Balances updated') {
