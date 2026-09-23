@@ -81,3 +81,23 @@
     max-width:calc(100% - 12px)!important;
   }
 }
+
+
+/* Hide scrollbars throughout the mobile app while preserving scrolling. */
+@media (max-width:760px) {
+  html,
+  body,
+  body * {
+    scrollbar-width:none!important;
+    -ms-overflow-style:none!important;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  body *::-webkit-scrollbar {
+    width:0!important;
+    height:0!important;
+    display:none!important;
+    background:transparent!important;
+  }
+}
