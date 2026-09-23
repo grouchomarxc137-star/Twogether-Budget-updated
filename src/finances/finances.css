@@ -3574,3 +3574,69 @@ dialog.finance-log-host .tv2-sheet {
     max-height:94dvh!important;
   }
 }
+
+
+/* Trips-style mobile swipe actions for logged finance entries. */
+.finance-month-swipe-row {
+  display:block;
+}
+
+.finance-month-edit-reveal,
+.finance-month-delete-reveal {
+  display:none;
+}
+
+@media(max-width:760px) {
+  .finance-month-swipe-row {
+    position:relative;
+    display:block;
+    overflow:hidden;
+  }
+
+  .finance-month-swipe-row>.overview-trip-expense {
+    position:relative;
+    z-index:2;
+    width:100%;
+    background:#f8f5ef!important;
+    transition:transform .2s cubic-bezier(.22,.8,.28,1),opacity .16s ease;
+    will-change:transform,opacity;
+    touch-action:pan-y;
+  }
+
+  .finance-month-edit-reveal,
+  .finance-month-delete-reveal {
+    position:absolute;
+    top:0;
+    bottom:0;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:0;
+    overflow:hidden;
+    opacity:0;
+    pointer-events:none;
+    white-space:nowrap;
+    font-weight:700;
+    font-size:14px;
+    will-change:width,opacity;
+  }
+
+  .finance-month-edit-reveal {
+    left:0;
+    background:#efe4bd;
+    color:#6b5417;
+  }
+
+  .finance-month-delete-reveal {
+    right:0;
+    background:#a84a37;
+    color:#fff;
+  }
+
+  .finance-month-edit-reveal b,
+  .finance-month-delete-reveal b {
+    min-width:max-content;
+    font:inherit;
+  }
+}
