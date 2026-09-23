@@ -900,6 +900,16 @@
 }
 
 /* Monthly finances fully reuse the Trips visual system. */
+html.finance-month-focus,
+body.finance-month-focus {
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+.finance-mini-modal.is-month-detail .finance-mini-backdrop {
+  background:rgba(38,34,30,.24);
+  -webkit-backdrop-filter:blur(9px);
+  backdrop-filter:blur(9px);
+}
 .finance-mini-modal.is-month-detail {
   padding:14px;
 }

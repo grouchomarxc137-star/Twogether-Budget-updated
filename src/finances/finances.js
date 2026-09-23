@@ -857,7 +857,10 @@ function showMini(html, mode = '') {
   ensureMiniModal();
   const modal = $('#financeMiniModal');
   $('#financeMiniBody').innerHTML = html;
-  modal.classList.toggle('is-month-detail', mode === 'month-detail');
+  const monthDetail = mode === 'month-detail';
+  modal.classList.toggle('is-month-detail', monthDetail);
+  document.documentElement.classList.toggle('finance-month-focus', monthDetail);
+  document.body.classList.toggle('finance-month-focus', monthDetail);
   modal.classList.add('show');
   modal.setAttribute('aria-hidden', 'false');
 }
@@ -865,6 +868,8 @@ function closeMini() {
   const modal = $('#financeMiniModal');
   modal?.classList.remove('show','is-month-detail');
   modal?.setAttribute('aria-hidden', 'true');
+  document.documentElement.classList.remove('finance-month-focus');
+  document.body.classList.remove('finance-month-focus');
 }
 
 async function saveProfile(next, message = 'Balances updated') {
