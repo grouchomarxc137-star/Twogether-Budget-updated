@@ -3581,7 +3581,6 @@ dialog.finance-log-host .tv2-sheet {
   display:block;
 }
 
-.finance-month-edit-reveal,
 .finance-month-delete-reveal {
   display:none;
 }
@@ -3603,10 +3602,10 @@ dialog.finance-log-host .tv2-sheet {
     touch-action:pan-y;
   }
 
-  .finance-month-edit-reveal,
   .finance-month-delete-reveal {
     position:absolute;
     top:0;
+    right:0;
     bottom:0;
     z-index:1;
     display:flex;
@@ -3617,26 +3616,19 @@ dialog.finance-log-host .tv2-sheet {
     opacity:0;
     pointer-events:none;
     white-space:nowrap;
+    background:#a84a37;
+    color:#fff;
     font-weight:700;
     font-size:14px;
     will-change:width,opacity;
   }
 
-  .finance-month-edit-reveal {
-    left:0;
-    background:#efe4bd;
-    color:#6b5417;
-  }
-
-  .finance-month-delete-reveal {
-    right:0;
-    background:#a84a37;
-    color:#fff;
-  }
-
-  .finance-month-edit-reveal b,
   .finance-month-delete-reveal b {
     min-width:max-content;
     font:inherit;
+  }
+
+  .finance-month-overview .overview-trip-dock {
+    touch-action:pan-x;
   }
 }
