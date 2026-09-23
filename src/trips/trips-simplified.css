@@ -380,6 +380,13 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     width:calc(100vw - 18px);
     max-height:calc(100dvh - 18px);
     border-radius:22px;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+  }
+  #twCurrentTrips.tv2-root.tv2-trip-view::-webkit-scrollbar{
+    width:0;
+    height:0;
+    display:none;
   }
   #twCurrentTrips.tv2-root.tv2-trip-view>.tv2-page{
     padding:16px 14px 6px;
