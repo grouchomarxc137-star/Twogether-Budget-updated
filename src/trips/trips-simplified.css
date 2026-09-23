@@ -49,11 +49,25 @@ html body #app#app .tv2-root h1, .tv2-layer .tv2-sheet h2 { font-family: inherit
 .tv2-fig span { font-size: 13.5px; color: var(--tv2-muted); }
 .tv2-fig b { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
-.tv2-nudge { font-size: 13px; color: var(--tv2-muted); text-decoration: underline; text-underline-offset: 3px; }
+.tv2-nudge { justify-self:start; margin:-2px 0 -4px; padding:4px 0!important; font-size:13px!important; color:var(--tv2-muted)!important; text-decoration:underline; text-underline-offset:3px; position:relative; z-index:2; }
 .tv2-left { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .tv2-left b { font-size: 34px; font-weight: 700; letter-spacing: -.01em; color: var(--tv2-good); font-variant-numeric: tabular-nums; line-height: 1.05; overflow-wrap: anywhere; }
 .tv2-left span { font-size: 17px; color: var(--tv2-good); font-weight: 600; }
 .tv2-left.is-over b, .tv2-left.is-over span { color: var(--tv2-over); }
+
+.tv2-budget-edit-page { align-content:start; }
+.tv2-budget-editor-card { display:grid; gap:12px; padding:18px; border:1px solid var(--tv2-line); border-radius:18px; background:var(--tv2-card); }
+.tv2-budget-editor-label { font-size:15px; color:var(--tv2-muted); line-height:1.4; }
+.tv2-budget-editor-amount { display:flex; align-items:baseline; gap:7px; padding:7px 0 10px; border-bottom:2px solid var(--tv2-line); }
+.tv2-budget-editor-amount:focus-within { border-color:var(--tv2-primary); }
+.tv2-budget-editor-amount span { font-size:27px; color:var(--tv2-faint); font-weight:550; }
+.tv2-budget-editor-amount input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--tv2-ink); font:inherit; font-size:40px!important; font-weight:650; font-variant-numeric:tabular-nums; padding:0; }
+.tv2-budget-editor-amount input::placeholder { color:var(--tv2-line); }
+.tv2-budget-editor-help { margin:0; color:var(--tv2-muted); font-size:13.5px; line-height:1.4; }
+.tv2-budget-editor-error { min-height:18px; margin:0; color:var(--tv2-over); font-size:13.5px; }
+.tv2-budget-editor-error:empty { display:none; }
+.tv2-budget-editor-save { margin-top:2px; }
+
 .tv2-bar { display: block; height: 6px; border-radius: 99px; background: var(--tv2-line); overflow: hidden; }
 .tv2-bar i { display: block; height: 100%; border-radius: inherit; background: var(--tv2-good); }
 .tv2-bar.is-over i { background: var(--tv2-over); }

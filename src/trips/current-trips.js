@@ -83,6 +83,12 @@ function ensureCurrentTrips() {
     section.dataset.tv2Full = '1';
     section.addEventListener('click', handleSimplifiedClick);
     section.addEventListener('keydown', (e) => {
+      const budgetInput = e.target.closest('[data-personal-budget-input]');
+      if (budgetInput && e.key === 'Enter') {
+        e.preventDefault();
+        section.querySelector('[data-act="save-my-budget"]')?.click();
+        return;
+      }
       const card = e.target.closest('[data-act="toggle-budget-view"]');
       if (!card || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
@@ -291,7 +297,7 @@ function simplifiedTrip(plan, trip) {
     '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="home">‹ Trips</button><button class="tv2-link" data-act="edit-trip">Edit</button></div>'+
       '<h1>'+esc(meta.city || locationLabel(meta))+'</h1><p>'+esc(shortRange(meta.start,meta.end))+(statusLine(meta)?' · '+esc(statusLine(meta)):'')+'</p></header>'+
     '<section class="tv2-money'+personalClass+'" data-act="toggle-budget-view" role="button" tabindex="0" aria-label="'+(personal?'Show combined trip budget':'Show your personal trip budget')+'"><div class="tv2-figs">'+
-      '<div class="tv2-fig"><span>'+budgetLabel+'</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!personal&&!has(plan?.budgets?.[me])?'<small class="tv2-nudge">+ add yours</small>':'')+'</div>'+
+      '<div class="tv2-fig"><span>'+budgetLabel+'</span><b>'+(available == null?'Not set':displayMoney(available))+'</b>'+(!personal&&!has(plan?.budgets?.[me])?'<button type="button" class="tv2-nudge" data-act="add-my-budget">+ add yours</button>':'')+'</div>'+
       '<div class="tv2-fig"><span>Spent</span><b>'+displayMoney(spent)+'</b></div></div>'+
       (available && available > 0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></div>':'')+
       (left == null?'':'<div class="tv2-left '+(over?'is-over':'')+'"><b>'+displayMoney(Math.abs(left))+'</b><span>'+(over?'over budget':'left')+'</span></div>')+
@@ -302,6 +308,21 @@ function simplifiedTrip(plan, trip) {
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
 }
+function simplifiedPersonalBudgetEditor(plan) {
+  const me = actor(), meta = plan?.meta || {};
+  return '<div class="tv2-page tv2-budget-edit-page">'+
+    '<header class="tv2-trip-head"><div class="tv2-nav"><button class="tv2-link" data-act="cancel-budget-editor">‹ '+esc(meta.city || 'Trip')+'</button></div>'+
+      '<h1>Add my budget</h1><p>'+esc(shortRange(meta.start,meta.end))+' · Only your personal trip budget</p></header>'+
+    '<section class="tv2-budget-editor-card">'+
+      '<label class="tv2-budget-editor-label" for="tv2PersonalBudgetInput">How much do you want available for this trip?</label>'+
+      '<div class="tv2-budget-editor-amount"><span aria-hidden="true">€</span><input id="tv2PersonalBudgetInput" data-personal-budget-input inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Your personal trip budget"></div>'+
+      '<p class="tv2-budget-editor-help">This is your own budget. '+esc(me === 'Principessa' ? 'Principe' : 'Principessa')+' keeps their own separately.</p>'+
+      '<p class="tv2-budget-editor-error" data-budget-error aria-live="polite"></p>'+
+    '</section>'+
+    '<button type="button" class="tv2-primary tv2-budget-editor-save" data-act="save-my-budget">Save my budget</button>'+
+  '</div>';
+}
+
 function setTripFocusLock(locked) {
   const body = document.body, html = document.documentElement;
   if (locked) {
@@ -329,7 +350,7 @@ function renderCurrentTrips() {
       root.classList.add('tv2-trip-view');
       section.classList.add('tv2-focus-open');
       setTripFocusLock(true);
-      root.innerHTML = simplifiedTrip(plan, trip);
+      root.innerHTML = simplifiedView.budgetEditor ? simplifiedPersonalBudgetEditor(plan) : simplifiedTrip(plan, trip);
       return;
     }
   }
@@ -1230,6 +1251,44 @@ async function handleSimplifiedClick(e) {
     return;
   }
   const plan = (remoteState?.plans || []).find((p)=>p.id===simplifiedView.planId); if (!plan) return;
+  if (b.dataset.act === 'add-my-budget') {
+    e.preventDefault();
+    e.stopPropagation();
+    simplifiedView.budgetEditor = true;
+    renderCurrentTrips();
+    return;
+  }
+  if (b.dataset.act === 'cancel-budget-editor') {
+    simplifiedView.budgetEditor = false;
+    renderCurrentTrips();
+    return;
+  }
+  if (b.dataset.act === 'save-my-budget') {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = section.querySelector('[data-personal-budget-input]');
+    const error = section.querySelector('[data-budget-error]');
+    const value = Number(String(input?.value || '').replace(',','.'));
+    if (!Number.isFinite(value) || value <= 0) {
+      if (error) error.textContent = 'Enter a valid budget amount.';
+      input?.focus();
+      return;
+    }
+    b.disabled = true;
+    b.textContent = 'Saving…';
+    if (error) error.textContent = '';
+    try {
+      await window.TwogetherAPI.post('savePlan',{id:plan.id,budget:value},actor());
+      simplifiedView.budgetEditor = false;
+      await refreshState(true);
+      simplifiedSnack('Your trip budget was added');
+    } catch (err) {
+      b.disabled = false;
+      b.textContent = 'Save my budget';
+      if (error) error.textContent = err?.message || 'Could not save your budget.';
+    }
+    return;
+  }
   if (b.dataset.act === 'toggle-budget-view') {
     simplifiedView.budgetMode = simplifiedView.budgetMode === 'personal' ? 'combined' : 'personal';
     renderCurrentTrips();
