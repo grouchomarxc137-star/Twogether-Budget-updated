@@ -623,6 +623,29 @@ function financeLogCategories(rec) {
     })),
   ];
 }
+function financeRecurringItemsForCategory(category) {
+  const config = recurringConfig();
+  if (category === 'income') {
+    return (config.incomes || []).map((item)=>({
+      id:item.id || item.name,
+      name:String(item.name || ''),
+      amount:item.amount,
+      day:normalizeRecurringDay(item.day),
+      group:'',
+      tone:'income',
+    })).filter((item)=>item.name);
+  }
+  if (!category || category === 'other') return [];
+  return (config.expenses || []).filter((item)=>groupTone(item.group)===category).map((item)=>({
+    id:item.id || item.name,
+    name:String(item.name || ''),
+    amount:item.amount,
+    day:normalizeRecurringDay(item.day),
+    group:normalizeGroup(item.group),
+    tone:category,
+  })).filter((item)=>item.name);
+}
+
 function financeGroupForTone(tone, name = '') {
   const lower = String(name || '').trim().toLowerCase();
   if (tone === 'fixed') return 'fixed';
@@ -661,7 +684,7 @@ function openFinanceTransactionSheet(rec) {
   if (!rec || rec.finalized) return;
   closeFinanceTransactionSheet();
   const categories=financeLogCategories(rec);
-  const state={amountText:'',category:'',name:'',date:'',more:false,busy:false,error:''};
+  const state={amountText:'',category:'',selectedItemId:'',name:'',group:'',date:'',more:false,busy:false,error:''};
   const layer=document.createElement('div');
   layer.className='tv2-layer finance-log-layer';
   layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="dialog" aria-modal="true" aria-label="Add expense"></div>';
@@ -684,20 +707,38 @@ function openFinanceTransactionSheet(rec) {
 
   function render() {
     const selected=categories.find((item)=>item.key===state.category);
+    const items=financeRecurringItemsForCategory(state.category);
     const bounds=financeDateBounds(rec.month);
+    const isOther=state.category==='other';
+    const itemPicker=state.category && !isOther
+      ? '<section class="finance-log-item-panel">'+
+          '<div class="finance-log-item-head"><span>'+esc(selected?.label || 'Items')+'</span><small>Select what you want to log</small></div>'+
+          (items.length
+            ? '<div class="finance-log-items">'+items.map((item,index)=>
+                '<button type="button" class="finance-log-item finance-tv2-tone-'+(selected?.tone||'other')+' '+(state.selectedItemId===String(item.id)?'on':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(state.selectedItemId===String(item.id)?'true':'false')+'">'+
+                  '<span><b>'+esc(item.name)+'</b><small>Usual amount</small></span><strong>'+money(item.amount)+'</strong><i aria-hidden="true">›</i>'+
+                '</button>'
+              ).join('')+'</div>'
+            : '<div class="finance-log-no-items">No recurring items are set in this category yet.</div>')+
+        '</section>'
+      : '';
+
     sheet.innerHTML=
       '<div class="tv2-sheet-head"><h2>Add expense</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
       '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
       '<div class="tv2-cats finance-tv2-cats" role="group" aria-label="Category">'+
         categories.map((item)=>'<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+' '+(state.category===item.key?'on':'')+'" data-fin-log-cat="'+item.key+'" aria-pressed="'+(state.category===item.key?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')+
       '</div>'+
-      (state.category
-        ? '<label class="tv2-field finance-tv2-name"><span>'+(state.category==='income'?'Income name':'Expense name')+'</span><input id="financeLogName" maxlength="100" placeholder="'+(state.category==='income'?'e.g. Salary':'e.g. Rent, Spotify, Groceries')+'" value="'+esc(state.name)+'"></label>'
+      itemPicker+
+      (isOther
+        ? '<label class="tv2-field finance-tv2-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
         : '')+
-      '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
-      '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></span></label></div>'+
+      ((state.name || isOther)
+        ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+          '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></span></label></div>'
+        : '')+
       '<p class="tv2-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
-      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button>';
+      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':state.category==='income'?'Log income':'Log expense')+'</button>';
 
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
@@ -712,15 +753,40 @@ function openFinanceTransactionSheet(rec) {
     const button=e.target.closest('button');
     if (!button) return;
     if (button.hasAttribute('data-fin-log-close')) { closeFinanceTransactionSheet(); return; }
+
     if (button.dataset.finLogCat) {
       state.category=button.dataset.finLogCat;
+      state.selectedItemId='';
       state.name='';
+      state.group=state.category==='other'?'other':'';
+      state.amountText='';
       state.error='';
+      state.more=false;
       render();
-      setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
+      if (state.category==='other') setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
       return;
     }
+
+    if (button.dataset.finLogItem != null) {
+      const items=financeRecurringItemsForCategory(state.category);
+      const item=items[Number(button.dataset.finLogItem)];
+      if (!item) return;
+      state.selectedItemId=String(item.id);
+      state.name=item.name;
+      state.group=item.group;
+      state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
+      state.error='';
+      render();
+      setTimeout(()=>{
+        const input=sheet.querySelector('#financeLogAmount');
+        input?.focus();
+        input?.select?.();
+      },0);
+      return;
+    }
+
     if (button.hasAttribute('data-fin-log-more')) { state.more=!state.more; render(); return; }
+
     if (button.hasAttribute('data-fin-log-save')) {
       if (!valid()||state.busy) return;
       state.busy=true; state.error=''; render();
@@ -728,7 +794,7 @@ function openFinanceTransactionSheet(rec) {
       if (state.category==='income') {
         next.incomes=[...(next.incomes||[]),{name:state.name.trim(),amount:amount(),date:state.date}];
       } else {
-        next.expenses=[...(next.expenses||[]),{group:financeGroupForTone(state.category,state.name),name:state.name.trim(),amount:amount(),date:state.date}];
+        next.expenses=[...(next.expenses||[]),{group:state.group||'other',name:state.name.trim(),amount:amount(),date:state.date}];
       }
       if (!recordFor(rec.month)) next.partialOnly=true;
       try {
@@ -743,6 +809,7 @@ function openFinanceTransactionSheet(rec) {
       }
     }
   });
+
   layer.querySelector('.tv2-backdrop').addEventListener('click',closeFinanceTransactionSheet);
   layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeFinanceTransactionSheet();});
   render();
