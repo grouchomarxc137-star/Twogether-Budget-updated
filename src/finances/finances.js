@@ -701,12 +701,17 @@ function bindRecurringItemSwipe(root) {
     const width=row.getBoundingClientRect().width||window.innerWidth-32;
     const threshold=Math.max(180,width*.62);
     const fullSwipe=swipe.active&&((direction==='edit'&&dx>=threshold)||(direction==='delete'&&-dx>=threshold));
-    if(!swipe.active||!fullSwipe){
+    if(!swipe.active){
       resetRecurringSwipeVisual(row,true);
       resetState();
       return;
     }
     recurringSwipeIgnoreUntil=Date.now()+550;
+    if(!fullSwipe){
+      resetRecurringSwipeVisual(row,true);
+      resetState();
+      return;
+    }
     const kind=row.dataset.finRecurringKind,index=Number(row.dataset.finRecurringIndex);
     finish(row,direction);
     resetState();
