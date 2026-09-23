@@ -1319,22 +1319,27 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
   const item=list[index];
   if(!item)return;
 
-  financeMonthDeleteConfirmLayer=document.createElement('div');
-  financeMonthDeleteConfirmLayer.className='tv2-confirm-layer';
+  financeMonthDeleteConfirmLayer=document.createElement('dialog');
+  financeMonthDeleteConfirmLayer.className='finance-month-delete-confirm-host';
+  financeMonthDeleteConfirmLayer.setAttribute('aria-label','Delete finance');
   financeMonthDeleteConfirmLayer.innerHTML=
-    '<div class="tv2-confirm-backdrop" data-fin-month-confirm-cancel></div>'+
-    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finMonthDeleteTitle">'+
-      '<h2 id="finMonthDeleteTitle">Delete finance?</h2>'+
-      '<p>Are you sure you want to delete <strong>'+esc(item.name||(kind==='income'?'Income':groupLabel(item.group)))+'</strong> · '+money(item.amount)+'?</p>'+
-      '<p class="tv2-confirm-note">This removes it from '+esc(monthLabel(rec.month))+'.</p>'+
-      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
-      '<div class="tv2-confirm-actions"><button type="button" data-fin-month-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-month-confirm-delete>Delete</button></div>'+
+    '<div class="tv2-confirm-layer">'+
+      '<div class="tv2-confirm-backdrop" data-fin-month-confirm-cancel></div>'+
+      '<div class="tv2-confirm-card" role="document" aria-labelledby="finMonthDeleteTitle">'+
+        '<h2 id="finMonthDeleteTitle">Delete finance?</h2>'+
+        '<p>Are you sure you want to delete <strong>'+esc(item.name||(kind==='income'?'Income':groupLabel(item.group)))+'</strong> · '+money(item.amount)+'?</p>'+
+        '<p class="tv2-confirm-note">This removes it from '+esc(monthLabel(rec.month))+'.</p>'+
+        '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions"><button type="button" data-fin-month-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-month-confirm-delete>Delete</button></div>'+
+      '</div>'+
     '</div>';
   document.body.appendChild(financeMonthDeleteConfirmLayer);
+  financeMonthDeleteConfirmLayer.showModal();
 
   const cancel=()=>{closeFinanceMonthDeleteConfirm();closeFinanceMonthSwipeRows();};
   financeMonthDeleteConfirmLayer.querySelectorAll('[data-fin-month-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
-  financeMonthDeleteConfirmLayer.addEventListener('keydown',(event)=>{if(event.key==='Escape')cancel();});
+  financeMonthDeleteConfirmLayer.addEventListener('cancel',(event)=>{event.preventDefault();cancel();});
+  financeMonthDeleteConfirmLayer.addEventListener('keydown',(event)=>{if(event.key==='Escape'){event.preventDefault();cancel();}});
 
   const deleteButton=financeMonthDeleteConfirmLayer.querySelector('[data-fin-month-confirm-delete]');
   deleteButton.addEventListener('click',async()=>{
