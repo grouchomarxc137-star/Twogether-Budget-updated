@@ -936,6 +936,7 @@ function financeGroupForTone(tone, name = '') {
 }
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
+  financeMonthDialog?.classList.remove('finance-log-background-locked');
   document.documentElement.classList.remove('finance-log-locked');
   document.body.classList.remove('finance-log-locked');
   document.body.classList.remove('tv2-locked');
@@ -1003,7 +1004,16 @@ function openFinanceTransactionSheet(rec, edit = null) {
   document.body.classList.add('finance-log-locked');
   document.body.classList.add('tv2-locked');
   document.body.classList.add('trip-expense-open');
+  financeMonthDialog?.classList.add('finance-log-background-locked');
   const sheet=layer.querySelector('.finance-log-sheet');
+
+  // Never let drag/wheel gestures on the dimmed area move the month behind the sheet.
+  layer.addEventListener('touchmove',(event)=>{
+    if(!event.target.closest('.finance-log-sheet')) event.preventDefault();
+  },{passive:false});
+  layer.addEventListener('wheel',(event)=>{
+    if(!event.target.closest('.finance-log-sheet')) event.preventDefault();
+  },{passive:false});
 
   function resetToCategories() {
     state.category='';
@@ -1209,6 +1219,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
         document.body.classList.add('finance-log-locked');
         document.body.classList.add('tv2-locked');
         document.body.classList.add('trip-expense-open');
+        financeMonthDialog?.classList.add('finance-log-background-locked');
         render();
       }
     }
