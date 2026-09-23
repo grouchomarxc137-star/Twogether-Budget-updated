@@ -3111,3 +3111,62 @@ body.finance-month-focus {
     animation:none;
   }
 }
+
+
+/* Trips-style Log Finances home */
+.finance-log-home-head {
+  display:grid;
+  gap:4px;
+}
+
+.finance-log-home-head p {
+  margin:0;
+  color:var(--tv2-muted);
+  font-size:15px;
+  line-height:1.4;
+}
+
+.finance-log-home-head .tv2-nav {
+  align-items:center;
+}
+
+.finance-log-home-head .tv2-link {
+  justify-self:end;
+}
+
+.finance-months-tv2 {
+  gap:10px;
+}
+
+.finance-month-tv2-card {
+  cursor:pointer;
+}
+
+.finance-month-tv2-card .tv2-card-money {
+  align-items:baseline;
+  gap:12px;
+}
+
+.finance-month-tv2-card .tv2-card-money span {
+  min-width:0;
+  color:var(--tv2-muted);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.finance-month-tv2-card .tv2-card-money b {
+  flex:0 0 auto;
+  text-align:right;
+  font-size:15px;
+  font-weight:600;
+  color:var(--tv2-ink);
+}
+
+.finance-month-tv2-card .tv2-card-money b.is-over {
+  color:var(--tv2-over);
+}
+
+.finance-month-tv2-card.is-empty {
+  background:transparent;
+}
