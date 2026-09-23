@@ -526,72 +526,123 @@ function renderScenarioPanel() {
 }
 
 function recurringRow(kind, item, index) {
-  const tone = kind === 'income' ? 'other' : groupTone(item.group);
+  const tone = kind === 'income' ? 'income' : groupTone(item.group);
   const sub = kind === 'income' ? 'Income' : (actor() === 'Principe' ? categoryLabel(tone) : groupLabel(item.group));
   const day = normalizeRecurringDay(item.day);
-  const timing = day === '' ? '' : `Usually ${ordinalDay(day)}`;
-  const detail = timing ? `${sub} · ${timing}` : sub;
-  return `<button class="finance-recurring-row finance-tone-${tone}" type="button" data-fin-recurring-kind="${kind}" data-fin-recurring-index="${index}"><span><strong>${esc(item.name)}</strong><small>${esc(detail)}</small></span><b>${money(item.amount)} <i>›</i></b></button>`;
+  const timing = day === '' ? '' : 'Usually '+ordinalDay(day);
+  const detail = [sub,timing].filter(Boolean).join(' · ');
+  return '<button class="tv2-row finance-recurring-tv2-row" type="button" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
+    '<span class="tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,kind)+'</span>'+
+    '<span class="tv2-row-main"><strong>'+esc(item.name)+'</strong><small>'+esc(detail)+'</small></span>'+
+    '<span class="tv2-amt">'+money(item.amount)+'</span>'+
+  '</button>';
 }
 
 function openRecurringManager() {
   const config = recurringConfig();
-  const incomes = config.incomes.length ? config.incomes.map((x, i) => recurringRow('income', x, i)).join('') : '<div class="finance-current-empty">No recurring income yet.</div>';
-  const expenseRows = config.expenses.map((x, i) => ({ ...x, index: i, tone: groupTone(x.group) }));
+  const incomes = config.incomes.length
+    ? config.incomes.map((x,i)=>recurringRow('income',x,i)).join('')
+    : '<div class="tv2-empty-list">No recurring income yet.</div>';
+  const expenseRows = config.expenses.map((x,i)=>({...x,index:i,tone:groupTone(x.group)}));
   const grouped = {};
-  expenseRows.forEach((x) => (grouped[x.tone] || (grouped[x.tone] = [])).push(x));
-  const expenses = categoryOrder().filter((tone) => grouped[tone]?.length).map((tone) => `<div class="finance-recurring-group"><h3>${esc(categoryLabel(tone))}</h3>${grouped[tone].map((x) => recurringRow('expense', x, x.index)).join('')}</div>`).join('') || '<div class="finance-current-empty">No recurring expenses yet.</div>';
-  showMini(`<span class="panel-kicker">MONTHLY DEFAULTS</span><h2>Manage recurring items</h2><p>These are the usual items Twogether asks you to confirm each month. Changes apply to future monthly check-ins only — confirmed months stay untouched.</p><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Income</h3><button class="text-btn" type="button" data-fin-recurring-add="income">+ Add</button></div>${incomes}</div><div class="finance-recurring-section"><div class="finance-recurring-title"><h3>Outflow</h3><button class="text-btn" type="button" data-fin-recurring-add="expense">+ Add</button></div>${expenses}</div>`);
-  const modalBody = $('#financeMiniBody');
+  expenseRows.forEach((x)=>(grouped[x.tone]||(grouped[x.tone]=[])).push(x));
+  const expenses = categoryOrder().filter((tone)=>grouped[tone]?.length).map((tone)=>
+    '<div class="tv2-day finance-recurring-category"><h2>'+esc(categoryLabel(tone))+'</h2>'+
+      grouped[tone].map((x)=>recurringRow('expense',x,x.index)).join('')+
+    '</div>'
+  ).join('') || '<div class="tv2-empty-list">No recurring expenses yet.</div>';
+
+  showMini(
+    '<div class="tv2-root finance-recurring-tv2">'+
+      '<div class="tv2-page">'+
+        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-recurring-close>‹ Finances</button><span></span></div>'+
+          '<h1>Manage recurring items</h1></header>'+
+        '<section class="tv2-list finance-recurring-list">'+
+          '<div class="finance-recurring-tv2-head"><h2>Income</h2><button type="button" class="tv2-link" data-fin-recurring-add="income">＋ Add</button></div>'+
+          incomes+
+          '<div class="finance-recurring-tv2-head is-outflow"><h2>Outflow</h2><button type="button" class="tv2-link" data-fin-recurring-add="expense">＋ Add</button></div>'+
+          expenses+
+        '</section>'+
+      '</div>'+
+    '</div>',
+    'recurring-manager'
+  );
+
+  const modalBody=$('#financeMiniBody');
+  $('[data-fin-recurring-close]',modalBody)?.addEventListener('click',closeMini);
   if (modalBody) {
-    modalBody.onclick = (e) => {
-      const edit = e.target.closest?.('[data-fin-recurring-kind]');
-      if (edit) {
-        openRecurringEditor(edit.dataset.finRecurringKind, Number(edit.dataset.finRecurringIndex));
-        return;
-      }
-      const add = e.target.closest?.('[data-fin-recurring-add]');
-      if (add) openRecurringEditor(add.dataset.finRecurringAdd, -1);
+    modalBody.onclick=(e)=>{
+      const edit=e.target.closest?.('[data-fin-recurring-kind]');
+      if(edit){openRecurringEditor(edit.dataset.finRecurringKind,Number(edit.dataset.finRecurringIndex));return;}
+      const add=e.target.closest?.('[data-fin-recurring-add]');
+      if(add) openRecurringEditor(add.dataset.finRecurringAdd,-1);
     };
   }
 }
 
-function openRecurringEditor(kind, index) {
-  const config = recurringConfig();
-  const list = kind === 'income' ? config.incomes : config.expenses;
-  const item = index >= 0 ? list[index] : null;
-  const isExpense = kind === 'expense';
-  const groups = recurringExpenseGroups();
-  const selectedGroup = item?.group || groups[0]?.key || 'other';
-  const groupField = isExpense ? `<label>Category<select id="finRecurringGroup">${groups.map((g) => `<option value="${g.key}" ${g.key === selectedGroup ? 'selected' : ''}>${esc(g.label)}</option>`).join('')}</select></label>` : '';
-  showMini(`<span class="panel-kicker">RECURRING ${isExpense ? 'OUTFLOW' : 'INCOME'}</span><h2>${item ? 'Edit recurring item' : 'Add recurring item'}</h2><p>This changes what is suggested in future monthly check-ins. The usual day is optional and can still be changed for a specific month.</p><div class="finance-mini-fields"><label>Name<input id="finRecurringName" value="${esc(item?.name || '')}" placeholder="${isExpense ? 'e.g. Spotify' : 'e.g. Salary'}"></label>${groupField}<label>Usual amount<div class="finance-money mini"><span>€</span><input id="finRecurringAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label><label>Usual day of month <small>Optional · e.g. 30</small><input id="finRecurringDay" type="number" inputmode="numeric" min="1" max="31" value="${esc(String(item?.day ?? ''))}" placeholder="Day"></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-recurring-delete>Remove</button>' : '<button class="btn ghost" type="button" data-fin-recurring-back>Back</button>'}<button class="btn primary" type="button" data-fin-recurring-save>Save</button></div>`);
-  $('[data-fin-recurring-back]')?.addEventListener('click', openRecurringManager);
-  $('[data-fin-recurring-save]')?.addEventListener('click', async () => {
-    const name = String($('#finRecurringName')?.value || '').trim();
-    const amount = $('#finRecurringAmount')?.value || '';
-    const dayRaw = String($('#finRecurringDay')?.value || '').trim();
-    const day = normalizeRecurringDay(dayRaw);
-    if (!name) return toast('Add a name first', 'warn');
-    if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn');
-    if (dayRaw && day === '') return toast('Choose a day from 1 to 31, or leave it blank', 'warn');
-    const next = profile();
-    const nextConfig = recurringConfig();
-    nextConfig.custom = true;
-    const row = { id: item?.id || uid(), name, amount: n(amount), day };
-    if (isExpense) row.group = $('#finRecurringGroup')?.value || selectedGroup;
-    const target = isExpense ? nextConfig.expenses : nextConfig.incomes;
-    if (index >= 0) target[index] = row; else target.push(row);
-    next.recurring = nextConfig;
-    await saveProfile(next, 'Recurring item saved');
+function openRecurringEditor(kind,index) {
+  const config=recurringConfig();
+  const list=kind==='income'?config.incomes:config.expenses;
+  const item=index>=0?list[index]:null;
+  const isExpense=kind==='expense';
+  const groups=recurringExpenseGroups();
+  const selectedGroup=item?.group||groups[0]?.key||'other';
+  const referenceMonth=/^\d{4}-\d{2}$/.test(String(selectedMonth||''))?selectedMonth:'2026-09';
+  const bounds=financeDateBounds(referenceMonth);
+  const selectedDate=financeDateForDay(referenceMonth,item?.day);
+  const groupField=isExpense
+    ? '<label class="tv2-field"><span>Category</span><select id="finRecurringGroup" class="finance-recurring-select">'+groups.map((g)=>'<option value="'+g.key+'" '+(g.key===selectedGroup?'selected':'')+'>'+esc(g.label)+'</option>').join('')+'</select></label>'
+    : '';
+
+  showMini(
+    '<div class="tv2-root finance-recurring-tv2">'+
+      '<div class="tv2-page tv2-budget-edit-page">'+
+        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-recurring-back>‹ Recurring items</button><span></span></div>'+
+          '<h1>'+(item?'Edit item':'Add item')+'</h1><p>'+(isExpense?'Monthly outflow':'Monthly income')+'</p></header>'+
+        '<section class="tv2-budget-editor-card finance-recurring-editor-card">'+
+          '<label class="tv2-field"><span>Name</span><input id="finRecurringName" value="'+esc(item?.name||'')+'" placeholder="'+(isExpense?'e.g. Spotify':'e.g. Salary')+'"></label>'+
+          groupField+
+          '<label class="tv2-field"><span>Usual amount</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0.00"></div></label>'+
+          '<label class="tv2-field tv2-date-field"><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
+        '</section>'+
+        '<div class="finance-recurring-editor-actions">'+
+          (item?'<button type="button" class="tv2-btn finance-recurring-remove" data-fin-recurring-delete>Remove</button>':'<span></span>')+
+          '<button type="button" class="tv2-primary" data-fin-recurring-save>Save</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>',
+    'recurring-manager'
+  );
+
+  $('[data-fin-recurring-back]')?.addEventListener('click',openRecurringManager);
+  $('[data-fin-recurring-save]')?.addEventListener('click',async()=>{
+    const name=String($('#finRecurringName')?.value||'').trim();
+    const amount=$('#finRecurringAmount')?.value||'';
+    const dateRaw=String($('#finRecurringDate')?.value||'').trim();
+    const safeDate=dateRaw?normalizeFinanceDate(dateRaw,referenceMonth):'';
+    const day=safeDate?Number(safeDate.slice(-2)):'';
+    if(!name) return toast('Add a name first','warn');
+    if(amount===''||!Number.isFinite(Number(amount.replace(',','.')))) return toast('Enter a valid amount','warn');
+    if(dateRaw&&!safeDate) return toast('Choose a valid date','warn');
+    const next=profile();
+    const nextConfig=recurringConfig();
+    nextConfig.custom=true;
+    const row={id:item?.id||uid(),name,amount:n(amount),day};
+    if(isExpense) row.group=$('#finRecurringGroup')?.value||selectedGroup;
+    const target=isExpense?nextConfig.expenses:nextConfig.incomes;
+    if(index>=0) target[index]=row; else target.push(row);
+    next.recurring=nextConfig;
+    await saveProfile(next,'Recurring item saved');
   });
-  $('[data-fin-recurring-delete]')?.addEventListener('click', async () => {
-    const next = profile();
-    const nextConfig = recurringConfig();
-    nextConfig.custom = true;
-    const target = isExpense ? nextConfig.expenses : nextConfig.incomes;
-    target.splice(index, 1);
-    next.recurring = nextConfig;
-    await saveProfile(next, 'Recurring item removed');
+
+  $('[data-fin-recurring-delete]')?.addEventListener('click',async()=>{
+    const next=profile();
+    const nextConfig=recurringConfig();
+    nextConfig.custom=true;
+    const target=isExpense?nextConfig.expenses:nextConfig.incomes;
+    target.splice(index,1);
+    next.recurring=nextConfig;
+    await saveProfile(next,'Recurring item removed');
   });
 }
 
@@ -950,15 +1001,18 @@ function showMini(html, mode = '') {
   const modal = $('#financeMiniModal');
   $('#financeMiniBody').innerHTML = html;
   const monthDetail = mode === 'month-detail';
+  const recurringManager = mode === 'recurring-manager';
+  const focused = monthDetail || recurringManager;
   modal.classList.toggle('is-month-detail', monthDetail);
-  document.documentElement.classList.toggle('finance-month-focus', monthDetail);
-  document.body.classList.toggle('finance-month-focus', monthDetail);
+  modal.classList.toggle('is-recurring-manager', recurringManager);
+  document.documentElement.classList.toggle('finance-month-focus', focused);
+  document.body.classList.toggle('finance-month-focus', focused);
   modal.classList.add('show');
   modal.setAttribute('aria-hidden', 'false');
 }
 function closeMini() {
   const modal = $('#financeMiniModal');
-  modal?.classList.remove('show','is-month-detail');
+  modal?.classList.remove('show','is-month-detail','is-recurring-manager');
   modal?.setAttribute('aria-hidden', 'true');
   document.documentElement.classList.remove('finance-month-focus');
   document.body.classList.remove('finance-month-focus');

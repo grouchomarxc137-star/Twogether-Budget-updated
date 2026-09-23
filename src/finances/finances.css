@@ -905,15 +905,18 @@ body.finance-month-focus {
   overflow:hidden!important;
   overscroll-behavior:none!important;
 }
-.finance-mini-modal.is-month-detail .finance-mini-backdrop {
+.finance-mini-modal.is-month-detail .finance-mini-backdrop,
+.finance-mini-modal.is-recurring-manager .finance-mini-backdrop {
   background:rgba(38,34,30,.24);
   -webkit-backdrop-filter:blur(9px);
   backdrop-filter:blur(9px);
 }
-.finance-mini-modal.is-month-detail {
+.finance-mini-modal.is-month-detail,
+.finance-mini-modal.is-recurring-manager {
   padding:14px;
 }
-.finance-mini-modal.is-month-detail .finance-mini-card {
+.finance-mini-modal.is-month-detail .finance-mini-card,
+.finance-mini-modal.is-recurring-manager .finance-mini-card {
   width:min(590px,calc(100vw - 28px));
   max-height:calc(100dvh - 28px);
   overflow-x:hidden;
@@ -927,15 +930,18 @@ body.finance-month-focus {
   scrollbar-width:none;
   -ms-overflow-style:none;
 }
-.finance-mini-modal.is-month-detail .finance-mini-card::-webkit-scrollbar {
+.finance-mini-modal.is-month-detail .finance-mini-card::-webkit-scrollbar,
+.finance-mini-modal.is-recurring-manager .finance-mini-card::-webkit-scrollbar {
   width:0;
   height:0;
   display:none;
 }
-.finance-mini-modal.is-month-detail .finance-mini-close {
+.finance-mini-modal.is-month-detail .finance-mini-close,
+.finance-mini-modal.is-recurring-manager .finance-mini-close {
   display:none;
 }
-.finance-mini-modal.is-month-detail #financeMiniBody {
+.finance-mini-modal.is-month-detail #financeMiniBody,
+.finance-mini-modal.is-recurring-manager #financeMiniBody {
   --tv2-bg:#f7f4ef;
   --tv2-card:#fffdf9;
   --tv2-ink:#26221e;
@@ -1085,6 +1091,108 @@ body.finance-month-focus {
 .finance-log-layer .finance-log-hint.is-error {
   color:#a84a37;
 }
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2>.tv2-page {
+  max-width:none;
+  min-height:0;
+  margin:0;
+  padding:18px 18px 24px;
+}
+.finance-recurring-tv2-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:2px 0 4px;
+}
+.finance-recurring-tv2-head h2 {
+  margin:0;
+  color:var(--tv2-muted);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.02em;
+}
+.finance-recurring-tv2-head.is-outflow {
+  margin-top:12px;
+}
+.finance-recurring-tv2-head .tv2-link {
+  min-height:30px;
+  padding:2px 0;
+  font-size:14px;
+}
+.finance-recurring-category {
+  margin-top:6px;
+}
+.finance-recurring-tv2-row {
+  cursor:pointer;
+}
+.finance-recurring-tv2-row .tv2-amt {
+  padding-right:2px;
+}
+.finance-recurring-editor-card {
+  gap:14px;
+}
+.finance-recurring-select {
+  box-sizing:border-box;
+  width:100%;
+  min-height:46px;
+  border:1px solid var(--tv2-line);
+  border-radius:12px;
+  background:var(--tv2-card);
+  padding:0 12px;
+  color:var(--tv2-ink);
+  font:inherit;
+  font-size:16px;
+}
+.finance-recurring-amount {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:46px;
+  padding:0 12px;
+  border:1px solid var(--tv2-line);
+  border-radius:12px;
+  background:var(--tv2-card);
+}
+.finance-recurring-amount b {
+  color:var(--tv2-faint);
+  font-size:18px;
+}
+.finance-recurring-amount input {
+  flex:1;
+  min-width:0;
+  border:0!important;
+  padding:0!important;
+  background:transparent!important;
+  outline:0;
+  font-size:18px!important;
+}
+.finance-recurring-editor-actions {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:10px;
+  align-items:center;
+}
+.finance-recurring-editor-actions>span {
+  display:block;
+}
+.finance-recurring-remove {
+  color:var(--tv2-over)!important;
+  border-color:#efcfc6!important;
+}
+@media(max-width:760px) {
+  .finance-mini-modal.is-recurring-manager {
+    padding:9px;
+  }
+  .finance-mini-modal.is-recurring-manager .finance-mini-card {
+    width:calc(100vw - 18px);
+    max-height:calc(100dvh - 18px);
+    border-radius:22px;
+  }
+  .finance-mini-modal.is-recurring-manager .finance-recurring-tv2>.tv2-page {
+    padding:16px 14px 20px;
+  }
+}
+
 @media(max-width:760px) {
   .finance-mini-modal.is-month-detail {
     padding:9px;
@@ -2392,14 +2500,18 @@ body.finance-month-focus {
   margin:3px 0 5px;
 }
 
-.finance-year-head p {
-  margin:0;
-  color:var(--muted);
-}
-
 .finance-manage-recurring {
   flex:0 0 auto;
+  min-height:46px;
+  padding:0 16px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card);
+  color:var(--ink);
+  font:inherit;
+  font-size:15px;
   white-space:nowrap;
+  cursor:pointer;
 }
 
 .finance-recurring-section {
