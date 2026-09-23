@@ -2682,3 +2682,72 @@ body.finance-month-focus {
     display:none!important;
   }
 }
+
+
+/* Trips-style recurring finance screen */
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2,
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2 * {
+  font-family:inherit!important;
+}
+
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2 .tv2-trip-head h1 {
+  margin:0;
+  font-size:32px!important;
+  font-weight:600!important;
+  letter-spacing:-.01em;
+  line-height:1.1;
+}
+
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head h2,
+.finance-mini-modal.is-recurring-manager .finance-recurring-category>h2 {
+  margin:0 0 2px;
+  color:var(--tv2-muted);
+  font-size:13px!important;
+  font-weight:600!important;
+  letter-spacing:.02em;
+  line-height:1.2;
+}
+
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head {
+  margin:2px 0 4px;
+}
+
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head.is-outflow {
+  margin-top:12px;
+}
+
+.finance-recurring-swipe-row {
+  --finance-recurring-line:var(--tv2-line);
+}
+
+.finance-recurring-swipe-row>.finance-recurring-tv2-row {
+  border-bottom-color:var(--finance-recurring-line);
+}
+
+.finance-recurring-tone-income {
+  --finance-recurring-line:#d5dfbc;
+}
+
+.finance-recurring-tone-fixed {
+  --finance-recurring-line:#e3c7bc;
+}
+
+.finance-recurring-tone-medical {
+  --finance-recurring-line:#c9d8e9;
+}
+
+.finance-recurring-tone-subscriptions {
+  --finance-recurring-line:#e8cccc;
+}
+
+.finance-recurring-tone-budgets {
+  --finance-recurring-line:#ded4ad;
+}
+
+.finance-recurring-tone-wealth {
+  --finance-recurring-line:#d5dfbc;
+}
+
+.finance-recurring-tone-other {
+  --finance-recurring-line:#e0d8d0;
+}
