@@ -638,7 +638,7 @@ function financeGroupForTone(tone, name = '') {
 }
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
-  document.body.classList.remove('finance-log-locked');
+  document.body.classList.remove('tv2-locked');
 }
 async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
   const next = cloneRecord(rec);
@@ -663,45 +663,49 @@ function openFinanceTransactionSheet(rec) {
   const categories=financeLogCategories(rec);
   const state={amountText:'',category:'',name:'',date:'',more:false,busy:false,error:''};
   const layer=document.createElement('div');
-  layer.className='finance-log-layer';
-  layer.innerHTML='<div class="finance-log-backdrop" data-fin-log-close></div><div class="finance-log-sheet" role="dialog" aria-modal="true" aria-label="Add finance transaction"></div>';
+  layer.className='tv2-layer finance-log-layer';
+  layer.innerHTML='<div class="tv2-backdrop" data-fin-log-close></div><div class="tv2-sheet finance-log-sheet" role="dialog" aria-modal="true" aria-label="Add expense"></div>';
   document.body.appendChild(layer);
-  document.body.classList.add('finance-log-locked');
+  document.body.classList.add('tv2-locked');
   const sheet=layer.querySelector('.finance-log-sheet');
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
   const valid=()=>validAmount()&&!!state.category&&!!state.name.trim();
 
+  function refreshSave() {
+    const save=sheet.querySelector('[data-fin-log-save]');
+    if (save) save.disabled=!valid()||state.busy;
+    const hint=sheet.querySelector('.finance-log-hint');
+    if (hint) {
+      hint.textContent=state.error || (!validAmount()&&state.amountText?'That amount doesn’t look right':'');
+      hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()));
+    }
+  }
+
   function render() {
     const selected=categories.find((item)=>item.key===state.category);
-    const tone=selected?.tone||'';
     const bounds=financeDateBounds(rec.month);
     sheet.innerHTML=
-      '<div class="finance-log-head"><h2>Add transaction</h2><button type="button" data-fin-log-close aria-label="Close">✕</button></div>'+
-      '<label class="finance-log-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-      '<div class="finance-log-cats" role="group" aria-label="Transaction category">'+
-        categories.map((item)=>'<button type="button" class="finance-log-cat finance-log-tone-'+item.tone+' '+(state.category===item.key?'on':'')+'" data-fin-log-cat="'+item.key+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')+
+      '<div class="tv2-sheet-head"><h2>Add expense</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
+      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
+      '<div class="tv2-cats finance-tv2-cats" role="group" aria-label="Category">'+
+        categories.map((item)=>'<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+' '+(state.category===item.key?'on':'')+'" data-fin-log-cat="'+item.key+'" aria-pressed="'+(state.category===item.key?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')+
       '</div>'+
-      '<label class="finance-log-name '+(tone?'finance-log-name-'+tone:'')+'"><span>'+(state.category==='income'?'Income name':'Transaction name')+'</span><input id="financeLogName" maxlength="100" placeholder="'+(state.category==='income'?'e.g. Salary':'e.g. Rent, Spotify, Groceries')+'" value="'+esc(state.name)+'"></label>'+
-      '<button type="button" class="finance-log-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span>'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><i aria-hidden="true">'+(state.more?'⌃':'⌄')+'</i></button>'+
-      '<div class="finance-log-more" '+(state.more?'':'hidden')+'><label><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'+
-      '<p class="finance-log-hint '+(state.error?'is-error':'')+'">'+esc(state.error)+'</p>'+
-      '<button type="button" class="finance-log-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button>';
+      (state.category
+        ? '<label class="tv2-field finance-tv2-name"><span>'+(state.category==='income'?'Income name':'Expense name')+'</span><input id="financeLogName" maxlength="100" placeholder="'+(state.category==='income'?'e.g. Salary':'e.g. Rent, Spotify, Groceries')+'" value="'+esc(state.name)+'"></label>'
+        : '')+
+      '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
+      '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></span></label></div>'+
+      '<p class="tv2-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
+      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button>';
 
-    const refreshSave=()=>{
-      const save=sheet.querySelector('[data-fin-log-save]');
-      if (save) save.disabled=!valid()||state.busy;
-      const hint=sheet.querySelector('.finance-log-hint');
-      if (hint) {
-        hint.textContent=state.error;
-        hint.classList.toggle('is-error',!!state.error);
-      }
-    };
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
+    amountInput?.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&valid()){e.preventDefault();sheet.querySelector('[data-fin-log-save]')?.click();}});
     const nameInput=sheet.querySelector('#financeLogName');
     nameInput?.addEventListener('input',(e)=>{state.name=e.target.value;state.error='';refreshSave();});
     sheet.querySelector('#financeLogDate')?.addEventListener('change',(e)=>{state.date=normalizeFinanceDate(e.target.value,rec.month);render();});
+    refreshSave();
   }
 
   layer.addEventListener('click',async(e)=>{
@@ -710,6 +714,7 @@ function openFinanceTransactionSheet(rec) {
     if (button.hasAttribute('data-fin-log-close')) { closeFinanceTransactionSheet(); return; }
     if (button.dataset.finLogCat) {
       state.category=button.dataset.finLogCat;
+      state.name='';
       state.error='';
       render();
       setTimeout(()=>sheet.querySelector('#financeLogName')?.focus(),0);
@@ -731,14 +736,14 @@ function openFinanceTransactionSheet(rec) {
         await saveDirectMonthRecord(next,state.category==='income'?'Income added':'Expense added');
       } catch(err) {
         state.busy=false;
-        state.error=err?.message||'Could not save this transaction.';
-        document.body.classList.add('finance-log-locked');
+        state.error=err?.message||'Could not save this expense.';
+        document.body.classList.add('tv2-locked');
         if (!layer.isConnected) document.body.appendChild(layer);
         render();
       }
     }
   });
-  layer.querySelector('.finance-log-backdrop').addEventListener('click',closeFinanceTransactionSheet);
+  layer.querySelector('.tv2-backdrop').addEventListener('click',closeFinanceTransactionSheet);
   layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeFinanceTransactionSheet();});
   render();
   setTimeout(()=>sheet.querySelector('#financeLogAmount')?.focus(),0);
@@ -749,102 +754,95 @@ function financeMonthToneIcon(tone, kind = 'expense') {
   return { fixed:'⌂', medical:'✚', subscriptions:'▣', budgets:'◌', wealth:'◇', other:'•' }[tone] || '•';
 }
 
-function financeMonthIncomeRows(rec) {
-  return (rec.incomes || []).map((item) => {
-    const date = financeDateLabel(item.date);
-    const meta = ['Income', date].filter(Boolean).join(' · ');
-    return '<div class="finance-month-row is-income">'+
-      '<span class="finance-month-row-icon" aria-hidden="true">'+financeMonthToneIcon('income','income')+'</span>'+
-      '<span class="finance-month-row-main"><strong>'+esc(item.name || 'Income')+'</strong><small>'+esc(meta)+'</small></span>'+
-      '<b>'+money(item.amount)+'</b>'+
-    '</div>';
-  }).join('');
+function financeMonthDayLabel(value) {
+  if (!value) return 'No date';
+  const safe=normalizeFinanceDate(value);
+  if (!safe) return 'No date';
+  const [year,month,day]=safe.split('-').map(Number);
+  const date=new Date(Date.UTC(year,month-1,day));
+  return new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short'}).format(date);
 }
-
-function financeMonthExpenseRows(rec) {
-  const rows = (rec.expenses || []).map((item,index) => ({
-    ...item,
-    index,
-    group: normalizeGroup(item.group),
-    tone: groupTone(item.group),
-    isExtraSpend:false,
-  }));
-  extraSpendSummary({ extraSpends: rec.extraSpends || [] }).forEach((item) => {
-    const savedUpOnly = actor() === 'Principe' && item.source === 'savings';
+function financeMonthTimeline(rec) {
+  const rows=(rec.incomes||[]).map((item,index)=>({
+    kind:'income',date:item.date||'',item,index,tone:'income',
+  })).concat((rec.expenses||[]).map((item,index)=>({
+    kind:'expense',date:item.date||'',item,index,tone:groupTone(item.group),
+  })));
+  extraSpendSummary({extraSpends:rec.extraSpends||[]}).forEach((item,index)=>{
+    const savedUpOnly=actor()==='Principe'&&item.source==='savings';
     rows.push({
-      group:savedUpOnly ? 'savings' : 'extra',
-      tone:savedUpOnly ? 'wealth' : 'budgets',
-      name:extraSourceLabel(item.source),
-      amount:item.amount,
+      kind:'expense',
       date:'',
-      isExtraSpend:true,
+      item:{name:extraSourceLabel(item.source),amount:item.amount,group:savedUpOnly?'savings':'extra'},
+      index:1000+index,
+      tone:savedUpOnly?'wealth':'budgets',
     });
   });
-  const order = categoryOrder();
-  rows.sort((a,b) => {
-    const ai=order.indexOf(a.tone), bi=order.indexOf(b.tone);
-    if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-    return 0;
-  });
-  return rows.map((item) => {
-    const date = financeDateLabel(item.date);
-    const meta = [categoryLabel(item.tone), date].filter(Boolean).join(' · ');
-    return '<div class="finance-month-row finance-tone-row-'+item.tone+'">'+
-      '<span class="finance-month-row-icon" aria-hidden="true">'+financeMonthToneIcon(item.tone)+'</span>'+
-      '<span class="finance-month-row-main"><strong>'+esc(item.name || groupLabel(item.group))+'</strong><small>'+esc(meta)+'</small></span>'+
-      '<b>'+money(item.amount)+'</b>'+
-    '</div>';
-  }).join('');
+  rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || a.kind.localeCompare(b.kind));
+  if (!rows.length) return '<div class="tv2-empty-list">No expenses yet. Add them as they happen, it takes a few seconds.</div>';
+  const groups=new Map();
+  rows.forEach((row)=>{const key=row.date||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);});
+  return [...groups.entries()].map(([date,items])=>
+    '<div class="tv2-day"><h2>'+esc(financeMonthDayLabel(date))+'</h2>'+
+      items.map((row)=>{
+        const item=row.item;
+        const income=row.kind==='income';
+        const tone=income?'income':row.tone;
+        const meta=income?'Income':categoryLabel(tone);
+        return '<div class="tv2-row finance-tv2-row">'+
+          '<span class="tv2-ic finance-tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,income?'income':'expense')+'</span>'+
+          '<span class="tv2-row-main"><strong>'+esc(item.name||(income?'Income':groupLabel(item.group)))+'</strong><small>'+esc(meta)+'</small></span>'+
+          '<span class="tv2-amt '+(income?'finance-tv2-income-amt':'')+'">'+money(item.amount)+'</span>'+
+        '</div>';
+      }).join('')+
+    '</div>'
+  ).join('');
 }
 
 function renderDetail(rec) {
   if (!rec) return;
-  const legacyRoot = $('#financeDetail');
-  if (legacyRoot) legacyRoot.innerHTML = '';
+  const legacyRoot=$('#financeDetail');
+  if (legacyRoot) legacyRoot.innerHTML='';
 
-  const rules = financeRules();
-  const c = calc(rec), carry = extraCarryInfo(rec.month);
-  const incomeRows = financeMonthIncomeRows(rec);
-  const expenseRows = financeMonthExpenseRows(rec);
-  const leftoverNegative = c.leftover < 0;
-  const progress = c.income > 0 ? Math.min(100, Math.max(0, (c.outflow / c.income) * 100)) : 0;
-  const extraStatus = rules.extraTracking && c.extraOver > 0
-    ? '<div class="finance-month-alert is-bad">⚠ '+money(c.extraOver)+' spent beyond this month’s Extra budget.</div>' : '';
-  const debtStatus = rules.extraTracking && carry.debt > 0
-    ? '<div class="finance-month-alert">You still owe yourself '+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+'.</div>' : '';
-  const stored = recordFor(rec.month);
-  const status = rec.finalized ? 'Locked' : stored ? 'Draft' : 'Not logged';
+  const rules=financeRules();
+  const c=calc(rec), carry=extraCarryInfo(rec.month);
+  const over=c.leftover<0;
+  const progress=c.income>0?Math.min(100,Math.max(0,(c.outflow/c.income)*100)):0;
+  const stored=recordFor(rec.month);
+  const status=rec.finalized?'Locked':stored?'Draft':'Not logged';
+  const extraNote=rules.extraTracking&&c.extraOver>0
+    ? '<div class="tv2-empty-card finance-tv2-note"><strong>Extra budget exceeded</strong><span>'+money(c.extraOver)+' spent beyond this month’s Extra budget.</span></div>' : '';
+  const carryNote=rules.extraTracking&&carry.debt>0
+    ? '<div class="tv2-empty-card finance-tv2-note"><strong>Extra carried over</strong><span>You still owe yourself '+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+'.</span></div>' : '';
+  const confirmHtml=rec.finalized
+    ? '<section class="tv2-trip-confirm is-waiting"><div><strong>✓ Month confirmed</strong><span>This month is locked.</span></div></section>'
+    : stored
+      ? '<section class="tv2-trip-confirm"><div><strong>Month draft</strong><span>Confirm when this month’s finances are final.</span></div><button type="button" data-fin-finalize-existing>Confirm month</button></section>'
+      : '';
 
   showMini(
-    '<div class="finance-month-detail-window">'+
-      '<header class="finance-month-trip-head">'+
-        '<div class="finance-month-trip-nav"><button type="button" class="finance-month-back" data-fin-month-close>‹ 2026</button></div>'+
-        '<h2>'+esc(monthLabel(rec.month))+'</h2>'+
-        '<p>'+esc(actor())+' · '+status+'</p>'+
-      '</header>'+
-      '<section class="finance-month-money '+(leftoverNegative?'is-over':'')+'">'+
-        '<div class="finance-month-figs">'+
-          '<div><span>Total income</span><strong>'+money(c.income)+'</strong></div>'+
-          '<div><span>Total outflow</span><strong>'+money(c.outflow)+'</strong></div>'+
-        '</div>'+
-        (c.income > 0 ? '<div class="finance-month-progress"><i style="width:'+progress.toFixed(1)+'%"></i></div>' : '')+
-        '<div class="finance-month-left"><strong>'+money(Math.abs(c.leftover))+'</strong><span>'+(leftoverNegative?'overspent':'leftover')+'</span></div>'+
-      '</section>'+
-      extraStatus+debtStatus+
-      (incomeRows ? '<section class="finance-month-list"><h3>Income</h3>'+incomeRows+'</section>' : '')+
-      (expenseRows ? '<section class="finance-month-list"><h3>Monthly outflow</h3>'+expenseRows+'</section>' : '')+
-      (!incomeRows && !expenseRows ? '<div class="finance-month-empty">Nothing logged for this month yet.</div>' : '')+
-      (!rec.finalized
-        ? '<div class="finance-month-actions"><button class="btn primary finance-month-add" type="button" data-fin-add-transaction>＋ Add transaction</button><button class="btn ghost" type="button" data-fin-finalize-existing>Confirm month</button></div>'
-        : '<div class="finance-month-locked">✓ This month is locked</div>')+
+    '<div class="tv2-root finance-month-tv2">'+
+      '<div class="tv2-page">'+
+        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-month-close>‹ 2026</button><span></span></div>'+
+          '<h1>'+esc(monthLabel(rec.month))+'</h1><p>'+esc(actor())+' · '+esc(status)+'</p></header>'+
+        '<section class="tv2-money"><div class="tv2-figs">'+
+          '<div class="tv2-fig"><span>Total income</span><b>'+money(c.income)+'</b></div>'+
+          '<div class="tv2-fig"><span>Total outflow</span><b>'+money(c.outflow)+'</b></div></div>'+
+          (c.income>0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+progress.toFixed(1)+'%"></i></div>':'')+
+          '<div class="tv2-left '+(over?'is-over':'')+'"><b>'+money(Math.abs(c.leftover))+'</b><span>'+(over?'overspent':'leftover')+'</span></div>'+
+        '</section>'+
+        extraNote+carryNote+confirmHtml+
+        '<section class="tv2-list" aria-label="Monthly finances">'+financeMonthTimeline(rec)+'</section>'+
+        (!rec.finalized?'<div class="tv2-dock"><button type="button" class="tv2-primary" data-fin-add-transaction>＋ Add expense</button></div>':'')+
+      '</div>'+
     '</div>',
     'month-detail'
   );
 
-  const modalBody = $('#financeMiniBody');
-  $('[data-fin-month-close]', modalBody)?.addEventListener('click', closeMini);
-  $('[data-fin-add-transaction]', modalBody)?.addEventListener('click', () => openFinanceTransactionSheet(rec));
-  $('[data-fin-finalize-existing]', modalBody)?.addEventListener('click', () => confirmExistingMonth(rec));
+  const modalBody=$('#financeMiniBody');
+  $('[data-fin-month-close]',modalBody)?.addEventListener('click',closeMini);
+  $('[data-fin-add-transaction]',modalBody)?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
+  $('[data-fin-finalize-existing]',modalBody)?.addEventListener('click',()=>confirmExistingMonth(rec));
 }
 
 function ensureMiniModal() {
