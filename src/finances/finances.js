@@ -693,52 +693,69 @@ function openFinanceTransactionSheet(rec) {
   const sheet=layer.querySelector('.finance-log-sheet');
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
+  const selectedCategory=()=>categories.find((item)=>item.key===state.category);
+  const selectedItems=()=>financeRecurringItemsForCategory(state.category);
   const valid=()=>validAmount()&&!!state.category&&!!state.name.trim();
+
+  function resetToCategories() {
+    state.category='';
+    state.selectedItemId='';
+    state.name='';
+    state.group='';
+    state.amountText='';
+    state.date='';
+    state.more=false;
+    state.error='';
+  }
 
   function refreshSave() {
     const save=sheet.querySelector('[data-fin-log-save]');
     if (save) save.disabled=!valid()||state.busy;
     const hint=sheet.querySelector('.finance-log-hint');
     if (hint) {
-      hint.textContent=state.error || (!validAmount()&&state.amountText?'That amount doesn’t look right':'');
+      const noItems=state.category&&state.category!=='other'&&!selectedItems().length;
+      hint.textContent=state.error
+        || (noItems?'No items are set for this category in Edit items.'
+          : state.amountText&&!validAmount()?'That amount doesn’t look right':'');
       hint.classList.toggle('is-error',!!state.error || (!!state.amountText&&!validAmount()));
     }
   }
 
+  function categoryTile(item, back=false) {
+    return '<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+' on '+(back?'finance-tv2-mode-tile':'')+'" '+(back?'data-fin-log-cat-back':'data-fin-log-cat="'+item.key+'"')+' aria-pressed="true"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>';
+  }
+
+  function itemTile(item,index,tone,icon) {
+    const active=state.selectedItemId===String(item.id);
+    return '<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-item-tile finance-tv2-tone-'+tone+' '+(active?'on':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(active?'true':'false')+'"><span aria-hidden="true">'+icon+'</span>'+esc(item.name)+'</button>';
+  }
+
   function render() {
-    const selected=categories.find((item)=>item.key===state.category);
-    const items=financeRecurringItemsForCategory(state.category);
+    const selected=selectedCategory();
+    const items=selectedItems();
     const bounds=financeDateBounds(rec.month);
     const isOther=state.category==='other';
-    const itemPicker=state.category && !isOther
-      ? '<section class="finance-log-item-panel">'+
-          '<div class="finance-log-item-head"><span>'+esc(selected?.label || 'Items')+'</span><small>Select what you want to log</small></div>'+
-          (items.length
-            ? '<div class="finance-log-items">'+items.map((item,index)=>
-                '<button type="button" class="finance-log-item finance-tv2-tone-'+(selected?.tone||'other')+' '+(state.selectedItemId===String(item.id)?'on':'')+'" data-fin-log-item="'+index+'" aria-pressed="'+(state.selectedItemId===String(item.id)?'true':'false')+'">'+
-                  '<span><b>'+esc(item.name)+'</b><small>Usual amount</small></span><strong>'+money(item.amount)+'</strong><i aria-hidden="true">›</i>'+
-                '</button>'
-              ).join('')+'</div>'
-            : '<div class="finance-log-no-items">No recurring items are set in this category yet.</div>')+
-        '</section>'
-      : '';
+    const drillDown=!!state.category;
+
+    const gridHtml=!drillDown
+      ? categories.map((item)=>'<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+'" data-fin-log-cat="'+item.key+'" aria-pressed="false"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')
+      : isOther
+        ? categoryTile(selected,true)
+        : categoryTile(selected,true)+items.map((item,index)=>itemTile(item,index,selected?.tone||'other',selected?.icon||'•')).join('');
 
     sheet.innerHTML=
-      '<div class="tv2-sheet-head"><h2>Add expense</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
+      '<div class="tv2-sheet-head"><h2>'+(selected?esc(selected.label):'Add expense')+'</h2><button type="button" class="tv2-x" data-fin-log-close aria-label="Close">✕</button></div>'+
       '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="financeLogAmount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>'+
-      '<div class="tv2-cats finance-tv2-cats" role="group" aria-label="Category">'+
-        categories.map((item)=>'<button type="button" class="tv2-cat finance-tv2-cat finance-tv2-tone-'+item.tone+' '+(state.category===item.key?'on':'')+'" data-fin-log-cat="'+item.key+'" aria-pressed="'+(state.category===item.key?'true':'false')+'"><span aria-hidden="true">'+item.icon+'</span>'+esc(item.label)+'</button>').join('')+
-      '</div>'+
-      itemPicker+
+      '<div class="tv2-cats finance-tv2-cats '+(drillDown?'is-drilled':'')+'" role="group" aria-label="'+(drillDown?'Items':'Category')+'">'+gridHtml+'</div>'+
       (isOther
         ? '<label class="tv2-field finance-tv2-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
         : '')+
-      ((state.name || isOther)
+      ((state.selectedItemId || isOther)
         ? '<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+(state.date?financeDateLabel(state.date):'Add date · optional')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
           '<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></span></label></div>'
         : '')+
       '<p class="tv2-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
-      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':state.category==='income'?'Log income':'Log expense')+'</button>';
+      '<button type="button" class="tv2-primary tv2-save" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Log item')+'</button>';
 
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
@@ -754,12 +771,19 @@ function openFinanceTransactionSheet(rec) {
     if (!button) return;
     if (button.hasAttribute('data-fin-log-close')) { closeFinanceTransactionSheet(); return; }
 
+    if (button.hasAttribute('data-fin-log-cat-back')) {
+      resetToCategories();
+      render();
+      return;
+    }
+
     if (button.dataset.finLogCat) {
       state.category=button.dataset.finLogCat;
       state.selectedItemId='';
       state.name='';
       state.group=state.category==='other'?'other':'';
       state.amountText='';
+      state.date='';
       state.error='';
       state.more=false;
       render();
@@ -768,13 +792,14 @@ function openFinanceTransactionSheet(rec) {
     }
 
     if (button.dataset.finLogItem != null) {
-      const items=financeRecurringItemsForCategory(state.category);
+      const items=selectedItems();
       const item=items[Number(button.dataset.finLogItem)];
       if (!item) return;
       state.selectedItemId=String(item.id);
       state.name=item.name;
       state.group=item.group;
       state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
+      state.date=financeDateForDay(rec.month,item.day);
       state.error='';
       render();
       setTimeout(()=>{
@@ -802,7 +827,7 @@ function openFinanceTransactionSheet(rec) {
         await saveDirectMonthRecord(next,state.category==='income'?'Income added':'Expense added');
       } catch(err) {
         state.busy=false;
-        state.error=err?.message||'Could not save this expense.';
+        state.error=err?.message||'Could not save this item.';
         document.body.classList.add('tv2-locked');
         if (!layer.isConnected) document.body.appendChild(layer);
         render();
