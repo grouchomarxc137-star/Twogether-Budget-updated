@@ -177,9 +177,40 @@ function categorySettlementState(plan, key) {
     paid, share,
   };
 }
+function owedCategoryBreakdown(plan, person = actor()) {
+  const keys = ['stay','transport','car','groceries','eating-out','activities','other'];
+  const overall = settlementState(plan);
+  const targetCents = overall.debtor === person ? Math.max(0, Math.round(n(overall.amount) * 100)) : 0;
+  const out = Object.fromEntries(keys.map((key)=>[key,0]));
+  if (!targetCents) return out;
+
+  const raw = {};
+  let rawTotal = 0;
+  keys.forEach((key) => {
+    const category = categorySettlementState(plan,key);
+    const value = category.debtor === person ? Math.max(0,n(category.amount)) : 0;
+    raw[key] = value;
+    rawTotal += value;
+  });
+
+  if (rawTotal <= .005) {
+    out.other = targetCents / 100;
+    return out;
+  }
+
+  const active = keys.filter((key)=>raw[key] > .005);
+  let remaining = targetCents;
+  active.forEach((key,index) => {
+    const cents = index === active.length - 1
+      ? remaining
+      : Math.max(0, Math.min(remaining, Math.round(targetCents * (raw[key] / rawTotal))));
+    out[key] = cents / 100;
+    remaining -= cents;
+  });
+  return out;
+}
 function owedCategoryAmount(plan, key, person = actor()) {
-  const category = categorySettlementState(plan,key);
-  return category.debtor === person ? category.amount : 0;
+  return owedCategoryBreakdown(plan,person)[key] || 0;
 }
 function debtCategoryLabel(key) {
   const item = EXPENSE_CATS.find(([candidate])=>candidate===key);
@@ -551,7 +582,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         else slot.innerHTML = '<div class="tv2-jar is-off"><span>Shared Jar not used</span><button type="button" data-jar="on">Use 20%</button></div>';
       } else slot.innerHTML = '';
     }
-    const summaryEl = sheet.querySelector('.tv2-summary');
+    const summaryEl = sheet.querySelector('[data-more] .tv2-summary');
     if (summaryEl) summaryEl.textContent = summary();
     const hint = sheet.querySelector('.tv2-hint'), save = sheet.querySelector('[data-save]');
     save.disabled = !canSave() || state.busy;

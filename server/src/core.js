@@ -444,12 +444,12 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
       const category = sanitizeTripRepayment_({category:payload.category}, actor).category;
       if (!category) throw new Error('Choose what this repayment is for');
-      const categorySettlement = tripCategorySettlement_(plan, category);
-      if (!categorySettlement.debtor || categorySettlement.debtor !== actor || categorySettlement.amount <= .005) {
+      const categoryOwed = Number(tripCategoryOwedBreakdown_(plan, actor)[category] || 0);
+      if (categoryOwed <= .005) {
         throw new Error('You do not owe anything for ' + tripRepaymentCategoryLabel_(category) + ' right now');
       }
-      if (Number(amount) > categorySettlement.amount + .005) {
-        throw new Error('You only owe €' + categorySettlement.amount.toFixed(2) + ' for ' + tripRepaymentCategoryLabel_(category));
+      if (Number(amount) > categoryOwed + .005) {
+        throw new Error('You only owe €' + categoryOwed.toFixed(2) + ' for ' + tripRepaymentCategoryLabel_(category));
       }
 
       const now = new Date().toISOString();
@@ -1495,6 +1495,41 @@ function tripCategorySettlement_(plan, category) {
   const delta = money2_(paid.Principessa - share.Principessa);
   if (Math.abs(delta) < .005) return {debtor:'',creditor:'',amount:0,paid:paid,share:share};
   return {debtor:delta>0?'Principe':'Principessa',creditor:delta>0?'Principessa':'Principe',amount:money2_(Math.abs(delta)),paid:paid,share:share};
+}
+
+function tripCategoryOwedBreakdown_(plan, actor) {
+  const keys = ['stay','transport','car','groceries','eating-out','activities','other'];
+  const out = {};
+  keys.forEach(function(key){ out[key] = 0; });
+
+  const overall = tripSettlement_(plan);
+  const targetCents = overall.debtor === actor ? Math.max(0, Math.round(Number(overall.amount || 0) * 100)) : 0;
+  if (!targetCents) return out;
+
+  const raw = {};
+  let rawTotal = 0;
+  keys.forEach(function(key){
+    const category = tripCategorySettlement_(plan,key);
+    const value = category.debtor === actor ? Math.max(0, Number(category.amount || 0)) : 0;
+    raw[key] = value;
+    rawTotal += value;
+  });
+
+  if (rawTotal <= .005) {
+    out.other = money2_(targetCents / 100);
+    return out;
+  }
+
+  const active = keys.filter(function(key){ return raw[key] > .005; });
+  let remaining = targetCents;
+  active.forEach(function(key,index){
+    const cents = index === active.length - 1
+      ? remaining
+      : Math.max(0, Math.min(remaining, Math.round(targetCents * (raw[key] / rawTotal))));
+    out[key] = money2_(cents / 100);
+    remaining -= cents;
+  });
+  return out;
 }
 
 function tripRepaymentCategoryLabel_(category) {

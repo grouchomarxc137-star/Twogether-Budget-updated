@@ -629,3 +629,59 @@ test('trip repayments can target a category and keep an optional note', () => {
     c.cleanup();
   }
 });
+
+
+test('legacy uncategorized repayments reduce the current category debt instead of appearing twice', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2026-09-19', end:'2026-09-22' },
+      budget: 600,
+    });
+
+    action(c.database, 'saveTripExpense', {
+      planId:p.planId,
+      expense:{ category:'accommodation', amount:281.60, paidBy:'Principe', split:'shared', date:'2026-09-20', useJar:false },
+    }, 'Principe');
+
+    const state = getState();
+    const plan = state.plans.find((item)=>item.id===p.planId);
+    plan.repayments.push({
+      id:'legacy-repayment',
+      from:'Principessa',
+      to:'Principe',
+      amount:110.80,
+      date:'2026-09-22',
+      createdAt:'2026-09-22T12:00:00.000Z',
+    });
+    c.database.store.write(state);
+
+    const tooMuch = action(c.database, 'saveTripRepayment', {
+      planId:p.planId,
+      amount:30.01,
+      date:'2026-09-23',
+      category:'stay',
+    }, 'Principessa');
+    assert.equal(tooMuch.ok, false);
+    assert.match(tooMuch.error, /only owe €30\.00 for Stay/i);
+
+    const final = action(c.database, 'saveTripRepayment', {
+      planId:p.planId,
+      amount:30,
+      date:'2026-09-23',
+      category:'stay',
+      note:'Final stay repayment',
+    }, 'Principessa');
+    assert.equal(final.ok, true);
+    assert.equal(final.settlement.amount, 0);
+
+    const saved = getState().plans.find((item)=>item.id===p.planId);
+    assert.equal(saved.repayments.length, 2);
+    assert.equal(saved.repayments[0].amount, 110.8);
+    assert.equal(saved.repayments[0].category, '');
+    assert.equal(saved.repayments[1].category, 'stay');
+    assert.equal(saved.repayments[1].note, 'Final stay repayment');
+  } finally {
+    c.cleanup();
+  }
+});
