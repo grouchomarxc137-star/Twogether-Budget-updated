@@ -442,6 +442,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (amount === '' || Number(amount) <= 0) throw new Error('Enter how much you paid back');
       if (Number(amount) > settlement.amount + .005) throw new Error('You only owe €' + settlement.amount.toFixed(2));
 
+      const category = sanitizeTripRepayment_({category:payload.category}, actor).category;
+      if (!category) throw new Error('Choose what this repayment is for');
+      const categorySettlement = tripCategorySettlement_(plan, category);
+      if (!categorySettlement.debtor || categorySettlement.debtor !== actor || categorySettlement.amount <= .005) {
+        throw new Error('You do not owe anything for ' + tripRepaymentCategoryLabel_(category) + ' right now');
+      }
+      if (Number(amount) > categorySettlement.amount + .005) {
+        throw new Error('You only owe €' + categorySettlement.amount.toFixed(2) + ' for ' + tripRepaymentCategoryLabel_(category));
+      }
+
       const now = new Date().toISOString();
       const repayment = sanitizeTripRepayment_({
         id: Utilities.getUuid(),
@@ -449,6 +459,8 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         to: settlement.creditor,
         amount: amount,
         date: payload.date || now.slice(0,10),
+        category: category,
+        note: payload.note,
         createdAt: now
       }, actor);
       plan.repayments.push(repayment);
@@ -1430,14 +1442,64 @@ function sanitizeTripRepayment_(item, fallbackActor) {
   const from = fromRaw === 'Unknown' ? (fallback === 'Unknown' ? '' : fallback) : fromRaw;
   const toRaw = cleanActor_(s.to);
   const to = toRaw === 'Unknown' ? (from === 'Principessa' ? 'Principe' : from === 'Principe' ? 'Principessa' : '') : toRaw;
+  const categories = ['stay','transport','car','groceries','eating-out','activities','other'];
+  const category = categories.indexOf(String(s.category || '')) >= 0 ? String(s.category) : '';
   return {
     id: cleanText_(s.id,80) || Utilities.getUuid(),
     from: ACTORS.includes(from) ? from : '',
     to: ACTORS.includes(to) ? to : '',
     amount: cleanMoney_(s.amount),
     date: cleanFinanceDate_(s.date),
+    category: category,
+    note: cleanText_(s.note,180),
     createdAt: cleanText_(s.createdAt,40)
   };
+}
+
+function tripExpenseCategoryKey_(entry) {
+  if (entry && entry.category === 'accommodation') return 'stay';
+  if (entry && entry.category === 'transport') return entry.transportType === 'fuel' ? 'car' : 'transport';
+  if (entry && entry.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eating-out';
+  if (entry && entry.category === 'activities') return 'activities';
+  return 'other';
+}
+
+function tripCategorySettlement_(plan, category) {
+  const safe = plan && plan.expenseEntries ? plan : sanitizePlan_(plan);
+  const paid = {Principessa:0,Principe:0};
+  const share = {Principessa:0,Principe:0};
+  (safe.expenseEntries || []).forEach(function(entry){
+    if (tripExpenseCategoryKey_(entry) !== category) return;
+    const remaining = Math.max(0, Number(entry.amount || 0) - Number(entry.jarContribution || 0));
+    if (entry.paidBy === 'both') {
+      paid.Principessa += remaining / 2;
+      paid.Principe += remaining / 2;
+    } else if (ACTORS.includes(entry.paidBy)) paid[entry.paidBy] += remaining;
+    if (entry.split === 'personal') {
+      const owner = ACTORS.includes(entry.forActor) ? entry.forActor : entry.paidBy;
+      if (ACTORS.includes(owner)) share[owner] += remaining;
+    } else {
+      share.Principessa += remaining / 2;
+      share.Principe += remaining / 2;
+    }
+  });
+  (safe.repayments || []).forEach(function(repayment){
+    if (repayment.category !== category) return;
+    const amount = Number(repayment.amount || 0);
+    if (repayment.from === 'Principessa' && repayment.to === 'Principe') {
+      paid.Principessa += amount; paid.Principe -= amount;
+    } else if (repayment.from === 'Principe' && repayment.to === 'Principessa') {
+      paid.Principe += amount; paid.Principessa -= amount;
+    }
+  });
+  const delta = money2_(paid.Principessa - share.Principessa);
+  if (Math.abs(delta) < .005) return {debtor:'',creditor:'',amount:0,paid:paid,share:share};
+  return {debtor:delta>0?'Principe':'Principessa',creditor:delta>0?'Principessa':'Principe',amount:money2_(Math.abs(delta)),paid:paid,share:share};
+}
+
+function tripRepaymentCategoryLabel_(category) {
+  const labels = {stay:'Stay',transport:'Transport',car:'Car',groceries:'Groceries','eating-out':'Eating out',activities:'Activities',other:'Other'};
+  return labels[category] || 'this category';
 }
 
 function tripSettlement_(plan) {

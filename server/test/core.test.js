@@ -475,6 +475,7 @@ test('logs partial trip repayments without double-counting the trip expense', ()
       planId: p.planId,
       amount: 50,
       date: '2026-09-30',
+      category: 'stay',
     }, 'Principessa');
     assert.equal(first.ok, true);
     assert.equal(first.settlement.debtor, 'Principessa');
@@ -485,6 +486,7 @@ test('logs partial trip repayments without double-counting the trip expense', ()
       planId: p.planId,
       amount: 151,
       date: '2026-10-01',
+      category: 'stay',
     }, 'Principessa');
     assert.equal(tooMuch.ok, false);
     assert.match(tooMuch.error, /only owe €150\.00/i);
@@ -493,6 +495,7 @@ test('logs partial trip repayments without double-counting the trip expense', ()
       planId: p.planId,
       amount: 100,
       date: '2026-10-15',
+      category: 'stay',
     }, 'Principessa');
     assert.equal(second.ok, true);
     assert.equal(second.settlement.amount, 50);
@@ -501,6 +504,7 @@ test('logs partial trip repayments without double-counting the trip expense', ()
       planId: p.planId,
       amount: 50,
       date: '2026-10-31',
+      category: 'stay',
     }, 'Principessa');
     assert.equal(final.ok, true);
     assert.equal(final.settlement.amount, 0);
@@ -518,6 +522,7 @@ test('logs partial trip repayments without double-counting the trip expense', ()
       planId: p.planId,
       amount: 1,
       date: '2026-11-01',
+      category: 'stay',
     }, 'Principessa');
     assert.equal(extra.ok, false);
     assert.match(extra.error, /do not owe anything/i);
@@ -577,6 +582,49 @@ test('planned trips cannot be confirmed before their end date has passed', () =>
     const result = action(c.database, 'confirmPlanTrip', { planId: p.planId });
     assert.equal(result.ok, false);
     assert.match(result.error, /after it has ended/);
+  } finally {
+    c.cleanup();
+  }
+});
+
+
+test('trip repayments can target a category and keep an optional note', () => {
+  const c = setup();
+  try {
+    const p = action(c.database, 'savePlan', {
+      meta: { location: 'Italy', city: 'Lonato', start: '2026-09-19', end: '2026-09-22' },
+      budget: 600,
+    });
+    action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { category:'accommodation', amount:200, paidBy:'Principe', split:'shared', date:'2026-09-20', useJar:false },
+    }, 'Principe');
+    action(c.database, 'saveTripExpense', {
+      planId: p.planId,
+      expense: { category:'food', foodType:'groceries', amount:80, paidBy:'Principe', split:'shared', date:'2026-09-21' },
+    }, 'Principe');
+
+    const first = action(c.database, 'saveTripRepayment', {
+      planId:p.planId, amount:60, date:'2026-09-23', category:'stay', note:'My part of the Airbnb',
+    }, 'Principessa');
+    assert.equal(first.ok, true);
+    assert.equal(first.settlement.amount, 80);
+
+    const plan = getState().plans.find((item) => item.id === p.planId);
+    assert.equal(plan.repayments[0].category, 'stay');
+    assert.equal(plan.repayments[0].note, 'My part of the Airbnb');
+
+    const tooMuchStay = action(c.database, 'saveTripRepayment', {
+      planId:p.planId, amount:41, date:'2026-09-24', category:'stay',
+    }, 'Principessa');
+    assert.equal(tooMuchStay.ok, false);
+    assert.match(tooMuchStay.error, /only owe €40\.00 for Stay/i);
+
+    const groceries = action(c.database, 'saveTripRepayment', {
+      planId:p.planId, amount:40, date:'2026-09-24', category:'groceries',
+    }, 'Principessa');
+    assert.equal(groceries.ok, true);
+    assert.equal(groceries.settlement.amount, 40);
   } finally {
     c.cleanup();
   }
