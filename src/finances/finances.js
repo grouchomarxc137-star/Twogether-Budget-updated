@@ -1108,16 +1108,22 @@ function openFinanceTransactionSheet(rec, edit = null) {
       if (!valid()||state.busy) return;
       state.busy=true; state.error=''; render();
       const next=cloneRecord(rec);
+      next.incomes=[...(next.incomes||[])];
+      next.expenses=[...(next.expenses||[])];
       if (state.category==='income') {
         const row={name:state.name.trim(),amount:amount(),date:state.date};
-        next.incomes=[...(next.incomes||[])];
         if(editingKind==='income'&&editingIndex>=0) next.incomes[editingIndex]=row;
-        else next.incomes.push(row);
+        else {
+          if(editingKind==='expense'&&editingIndex>=0) next.expenses.splice(editingIndex,1);
+          next.incomes.push(row);
+        }
       } else {
         const row={group:state.group||'other',name:state.name.trim(),amount:amount(),date:state.date};
-        next.expenses=[...(next.expenses||[])];
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
-        else next.expenses.push(row);
+        else {
+          if(editingKind==='income'&&editingIndex>=0) next.incomes.splice(editingIndex,1);
+          next.expenses.push(row);
+        }
       }
       if (!recordFor(rec.month)) next.partialOnly=true;
       try {
