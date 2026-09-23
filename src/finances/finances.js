@@ -100,6 +100,7 @@ let financeMonthDialog = null;
 let financeMonthSwipeAbort = null;
 let financeMonthSwipeIgnoreUntil = 0;
 let financeMonthDeleteConfirmLayer = null;
+let financeLogBackgroundLock = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -936,6 +937,19 @@ function financeGroupForTone(tone, name = '') {
 }
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
+
+  if(financeLogBackgroundLock){
+    const {shell,scrollTop,controller}=financeLogBackgroundLock;
+    controller?.abort();
+    if(shell?.isConnected){
+      shell.style.removeProperty('overflow');
+      shell.style.removeProperty('overflow-y');
+      shell.style.removeProperty('touch-action');
+      shell.scrollTop=scrollTop;
+    }
+    financeLogBackgroundLock=null;
+  }
+
   financeMonthDialog?.classList.remove('finance-log-background-locked');
   document.documentElement.classList.remove('finance-log-locked');
   document.body.classList.remove('finance-log-locked');
@@ -1007,12 +1021,54 @@ function openFinanceTransactionSheet(rec, edit = null) {
   financeMonthDialog?.classList.add('finance-log-background-locked');
   const sheet=layer.querySelector('.finance-log-sheet');
 
-  // Never let drag/wheel gestures on the dimmed area move the month behind the sheet.
+  // Freeze the actual month scroller at its current position while Log finance is open.
+  const backgroundShell=financeMonthDialog?.querySelector('.overview-trip-shell')||null;
+  if(backgroundShell){
+    const controller=new AbortController();
+    const frozenTop=backgroundShell.scrollTop;
+    financeLogBackgroundLock={shell:backgroundShell,scrollTop:frozenTop,controller};
+    backgroundShell.style.setProperty('overflow','hidden','important');
+    backgroundShell.style.setProperty('overflow-y','hidden','important');
+    backgroundShell.style.setProperty('touch-action','none','important');
+    const hold=()=>{
+      if(Math.abs(backgroundShell.scrollTop-frozenTop)>.5) backgroundShell.scrollTop=frozenTop;
+    };
+    backgroundShell.addEventListener('scroll',hold,{passive:true,signal:controller.signal});
+    backgroundShell.addEventListener('touchmove',(event)=>event.preventDefault(),{passive:false,signal:controller.signal});
+    backgroundShell.addEventListener('wheel',(event)=>event.preventDefault(),{passive:false,signal:controller.signal});
+    hold();
+  }
+
+  // Stop scroll chaining on mobile: the sheet may scroll, but never the page behind it.
+  let financeLogTouchY=null;
+  layer.addEventListener('touchstart',(event)=>{
+    if(event.touches.length===1) financeLogTouchY=event.touches[0].clientY;
+  },{passive:true});
   layer.addEventListener('touchmove',(event)=>{
-    if(!event.target.closest('.finance-log-sheet')) event.preventDefault();
+    const targetSheet=event.target.closest('.finance-log-sheet');
+    if(!targetSheet){
+      event.preventDefault();
+      return;
+    }
+    if(event.touches.length!==1||financeLogTouchY==null)return;
+    const y=event.touches[0].clientY;
+    const dy=y-financeLogTouchY;
+    financeLogTouchY=y;
+    const atTop=targetSheet.scrollTop<=0;
+    const atBottom=Math.ceil(targetSheet.scrollTop+targetSheet.clientHeight)>=targetSheet.scrollHeight;
+    if((atTop&&dy>0)||(atBottom&&dy<0)) event.preventDefault();
   },{passive:false});
+  layer.addEventListener('touchend',()=>{financeLogTouchY=null;},{passive:true});
+  layer.addEventListener('touchcancel',()=>{financeLogTouchY=null;},{passive:true});
   layer.addEventListener('wheel',(event)=>{
-    if(!event.target.closest('.finance-log-sheet')) event.preventDefault();
+    const targetSheet=event.target.closest('.finance-log-sheet');
+    if(!targetSheet){
+      event.preventDefault();
+      return;
+    }
+    const atTop=targetSheet.scrollTop<=0;
+    const atBottom=Math.ceil(targetSheet.scrollTop+targetSheet.clientHeight)>=targetSheet.scrollHeight;
+    if((atTop&&event.deltaY<0)||(atBottom&&event.deltaY>0)) event.preventDefault();
   },{passive:false});
 
   function resetToCategories() {
@@ -1220,6 +1276,9 @@ function openFinanceTransactionSheet(rec, edit = null) {
         document.body.classList.add('tv2-locked');
         document.body.classList.add('trip-expense-open');
         financeMonthDialog?.classList.add('finance-log-background-locked');
+        if(financeLogBackgroundLock?.shell?.isConnected){
+          financeLogBackgroundLock.shell.scrollTop=financeLogBackgroundLock.scrollTop;
+        }
         render();
       }
     }
