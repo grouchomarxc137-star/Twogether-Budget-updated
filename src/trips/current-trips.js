@@ -33,8 +33,7 @@ let storyObserver = null;
 let simplifiedView = { name: 'home', planId: '', budgetMode: 'combined' };
 let simplifiedLayer = null;
 let simplifiedSnackTimer = null;
-let swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
-let swipeDownBack = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
+let tripSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0 };
 let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:0 };
 let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
@@ -336,6 +335,9 @@ function renderCurrentTrips() {
   }
   root.classList.remove('tv2-trip-view');
   section.classList.remove('tv2-focus-open');
+  root.style.transition = '';
+  root.style.transform = '';
+  root.style.opacity = '';
   setTripFocusLock(false);
   root.innerHTML = simplifiedHome(allSimplifiedItems());
 }
@@ -1104,116 +1106,116 @@ function bindSimplifiedSwipe(section) {
   section.dataset.tv2Swipe = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
   const root = () => section.querySelector('#twCurrentTrips.tv2-trip-view');
-  const page = () => section.querySelector('#twCurrentTrips.tv2-trip-view > .tv2-page');
-  const clearVisual = (animate = true) => {
-    const current = page(); if (!current) return;
-    current.style.transition = animate ? 'transform .18s cubic-bezier(.22,.8,.28,1), opacity .18s ease' : 'none';
-    current.style.transform = 'translateX(0)';
-    current.style.opacity = '1';
-    if (animate) setTimeout(() => { if (current.isConnected) current.style.transition = ''; }, 200);
+
+  const resetState = () => {
+    tripSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0 };
   };
-  const clearDownVisual = (animate = true) => {
-    const current = root(); if (!current) return;
+  const clearVisual = (animate = true) => {
+    const current = root(); if (!current) { resetState(); return; }
     current.style.transition = animate ? 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .18s ease' : 'none';
     current.style.transform = 'translate(-50%,-50%)';
     current.style.opacity = '1';
-    if (animate) setTimeout(() => { if (current.isConnected) current.style.transition = ''; }, 220);
+    if (animate) setTimeout(() => {
+      if (!current.isConnected || simplifiedView.name !== 'trip') return;
+      current.style.transition = '';
+    }, 220);
   };
-  const cancel = () => {
-    if (swipeBack.active) clearVisual(true);
-    swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
+  const finishBack = (mode) => {
+    const current = root(); if (!current) { resetState(); return; }
+    current.style.transition = 'transform .22s cubic-bezier(.22,.8,.28,1), opacity .18s ease';
+    current.style.transform = mode === 'right'
+      ? 'translate(calc(-50% + 100vw),-50%)'
+      : 'translate(-50%,calc(-50% + 100dvh))';
+    current.style.opacity = '.7';
+    resetState();
+    setTimeout(() => {
+      if (simplifiedView.name !== 'trip') return;
+      simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
+      renderCurrentTrips();
+    }, 185);
   };
+
   section.addEventListener('touchstart', (e) => {
-    if (!mobile() || simplifiedView.name !== 'trip' || simplifiedLayer || e.touches.length !== 1) return;
-    const t = e.touches[0], currentRoot = root();
-    if (currentRoot && currentRoot.scrollTop <= 1) {
-      swipeDownBack = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastY:t.clientY };
-    }
-    if (t.clientX > 46) return;
-    swipeBack = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastX:t.clientX };
+    if (!mobile() || simplifiedView.name !== 'trip' || simplifiedLayer || deleteConfirmLayer || e.touches.length !== 1) return;
+    const current = root(); if (!current) return;
+    const t = e.touches[0];
+    const canRight = t.clientX <= 46;
+    const canDown = current.scrollTop <= 1;
+    if (!canRight && !canDown) return;
+    tripSwipe = {
+      tracking:true, active:false, mode:'',
+      startX:t.clientX, startY:t.clientY, lastX:t.clientX, lastY:t.clientY
+    };
   }, { passive:true });
+
   section.addEventListener('touchmove', (e) => {
-    if (!swipeDownBack.tracking || e.touches.length !== 1) return;
-    const t = e.touches[0], currentRoot = root();
-    const dx = Math.abs(t.clientX - swipeDownBack.startX), dy = t.clientY - swipeDownBack.startY;
-    swipeDownBack.lastY = t.clientY;
-    if (!swipeDownBack.active) {
-      if (dx < 8 && Math.abs(dy) < 8) return;
-      if (dy > 10 && dy > dx * 1.25 && currentRoot?.scrollTop <= 1) {
-        swipeDownBack.active = true;
-        swipeBack.tracking = false;
+    if (!tripSwipe.tracking || e.touches.length !== 1) return;
+    const current = root(); if (!current) { resetState(); return; }
+    const t = e.touches[0];
+    const dx = t.clientX - tripSwipe.startX;
+    const dy = t.clientY - tripSwipe.startY;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    tripSwipe.lastX = t.clientX;
+    tripSwipe.lastY = t.clientY;
+
+    if (!tripSwipe.active) {
+      if (ax < 9 && ay < 9) return;
+
+      if (ax > ay * 1.25) {
+        if (dx > 10 && tripSwipe.startX <= 46) {
+          tripSwipe.active = true;
+          tripSwipe.mode = 'right';
+          expenseSwipe.tracking = false;
+        } else {
+          resetState();
+          return;
+        }
+      } else if (ay > ax * 1.15) {
+        if (dy > 10 && current.scrollTop <= 1) {
+          tripSwipe.active = true;
+          tripSwipe.mode = 'down';
+          expenseSwipe.tracking = false;
+        } else {
+          resetState();
+          return;
+        }
       } else {
-        swipeDownBack.tracking = false;
         return;
       }
     }
-    if (!swipeDownBack.active || !currentRoot) return;
-    e.preventDefault();
-    const distance = Math.max(0, Math.min(dy, window.innerHeight * .62));
-    currentRoot.style.transition = 'none';
-    currentRoot.style.transform = 'translate(-50%,calc(-50% + '+distance+'px))';
-    currentRoot.style.opacity = String(Math.max(.8, 1 - distance / (window.innerHeight * 2.15)));
-  }, { passive:false });
 
-  section.addEventListener('touchmove', (e) => {
-    if (!swipeBack.tracking || e.touches.length !== 1) return;
-    const t = e.touches[0], dx = t.clientX - swipeBack.startX, dy = Math.abs(t.clientY - swipeBack.startY);
-    swipeBack.lastX = t.clientX;
-    if (!swipeBack.active) {
-      if (Math.abs(dx) < 8 && dy < 8) return;
-      if (dx > 10 && dx > dy * 1.25) swipeBack.active = true;
-      else if (dy >= Math.abs(dx) || dx < 0) { swipeBack.tracking = false; return; }
-    }
-    if (!swipeBack.active) return;
+    if (!tripSwipe.active) return;
     e.preventDefault();
-    const current = page(); if (!current) return;
-    const distance = Math.max(0, Math.min(dx, window.innerWidth * .78));
     current.style.transition = 'none';
-    current.style.transform = 'translateX(' + distance + 'px)';
-    current.style.opacity = String(Math.max(.82, 1 - distance / (window.innerWidth * 2.5)));
-  }, { passive:false });
-  section.addEventListener('touchend', () => {
-    if (!swipeDownBack.tracking) {
-      swipeDownBack = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
-      return;
+
+    if (tripSwipe.mode === 'right') {
+      const distance = Math.max(0, Math.min(dx, window.innerWidth * .78));
+      current.style.transform = 'translate(calc(-50% + '+distance+'px),-50%)';
+      current.style.opacity = String(Math.max(.82, 1 - distance / (window.innerWidth * 2.5)));
+    } else {
+      const distance = Math.max(0, Math.min(dy, window.innerHeight * .62));
+      current.style.transform = 'translate(-50%,calc(-50% + '+distance+'px))';
+      current.style.opacity = String(Math.max(.82, 1 - distance / (window.innerHeight * 2.2)));
     }
-    const dy = swipeDownBack.lastY - swipeDownBack.startY, currentRoot = root();
-    const goBack = swipeDownBack.active && dy >= Math.min(110, window.innerHeight * .16);
-    swipeDownBack = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
-    if (!currentRoot) return;
-    if (goBack) {
-      currentRoot.style.transition = 'transform .22s cubic-bezier(.22,.8,.28,1), opacity .18s ease';
-      currentRoot.style.transform = 'translate(-50%,calc(-50% + 100dvh))';
-      currentRoot.style.opacity = '.7';
-      setTimeout(() => {
-        simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
-        renderCurrentTrips();
-        window.scrollTo({ top:0, behavior:'auto' });
-      }, 185);
-    } else clearDownVisual(true);
-  }, { passive:true });
+  }, { passive:false });
 
   section.addEventListener('touchend', () => {
-    if (!swipeBack.tracking) { swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 }; return; }
-    const dx = swipeBack.lastX - swipeBack.startX, current = page();
-    const goBack = swipeBack.active && dx >= Math.min(92, window.innerWidth * .24);
-    swipeBack = { tracking:false, active:false, startX:0, startY:0, lastX:0 };
-    if (!current) return;
-    if (goBack) {
-      current.style.transition = 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-      current.style.transform = 'translateX(100vw)';
-      current.style.opacity = '.72';
-      setTimeout(() => {
-        simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
-        renderCurrentTrips();
-        window.scrollTo({ top:0, behavior:'auto' });
-      }, 170);
-    } else clearVisual(true);
+    if (!tripSwipe.tracking) { resetState(); return; }
+    const mode = tripSwipe.mode;
+    const dx = tripSwipe.lastX - tripSwipe.startX;
+    const dy = tripSwipe.lastY - tripSwipe.startY;
+    const goBack = tripSwipe.active && (
+      (mode === 'right' && dx >= Math.min(92, window.innerWidth * .24)) ||
+      (mode === 'down' && dy >= Math.min(110, window.innerHeight * .16))
+    );
+    if (goBack) finishBack(mode);
+    else { resetState(); clearVisual(true); }
   }, { passive:true });
+
   section.addEventListener('touchcancel', () => {
-    cancel();
-    if (swipeDownBack.active) clearDownVisual(true);
-    swipeDownBack = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
+    const wasActive = tripSwipe.active;
+    resetState();
+    if (wasActive) clearVisual(true);
   }, { passive:true });
 }
 
