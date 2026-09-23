@@ -534,7 +534,7 @@ function recurringRow(kind, item, index) {
   const day = normalizeRecurringDay(item.day);
   const timing = day === '' ? '' : 'Usually '+ordinalDay(day);
   const detail = [sub,timing].filter(Boolean).join(' · ');
-  return '<div class="finance-recurring-swipe-row" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
+  return '<div class="finance-recurring-swipe-row finance-recurring-tone-'+tone+'" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
     '<div class="finance-recurring-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
     '<div class="finance-recurring-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
     '<button class="tv2-row finance-recurring-tv2-row" type="button" data-fin-recurring-open>'+
