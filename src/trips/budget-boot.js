@@ -74,6 +74,7 @@ function init() {
     decorateCoreWizard();
   }
   document.addEventListener('twogether:budget-refreshed', () => { renderBudgetPlans(); decorateCoreWizard(); });
+  document.addEventListener('twogether:saved', () => { refreshState().catch(() => {}); });
   bindGlobalClicks();
   refreshState().catch(() => {});
   window.addEventListener('focus', () => refreshState().catch(() => {}), { passive: true });

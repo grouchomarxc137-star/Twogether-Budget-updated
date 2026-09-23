@@ -18,6 +18,21 @@ const database = openDatabase(databasePath);
 configureStateStore(database.store);
 
 const app = express();
+const liveClients = new Map();
+let liveClientSeq = 0;
+const liveHeartbeat = setInterval(() => {
+  for (const client of liveClients.values()) {
+    try { client.res.write(': keepalive\n\n'); } catch {}
+  }
+}, 25000);
+liveHeartbeat.unref?.();
+
+function broadcastStateChange(sourceClientId = '') {
+  for (const client of liveClients.values()) {
+    if (sourceClientId && client.clientId === sourceClientId) continue;
+    try { client.res.write('event: state\ndata: {}\n\n'); } catch {}
+  }
+}
 // Vite's build always marks the module script and stylesheet tags
 // `crossorigin`, which makes browsers send an Origin header even for
 // same-origin requests -- so in production (this server serving both the
@@ -44,6 +59,19 @@ app.get('/api/ping', (_req, res) => {
   res.json({ ok: true, version: 18, now: new Date().toISOString() });
 });
 
+app.get('/api/events', (req, res) => {
+  const clientId = String(req.query.client || '').slice(0, 120);
+  const key = (clientId || 'anonymous') + ':' + (++liveClientSeq);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+  res.write('retry: 1500\n\n');
+  liveClients.set(key, { clientId, res });
+  req.on('close', () => liveClients.delete(key));
+});
+
 // Serves the built frontend (npm run build -> dist/) so one process can
 // answer both the app and the API in production. In local dev, run the
 // frontend separately with `npm run dev` (Vite, hot reload) instead --
@@ -61,9 +89,10 @@ app.get('/api/state', (_req, res) => {
 
 app.post('/api/action', (req, res) => {
   try {
-    const { action, actor, payload = {} } = req.body || {};
+    const { action, actor, payload = {}, clientId = '' } = req.body || {};
     const result = database.db.transaction(() => runAction(action, payload, actor))();
     res.json(result);
+    if (result?.ok) broadcastStateChange(String(clientId || '').slice(0, 120));
   } catch (error) {
     res.json({ ok: false, error: error?.message || 'Could not save the change' });
   }
@@ -82,6 +111,11 @@ const server = app.listen(port, '0.0.0.0', () => {
 });
 
 function shutdown() {
+  clearInterval(liveHeartbeat);
+  for (const client of liveClients.values()) {
+    try { client.res.end(); } catch {}
+  }
+  liveClients.clear();
   server.close(() => {
     database.close();
     process.exit(0);

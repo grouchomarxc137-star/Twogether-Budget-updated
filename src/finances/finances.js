@@ -1294,6 +1294,7 @@ function init() {
   $('#restartFinanceWizard')?.addEventListener('click', resetWizard);
   $('#financeManageRecurring')?.addEventListener('click', openRecurringManager);
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
+  document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });
   const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderWizard(); renderPage(); setTimeout(loadState, 40); } });
   obs.observe(document.body, { attributes: true, attributeFilter: ['data-actor'] });
   renderWizard(); renderPage();
