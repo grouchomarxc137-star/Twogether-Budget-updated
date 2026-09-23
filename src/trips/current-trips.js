@@ -483,43 +483,34 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   const html = () => {
     const settlement = debt(), mine = settlement.debtor === me ? settlement.amount : 0;
     const categories = EXPENSE_CATS.filter(([key]) => !existing || key !== 'owed');
-    const amountField = state.category === 'owed' ? '' :
-      '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>';
+    const owedMode = state.category === 'owed';
+    const selectedAmount = owedCategoryAmountNow();
+    const selectedMax = maxCategoryRepayment();
+    const selectedLabel = state.owedCategory ? debtCategoryLabel(state.owedCategory) : '';
+    const amountField = owedMode
+      ? '<div class="tv2-amount tv2-owed-total" aria-label="Total amount you owe"><strong>'+displayMoney(mine,true)+'</strong><small>total owed</small></div>'
+      : '<label class="tv2-amount"><span aria-hidden="true">€</span><input id="tv2Amount" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0" value="'+esc(state.amountText)+'" aria-label="Amount in euros"></label>';
+
     let owedPanel = '';
-    if (state.category === 'owed') {
-      const debtCategories = EXPENSE_CATS.filter(([key])=>key!=='owed');
-      const selectedAmount = owedCategoryAmountNow();
-      const selectedMax = maxCategoryRepayment();
-      const selectedLabel = state.owedCategory ? debtCategoryLabel(state.owedCategory) : '';
-      if (mine > .005) {
-        owedPanel = '<div class="tv2-owed-panel">'+
-          '<div class="tv2-owed-head"><span>You owe '+esc(settlement.creditor)+' overall</span><strong>'+displayMoney(mine,true)+'</strong></div>'+
-          '<p>Choose what the repayment is for. Each category shows what you currently owe there.</p>'+
-          '<div class="tv2-owed-categories" role="group" aria-label="Owed money categories">'+
-            debtCategories.map(([key,label,icon])=>{
-              const categoryAmount=owedCategoryAmount(plan,key,me);
-              return '<button type="button" class="tv2-owed-cat '+(state.owedCategory===key?'on':'')+'" data-owed-category="'+key+'" aria-pressed="'+(state.owedCategory===key?'true':'false')+'"><span class="tv2-owed-cat-icon" aria-hidden="true">'+icon+'</span><span><b>'+esc(label)+'</b><small>'+displayMoney(categoryAmount,true)+' owed</small></span><i aria-hidden="true">›</i></button>';
-            }).join('')+
-          '</div>'+
-          (state.owedCategory
-            ? '<div class="tv2-owed-detail">'+
-                '<div class="tv2-owed-detail-head"><span>'+esc(selectedLabel)+'</span><strong>'+displayMoney(selectedAmount,true)+' owed</strong></div>'+
-                (selectedMax > .005
-                  ? '<label class="tv2-owed-field"><span>Amount you paid back</span><div><b>€</b><input id="tv2Amount" inputmode="decimal" autocomplete="off" placeholder="0.00" value="'+esc(state.amountText)+'"></div></label>'+
-                    '<button type="button" class="tv2-btn tv2-pay-full" data-pay-full>Pay full '+displayMoney(selectedMax,true)+'</button>'+
-                    '<button type="button" class="tv2-owed-note-toggle" data-owed-note-toggle aria-expanded="'+(state.owedNoteOpen?'true':'false')+'">'+(state.owedNoteOpen?'Hide note':'＋ Add note')+'</button>'+
-                    (state.owedNoteOpen?'<label class="tv2-field tv2-owed-note-field"><span>Optional note</span><input id="tv2RepaymentNote" maxlength="180" placeholder="e.g. my half of the Airbnb" value="'+esc(state.repaymentNote)+'"></label>':'')
-                  : '<div class="tv2-owed-category-empty">Nothing to pay back in '+esc(selectedLabel)+' right now.</div>')+
-              '</div>'
-            : '<div class="tv2-owed-pick-hint">Tap a category to pay it back.</div>')+
+    if (owedMode && state.owedCategory) {
+      if (selectedMax > .005) {
+        owedPanel = '<div class="tv2-owed-panel tv2-owed-repay">'+
+          '<div class="tv2-owed-head"><span>You owe '+esc(settlement.creditor)+' for '+esc(selectedLabel)+'</span><strong>'+displayMoney(selectedAmount,true)+'</strong></div>'+
+          '<label class="tv2-owed-field"><span>Amount you paid back</span><div><b>€</b><input id="tv2Amount" inputmode="decimal" autocomplete="off" placeholder="0.00" value="'+esc(state.amountText)+'"></div></label>'+
+          '<button type="button" class="tv2-btn tv2-pay-full" data-pay-full>Pay full '+displayMoney(selectedMax,true)+'</button>'+
+          '<button type="button" class="tv2-defaults tv2-owed-note-toggle" data-owed-note-toggle aria-expanded="'+(state.owedNoteOpen?'true':'false')+'"><span class="tv2-summary">'+(state.owedNoteOpen?'Hide note':'＋ Add note')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.owedNoteOpen?'⌃':'⌄')+'</span></button>'+
+          '<div class="tv2-more tv2-owed-note-box" '+(state.owedNoteOpen?'':'hidden')+'><label class="tv2-field"><span>Optional note</span><input id="tv2RepaymentNote" maxlength="180" placeholder="e.g. my half of the Airbnb" value="'+esc(state.repaymentNote)+'"></label></div>'+
         '</div>';
-      } else if (settlement.creditor === me && settlement.debtor) {
-        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(settlement.debtor)+' owes you</span><strong>'+displayMoney(settlement.amount,true)+'</strong></div><p>They can log their repayment from their own profile.</p></div>';
       } else {
-        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0.00</strong></div><p>You’re even on this trip right now.</p></div>';
+        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(selectedLabel)+'</span><strong>€0.00</strong></div><p>Nothing to pay back in this category right now.</p></div>';
       }
+    } else if (owedMode && mine <= .005) {
+      owedPanel = settlement.creditor === me && settlement.debtor
+        ? '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(settlement.debtor)+' owes you</span><strong>'+displayMoney(settlement.amount,true)+'</strong></div><p>They can log their repayment from their own profile.</p></div>'
+        : '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0.00</strong></div><p>You’re even on this trip right now.</p></div>';
     }
-    const normalOptions = state.category === 'owed' ? '' :
+
+    const normalOptions = owedMode ? '' :
       '<div class="tv2-jar-slot"></div>'+
       '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
       '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
@@ -534,12 +525,17 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
         '<label class="tv2-check"><input type="checkbox" id="tv2Est" '+(state.uncertain?'checked':'')+'> This amount is an estimate</label>'+
       '</div>';
-    return '<div class="tv2-sheet-head"><h2>'+(existing?'Edit expense':'Add expense')+'</h2><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+
+    return '<div class="tv2-sheet-head"><h2>'+(owedMode?'Owed money':existing?'Edit expense':'Add expense')+'</h2><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
       amountField+
-      '<div class="tv2-cats" role="group" aria-label="Category">'+categories.map(([k,l,i])=>'<button type="button" class="tv2-cat '+(state.category===k?'on':'')+'" data-cat="'+k+'" aria-pressed="'+(state.category===k?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>').join('')+'</div>'+
+      '<div class="tv2-cats" role="group" aria-label="Category">'+categories.map(([k,l,i])=>{
+        const selectedDebt = owedMode && state.owedCategory===k;
+        const cls = state.category===k || selectedDebt ? 'on' : '';
+        return '<button type="button" class="tv2-cat '+cls+(selectedDebt?' is-owed-target':'')+'" data-cat="'+k+'" aria-pressed="'+((state.category===k||selectedDebt)?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>';
+      }).join('')+'</div>'+
       owedPanel+normalOptions+
       '<p class="tv2-hint" aria-live="polite"></p>'+
-      '<button type="button" class="tv2-primary tv2-save" data-save>'+(state.category==='owed'?'Log repayment':existing?'Save changes':'Save')+'</button>'+
+      '<button type="button" class="tv2-primary tv2-save" data-save>'+(owedMode?'Log repayment':existing?'Save changes':'Save')+'</button>'+
       (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
   };
   simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer';
@@ -571,6 +567,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     }
   }
   function mount() {
+    sheet.classList.toggle('is-owed', state.category === 'owed');
     sheet.innerHTML = html();
     const input = sheet.querySelector('#tv2Amount');
     input?.addEventListener('input',()=>{state.amountText=input.value;state.error='';refreshLive();});
@@ -595,12 +592,39 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         return;
       }
       if (b.dataset.cat) {
-        const wasOwed = state.category === 'owed';
-        state.category=b.dataset.cat;
-        if ((state.category === 'owed') !== wasOwed) state.amountText='';
+        const key = b.dataset.cat;
+        if (state.category === 'owed') {
+          if (key === 'owed') {
+            state.category='';
+            state.owedCategory='';
+            state.amountText='';
+            state.owedNoteOpen=false;
+            state.repaymentNote='';
+            state.error='';
+            state.useJar=true;
+          } else {
+            state.owedCategory=key;
+            state.amountText='';
+            state.owedNoteOpen=false;
+            state.repaymentNote='';
+            state.error='';
+          }
+          mount();
+          return;
+        }
+        state.category=key;
+        state.amountText='';
         if(state.category!=='stay')state.useJar=false;
-        if(state.category==='owed'){state.more=false;state.owedCategory='';state.owedNoteOpen=false;state.repaymentNote='';}
-        else {state.owedCategory='';state.owedNoteOpen=false;state.repaymentNote='';}
+        if(state.category==='owed'){
+          state.more=false;
+          state.owedCategory='';
+          state.owedNoteOpen=false;
+          state.repaymentNote='';
+        } else {
+          state.owedCategory='';
+          state.owedNoteOpen=false;
+          state.repaymentNote='';
+        }
         mount();
         return;
       }

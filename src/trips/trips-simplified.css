@@ -171,21 +171,45 @@ body.tv2-locked { overflow: hidden; }
 .tv2-jar.is-off { background: transparent; border: 1px dashed var(--tv2-line); color: var(--tv2-muted); }
 .tv2-jar button { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 8px 0; }
 
-.tv2-owed-categories { display:grid; gap:7px; margin-top:2px; }
-.tv2-owed-cat { display:grid; grid-template-columns:38px 1fr auto; gap:10px; align-items:center; min-height:58px; padding:8px 10px!important; border:1px solid var(--tv2-line)!important; border-radius:13px!important; background:var(--tv2-card)!important; text-align:left; }
-.tv2-owed-cat.on { border-color:var(--tv2-primary)!important; box-shadow:inset 0 0 0 1px var(--tv2-primary); }
-.tv2-owed-cat-icon { width:36px; height:36px; display:grid; place-items:center; border-radius:11px; background:var(--tv2-bg); font-size:18px; }
-.tv2-owed-cat>span:nth-child(2) { display:grid; gap:1px; min-width:0; }
-.tv2-owed-cat b { font-size:14.5px; font-weight:600; }
-.tv2-owed-cat small { color:var(--tv2-muted); font-size:12.5px; }
-.tv2-owed-cat i { color:var(--tv2-faint); font-style:normal; font-size:19px; }
-.tv2-owed-detail { display:grid; gap:10px; margin-top:3px; padding-top:13px; border-top:1px solid var(--tv2-line); }
-.tv2-owed-detail-head { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
-.tv2-owed-detail-head span { color:var(--tv2-muted); font-size:13.5px; }
-.tv2-owed-detail-head strong { font-size:16px; font-weight:650; }
-.tv2-owed-pick-hint,.tv2-owed-category-empty { padding:10px 2px 2px; color:var(--tv2-muted); font-size:13.5px; text-align:center; }
-.tv2-owed-note-toggle { justify-self:center; min-height:36px; padding:3px 8px!important; color:var(--tv2-muted)!important; font-size:13.5px!important; text-decoration:underline; text-underline-offset:3px; }
-.tv2-owed-note-field { margin-top:-2px; }
+.tv2-sheet { transition:background .18s ease; }
+.tv2-sheet.is-owed { background:#eef7ee; }
+.tv2-sheet.is-owed .tv2-cat[data-cat="owed"] {
+  background:var(--tv2-good-soft)!important;
+  border-color:var(--tv2-good)!important;
+  box-shadow:inset 0 0 0 1px var(--tv2-good);
+  font-weight:650;
+}
+.tv2-sheet.is-owed .tv2-cat.is-owed-target {
+  border-color:var(--tv2-good)!important;
+  box-shadow:inset 0 0 0 1px var(--tv2-good);
+}
+.tv2-owed-total {
+  display:grid;
+  justify-items:center;
+  gap:1px;
+  padding:7px 0 8px;
+}
+.tv2-owed-total strong {
+  color:var(--tv2-ink);
+  font-size:46px;
+  font-weight:650;
+  line-height:1.05;
+  font-variant-numeric:tabular-nums;
+}
+.tv2-owed-total small {
+  color:var(--tv2-muted);
+  font-size:13px;
+  font-weight:500;
+}
+.tv2-owed-repay { margin-top:0; }
+.tv2-owed-note-toggle {
+  min-height:40px;
+  padding:0!important;
+  justify-self:stretch;
+  text-decoration:none;
+}
+.tv2-owed-note-box { padding:12px; margin-top:-6px; }
+.tv2-owed-note-box[hidden] { display:none; }
 
 .tv2-defaults { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 40px; color: var(--tv2-muted); font-size: 14.5px; }
 .tv2-summary { border-bottom: 1px dashed var(--tv2-faint); }
@@ -604,10 +628,13 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 .tv2-owed-panel{
   display:grid;
   gap:12px;
-  padding:16px;
+  padding:14px;
   border:1px solid var(--tv2-line);
-  border-radius:16px;
-  background:var(--tv2-card);
+  border-radius:14px;
+  background:rgba(255,255,255,.58);
+}
+.tv2-sheet.is-owed .tv2-owed-panel{
+  border-color:rgba(77,122,77,.16);
 }
 .tv2-owed-head{
   display:flex;
