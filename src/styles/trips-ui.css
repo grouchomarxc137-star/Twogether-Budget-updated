@@ -9,12 +9,16 @@ html body dialog.current-overview.current-overview-trip {
   width:min(560px,calc(100vw - 40px))!important;
   max-width:560px!important;
   min-width:0!important;
-  height:auto!important;
+  height:fit-content!important;
   min-height:0!important;
   max-height:calc(100dvh - 40px)!important;
-  margin:auto!important;
+  margin:0!important;
   padding:0!important;
-  inset:0!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  transform:translate(-50%,-50%)!important;
   overflow:hidden!important;
   border:0!important;
   border-radius:22px!important;
@@ -324,8 +328,13 @@ html body .current-overview.current-overview-trip>.tv2-layer {
   html body dialog.current-overview.current-overview-trip {
     width:calc(100vw - 40px)!important;
     max-width:560px!important;
-    height:auto!important;
+    height:fit-content!important;
     max-height:calc(100dvh - 40px)!important;
+    top:50%!important;
+    left:50%!important;
+    right:auto!important;
+    bottom:auto!important;
+    transform:translate(-50%,-50%)!important;
     border-radius:22px!important;
   }
 
