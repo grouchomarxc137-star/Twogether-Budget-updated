@@ -89,6 +89,7 @@ function ensureCurrentTrips() {
         section.querySelector('[data-act="save-my-budget"]')?.click();
         return;
       }
+      if (e.target.closest('[data-act="add-my-budget"], [data-act="save-my-budget"], [data-act="cancel-budget-editor"]')) return;
       const card = e.target.closest('[data-act="toggle-budget-view"]');
       if (!card || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
@@ -1266,8 +1267,9 @@ async function handleSimplifiedClick(e) {
   if (b.dataset.act === 'save-my-budget') {
     e.preventDefault();
     e.stopPropagation();
-    const input = section.querySelector('[data-personal-budget-input]');
-    const error = section.querySelector('[data-budget-error]');
+    const currentSection = b.closest('#twCurrentTripsSection') || document;
+    const input = currentSection.querySelector('[data-personal-budget-input]');
+    const error = currentSection.querySelector('[data-budget-error]');
     const value = Number(String(input?.value || '').replace(',','.'));
     if (!Number.isFinite(value) || value <= 0) {
       if (error) error.textContent = 'Enter a valid budget amount.';
