@@ -2752,3 +2752,362 @@ body.finance-month-focus {
 .finance-recurring-tone-other {
   --finance-recurring-line:#e0d8d0;
 }
+
+
+/* Finance logging uses the same sheet/UI language as Trips expense logging. */
+.finance-log-layer {
+  position:fixed!important;
+  inset:0!important;
+  z-index:1400!important;
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
+  padding:0!important;
+  overflow:hidden!important;
+  font-family:inherit!important;
+}
+
+.finance-log-layer .finance-log-backdrop {
+  position:absolute;
+  inset:0;
+  background:rgba(38,34,30,.38);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+}
+
+.finance-log-layer .trip-expense-workspace {
+  position:relative;
+  z-index:1;
+  width:100%;
+  max-width:560px;
+  max-height:92dvh;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  margin:0!important;
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  display:grid;
+  gap:14px;
+  background:var(--card,#fffdfa);
+  border:1px solid rgba(222,210,196,.9);
+  border-bottom:0;
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -12px 40px rgba(38,34,30,.18);
+  animation:financeExpenseSheetIn .16s ease-out;
+  color:#29231f;
+  font-family:inherit!important;
+}
+
+@keyframes financeExpenseSheetIn {
+  from { transform:translateY(16px); opacity:.65; }
+  to { transform:translateY(0); opacity:1; }
+}
+
+.finance-log-layer .trip-expense-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.finance-log-layer .trip-expense-head h2 {
+  margin:0!important;
+  font-family:inherit!important;
+  font-size:22px!important;
+  font-weight:600!important;
+  letter-spacing:-.015em;
+  line-height:1.1;
+}
+
+.finance-log-layer .trip-expense-done {
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  min-width:40px;
+  margin:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#7a7068;
+  font:inherit;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+}
+
+.finance-log-layer .trip-expense-done:hover {
+  background:#f3eee7;
+}
+
+.finance-log-layer .trip-expense-amount-hero {
+  display:flex;
+  align-items:baseline;
+  justify-content:center;
+  gap:4px;
+  margin:0 40px;
+  padding:6px 0 2px;
+  border:0;
+  border-bottom:2px solid #ebe2d8;
+  border-radius:0;
+  background:transparent;
+}
+
+.finance-log-layer .trip-expense-amount-hero:focus-within {
+  border-color:#bd8626;
+}
+
+.finance-log-layer .trip-expense-amount-hero>span {
+  font-size:30px;
+  font-weight:500;
+  color:#a39a91;
+}
+
+.finance-log-layer .trip-expense-amount-hero input,
+.finance-log-layer .trip-expense-amount-hero input:focus,
+.finance-log-layer .trip-expense-amount-hero input:focus-visible {
+  width:7.5ch;
+  min-height:auto;
+  padding:0;
+  border:0!important;
+  border-radius:0!important;
+  outline:0!important;
+  background:transparent!important;
+  font:inherit;
+  font-size:46px!important;
+  font-weight:650!important;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+  color:#29231f;
+  box-shadow:none!important;
+}
+
+.finance-log-layer .trip-expense-amount-hero input::placeholder {
+  color:#e4dbd0;
+}
+
+.finance-log-layer .trip-expense-categories {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+}
+
+.finance-log-layer .trip-expense-categories button {
+  position:relative;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:3px;
+  min-width:0;
+  min-height:66px;
+  padding:8px 3px;
+  border:1px solid #e7ddd2;
+  border-radius:14px;
+  background:#fffdfa;
+  color:inherit;
+  font:inherit;
+  cursor:pointer;
+}
+
+.finance-log-layer .trip-expense-categories button span {
+  display:block;
+  width:auto;
+  height:auto;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  font-size:21px;
+  line-height:1.2;
+}
+
+.finance-log-layer .trip-expense-categories button strong {
+  max-width:100%;
+  font-size:12px;
+  font-weight:600;
+  line-height:1.15;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.finance-log-layer .trip-expense-categories button.active {
+  box-shadow:inset 0 0 0 1px currentColor;
+}
+
+.finance-log-layer .finance-expense-mode-tile::after {
+  content:"↩";
+  position:absolute;
+  top:5px;
+  right:7px;
+  color:currentColor;
+  font-size:10px;
+  opacity:.55;
+}
+
+.finance-log-layer .finance-tv2-tone-income {
+  color:#4e7352;
+  background:#edf3df!important;
+  border-color:#d5dfbc!important;
+}
+.finance-log-layer .finance-tv2-tone-fixed {
+  color:#8b5c4f;
+  background:#f3e2dc!important;
+  border-color:#e3c7bc!important;
+}
+.finance-log-layer .finance-tv2-tone-medical {
+  color:#536f90;
+  background:#e7eef7!important;
+  border-color:#c9d8e9!important;
+}
+.finance-log-layer .finance-tv2-tone-subscriptions {
+  color:#945f66;
+  background:#f5e7e7!important;
+  border-color:#e8cccc!important;
+}
+.finance-log-layer .finance-tv2-tone-budgets {
+  color:#7c7048;
+  background:#eee9d5!important;
+  border-color:#ded4ad!important;
+}
+.finance-log-layer .finance-tv2-tone-wealth {
+  color:#64784a;
+  background:#edf3df!important;
+  border-color:#d5dfbc!important;
+}
+.finance-log-layer .finance-tv2-tone-other {
+  color:#6f655c;
+  background:#f3f0ec!important;
+  border-color:#e0d8d0!important;
+}
+
+.finance-log-layer .finance-tv2-tone-income.active { border-color:#8eaa89!important; }
+.finance-log-layer .finance-tv2-tone-fixed.active { border-color:#d7ad9f!important; }
+.finance-log-layer .finance-tv2-tone-medical.active { border-color:#acc2dc!important; }
+.finance-log-layer .finance-tv2-tone-subscriptions.active { border-color:#dbafb4!important; }
+.finance-log-layer .finance-tv2-tone-budgets.active { border-color:#cfc28e!important; }
+.finance-log-layer .finance-tv2-tone-wealth.active { border-color:#bccb98!important; }
+.finance-log-layer .finance-tv2-tone-other.active { border-color:#c9beb4!important; }
+
+.finance-log-layer .trip-expense-defaults {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  min-height:40px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#766d65;
+  font:inherit;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.finance-log-layer .trip-expense-default-summary {
+  border-bottom:1px dashed #a59b92;
+}
+
+.finance-log-layer .trip-expense-chevron {
+  font-size:13px;
+}
+
+.finance-log-layer .trip-expense-more-fields {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:14px;
+  padding:14px;
+  border:1px solid #ebe2d8;
+  border-radius:14px;
+  background:#fffdfa;
+}
+
+.finance-log-layer .trip-expense-more-fields.hidden {
+  display:none;
+}
+
+.finance-log-layer .trip-expense-more-fields label {
+  display:grid;
+  gap:6px;
+  border:0;
+  padding:0;
+  margin:0;
+  font-size:13px;
+  color:#756b63;
+}
+
+.finance-log-layer .trip-expense-more-fields>label input {
+  width:100%;
+  min-height:46px;
+  padding:0 12px;
+  border:1px solid #e4dacf;
+  border-radius:12px;
+  background:#fff;
+  font:inherit;
+  font-size:16px;
+  color:#2b2520;
+  outline:none;
+  box-shadow:none;
+}
+
+.finance-log-layer .trip-expense-more-fields>label input:focus {
+  border-color:#bd8626;
+}
+
+.finance-log-layer .trip-expense-hint {
+  min-height:18px;
+  margin:-4px 0 0;
+  text-align:center;
+  font-size:13px;
+  color:#7a7068;
+}
+
+.finance-log-layer .trip-expense-hint.is-error {
+  color:#9a5146;
+}
+
+.finance-log-layer .trip-expense-actions {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+}
+
+.finance-log-layer .trip-expense-actions .btn {
+  width:100%;
+  min-width:0;
+  min-height:48px;
+  border-radius:13px;
+}
+
+.finance-log-layer .trip-expense-actions .btn.primary {
+  background:#302a25!important;
+  border-color:#302a25!important;
+  color:#fff!important;
+}
+
+.finance-log-layer .trip-expense-actions .btn.primary:disabled {
+  background:#b8b4ae!important;
+  border-color:#b8b4ae!important;
+  color:#fff!important;
+  opacity:1!important;
+}
+
+@media(max-width:640px) {
+  .finance-log-layer .trip-expense-workspace {
+    max-height:94dvh;
+    padding:12px 14px calc(16px + env(safe-area-inset-bottom,0px));
+    border-left:0;
+    border-right:0;
+  }
+
+  .finance-log-layer .trip-expense-amount-hero {
+    margin:0 28px;
+  }
+
+  .finance-log-layer .trip-expense-categories {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .finance-log-layer .trip-expense-workspace {
+    animation:none;
+  }
+}
