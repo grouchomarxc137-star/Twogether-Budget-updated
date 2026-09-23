@@ -95,6 +95,7 @@ let loading = false;
 let recurringSwipeAbort = null;
 let recurringSwipeIgnoreUntil = 0;
 let recurringDeleteConfirmLayer = null;
+let financeMonthDialog = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -951,11 +952,29 @@ async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
   toast(message);
   setTimeout(loadState,800);
 }
-function openFinanceTransactionSheet(rec) {
+function openFinanceTransactionSheet(rec, edit = null) {
   if (!rec || rec.finalized) return;
   closeFinanceTransactionSheet();
   const categories=financeLogCategories(rec);
-  const state={amountText:'',category:'',selectedItemId:'',name:'',group:'',date:'',more:false,busy:false,error:''};
+  const editingKind=edit?.kind==='income'?'income':edit?.kind==='expense'?'expense':'';
+  const editingIndex=Number.isInteger(edit?.index)?edit.index:-1;
+  const editingItem=editingKind==='income'
+    ? (rec.incomes||[])[editingIndex]
+    : editingKind==='expense'
+      ? (rec.expenses||[])[editingIndex]
+      : null;
+  const editingCategory=editingKind==='income'?'income':editingItem?groupTone(editingItem.group):'';
+  const state={
+    amountText:editingItem?String(n(editingItem.amount)):'',
+    category:editingCategory,
+    selectedItemId:editingItem?'__editing__':'',
+    name:editingItem?String(editingItem.name||''):'',
+    group:editingKind==='expense'?normalizeGroup(editingItem?.group):'',
+    date:editingItem?normalizeFinanceDate(editingItem.date,rec.month):'',
+    more:!!editingItem,
+    busy:false,
+    error:'',
+  };
   const layer=document.createElement('div');
   layer.className='finance-log-layer trip-expense-mode';
   layer.innerHTML='<div class="finance-log-backdrop" data-fin-log-close></div><div class="trip-expense-workspace finance-expense-workspace" role="dialog" aria-modal="true" aria-label="Log finance"></div>';
@@ -1015,7 +1034,7 @@ function openFinanceTransactionSheet(rec) {
         : categoryButton(selected,true)+items.map((item,index)=>itemButton(item,index,selected?.tone||'other',selected?.icon||'•')).join('');
 
     const dateSummary=state.date?financeDateLabel(state.date):'Add date · optional';
-    const title=selected?esc(selected.label):'Log finance';
+    const title=editingItem?'Edit finance':selected?esc(selected.label):'Log finance';
 
     sheet.innerHTML=
       '<header class="trip-expense-head"><h2>'+title+'</h2><button type="button" class="trip-expense-done" data-fin-log-close aria-label="Close">×</button></header>'+
@@ -1029,7 +1048,7 @@ function openFinanceTransactionSheet(rec) {
           '<div class="trip-expense-more-fields '+(state.more?'':'hidden')+'><label>Date<input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>'
         : '')+
       '<p class="trip-expense-hint finance-log-hint '+(state.error?'is-error':'')+'" aria-live="polite"></p>'+
-      '<div class="trip-expense-actions"><button type="button" class="btn primary big" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save')+'</button></div>';
+      '<div class="trip-expense-actions">'+(editingItem?'<button type="button" class="btn ghost" data-fin-log-cancel-edit>Cancel edit</button>':'')+'<button type="button" class="btn primary big" data-fin-log-save '+(!valid()||state.busy?'disabled':'')+'>'+(state.busy?'Saving…':editingItem?'Save changes':'Save')+'</button></div>';
 
     const amountInput=sheet.querySelector('#financeLogAmount');
     amountInput?.addEventListener('input',(e)=>{state.amountText=e.target.value;state.error='';refreshSave();});
@@ -1043,7 +1062,7 @@ function openFinanceTransactionSheet(rec) {
   layer.addEventListener('click',async(e)=>{
     const button=e.target.closest('button');
     if (!button) return;
-    if (button.hasAttribute('data-fin-log-close')) { closeFinanceTransactionSheet(); return; }
+    if (button.hasAttribute('data-fin-log-close') || button.hasAttribute('data-fin-log-cancel-edit')) { closeFinanceTransactionSheet(); return; }
 
     if (button.hasAttribute('data-fin-log-cat-back')) {
       resetToCategories();
@@ -1090,14 +1109,20 @@ function openFinanceTransactionSheet(rec) {
       state.busy=true; state.error=''; render();
       const next=cloneRecord(rec);
       if (state.category==='income') {
-        next.incomes=[...(next.incomes||[]),{name:state.name.trim(),amount:amount(),date:state.date}];
+        const row={name:state.name.trim(),amount:amount(),date:state.date};
+        next.incomes=[...(next.incomes||[])];
+        if(editingKind==='income'&&editingIndex>=0) next.incomes[editingIndex]=row;
+        else next.incomes.push(row);
       } else {
-        next.expenses=[...(next.expenses||[]),{group:state.group||'other',name:state.name.trim(),amount:amount(),date:state.date}];
+        const row={group:state.group||'other',name:state.name.trim(),amount:amount(),date:state.date};
+        next.expenses=[...(next.expenses||[])];
+        if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
+        else next.expenses.push(row);
       }
       if (!recordFor(rec.month)) next.partialOnly=true;
       try {
         closeFinanceTransactionSheet();
-        await saveDirectMonthRecord(next,state.category==='income'?'Income added':'Expense added');
+        await saveDirectMonthRecord(next,editingItem?'Finance updated':state.category==='income'?'Income added':'Expense added');
       } catch(err) {
         state.busy=false;
         state.error=err?.message||'Could not save this item.';
@@ -1136,7 +1161,7 @@ function financeMonthTimeline(rec) {
   extraSpendSummary({extraSpends:rec.extraSpends||[]}).forEach((item,index)=>{
     const savedUpOnly=actor()==='Principe'&&item.source==='savings';
     rows.push({
-      kind:'expense',
+      kind:'summary',
       date:'',
       item:{name:extraSourceLabel(item.source),amount:item.amount,group:savedUpOnly?'savings':'extra'},
       index:1000+index,
@@ -1144,30 +1169,38 @@ function financeMonthTimeline(rec) {
     });
   });
   rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || a.kind.localeCompare(b.kind));
-  if (!rows.length) return '<div class="tv2-empty-list">No expenses yet. Add them as they happen, it takes a few seconds.</div>';
+  if (!rows.length) return '<p class="overview-trip-empty">No finances yet. Add them as they happen, it takes a few seconds.</p>';
   const groups=new Map();
   rows.forEach((row)=>{const key=row.date||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);});
   return [...groups.entries()].map(([date,items])=>
-    '<div class="tv2-day"><h2>'+esc(financeMonthDayLabel(date))+'</h2>'+
+    '<section class="overview-trip-day"><h3>'+esc(financeMonthDayLabel(date))+'</h3>'+
       items.map((row)=>{
         const item=row.item;
         const income=row.kind==='income';
         const tone=income?'income':row.tone;
         const meta=income?'Income':categoryLabel(tone);
-        return '<div class="tv2-row finance-tv2-row">'+
-          '<span class="tv2-ic finance-tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,income?'income':'expense')+'</span>'+
-          '<span class="tv2-row-main"><strong>'+esc(item.name||(income?'Income':groupLabel(item.group)))+'</strong><small>'+esc(meta)+'</small></span>'+
-          '<span class="tv2-amt '+(income?'finance-tv2-income-amt':'')+'">'+money(item.amount)+'</span>'+
-        '</div>';
+        const editable=row.kind!=='summary';
+        return '<button type="button" class="overview-trip-expense finance-month-entry" '+(editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'disabled')+'>'+
+          '<span class="overview-trip-expense-icon finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,income?'income':'expense')+'</span>'+
+          '<span class="overview-trip-expense-copy"><strong>'+esc(item.name||(income?'Income':groupLabel(item.group)))+'</strong><small>'+esc(meta)+'</small></span>'+
+          '<b class="'+(income?'finance-tv2-income-amt':'')+'">'+money(item.amount)+'</b>'+
+        '</button>';
       }).join('')+
-    '</div>'
+    '</section>'
   ).join('');
+}
+
+function closeFinanceMonthDialog() {
+  financeMonthDialog?.remove();
+  financeMonthDialog=null;
 }
 
 function renderDetail(rec) {
   if (!rec) return;
   const legacyRoot=$('#financeDetail');
   if (legacyRoot) legacyRoot.innerHTML='';
+  closeFinanceMonthDialog();
+  if ($('#financeMiniModal')?.classList.contains('is-month-detail')) closeMini();
 
   const rules=financeRules();
   const c=calc(rec), carry=extraCarryInfo(rec.month);
@@ -1175,40 +1208,51 @@ function renderDetail(rec) {
   const progress=c.income>0?Math.min(100,Math.max(0,(c.outflow/c.income)*100)):0;
   const stored=recordFor(rec.month);
   const status=rec.finalized?'Locked':stored?'Draft':'Not logged';
+  const year=String(rec.month||'').slice(0,4)||String(financeViewYear);
+  const confirmControl=stored&&!rec.finalized
+    ? '<button type="button" data-fin-finalize-existing>Confirm</button>'
+    : '<span></span>';
   const extraNote=rules.extraTracking&&c.extraOver>0
-    ? '<div class="tv2-empty-card finance-tv2-note"><strong>Extra budget exceeded</strong><span>'+money(c.extraOver)+' spent beyond this month’s Extra budget.</span></div>' : '';
+    ? '<div class="overview-trip-balance is-debtor finance-month-note"><span>Extra budget exceeded · '+money(c.extraOver)+' over</span></div>' : '';
   const carryNote=rules.extraTracking&&carry.debt>0
-    ? '<div class="tv2-empty-card finance-tv2-note"><strong>Extra carried over</strong><span>You still owe yourself '+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+'.</span></div>' : '';
-  const confirmHtml=rec.finalized
-    ? '<section class="tv2-trip-confirm is-waiting"><div><strong>✓ Month confirmed</strong><span>This month is locked.</span></div></section>'
-    : stored
-      ? '<section class="tv2-trip-confirm"><div><strong>Month draft</strong><span>Confirm when this month’s finances are final.</span></div><button type="button" data-fin-finalize-existing>Confirm month</button></section>'
-      : '';
+    ? '<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>' : '';
 
-  showMini(
-    '<div class="tv2-root finance-month-tv2">'+
-      '<div class="tv2-page">'+
-        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-month-close>‹ 2026</button><span></span></div>'+
-          '<h1>'+esc(monthLabel(rec.month))+'</h1><p>'+esc(actor())+' · '+esc(status)+'</p></header>'+
-        '<section class="tv2-money"><div class="tv2-figs">'+
-          '<div class="tv2-fig"><span>Total income</span><b>'+money(c.income)+'</b></div>'+
-          '<div class="tv2-fig"><span>Total outflow</span><b>'+money(c.outflow)+'</b></div></div>'+
-          (c.income>0?'<div class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+progress.toFixed(1)+'%"></i></div>':'')+
-          '<div class="tv2-left '+(over?'is-over':'')+'"><b>'+money(Math.abs(c.leftover))+'</b><span>'+(over?'overspent':'leftover')+'</span></div>'+
-        '</section>'+
-        extraNote+carryNote+confirmHtml+
-        '<section class="tv2-list" aria-label="Monthly finances">'+financeMonthTimeline(rec)+'</section>'+
-        (!rec.finalized?'<div class="tv2-dock"><button type="button" class="tv2-primary" data-fin-add-transaction>＋ Log finance</button></div>':'')+
-      '</div>'+
-    '</div>',
-    'month-detail'
-  );
+  financeMonthDialog=document.createElement('dialog');
+  financeMonthDialog.className='current-overview current-overview-trip finance-month-overview';
+  financeMonthDialog.innerHTML=
+    '<div class="overview-trip-shell">'+
+      '<header class="overview-trip-head">'+
+        '<div class="overview-trip-nav"><button type="button" data-fin-month-close>‹ '+esc(year)+'</button>'+confirmControl+'</div>'+
+        '<h2>'+esc(monthLabel(rec.month))+'</h2>'+
+        '<p>'+esc(actor())+' · '+esc(status)+'</p>'+
+      '</header>'+
+      '<section class="overview-trip-money">'+
+        '<div class="overview-trip-figures">'+
+          '<div><span>Total income</span><strong>'+money(c.income)+'</strong></div>'+
+          '<div><span>Total outflow</span><strong>'+money(c.outflow)+'</strong></div>'+
+        '</div>'+
+        (c.income>0?'<span class="overview-trip-progress"><i style="width:'+progress.toFixed(1)+'%"></i></span>':'')+
+        '<div class="overview-trip-left '+(over?'over':'')+'"><strong>'+money(Math.abs(c.leftover))+'</strong><span>'+(over?'overspent':'leftover')+'</span></div>'+
+      '</section>'+
+      extraNote+carryNote+
+      '<div class="overview-trip-list">'+financeMonthTimeline(rec)+'</div>'+
+      (!rec.finalized?'<div class="overview-trip-dock"><button type="button" data-fin-add-transaction>＋ Log finance</button></div>':'')+
+    '</div>';
 
-  const modalBody=$('#financeMiniBody');
-  $('[data-fin-month-close]',modalBody)?.addEventListener('click',closeMini);
-  $('[data-fin-add-transaction]',modalBody)?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
-  $('[data-fin-finalize-existing]',modalBody)?.addEventListener('click',()=>confirmExistingMonth(rec));
+  document.body.appendChild(financeMonthDialog);
+  financeMonthDialog.showModal();
+  financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();closeFinanceMonthDialog();});
+  financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',closeFinanceMonthDialog);
+  financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
+  financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
+  financeMonthDialog.querySelectorAll('[data-fin-entry-kind]').forEach((button)=>{
+    button.addEventListener('click',()=>openFinanceTransactionSheet(rec,{
+      kind:button.dataset.finEntryKind,
+      index:Number(button.dataset.finEntryIndex),
+    }));
+  });
 }
+
 
 function ensureMiniModal() {
   if ($('#financeMiniModal')) return;
