@@ -436,7 +436,34 @@ function recurringConfig() {
   return recurringDefaults();
 }
 function recurringExpenseGroups() {
-  return manualGroups().filter((g) => g.key !== 'extra');
+  return actor() === 'Principe'
+    ? [
+        { key: 'fixed', label: 'Fixed expenses' },
+        { key: 'subscriptions', label: 'Subscriptions' },
+        { key: 'budgets', label: 'Variable expenses' },
+        { key: 'wealth', label: 'Savings' },
+        { key: 'other', label: 'Other' },
+      ]
+    : [
+        { key: 'medical', label: 'Medical' },
+        { key: 'subscriptions', label: 'Subscriptions' },
+        { key: 'budgets', label: 'Budgets' },
+        { key: 'wealth', label: 'Savings / Investments' },
+        { key: 'other', label: 'Other' },
+      ];
+}
+
+function recurringGroupForCategory(category, name, currentItem = null) {
+  if (currentItem && groupTone(currentItem.group) === category) return currentItem.group;
+  if (category === 'fixed') return 'fixed';
+  if (category === 'medical') return 'medical';
+  if (category === 'subscriptions') return 'subscriptions';
+  if (category === 'budgets') return 'variable';
+  if (category === 'wealth') {
+    if (actor() === 'Principessa' && /invest/i.test(String(name || ''))) return 'investments';
+    return 'savings';
+  }
+  return 'other';
 }
 
 function post(action, payload) { return window.TwogetherAPI.post(action, payload, actor()); }
@@ -1012,7 +1039,7 @@ function openRecurringEditor(kind,index) {
   const item=index>=0?list[index]:null;
   const isExpense=kind==='expense';
   const groups=recurringExpenseGroups();
-  const selectedGroup=item?.group||groups[0]?.key||'other';
+  const selectedGroup=item?groupTone(item.group):(groups[0]?.key||'other');
   const referenceMonth=/^\d{4}-\d{2}$/.test(String(selectedMonth||''))?selectedMonth:'2026-09';
   const bounds=financeDateBounds(referenceMonth);
   const selectedDate=financeDateForDay(referenceMonth,item?.day);
@@ -1053,7 +1080,10 @@ function openRecurringEditor(kind,index) {
     const nextConfig=recurringConfig();
     nextConfig.custom=true;
     const row={id:item?.id||uid(),name,amount:n(amount),day};
-    if(isExpense) row.group=$('#finRecurringGroup')?.value||selectedGroup;
+    if(isExpense) {
+      const category=$('#finRecurringGroup')?.value||selectedGroup;
+      row.group=recurringGroupForCategory(category,name,item);
+    }
     const target=isExpense?nextConfig.expenses:nextConfig.incomes;
     if(index>=0) target[index]=row; else target.push(row);
     next.recurring=nextConfig;
