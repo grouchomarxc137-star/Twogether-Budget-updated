@@ -83,7 +83,7 @@ function installStyles() {
     .v5-review-row.review-paid-over{background:#f8ebe8!important;box-shadow:inset 3px 0 0 #c9877a}
     .v5-review-row.review-paid-on{background:#f1f0eb!important}
     .confirmed-spend-overview{margin:16px 0}
-    .confirmed-spend-card{position:relative;background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);border:1px solid #e6dbcf;border-radius:24px;padding:22px;box-shadow:0 10px 28px rgba(62,45,31,.055);cursor:pointer;touch-action:pan-y;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+    .confirmed-spend-card{position:relative;background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);border:1px solid #e6dbcf;border-radius:24px;padding:22px;box-shadow:0 10px 28px rgba(62,45,31,.055);cursor:pointer;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
     .confirmed-spend-card.is-principessa{border-color:#d6ad45;box-shadow:0 0 0 2px rgba(214,173,69,.18),0 10px 28px rgba(96,72,24,.08);background:linear-gradient(180deg,#fffdf5 0%,#fbf5e5 100%)}
     .confirmed-spend-card.is-principe{border-color:#e68145;box-shadow:0 0 0 2px rgba(230,129,69,.18),0 10px 28px rgba(114,62,27,.08);background:linear-gradient(180deg,#fffaf6 0%,#fcf0e7 100%)}
     .confirmed-spend-card:focus-visible{outline:2px solid rgba(102,86,69,.55);outline-offset:3px}
