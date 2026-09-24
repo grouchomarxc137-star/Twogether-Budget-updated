@@ -53,6 +53,19 @@ function lastFinanceView() {
   try { return localStorage.getItem(FIN_VIEW_KEY) || 'overview'; } catch { return 'overview'; }
 }
 
+function isInsideHub(name) {
+  if (name === 'trips') {
+    const activeSheet = $('.sheet.active');
+    return !!activeSheet && ['log', 'monthly', 'compare'].includes(activeSheet.id);
+  }
+  if (name === 'finances') {
+    const financeSheet = $('#finances');
+    const activeView = $('[data-fin-view].active', financeSheet || document);
+    return !!financeSheet?.classList.contains('active') && activeView?.dataset.finView !== 'wishlist';
+  }
+  return false;
+}
+
 // Moved from app.js's bindStatic(): the foundational "show this one .sheet,
 // highlight this one .tab" toggle that everything else (including this
 // file's own setHub/activateTrip/activateFinanceView) ultimately triggers
@@ -189,8 +202,8 @@ function installDropdownRefinement() {
     menu?.addEventListener('pointerenter', () => { if (!isMobile() && pinned === w) { cancelTimers(w); openWrap(w); } });
     menu?.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
     hub?.addEventListener('click', () => {
-      const alreadyActive = hub.classList.contains('active');
-      if (!alreadyActive) {
+      const alreadyInside = isInsideHub(hub.dataset.hub);
+      if (!alreadyInside) {
         suppressHover = true;
         pinned = null;
         closeOthers(w, false);
@@ -237,12 +250,12 @@ export function initNavigation() {
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {
-    if (tripHub.classList.contains('active')) return;
+    if (isInsideHub('trips')) return;
     activateTrip('log');
   });
 
   financeHub.addEventListener('click', () => {
-    if (financeHub.classList.contains('active')) return;
+    if (isInsideHub('finances')) return;
     setHub('finances');
     ensureFinanceSheet();
     setTimeout(() => activateFinanceView('monthly'), 0);
