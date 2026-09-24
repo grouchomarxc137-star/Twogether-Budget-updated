@@ -62,7 +62,7 @@ function renderItem(item) {
   const openAction = item.openLabel
     ? '<div class="tw-notification-actions"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
     : '';
-  return '<article class="tw-notification-item" data-notification-id="' + esc(item.id) + '">' +
+  return '<article class="tw-notification-item' + (item.urgent ? ' is-urgent' : '') + '" data-notification-id="' + esc(item.id) + '">' +
     '<div class="tw-notification-copy"><strong>' + esc(item.title || 'Reminder') + '</strong>' +
     (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
     important + packing + '</div>' + financeActions + openAction + '</article>';
@@ -126,6 +126,7 @@ function setPending(items = [], source = 'default') {
     actionable: item?.actionable === true,
     kind: String(item?.kind || ''),
     openLabel: String(item?.openLabel || ''),
+    urgent: item?.urgent === true,
     reminders: Array.isArray(item?.reminders) ? item.reminders.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
     packing: Array.isArray(item?.packing) ? item.packing.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
   })).filter((item) => item.id && item.title) : [];
