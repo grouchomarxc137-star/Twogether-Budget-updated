@@ -1300,6 +1300,7 @@ function sanitizeFinanceRepayment_(item) {
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     month: cleanText_(item && item.month, 10),
+    date: cleanFinanceDate_(item && item.date),
     amount: cleanMoney_(item && item.amount),
     at: cleanText_(item && item.at, 40)
   };
