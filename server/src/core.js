@@ -658,7 +658,12 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
       if (planIdx < 0) throw new Error('Budget plan not found');
-      const plan = sanitizePlan_(state.plans[planIdx]);
+      const rawPlan = state.plans[planIdx];
+      const paymentMismatches = planPaymentMismatchDetails_(rawPlan);
+      if (paymentMismatches.length) {
+        throw new Error('Fix payment assignment before confirming: ' + paymentMismatches.map(function(item){ return item.name + ' (€' + Number(item.amount).toFixed(2) + ' unassigned)'; }).join(', ') + '.');
+      }
+      const plan = sanitizePlan_(rawPlan);
       const today = new Date().toISOString().slice(0,10);
       if (!plan.meta.end || plan.meta.end >= today) throw new Error('This trip can be confirmed after it has ended');
       const outstandingSettlement = tripSettlement_(plan);
@@ -740,7 +745,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (!submissionsMatch_(trip.submissions.Principessa, trip.submissions.Principe)) {
         throw new Error('Your versions still differ. Edit them until they match first.');
       }
-      const warnings=reconciliationWarnings_(trip);
+      const warnings=reconciliationWarnings_(trip, planForTrip);
       if(warnings.length)throw new Error(warnings.join(' '));
       const alreadyConfirmed = !!trip.confirmed[actor];
       trip.confirmed[actor] = true;
@@ -1645,6 +1650,36 @@ function tripRepaymentCategoryLabel_(category) {
   return labels[category] || 'this category';
 }
 
+function planPaymentMismatchDetails_(plan) {
+  const source = plan && typeof plan === 'object' ? plan : {};
+  const rows = [];
+  (Array.isArray(source.expenseEntries) ? source.expenseEntries : []).forEach(function(raw){
+    const entry = sanitizeTripExpense_(raw, raw && raw.loggedBy);
+    const amount = Math.max(0, Number(entry.amount || 0));
+    if (amount <= .005) return;
+    const jar = Math.min(amount, Math.max(0, Number(entry.jarContribution || 0)));
+    const remaining = Math.max(0, amount - jar);
+    const assigned = (ACTORS.includes(entry.paidBy) || entry.paidBy === 'both') ? remaining : 0;
+    const missing = money2_(Math.max(0, amount - jar - assigned));
+    if (missing <= .005) return;
+    const label = cleanText_(entry.name || entry.note, 120) || (
+      entry.category === 'accommodation' ? 'Stay' :
+      entry.category === 'transport' ? (entry.transportType === 'fuel' ? 'Car' : 'Transport') :
+      entry.category === 'food' ? (entry.foodType === 'groceries' ? 'Groceries' : 'Eating out') :
+      entry.category === 'activities' ? 'Activities' : 'Other'
+    );
+    rows.push({id:entry.id,name:label,amount:missing});
+  });
+  return rows;
+}
+
+function planJarTotal_(plan) {
+  return money2_((Array.isArray(plan && plan.expenseEntries) ? plan.expenseEntries : []).reduce(function(sum,raw){
+    const entry=sanitizeTripExpense_(raw,raw&&raw.loggedBy);
+    return sum+Math.max(0,Number(entry.jarContribution||0));
+  },0));
+}
+
 function tripSettlement_(plan) {
   const safe = plan && plan.expenseEntries ? plan : sanitizePlan_(plan);
   const paid = {Principessa:0,Principe:0};
@@ -1779,7 +1814,7 @@ function addAudit_(state, actor, action, ref) {
   state.audit = state.audit.slice(-MAX_AUDIT);
 }
 
-function reconciliationWarnings_(trip) {
+function reconciliationWarnings_(trip, plan) {
   const warnings=[];
   const shared=sanitizeSharedExpenses_(trip.sharedExpenses);
   SHARED_EXPENSE_KEYS.forEach(function(key){
@@ -1793,7 +1828,15 @@ function reconciliationWarnings_(trip) {
     if(Math.abs(paid-Number(m.total))>.005)warnings.push(key+' payments differ from the bill by €'+Math.abs(paid-Number(m.total)).toFixed(2)+'.');
   });
   const a=trip.submissions.Principessa,b=trip.submissions.Principe;
-  if(a&&b){const total=MONEY_FIELDS.reduce((sum,key)=>sum+Number(a[key]||0),0);const shared=sanitizeSharedExpenses_(trip.sharedExpenses);const jar=Number(shared.accom&&shared.accom.accommodation&&shared.accom.accommodation.jarContribution||0);const paid=Number(a.paid||0)+Number(b.paid||0)+jar;if(Math.abs(total-paid)>.005)warnings.push('Total payments do not match trip expenses (difference €'+Math.abs(total-paid).toFixed(2)+').');}
+  if(a&&b){
+    const total=MONEY_FIELDS.reduce((sum,key)=>sum+Number(a[key]||0),0);
+    const shared=sanitizeSharedExpenses_(trip.sharedExpenses);
+    const legacyJar=Number(shared.accom&&shared.accom.accommodation&&shared.accom.accommodation.jarContribution||0);
+    const planJar=plan&&Array.isArray(plan.expenseEntries)?planJarTotal_(plan):0;
+    const jar=planJar>0?planJar:legacyJar;
+    const paid=Number(a.paid||0)+Number(b.paid||0)+jar;
+    if(Math.abs(total-paid)>.005)warnings.push('Total payments do not match trip expenses (difference €'+Math.abs(total-paid).toFixed(2)+').');
+  }
   return warnings;
 }
 
