@@ -439,13 +439,16 @@ function simplifiedTrip(plan, trip) {
   const meta = plan?.meta || {}, me = actor(), personal = simplifiedView.budgetMode === 'personal';
   const other = me === 'Principessa' ? 'Principe' : 'Principessa';
   const phase = tripPhase(meta), past = phase === 'past';
+  const settlement = settlementState(plan), hasOutstandingDebt = settlement.amount > .005;
   const mineConfirmed = !!trip?.confirmed?.[me], otherConfirmed = !!trip?.confirmed?.[other];
   const confirmHtml = !past ? '' : mineConfirmed
     ? '<section class="tv2-trip-confirm is-waiting"><div><strong>✓ You confirmed this trip</strong><span>'+(otherConfirmed?'Finalising trip…':'Waiting for '+esc(other)+'. It stays under Past until both of you confirm.')+'</span></div></section>'
-    : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
+    : hasOutstandingDebt
+      ? '<section class="tv2-trip-confirm is-blocked"><div><strong>Payback needed</strong><span>Pay back all owed money before confirming this trip. '+esc(settlement.debtor)+' still owes '+displayMoney(settlement.amount,true)+'.</span></div><button type="button" disabled>Confirm trip</button></section>'
+      : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
   const combinedAvailable = tripBudget(plan, trip), combinedSpent = expenseTotal(plan, trip);
   const ownBudget = has(plan?.budgets?.[me]) ? n(plan.budgets[me]) : null;
-  const ownSpent = n(settlementState(plan).paid?.[me]);
+  const ownSpent = n(settlement.paid?.[me]);
   const available = personal ? ownBudget : combinedAvailable;
   const spent = personal ? ownSpent : combinedSpent;
   const left = available == null ? null : available - spent;
@@ -1522,6 +1525,11 @@ async function handleSimplifiedClick(e) {
   if (b.dataset.act === 'budgets') { window.TwogetherWorkflow?.budget(plan.id); return; }
   if (b.dataset.act === 'confirm-trip') {
     if (tripPhase(plan.meta) !== 'past' || b.disabled) return;
+    const outstanding = settlementState(plan);
+    if (outstanding.amount > .005) {
+      toast('Pay back all owed money before confirming this trip.','warn');
+      return;
+    }
     const other = actor() === 'Principessa' ? 'Principe' : 'Principessa';
     b.disabled = true;
     b.textContent = 'Confirming…';

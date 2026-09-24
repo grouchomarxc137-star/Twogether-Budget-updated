@@ -83,6 +83,9 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-trip-confirm button { flex:0 0 auto; min-height:42px; padding:0 15px!important; border-radius:12px!important; background:var(--tv2-primary)!important; color:var(--tv2-on-primary)!important; font-weight:650!important; }
 .tv2-trip-confirm button:disabled { opacity:.55; }
 .tv2-trip-confirm.is-waiting { background:var(--tv2-good-soft); border-color:transparent; }
+.tv2-trip-confirm.is-blocked { background:#fff2ee; border-color:#efd5cc; }
+.tv2-trip-confirm.is-blocked strong { color:var(--tv2-over); }
+.tv2-trip-confirm.is-blocked button { background:#d8cbc5!important; color:#7f716a!important; cursor:not-allowed; opacity:1; }
 @media(max-width:520px){ .tv2-trip-confirm{align-items:stretch;flex-direction:column}.tv2-trip-confirm button{width:100%} }
 
 /* ---- expense list ---- */

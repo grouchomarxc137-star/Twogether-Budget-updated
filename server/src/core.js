@@ -661,6 +661,8 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const plan = sanitizePlan_(state.plans[planIdx]);
       const today = new Date().toISOString().slice(0,10);
       if (!plan.meta.end || plan.meta.end >= today) throw new Error('This trip can be confirmed after it has ended');
+      const outstandingSettlement = tripSettlement_(plan);
+      if (outstandingSettlement.amount > .005) throw new Error('Pay back all owed money before confirming this trip.');
 
       let tripIdx = plan.linkedTripId ? state.trips.findIndex(function(t){ return t.id === plan.linkedTripId; }) : -1;
       let trip = tripIdx >= 0 ? sanitizeTripRecord_(state.trips[tripIdx]) : sanitizeTripRecord_({
@@ -725,6 +727,10 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const idx = state.trips.findIndex(t => t.id === id);
       if (idx < 0) throw new Error('Trip not found');
       const trip = sanitizeTripRecord_(state.trips[idx]);
+      const planForTrip = state.plans.map(sanitizePlan_).find(function(p){ return p.linkedTripId === trip.id; });
+      if (planForTrip && tripSettlement_(planForTrip).amount > .005) {
+        throw new Error('Pay back all owed money before confirming this trip.');
+      }
       if (!trip.submissions.Principessa || !trip.submissions.Principe) {
         throw new Error('Both versions must be logged before confirming');
       }
@@ -745,7 +751,6 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (!alreadyConfirmed) {
         state.game = sanitizeGame_(state.game);
         const pstate = state.game[actor];
-        const planForTrip = state.plans.map(sanitizePlan_).find(function(p){ return p.linkedTripId === trip.id; });
         const budgetRaw = planForTrip && planForTrip.budgets && planForTrip.budgets[actor] !== '' ? planForTrip.budgets[actor] : trip.budget;
         const actualRaw = trip.submissions[actor] && trip.submissions[actor].paid;
         if (budgetRaw !== '' && actualRaw !== '' && isFinite(Number(budgetRaw)) && isFinite(Number(actualRaw))) {
