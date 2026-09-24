@@ -1079,7 +1079,7 @@ function financeLogCategories(rec) {
   (rec?.expenses || []).forEach((item)=>tones.add(groupTone(item.group)));
   manualGroups().forEach((group)=>tones.add(group.tone));
   return [
-    { key:'income', label:'Income', tone:'income', icon:'€' },
+    { key:'income', label:'Income', tone:'income', icon:financeMonthToneIcon('income', 'income') },
     ...categoryOrder().filter((tone)=>tones.has(tone)).map((tone)=>({
       key:tone,
       label:categoryLabel(tone),
@@ -1483,8 +1483,9 @@ function openFinanceTransactionSheet(rec, edit = null) {
 
 
 function financeMonthToneIcon(tone, kind = 'expense') {
-  if (kind === 'income') return '€';
-  return { fixed:'⌂', medical:'✚', subscriptions:'▣', budgets:'◌', wealth:'◇', other:'•' }[tone] || '•';
+  if (kind === 'income') return '💶';
+  if (tone === 'budgets' && actor() === 'Principe') return '🛒';
+  return { fixed:'🏠', medical:'🩺', subscriptions:'🔁', budgets:'💰', wealth:'🏦', other:'🏷️' }[tone] || '🏷️';
 }
 
 function financeMonthDayLabel(value) {
