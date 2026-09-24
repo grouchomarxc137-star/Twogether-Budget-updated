@@ -1078,7 +1078,8 @@ function openRecurringEditor(kind,index) {
         '</div>'+
       '</div>'+
     '</div>',
-    'recurring-manager'
+    'recurring-manager',
+    { back: openRecurringManager }
   );
 
   $('[data-fin-recurring-back]')?.addEventListener('click',openRecurringManager);
@@ -1975,9 +1976,11 @@ function ensureMiniModal() {
   document.body.appendChild(modal);
   $$('[data-fin-mini-close]', modal).forEach((el) => el.addEventListener('click', closeMini));
 }
-function showMini(html, mode = '') {
+function showMini(html, mode = '', nav = {}) {
   ensureMiniModal();
   const modal = $('#financeMiniModal');
+  modal._twogetherBack = typeof nav.back === 'function' ? nav.back : closeMini;
+  modal._twogetherHome = typeof nav.home === 'function' ? nav.home : closeMini;
   $('#financeMiniBody').innerHTML = html;
   const monthDetail = mode === 'month-detail';
   const recurringManager = mode === 'recurring-manager';
@@ -1998,6 +2001,10 @@ function closeMini() {
   recurringSwipeAbort?.abort();
   recurringSwipeAbort=null;
   closeRecurringDeleteConfirm();
+  if(modal){
+    modal._twogetherBack=null;
+    modal._twogetherHome=null;
+  }
 }
 
 async function saveProfile(next, message = 'Balances updated') {
@@ -2017,11 +2024,11 @@ function openSharedJarHistory(detail = {}) {
     ? transactions.map((transaction) => `<div class="finance-jar-history-row"><span><strong>${esc(transaction.trip || 'Trip')}</strong><small>${esc(transaction.category || 'Stay')}${transaction.date ? ' · ' + esc(transaction.date) : ''}${transaction.actor ? ' · ' + esc(transaction.actor) : ''}</small></span><b>−${money(transaction.amount)}</b></div>`).join('')
     : '<div class="finance-current-empty">No Shared Jar transactions yet.</div>';
   showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Shared Jar</h2><div class="finance-jar-summary"><span>Current balance</span><strong>${money(balance)}</strong><small>Started with ${money(initialBalance)}</small></div><div class="finance-jar-history-head"><h3>Past transactions</h3><span>${transactions.length} ${transactions.length === 1 ? 'transaction' : 'transactions'}</span></div><div class="finance-jar-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-jar-edit>Edit balance</button></div>`);
-  $('[data-fin-jar-edit]')?.addEventListener('click', () => openSharedJarModal(balance));
+  $('[data-fin-jar-edit]')?.addEventListener('click', () => openSharedJarModal(balance, () => openSharedJarHistory(detail)));
 }
 
-function openSharedJarModal(balance) {
-  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><p>Change how much is currently in the shared account. Existing accommodation contributions stay linked and future 20% contributions will continue to update this balance.</p><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
+function openSharedJarModal(balance, backAction = closeMini) {
+  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><p>Change how much is currently in the shared account. Existing accommodation contributions stay linked and future 20% contributions will continue to update this balance.</p><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`, '', { back: backAction });
   $('[data-fin-mini-save]')?.addEventListener('click', async () => {
     const amount = $('#finMiniAmount')?.value || '';
     if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || Number(amount.replace(',', '.')) < 0) return toast('Enter a valid balance', 'warn');
@@ -2182,38 +2189,38 @@ function openOwedHistory() {
     btn.closest('.finance-owed-history-item')?.classList.toggle('is-expanded', !expanded);
     panel.hidden = expanded;
   }));
-  $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1));
+  $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1, openOwedHistory));
 }
 
-function openOwedModal(index) {
+function openOwedModal(index, backAction = closeMini) {
   const p = profile(), item = index >= 0 ? p.receivables[index] : null;
   if (!item) {
-    showMini(`<span class="panel-kicker">NEW LOAN</span><h2>Add money someone owes you</h2><p>Track the original amount you lent. Repayments will be recorded separately.</p><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" placeholder="e.g. Sis"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" placeholder="0.00"></div></label><label class="full">Why did you lend it?<input id="finMiniReason" placeholder="e.g. IP17"></label></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save loan</button></div>`);
+    showMini(`<span class="panel-kicker">NEW LOAN</span><h2>Add money someone owes you</h2><p>Track the original amount you lent. Repayments will be recorded separately.</p><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" placeholder="e.g. Sis"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" placeholder="0.00"></div></label><label class="full">Why did you lend it?<input id="finMiniReason" placeholder="e.g. IP17"></label></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save loan</button></div>`, '', { back: backAction });
     $('[data-fin-mini-save]')?.addEventListener('click', () => { const person = String($('#finMiniPerson')?.value || '').trim(), reason = String($('#finMiniReason')?.value || '').trim(), amount = $('#finMiniAmount')?.value || ''; if (!person) return toast('Add who owes you first', 'warn'); if (!reason) return toast('Add why you lent it', 'warn'); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); const next = profile(); next.receivables.push({ id: uid(), person, reason, principal: n(amount), repayments: [] }); saveProfile(next, 'Loan added'); });
     return;
   }
   const paid = loanPaid(item), remaining = loanRemaining(item);
   const grouped = {}; (item.repayments || []).forEach((r) => { const key = r.month || 'Other'; grouped[key] = (grouped[key] || 0) + n(r.amount); });
   const history = Object.keys(grouped).sort().reverse().map((month) => `<div class="loan-history-row"><span>${esc(monthLabel(month))}</span><strong>${money(grouped[month])}</strong></div>`).join('') || '<div class="finance-current-empty">No repayments logged yet.</div>';
-  showMini(`<span class="panel-kicker">PAYBACK TRACKER</span><h2>${esc(item.person)}</h2><p>${esc(item.reason)}</p><div class="loan-stats"><div><span>Originally lent</span><strong>${money(item.principal)}</strong></div><div><span>Repaid</span><strong>${money(paid)}</strong></div><div><span>Still left</span><strong>${money(remaining)}</strong></div></div><h3>Repayment history</h3><div class="loan-history">${history}</div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-loan-edit>Edit loan</button><button class="btn ghost" type="button" data-fin-mini-delete>Delete</button><button class="btn primary" type="button" data-fin-loan-repay ${remaining <= 0 ? 'disabled' : ''}>+ Add repayment</button></div>`);
-  $('[data-fin-loan-edit]')?.addEventListener('click', () => openLoanEdit(index));
-  $('[data-fin-loan-repay]')?.addEventListener('click', () => openLoanRepayment(index));
+  showMini(`<span class="panel-kicker">PAYBACK TRACKER</span><h2>${esc(item.person)}</h2><p>${esc(item.reason)}</p><div class="loan-stats"><div><span>Originally lent</span><strong>${money(item.principal)}</strong></div><div><span>Repaid</span><strong>${money(paid)}</strong></div><div><span>Still left</span><strong>${money(remaining)}</strong></div></div><h3>Repayment history</h3><div class="loan-history">${history}</div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-loan-edit>Edit loan</button><button class="btn ghost" type="button" data-fin-mini-delete>Delete</button><button class="btn primary" type="button" data-fin-loan-repay ${remaining <= 0 ? 'disabled' : ''}>+ Add repayment</button></div>`, '', { back: backAction });
+  $('[data-fin-loan-edit]')?.addEventListener('click', () => openLoanEdit(index, () => openOwedModal(index, backAction)));
+  $('[data-fin-loan-repay]')?.addEventListener('click', () => openLoanRepayment(index, () => openOwedModal(index, backAction)));
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.receivables.splice(index, 1); saveProfile(next, 'Loan removed'); });
 }
 
-function openLoanEdit(index) {
+function openLoanEdit(index, backAction = closeMini) {
   const p = profile(), item = p.receivables[index]; if (!item) return;
-  showMini(`<span class="panel-kicker">EDIT LOAN</span><h2>${esc(item.person)}</h2><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" value="${esc(item.person)}"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item.principal ?? ''))}"></div></label><label class="full">Reason<input id="finMiniReason" value="${esc(item.reason)}"></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
-  $('[data-fin-mini-back]')?.addEventListener('click', () => openOwedModal(index));
+  showMini(`<span class="panel-kicker">EDIT LOAN</span><h2>${esc(item.person)}</h2><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" value="${esc(item.person)}"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item.principal ?? ''))}"></div></label><label class="full">Reason<input id="finMiniReason" value="${esc(item.reason)}"></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`, '', { back: backAction });
+  $('[data-fin-mini-back]')?.addEventListener('click', backAction);
   $('[data-fin-mini-save]')?.addEventListener('click', () => { const person = String($('#finMiniPerson')?.value || '').trim(), reason = String($('#finMiniReason')?.value || '').trim(), amount = $('#finMiniAmount')?.value || ''; if (!person || !reason || amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Complete the loan details', 'warn'); if (n(amount) < loanPaid(item)) return toast('Original amount cannot be below what has already been repaid', 'warn'); const next = profile(); next.receivables[index] = { ...next.receivables[index], person, reason, principal: n(amount) }; saveProfile(next, 'Loan updated'); });
 }
 
-function openLoanRepayment(index) {
+function openLoanRepayment(index, backAction = closeMini) {
   const p = profile(), item = p.receivables[index]; if (!item) return; const remaining = loanRemaining(item);
   const today = new Date().toISOString().slice(0, 10);
   const defaultDate = today.startsWith(selectedMonth+'-') ? today : '';
-  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><p>${money(remaining)} is still outstanding. This repayment will increase Saved up but will not count as income.</p><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Date repaid<input id="finMiniRepayDate" type="date" value="${defaultDate}" min="${selectedMonth}-01" max="${selectedMonth}-${String(daysInFinanceMonth(selectedMonth)).padStart(2,'0')}"></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0.00"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`);
-  $('[data-fin-mini-back]')?.addEventListener('click', () => openOwedModal(index));
+  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><p>${money(remaining)} is still outstanding. This repayment will increase Saved up but will not count as income.</p><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Date repaid<input id="finMiniRepayDate" type="date" value="${defaultDate}" min="${selectedMonth}-01" max="${selectedMonth}-${String(daysInFinanceMonth(selectedMonth)).padStart(2,'0')}"></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0.00"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`, '', { back: backAction });
+  $('[data-fin-mini-back]')?.addEventListener('click', backAction);
   $('#finMiniRepayMonth')?.addEventListener('change', (event) => {
     const month = event.target.value || selectedMonth;
     const dateInput = $('#finMiniRepayDate');
