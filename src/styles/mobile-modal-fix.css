@@ -1,3 +1,20 @@
+/* Global background lock for open cards/windows.
+   iOS Safari can keep scrolling through overflow:hidden, so fix the page
+   in place and let each modal/card keep its own internal scrolling. */
+html.tw-card-scroll-locked,
+body.tw-card-scroll-locked {
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+
+body.tw-card-scroll-locked {
+  position:fixed!important;
+  top:var(--tw-card-scroll-top,0px)!important;
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+}
+
 /* Shared mobile modal centering.
    Keep every full-screen window inside the visible mobile viewport and
    centered regardless of feature-specific width/margin rules. */
