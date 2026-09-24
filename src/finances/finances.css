@@ -2308,6 +2308,104 @@ button.finance-owed-history-row:hover {
   color:var(--muted);
 }
 
+.finance-owed-history-item {
+  min-width:0;
+}
+
+.finance-owed-history-side {
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.finance-owed-history-side i {
+  display:inline-block;
+  color:var(--muted);
+  font-style:normal;
+  font-size:14px;
+  transition:transform .16s ease;
+}
+
+.finance-owed-history-item.is-expanded .finance-owed-history-side i {
+  transform:rotate(180deg);
+}
+
+.finance-owed-transactions {
+  display:grid;
+  margin:0 0 8px;
+  padding:4px 10px 10px 14px;
+  border-left:2px solid rgba(98,126,82,.18);
+}
+
+.finance-owed-transactions[hidden] {
+  display:none!important;
+}
+
+.finance-owed-transaction {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:9px 0;
+  border-top:1px solid rgba(100,80,65,.08);
+}
+
+.finance-owed-transaction:first-child {
+  border-top:0;
+}
+
+.finance-owed-transaction span {
+  min-width:0;
+}
+
+.finance-owed-transaction strong {
+  display:block;
+  font-size:13px;
+  font-weight:650;
+}
+
+.finance-owed-transaction small {
+  display:block;
+  margin-top:1px;
+  color:var(--muted);
+  font-size:11px;
+}
+
+.finance-owed-transaction b {
+  flex:0 0 auto;
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
+
+.finance-owed-transaction b.is-added {
+  color:#4f6f4a;
+}
+
+.finance-owed-transaction b.is-repayment {
+  color:#8a6457;
+}
+
+.finance-owed-transactions-empty {
+  padding:8px 0;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.finance-owed-manage {
+  justify-self:end;
+  margin-top:4px;
+  padding:6px 0;
+  border:0;
+  background:transparent;
+  color:#6c6158;
+  font:inherit;
+  font-size:12px;
+  text-decoration:underline;
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+
 .v33-shared-jar {
   margin-top:18px;
   border:1px solid #dccdaE;
