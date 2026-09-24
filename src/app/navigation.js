@@ -252,7 +252,10 @@ export function initNavigation() {
   ensureNavigation();
   installDropdownRefinement();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
-  $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
+  $('.tab').forEach((tab) => {
+    if (tab.dataset.hub) return;
+    tab.addEventListener('click', () => openSheet(tab.dataset.sheet));
+  });
 
   tripHub.addEventListener('click', () => {
     if (isInsideHub('trips')) return;
