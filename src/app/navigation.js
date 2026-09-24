@@ -252,7 +252,7 @@ export function initNavigation() {
   ensureNavigation();
   installDropdownRefinement();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
-  $('.tab').forEach((tab) => {
+  document.querySelectorAll('.tab').forEach((tab) => {
     if (tab.dataset.hub) return;
     tab.addEventListener('click', () => openSheet(tab.dataset.sheet));
   });
