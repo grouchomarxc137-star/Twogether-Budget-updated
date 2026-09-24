@@ -365,7 +365,8 @@ function expenseTimeline(plan, canDelete = true) {
       const category = repayment.category ? debtCategoryLabel(repayment.category) : 'Owed money';
       const direction = repayment.from === me ? 'you → '+repayment.to : repayment.from+' → you';
       const meta = [category, repayment.note, direction].filter(Boolean).join(' · ');
-      return '<div class="tv2-row is-settlement"><span class="tv2-ic" aria-hidden="true">💸</span><span class="tv2-row-main"><strong>'+esc(title)+'</strong><small>'+esc(meta)+'</small></span><span class="tv2-amt">'+displayMoney(repayment.amount,true)+'</span></div>';
+      const settlementClass = repayment.from === me ? 'is-settlement is-outgoing' : 'is-settlement';
+      return '<div class="tv2-row '+settlementClass+'"><span class="tv2-ic" aria-hidden="true">💸</span><span class="tv2-row-main"><strong>'+esc(title)+'</strong><small>'+esc(meta)+'</small></span><span class="tv2-amt">'+displayMoney(repayment.amount,true)+'</span></div>';
     }
     const entry = row.entry, [, icon] = categoryInfo(entry);
     const button = '<button class="tv2-row" data-act="open-expense" data-id="'+esc(entry.id)+'"><span class="tv2-ic" aria-hidden="true">'+icon+'</span><span class="tv2-row-main"><strong>'+esc(entryTitle(entry))+'</strong><small>'+esc(entryMeta(entry))+'</small></span><span class="tv2-amt">'+displayMoney(entry.amount,true)+'</span></button>';

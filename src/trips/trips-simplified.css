@@ -97,6 +97,8 @@ button.tv2-fig span::after { content: " ›"; color: var(--tv2-faint); }
 .tv2-amt { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tv2-row.is-settlement .tv2-ic { background: var(--tv2-good-soft); border-color: transparent; }
 .tv2-row.is-settlement .tv2-amt { color: var(--tv2-good); }
+.tv2-row.is-settlement.is-outgoing .tv2-ic { background: var(--tv2-over-soft); }
+.tv2-row.is-settlement.is-outgoing .tv2-amt { color: var(--tv2-over); }
 .tv2-warn-text { font-style: normal; color: var(--tv2-over); }
 .tv2-empty-list, .tv2-empty-card { color: var(--tv2-muted); font-size: 15px; line-height: 1.45; padding: 18px 0; }
 .tv2-empty-card { display: grid; gap: 4px; background: var(--tv2-card); border: 1px dashed var(--tv2-line); border-radius: 16px; padding: 18px; }
