@@ -1977,6 +1977,33 @@ button, .btn, .text-btn {
   margin-bottom:3px;
 }
 
+.tw-trip-warning-list {
+  display:grid;
+  gap:6px;
+  margin-top:8px;
+}
+
+.tw-trip-warning-list span {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  padding-top:6px;
+  border-top:1px solid rgba(132,75,66,.12);
+}
+
+.tw-trip-warning-list b {
+  min-width:0;
+  font-size:12px;
+}
+
+.tw-trip-warning-list i {
+  color:inherit;
+  font-size:11px;
+  font-style:normal;
+  text-align:right;
+}
+
 .shared-entry {
   display:grid;
   gap:13px;
