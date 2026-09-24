@@ -1131,6 +1131,11 @@ body.finance-month-focus {
 }
 .finance-recurring-category-head h2 {
   margin:0;
+  color:var(--tv2-muted);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.02em;
+  line-height:1.2;
 }
 .finance-recurring-category-total {
   flex:0 0 auto;
@@ -2870,9 +2875,17 @@ button.finance-owed-history-row:hover {
   line-height:1.1;
 }
 
-.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head h2,
-.finance-mini-modal.is-recurring-manager .finance-recurring-category>h2 {
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head h2 {
   margin:0 0 2px;
+  color:var(--tv2-text);
+  font-size:20px!important;
+  font-weight:650!important;
+  letter-spacing:-.01em;
+  line-height:1.15;
+}
+
+.finance-mini-modal.is-recurring-manager .finance-recurring-category-head h2 {
+  margin:0;
   color:var(--tv2-muted);
   font-size:13px!important;
   font-weight:600!important;
