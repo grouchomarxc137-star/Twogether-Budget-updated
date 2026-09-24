@@ -722,9 +722,14 @@ body.dev-v21 #loggedUserBadge {
   box-shadow:inset 3px 0 0 rgba(91,124,92,.24);
 }
 
-.tw-notification-group.is-trips.is-priority {
+.tw-notification-group.is-trips.is-priority.is-critical {
   border-color:rgba(181,91,91,.28);
   box-shadow:inset 3px 0 0 rgba(181,91,91,.34);
+}
+
+.tw-notification-group.is-trips.is-priority.is-important {
+  border-color:rgba(210,135,54,.30);
+  box-shadow:inset 3px 0 0 rgba(210,135,54,.36);
 }
 
 .tw-notification-group-head {
@@ -761,8 +766,12 @@ body.dev-v21 #loggedUserBadge {
   color:#557150;
 }
 
-.tw-notification-group.is-trips.is-priority .tw-notification-group-head strong {
+.tw-notification-group.is-trips.is-priority.is-critical .tw-notification-group-head strong {
   color:#9e4f4f;
+}
+
+.tw-notification-group.is-trips.is-priority.is-important .tw-notification-group-head strong {
+  color:#b66b24;
 }
 
 .tw-notification-group-items {
@@ -788,6 +797,14 @@ body.dev-v21 #loggedUserBadge {
   border:1px solid rgba(181,91,91,.18);
   border-radius:14px;
   background:rgba(181,91,91,.055);
+}
+
+.tw-notification-item.is-important {
+  margin:4px -8px;
+  padding:13px 10px;
+  border:1px solid rgba(210,135,54,.22);
+  border-radius:14px;
+  background:rgba(210,135,54,.065);
 }
 
 .tw-notification-copy {
