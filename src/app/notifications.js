@@ -30,7 +30,9 @@ function ensureUi() {
     button.setAttribute('aria-label', 'Open notifications');
     button.setAttribute('aria-expanded', 'false');
     button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="tw-notification-count" aria-hidden="true"></span>';
-    top.appendChild(button);
+    const profileBadge = document.getElementById('loggedUserBadge');
+    if (profileBadge?.parentElement === top) profileBadge.insertAdjacentElement('afterend', button);
+    else top.appendChild(button);
   }
 
   let layer = document.getElementById(PANEL_ID);
