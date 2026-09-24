@@ -2319,7 +2319,10 @@ function openOwedHistory() {
     paid: loanPaid(item),
     remaining: loanRemaining(item),
   }));
-  const total = manualItems.reduce((sum, x) => sum + x.remaining, 0) + tripItems.reduce((sum, x) => sum + n(x.amount), 0);
+  const activeManualItems = manualItems.filter(({ remaining }) => remaining > .005);
+  const paidManualItems = manualItems.filter(({ remaining }) => remaining <= .005);
+  const total = activeManualItems.reduce((sum, x) => sum + x.remaining, 0) + tripItems.reduce((sum, x) => sum + n(x.amount), 0);
+
   const tripRows = tripItems.map((item, index) => `
     <div class="finance-owed-history-item">
       <button class="finance-owed-history-row is-trip" type="button" data-fin-history-expand="trip-${index}" aria-expanded="false">
@@ -2328,18 +2331,42 @@ function openOwedHistory() {
       </button>
       <div class="finance-owed-transactions" data-fin-history-panel="trip-${index}" hidden>${tripOwedTransactionsHtml(item)}</div>
     </div>`).join('');
-  const manualRows = [...manualItems].reverse().map(({ item, index, paid, remaining }) => `
+
+  const manualRows = [...activeManualItems].reverse().map(({ item, index, paid, remaining }) => `
     <div class="finance-owed-history-item">
-      <button class="finance-owed-history-row is-loan ${remaining <= .005 ? 'is-paid' : ''}" type="button" data-fin-history-expand="loan-${index}" aria-expanded="false">
-        <span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(paid)}${remaining <= .005 ? ' · Paid back' : ''}</small></span>
+      <button class="finance-owed-history-row is-loan" type="button" data-fin-history-expand="loan-${index}" aria-expanded="false">
+        <span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(paid)}</small></span>
         <span class="finance-owed-history-side"><b>${money(remaining)}</b><i aria-hidden="true">⌄</i></span>
       </button>
       <div class="finance-owed-transactions" data-fin-history-panel="loan-${index}" hidden>
         ${manualLoanTransactionsHtml(item, remaining)}
       </div>
     </div>`).join('');
-  const rows = tripRows + manualRows || '<div class="finance-current-empty">No owed-money history yet.</div>';
-  showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong></div><div class="finance-jar-history-head"><h3>All owed money</h3><span>${tripItems.length + manualItems.length} ${tripItems.length + manualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
+
+  const activeRows = tripRows + manualRows || '<div class="finance-current-empty">Nobody currently owes you money.</div>';
+
+  const pastLoans = paidManualItems.map(({ item }) => {
+    const repayments = (Array.isArray(item?.repayments) ? item.repayments : [])
+      .map((repayment, index) => ({ repayment, stamp: owedTransactionSortValue(repayment, index) }))
+      .sort((a, b) => b.stamp.localeCompare(a.stamp));
+    const finalRepayment = repayments[0]?.repayment || null;
+    const finalDate = normalizeFinanceDate(finalRepayment?.date) || normalizeFinanceDate(String(finalRepayment?.at || '').slice(0, 10));
+    return { item, finalDate, stamp: finalRepayment ? owedTransactionSortValue(finalRepayment) : '' };
+  }).sort((a, b) => b.stamp.localeCompare(a.stamp));
+
+  const pastRows = pastLoans.map(({ item, finalDate }) => `
+    <div class="finance-past-loan-row">
+      <strong>${esc(item.person)}</strong>
+      <span>${esc(item.reason || 'Reason not added')}</span>
+      <time>${esc(financeDateLabel(finalDate) || '—')}</time>
+      <b>${money(item.principal)}</b>
+    </div>`).join('');
+
+  const pastSection = pastLoans.length
+    ? `<div class="finance-jar-history-head finance-past-loans-head"><h3>Past loans</h3><span>${pastLoans.length} ${pastLoans.length === 1 ? 'loan' : 'loans'}</span></div><div class="finance-past-loans">${pastRows}</div>`
+    : '';
+
+  showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong></div><div class="finance-jar-history-head"><h3>Currently owed</h3><span>${tripItems.length + activeManualItems.length} ${tripItems.length + activeManualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${activeRows}</div>${pastSection}<div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
 
   $$('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
     const key = btn.dataset.finHistoryExpand;
