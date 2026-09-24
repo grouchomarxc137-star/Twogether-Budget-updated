@@ -103,6 +103,7 @@ let financeMonthSwipeIgnoreUntil = 0;
 let financeMonthDeleteConfirmLayer = null;
 let financeLogBackgroundLock = null;
 let financeMonthPageLock = null;
+let financeReminderSyncing = false;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -217,7 +218,7 @@ function normalizeRecurringConfig(value) {
   };
 }
 function freshProfile() {
-  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, recurring: normalizeRecurringConfig({}), updatedAt: '', updatedBy: '' };
+  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, recurring: normalizeRecurringConfig({}), financeReminders: [], updatedAt: '', updatedBy: '' };
 }
 function normalizeProfile(profileData) {
   const p = profileData && typeof profileData === 'object' ? profileData : {};
@@ -234,6 +235,16 @@ function normalizeProfile(profileData) {
     wishlist: Array.isArray(p.wishlist) ? JSON.parse(JSON.stringify(p.wishlist)) : [],
     compareLab: p.compareLab && typeof p.compareLab === 'object' ? JSON.parse(JSON.stringify(p.compareLab)) : {},
     recurring: normalizeRecurringConfig(p.recurring),
+    financeReminders: Array.isArray(p.financeReminders) ? p.financeReminders.map((item) => ({
+      id: String(item?.id || ''),
+      kind: item?.kind === 'income' ? 'income' : 'expense',
+      name: String(item?.name || ''),
+      group: String(item?.group || ''),
+      amount: item?.amount ?? '',
+      month: String(item?.month || ''),
+      date: normalizeFinanceDate(item?.date),
+      createdAt: String(item?.createdAt || ''),
+    })).filter((item) => item.id && item.name && item.month && item.date) : [],
     updatedAt: p.updatedAt || '', updatedBy: p.updatedBy || '',
   };
 }
@@ -436,6 +447,154 @@ function recurringConfig() {
   if (saved?.custom) return normalizeRecurringConfig(saved);
   return recurringDefaults();
 }
+function financeReminderSlug(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'item';
+}
+function financeReminderId(kind, item, month) {
+  return ['finance',actor(),month,kind,kind==='expense'?normalizeGroup(item?.group):'',financeReminderSlug(item?.name)].join(':');
+}
+function localFinanceToday() {
+  const now=new Date();
+  const month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const date=month+'-'+String(now.getDate()).padStart(2,'0');
+  return {month,date};
+}
+function financeReminderMatchesLogged(reminder) {
+  const rec=recordFor(reminder.month);
+  if (!rec) return false;
+  const list=reminder.kind==='income'?(rec.incomes||[]):(rec.expenses||[]);
+  const name=String(reminder.name||'').trim().toLowerCase();
+  return list.some((item)=>{
+    if(String(item?.name||'').trim().toLowerCase()!==name)return false;
+    if(reminder.kind==='expense'&&normalizeGroup(item?.group)!==normalizeGroup(reminder.group))return false;
+    return true;
+  });
+}
+function financeReminderResolved(reminder) {
+  const rec=recordFor(reminder.month);
+  return rec?.finalized===true || financeReminderMatchesLogged(reminder);
+}
+function dueFinanceReminderSnapshots() {
+  if(!actor())return [];
+  const {month,date}=localFinanceToday();
+  const rec=recordFor(month);
+  if(rec?.finalized===true)return [];
+  const config=recurringConfig();
+  const rows=[
+    ...config.incomes.map((item)=>({kind:'income',item})),
+    ...config.expenses.map((item)=>({kind:'expense',item})),
+  ];
+  return rows.map(({kind,item})=>{
+    const day=normalizeRecurringDay(item.day);
+    if(day==='')return null;
+    const dueDate=financeDateForDay(month,day);
+    if(!dueDate||dueDate>date)return null;
+    const reminder={
+      id:financeReminderId(kind,item,month),
+      kind,
+      name:String(item.name||''),
+      group:kind==='expense'?String(item.group||''):'',
+      amount:item.amount,
+      month,
+      date:dueDate,
+      createdAt:new Date().toISOString(),
+    };
+    if(financeReminderMatchesLogged(reminder))return null;
+    return reminder;
+  }).filter(Boolean);
+}
+function financeReminderQuestion(reminder) {
+  return reminder.kind==='income'
+    ? 'Has '+reminder.name+' arrived?'
+    : 'Has '+reminder.name+' been charged?';
+}
+function publishFinanceNotifications() {
+  const p=profile();
+  const items=(p.financeReminders||[]).filter((item)=>!financeReminderResolved(item)).map((item)=>({
+    id:item.id,
+    actor:actor(),
+    kind:'finance-recurring',
+    title:financeReminderQuestion(item),
+    detail:money(item.amount)+' · '+financeDateLabel(item.date),
+    actionable:true,
+  }));
+  window.TwogetherNotifications?.setPending(items);
+}
+async function syncFinanceReminders() {
+  const a=actor();
+  if(!a||financeReminderSyncing)return;
+  financeReminderSyncing=true;
+  try{
+    const current=profile();
+    const kept=(current.financeReminders||[]).filter((item)=>!financeReminderResolved(item));
+    const byId=new Map(kept.map((item)=>[item.id,item]));
+    dueFinanceReminderSnapshots().forEach((item)=>{if(!byId.has(item.id))byId.set(item.id,item);});
+    const next=[...byId.values()];
+    const changed=JSON.stringify(current.financeReminders||[])!==JSON.stringify(next);
+    current.financeReminders=next;
+    financeState.financeProfiles[a]=normalizeProfile(current);
+    publishFinanceNotifications();
+    if(changed){
+      try{await post('saveFinanceProfile',{profile:current});}
+      catch{}
+    }
+  } finally {
+    financeReminderSyncing=false;
+  }
+}
+function financeReminderById(id) {
+  return (profile().financeReminders||[]).find((item)=>item.id===id)||null;
+}
+async function removeFinanceReminder(id) {
+  const a=actor(); if(!a)return;
+  const next=profile();
+  next.financeReminders=(next.financeReminders||[]).filter((item)=>item.id!==id);
+  financeState.financeProfiles[a]=normalizeProfile(next);
+  publishFinanceNotifications();
+  try{await post('saveFinanceProfile',{profile:next});}catch{}
+}
+function openFinanceReminderConfirm(reminder) {
+  if(!reminder)return;
+  const rec=recordFor(reminder.month);
+  if(rec?.finalized===true){publishFinanceNotifications();return toast('This month is final and locked','warn');}
+  const back=()=>{closeMini();window.TwogetherNotifications?.open?.();};
+  showMini(
+    '<span class="panel-kicker">FINANCE REMINDER</span>'+
+    '<h2>'+esc(financeReminderQuestion(reminder))+'</h2>'+
+    '<div class="finance-mini-fields">'+
+      '<label class="full">Amount<div class="finance-money mini"><span>€</span><input id="finReminderAmount" inputmode="decimal" value="'+esc(String(reminder.amount??''))+'"></div></label>'+
+      '<label class="full">Date<strong class="finance-reminder-date">'+esc(financeDateLabel(reminder.date))+'</strong></label>'+
+    '</div>'+
+    '<div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-reminder-back>Back</button><button class="btn primary" type="button" data-fin-reminder-confirm>Confirm & log</button></div>',
+    '',
+    {back}
+  );
+  $('[data-fin-reminder-back]')?.addEventListener('click',back);
+  $('[data-fin-reminder-confirm]')?.addEventListener('click',async()=>{
+    const raw=$('#finReminderAmount')?.value||'';
+    if(raw===''||!Number.isFinite(Number(raw.replace(',','.')))||n(raw)<0)return toast('Enter a valid amount','warn');
+    const button=$('[data-fin-reminder-confirm]'); if(button)button.disabled=true;
+    try{
+      const next=directMonthRecord(reminder.month);
+      if(next.finalized===true)throw new Error('This month is final and locked');
+      if(financeReminderMatchesLogged(reminder)){
+        closeMini();
+        await removeFinanceReminder(reminder.id);
+        return;
+      }
+      if(reminder.kind==='income') next.incomes.push({name:reminder.name,amount:n(raw),date:reminder.date});
+      else next.expenses.push({group:reminder.group||'other',name:reminder.name,amount:n(raw),date:reminder.date});
+      if(!recordFor(reminder.month))next.partialOnly=true;
+      closeMini();
+      await saveDirectMonthRecord(next,reminder.name+' logged',{openDetail:false});
+      await removeFinanceReminder(reminder.id);
+    }catch(error){
+      if(button)button.disabled=false;
+      toast(error?.message||'Could not log this finance','warn');
+    }
+  });
+}
+
 function recurringExpenseGroups() {
   return actor() === 'Principe'
     ? [
@@ -646,6 +805,7 @@ async function loadState() {
         plans: Array.isArray(state?.plans) ? state.plans : [],
       };
       renderPage();
+      await syncFinanceReminders();
     }
   } catch {}
   finally { loading = false; }
@@ -1216,7 +1376,7 @@ function closeFinanceTransactionSheet() {
   document.body.classList.remove('tv2-locked');
   document.body.classList.remove('trip-expense-open');
 }
-async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
+async function saveDirectMonthRecord(rec, message = 'Transaction saved', options = {}) {
   if (!rec || rec.finalized === true) throw new Error('This month is final and locked');
   const next = cloneRecord(rec);
   next.finalized = false;
@@ -1230,7 +1390,8 @@ async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
   list.sort((a,b)=>String(a.month).localeCompare(String(b.month)));
   selectedMonth=saved.month;
   renderPage();
-  renderDetail(saved);
+  if(options.openDetail!==false) renderDetail(saved);
+  publishFinanceNotifications();
   toast(message);
   setTimeout(loadState,800);
 }
@@ -2816,9 +2977,23 @@ function init() {
   document.addEventListener('twogether:open-shared-jar', (e) => openSharedJarHistory(e.detail || {}));
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });
-  const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderPage(); setTimeout(loadState, 40); } });
+  document.addEventListener('twogether:notification-action',(event)=>{
+    if(event.detail?.kind!=='finance-recurring')return;
+    if(event.detail?.choice==='not-yet'){publishFinanceNotifications();return;}
+    if(event.detail?.choice!=='yes')return;
+    const reminder=financeReminderById(String(event.detail?.id||''));
+    if(reminder)openFinanceReminderConfirm(reminder);
+    else publishFinanceNotifications();
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>loadState().catch(()=>{}),40);});
+  const obs = new MutationObserver(() => {
+    publishFinanceNotifications();
+    setTimeout(()=>loadState().catch(()=>{}),40);
+    if ($('#finances')?.classList.contains('active')) { flow = null; renderPage(); }
+  });
   obs.observe(document.body, { attributes: true, attributeFilter: ['data-actor'] });
   renderPage();
+  setTimeout(()=>loadState().catch(()=>{}),50);
 }
 
 document.addEventListener('DOMContentLoaded', init);
