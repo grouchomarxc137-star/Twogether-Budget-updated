@@ -518,7 +518,7 @@ function publishFinanceNotifications() {
     detail:money(item.amount)+' · '+financeDateLabel(item.date),
     actionable:true,
   }));
-  window.TwogetherNotifications?.setPending(items);
+  window.TwogetherNotifications?.setPending(items,'finances');
 }
 async function syncFinanceReminders() {
   const a=actor();
