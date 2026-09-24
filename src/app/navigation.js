@@ -235,15 +235,13 @@ export function initNavigation() {
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {
-    if (isMobile()) return;
-    activateTrip(lastTripView());
+    activateTrip('log');
   });
 
   financeHub.addEventListener('click', () => {
-    if (isMobile()) return;
     setHub('finances');
     ensureFinanceSheet();
-    setTimeout(() => activateFinanceView(lastFinanceView()), 0);
+    setTimeout(() => activateFinanceView('monthly'), 0);
   });
 
   $$('.trip-subnav .tab').forEach((btn) => btn.addEventListener('click', () => {
