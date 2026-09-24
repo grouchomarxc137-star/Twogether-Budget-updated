@@ -727,8 +727,8 @@ function renderCurrentPanel() {
   $('[data-fin-add-hold]', root)?.addEventListener('click', () => openHoldModal(-1));
   $$('[data-fin-edit-hold]', root).forEach((btn) => btn.addEventListener('click', () => openHoldModal(Number(btn.dataset.finEditHold))));
   $('[data-fin-add-owed]', root)?.addEventListener('click', () => openOwedModal(-1));
-  $('[data-fin-repay-owed]', root).forEach((btn) => btn.addEventListener('click', () => openLoanRepayment(Number(btn.dataset.finRepayOwed))));
-  $('[data-fin-open-owed-history]', root).forEach((btn) => btn.addEventListener('click', openOwedHistory));
+  root.querySelectorAll('[data-fin-repay-owed]').forEach((btn) => btn.addEventListener('click', () => openLoanRepayment(Number(btn.dataset.finRepayOwed))));
+  root.querySelectorAll('[data-fin-open-owed-history]').forEach((btn) => btn.addEventListener('click', openOwedHistory));
   $('[data-fin-owed-card]', root)?.addEventListener('click', (event) => {
     if (event.target.closest('button')) return;
     openOwedHistory();
