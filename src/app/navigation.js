@@ -430,7 +430,11 @@ function finishSurfaceVisual(visual, mode, done) {
     backdrop.style.setProperty('transition','opacity .18s ease','important');
     backdrop.style.setProperty('opacity','0','important');
   }
-  setTimeout(done,190);
+  setTimeout(() => {
+    done();
+    if (target.isConnected) restoreInlineStyle(target,visual.targetStyle);
+    if (backdrop?.isConnected) restoreInlineStyle(backdrop,visual.backdropStyle);
+  },190);
 }
 
 function surfaceBackControl(surface) {
