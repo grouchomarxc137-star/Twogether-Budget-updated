@@ -181,15 +181,12 @@ function installDropdownRefinement() {
     if (w.dataset.v22Nav === '3') return; w.dataset.v22Nav = '3';
     const hub = w.querySelector('[data-hub]'), menu = w.querySelector('.tw-nav-menu');
     w.addEventListener('pointerenter', () => {
-      if (isMobile()) return;
+      if (isMobile() || pinned !== w) return;
       cancelTimers(w);
-      if (!hub?.classList.contains('active')) return;
-      if (suppressHover) return;
-      if (pinned && pinned !== w) { const old = pinned; pinned = null; fadeClose(old); }
       openWrap(w);
     });
     w.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
-    menu?.addEventListener('pointerenter', () => { if (!isMobile()) { cancelTimers(w); if (!suppressHover) openWrap(w); } });
+    menu?.addEventListener('pointerenter', () => { if (!isMobile() && pinned === w) { cancelTimers(w); openWrap(w); } });
     menu?.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
     hub?.addEventListener('click', () => {
       const alreadyActive = hub.classList.contains('active');
@@ -223,11 +220,7 @@ function installDropdownRefinement() {
     if (isMobile()) return;
     const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2;
     lastPointer = { x: e.clientX, y: e.clientY };
-    if (suppressHover && moved) {
-      suppressHover = false;
-      const w = e.target.closest?.('.tw-nav-wrap');
-      if (w) openWrap(w);
-    }
+    if (suppressHover && moved) suppressHover = false;
   }, { passive: true, capture: true });
   document.addEventListener('pointerdown', (e) => { suppressHover = false; if (!e.target.closest?.('.tw-nav-wrap')) closeAfterAction(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { suppressHover = false; unpinAndFadeAll(); } }, true);
