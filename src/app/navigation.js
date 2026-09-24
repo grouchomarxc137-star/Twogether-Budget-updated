@@ -183,6 +183,7 @@ function installDropdownRefinement() {
     w.addEventListener('pointerenter', () => {
       if (isMobile()) return;
       cancelTimers(w);
+      if (!hub?.classList.contains('active')) return;
       if (suppressHover) return;
       if (pinned && pinned !== w) { const old = pinned; pinned = null; fadeClose(old); }
       openWrap(w);
@@ -191,6 +192,14 @@ function installDropdownRefinement() {
     menu?.addEventListener('pointerenter', () => { if (!isMobile()) { cancelTimers(w); if (!suppressHover) openWrap(w); } });
     menu?.addEventListener('pointerleave', () => { if (!isMobile()) scheduleClose(w); });
     hub?.addEventListener('click', () => {
+      const alreadyActive = hub.classList.contains('active');
+      if (!alreadyActive) {
+        suppressHover = true;
+        pinned = null;
+        closeOthers(w, false);
+        hardClose(w);
+        return;
+      }
       suppressHover = false;
       if (isMobile()) {
         if (pinned === w) { openWrap(w); return; }
@@ -235,10 +244,12 @@ export function initNavigation() {
   $$('.tab').forEach((tab) => tab.addEventListener('click', () => openSheet(tab.dataset.sheet)));
 
   tripHub.addEventListener('click', () => {
+    if (tripHub.classList.contains('active')) return;
     activateTrip('log');
   });
 
   financeHub.addEventListener('click', () => {
+    if (financeHub.classList.contains('active')) return;
     setHub('finances');
     ensureFinanceSheet();
     setTimeout(() => activateFinanceView('monthly'), 0);
