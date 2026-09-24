@@ -228,7 +228,7 @@ function normalizeProfile(profileData) {
     receivables: Array.isArray(p.receivables) ? p.receivables.map((x) => ({
       id: x.id || uid(), person: String(x.person || ''), reason: String(x.reason || ''),
       principal: x.principal ?? x.amount ?? '',
-      repayments: Array.isArray(x.repayments) ? x.repayments.map((r) => ({ id: r.id || uid(), month: String(r.month || ''), amount: r.amount ?? '', at: String(r.at || '') })) : [],
+      repayments: Array.isArray(x.repayments) ? x.repayments.map((r) => ({ id: r.id || uid(), month: String(r.month || ''), date: normalizeFinanceDate(r.date) || String(r.at || '').slice(0, 10), amount: r.amount ?? '', at: String(r.at || '') })) : [],
     })) : [],
     scenarios: Array.isArray(p.scenarios) ? p.scenarios.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), upfront: x.upfront ?? '', monthly: x.monthly ?? '' })) : [],
     wishlist: Array.isArray(p.wishlist) ? JSON.parse(JSON.stringify(p.wishlist)) : [],
@@ -2080,11 +2080,13 @@ function manualLoanTransactionsHtml(item, remaining) {
 
   return repayments.map(({ repayment }, rowIndex) => {
     const month = String(repayment.month || '');
-    const dateLabel = financeDateLabel(String(repayment.at || '').slice(0, 10));
+    const exactDate = normalizeFinanceDate(repayment.date) || normalizeFinanceDate(String(repayment.at || '').slice(0, 10));
+    const dateLabel = financeDateLabel(exactDate);
     const label = /^\d{4}-\d{2}$/.test(month) ? monthLabel(month) : (dateLabel || 'Repayment');
     const finalPayment = remaining <= .005 && rowIndex === 0;
+    const meta = (finalPayment ? 'Final repayment' : 'Repayment') + (dateLabel ? ' · Paid '+dateLabel : '');
     return '<div class="finance-owed-transaction">'+
-      '<span><strong>'+esc(label)+'</strong><small>'+(finalPayment ? 'Final repayment' : 'Repayment')+'</small></span>'+
+      '<span><strong>'+esc(label)+'</strong><small>'+esc(meta)+'</small></span>'+
       '<b class="is-repayment">−'+money(repayment.amount)+'</b>'+
     '</div>';
   }).join('');
@@ -2208,9 +2210,19 @@ function openLoanEdit(index) {
 
 function openLoanRepayment(index) {
   const p = profile(), item = p.receivables[index]; if (!item) return; const remaining = loanRemaining(item);
-  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><p>${money(remaining)} is still outstanding. This repayment will increase Saved up but will not count as income.</p><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0.00"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`);
+  const today = new Date().toISOString().slice(0, 10);
+  const defaultDate = today.startsWith(selectedMonth+'-') ? today : '';
+  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><p>${money(remaining)} is still outstanding. This repayment will increase Saved up but will not count as income.</p><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Date repaid<input id="finMiniRepayDate" type="date" value="${defaultDate}" min="${selectedMonth}-01" max="${selectedMonth}-${String(daysInFinanceMonth(selectedMonth)).padStart(2,'0')}"></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0.00"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`);
   $('[data-fin-mini-back]')?.addEventListener('click', () => openOwedModal(index));
-  $('[data-fin-mini-save]')?.addEventListener('click', () => { const amount = $('#finMiniRepayAmount')?.value || '', month = $('#finMiniRepayMonth')?.value || selectedMonth; if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || n(amount) <= 0) return toast('Enter a valid repayment', 'warn'); if (n(amount) > remaining) return toast('Repayment is higher than the amount still owed', 'warn'); const next = profile(); next.receivables[index].repayments = [...(next.receivables[index].repayments || []), { id: uid(), month, amount: n(amount), at: new Date().toISOString() }]; next.savingsTotal = n(next.savingsTotal) + n(amount); saveProfile(next, `Repayment saved · ${money(amount)} added to savings`); });
+  $('#finMiniRepayMonth')?.addEventListener('change', (event) => {
+    const month = event.target.value || selectedMonth;
+    const dateInput = $('#finMiniRepayDate');
+    if (!dateInput) return;
+    dateInput.min = month+'-01';
+    dateInput.max = month+'-'+String(daysInFinanceMonth(month)).padStart(2,'0');
+    if (dateInput.value && !dateInput.value.startsWith(month+'-')) dateInput.value='';
+  });
+  $('[data-fin-mini-save]')?.addEventListener('click', () => { const amount = $('#finMiniRepayAmount')?.value || '', month = $('#finMiniRepayMonth')?.value || selectedMonth, rawDate = String($('#finMiniRepayDate')?.value || '').trim(), date = normalizeFinanceDate(rawDate, month); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || n(amount) <= 0) return toast('Enter a valid repayment', 'warn'); if (!date) return toast('Choose the repayment date', 'warn'); if (n(amount) > remaining) return toast('Repayment is higher than the amount still owed', 'warn'); const next = profile(); next.receivables[index].repayments = [...(next.receivables[index].repayments || []), { id: uid(), month, date, amount: n(amount), at: new Date().toISOString() }]; next.savingsTotal = n(next.savingsTotal) + n(amount); saveProfile(next, `Repayment saved · ${money(amount)} added to savings`); });
 }
 
 function freshRecord(month) {
