@@ -846,8 +846,43 @@ function tripPrepNotificationItems() {
   }).filter(Boolean);
 }
 
-function publishTripPrepNotifications() {
-  window.TwogetherNotifications?.setPending(tripPrepNotificationItems(), 'trips');
+function tripRepaymentNotificationItems() {
+  if (!remoteState || !actor()) return [];
+  const me = actor();
+  const today = localToday();
+
+  return (remoteState.plans || []).map((plan) => {
+    const meta = plan?.meta || {};
+    const end = localDate(meta.end);
+    if (!end) return null;
+
+    const daysAfterEnd = dayDiff(end, today);
+    if (daysAfterEnd < 2) return null;
+
+    const settlement = settlementState(plan);
+    if (!settlement.debtor || !settlement.creditor || settlement.amount <= .005) return null;
+    if (me !== settlement.debtor && me !== settlement.creditor) return null;
+
+    const tripName = String(meta.city || locationLabel(meta) || 'Trip').trim();
+    const title = me === settlement.debtor
+      ? 'You still need to pay ' + settlement.creditor + ' ' + displayMoney(settlement.amount, true)
+      : settlement.debtor + ' still needs to pay you ' + displayMoney(settlement.amount, true);
+
+    return {
+      id: 'trip-repayment:' + plan.id,
+      actor: me,
+      kind: 'trip-repayment',
+      title,
+      detail: tripName + ' · ended ' + daysAfterEnd + ' day' + (daysAfterEnd === 1 ? '' : 's') + ' ago',
+    };
+  }).filter(Boolean);
+}
+
+function publishTripNotifications() {
+  window.TwogetherNotifications?.setPending([
+    ...tripPrepNotificationItems(),
+    ...tripRepaymentNotificationItems(),
+  ], 'trips');
 }
 
 function openSimplifiedChecklist(plan) {
@@ -1630,7 +1665,7 @@ function decorateTripStories() {
 
 export async function refreshState(force = false) {
   if (refreshing || !window.TwogetherAPI) return; refreshing = true;
-  try { remoteState = await window.TwogetherAPI.state(); renderCurrentTrips(); filterTripStories(); enhanceTripModal(); publishTripPrepNotifications(); }
+  try { remoteState = await window.TwogetherAPI.state(); renderCurrentTrips(); filterTripStories(); enhanceTripModal(); publishTripNotifications(); }
   catch (err) { if (force) toast(err.message || 'Could not refresh shared trips', 'warn'); }
   finally { refreshing = false; }
 }
