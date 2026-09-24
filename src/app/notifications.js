@@ -78,7 +78,8 @@ function render() {
     <div class="tw-notification-list">
       ${items.length ? items.map((item) => `
         <article class="tw-notification-item" data-notification-id="${esc(item.id)}">
-          <div><strong>${esc(item.title || 'Reminder')}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</div>
+          <div class="tw-notification-copy"><strong>${esc(item.title || 'Reminder')}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</div>
+          ${item.actionable ? `<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="${esc(item.id)}">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="${esc(item.id)}">Yes</button></div>` : ''}
         </article>`).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>'}
     </div>
   `;
@@ -109,6 +110,8 @@ function setPending(items = []) {
     actor: String(item?.actor || ''),
     title: String(item?.title || ''),
     detail: String(item?.detail || ''),
+    actionable: item?.actionable === true,
+    kind: String(item?.kind || ''),
   })).filter((item) => item.id && item.title) : [];
   render();
 }
@@ -124,7 +127,22 @@ export function initNotifications() {
   });
 
   ui.layer.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-tw-notification-close]')) close();
+    if (event.target.closest?.('[data-tw-notification-close]')) { close(); return; }
+    const action = event.target.closest?.('[data-tw-notification-action]');
+    if (!action) return;
+    const id = String(action.dataset.notificationId || '');
+    const item = currentItems().find((candidate) => candidate.id === id);
+    if (!item) return;
+    const choice = String(action.dataset.twNotificationAction || '');
+    if (choice === 'not-yet') {
+      close();
+      document.dispatchEvent(new CustomEvent('twogether:notification-action', { detail:{ id, choice, kind:item.kind } }));
+      return;
+    }
+    if (choice === 'yes') {
+      close();
+      document.dispatchEvent(new CustomEvent('twogether:notification-action', { detail:{ id, choice, kind:item.kind } }));
+    }
   });
 
   document.addEventListener('keydown', (event) => {
