@@ -260,7 +260,7 @@ export function initNavigation() {
 
   document.addEventListener('click', (e) => {
     const tab = e.target.closest?.('.tab[data-sheet="finances"]');
-    if (tab) {
+    if (tab && tab !== financeHub) {
       setHub('finances');
       ensureFinanceSheet();
       setTimeout(() => activateFinanceView(tab.dataset.finSubview || lastFinanceView()), 0);
