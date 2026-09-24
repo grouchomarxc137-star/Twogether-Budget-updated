@@ -2357,20 +2357,24 @@ function openOwedHistory() {
   }).sort((a, b) => b.stamp.localeCompare(a.stamp));
 
   const pastRows = pastLoans.map(({ item, finalLabel }) => `
-    <div class="finance-past-loan-row">
-      <strong>${esc(item.person)}</strong>
-      <span>${esc(item.reason || 'Reason not added')}</span>
-      <time>${esc(finalLabel)}</time>
-      <b>${money(item.principal)}</b>
+    <div class="finance-owed-history-row is-paid finance-past-loan-row">
+      <span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(loanPaid(item))} · ${esc(finalLabel)}</small></span>
+      <span class="finance-owed-history-side"><b>${money(item.principal)}</b></span>
     </div>`).join('');
 
   const pastSection = pastLoans.length
-    ? `<div class="finance-jar-history-head finance-past-loans-head"><h3>Past loans</h3><span>${pastLoans.length} ${pastLoans.length === 1 ? 'loan' : 'loans'}</span></div><div class="finance-past-loans">${pastRows}</div>`
+    ? `<div class="finance-past-loans-section">
+        <button class="finance-owed-history-row finance-past-loans-toggle" type="button" data-fin-past-loans-toggle aria-expanded="false">
+          <span><strong>Past loans</strong><small>Fully repaid</small></span>
+          <span class="finance-owed-history-side"><b>${pastLoans.length} ${pastLoans.length === 1 ? 'loan' : 'loans'}</b><i aria-hidden="true">⌄</i></span>
+        </button>
+        <div class="finance-past-loans" data-fin-past-loans-panel hidden>${pastRows}</div>
+      </div>`
     : '';
 
   showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong></div><div class="finance-jar-history-head"><h3>Currently owed</h3><span>${tripItems.length + activeManualItems.length} ${tripItems.length + activeManualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${activeRows}</div>${pastSection}<div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
 
-  $$('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
     const key = btn.dataset.finHistoryExpand;
     const panel = document.querySelector('[data-fin-history-panel="'+key+'"]');
     if (!panel) return;
@@ -2379,6 +2383,15 @@ function openOwedHistory() {
     btn.closest('.finance-owed-history-item')?.classList.toggle('is-expanded', !expanded);
     panel.hidden = expanded;
   }));
+  $('[data-fin-past-loans-toggle]')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    const panel = document.querySelector('[data-fin-past-loans-panel]');
+    if (!panel) return;
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    button.closest('.finance-past-loans-section')?.classList.toggle('is-expanded', !expanded);
+    panel.hidden = expanded;
+  });
   $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1, openOwedHistory));
 }
 
