@@ -5,5 +5,7 @@
 // of here, since this file loads last -- see src/app/navigation.js and
 // src/shop/boot.js for why that ordering matters.
 import { installPwa } from './app/pwa.js';
+import { initNotifications } from './app/notifications.js';
 
 installPwa();
+initNotifications();
