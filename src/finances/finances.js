@@ -716,7 +716,7 @@ function renderCurrentPanel() {
     ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestTripOwed.person)}<small>${esc(latestTripOwed.reason)} · ${esc(latestTripOwed.categories)}</small></span><strong>${money(latestTripOwed.amount)}</strong></button>`
     : latestManualOwed
       ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestManualOwed.item.person)}<small>${esc(latestManualOwed.item.reason || 'Reason not added')} · Loan</small></span><strong>${money(latestManualOwed.remaining)}</strong></button>`
-      : '<div class="finance-current-empty">Nobody currently owes you money.</div>';
+      : '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.<small>Tap to view past loans and owed-money history.</small></span><strong>€0.00</strong></button>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
     <div class="finance-current-grid">
