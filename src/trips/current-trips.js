@@ -840,6 +840,7 @@ function tripPrepNotificationItems() {
       detail: parts.join(' · '),
       openLabel: 'Open checklist',
       urgent: days <= 1,
+      priority: days <= 1 ? 'critical' : '',
       reminders: reminders.map((item) => item.text),
       packing: packing.map((item) => item.text),
     };
@@ -874,6 +875,7 @@ function tripRepaymentNotificationItems() {
       kind: 'trip-repayment',
       title,
       detail: tripName + ' · ended ' + daysAfterEnd + ' day' + (daysAfterEnd === 1 ? '' : 's') + ' ago',
+      priority: 'important',
     };
   }).filter(Boolean);
 }
