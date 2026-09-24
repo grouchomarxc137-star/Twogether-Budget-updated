@@ -343,6 +343,28 @@ function categoryInfo(entry) {
 function entryTitle(entry) {
   return entry?.note || entry?.name || categoryInfo(entry)[0];
 }
+function paymentMismatchDetails(plan) {
+  const validPayers = new Set(['Principessa','Principe','both']);
+  return tripEntries(plan).map((entry) => {
+    const amount = Math.max(0, n(entry?.amount));
+    if (amount <= .005) return null;
+    const jar = Math.min(amount, Math.max(0, n(entry?.jarContribution)));
+    const remaining = Math.max(0, amount - jar);
+    const assignedByPeople = validPayers.has(String(entry?.paidBy || '')) ? remaining : 0;
+    const missing = Math.max(0, amount - jar - assignedByPeople);
+    if (missing <= .005) return null;
+    return {
+      id: String(entry?.id || ''),
+      title: entryTitle(entry),
+      amount: missing,
+      reason: entry?.paidBy ? 'Payment assignment is incomplete' : 'No payer selected',
+    };
+  }).filter(Boolean);
+}
+
+function planJarTotal(plan) {
+  return tripEntries(plan).reduce((sum, entry) => sum + Math.max(0, n(entry?.jarContribution)), 0);
+}
 function entryMeta(entry) {
   const parts = [];
   if (entry?.paidBy === 'both') parts.push('each paid half');
@@ -440,12 +462,15 @@ function simplifiedTrip(plan, trip) {
   const other = me === 'Principessa' ? 'Principe' : 'Principessa';
   const phase = tripPhase(meta), past = phase === 'past';
   const settlement = settlementState(plan), hasOutstandingDebt = settlement.amount > .005;
+  const paymentMismatches = paymentMismatchDetails(plan), hasPaymentMismatch = paymentMismatches.length > 0;
   const mineConfirmed = !!trip?.confirmed?.[me], otherConfirmed = !!trip?.confirmed?.[other];
   const confirmHtml = !past ? '' : mineConfirmed
     ? '<section class="tv2-trip-confirm is-waiting"><div><strong>✓ You confirmed this trip</strong><span>'+(otherConfirmed?'Finalising trip…':'Waiting for '+esc(other)+'. It stays under Past until both of you confirm.')+'</span></div></section>'
-    : hasOutstandingDebt
-      ? '<section class="tv2-trip-confirm is-blocked"><div><strong>Payback needed</strong><span>Pay back all owed money before confirming this trip. '+esc(settlement.debtor)+' still owes '+displayMoney(settlement.amount,true)+'.</span></div><button type="button" disabled>Confirm trip</button></section>'
-      : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
+    : hasPaymentMismatch
+      ? '<section class="tv2-trip-confirm is-blocked"><div><strong>Payment assignment needs fixing</strong><span>'+esc(paymentMismatches.map((item)=>item.title+' · '+displayMoney(item.amount,true)+' unassigned').join(' · '))+'.</span></div><button type="button" disabled>Confirm trip</button></section>'
+      : hasOutstandingDebt
+        ? '<section class="tv2-trip-confirm is-blocked"><div><strong>Payback needed</strong><span>Pay back all owed money before confirming this trip. '+esc(settlement.debtor)+' still owes '+displayMoney(settlement.amount,true)+'.</span></div><button type="button" disabled>Confirm trip</button></section>'
+        : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
   const combinedAvailable = tripBudget(plan, trip), combinedSpent = expenseTotal(plan, trip);
   const ownBudget = has(plan?.budgets?.[me]) ? n(plan.budgets[me]) : null;
   const ownSpent = n(settlement.paid?.[me]);
@@ -1626,6 +1651,11 @@ async function handleSimplifiedClick(e) {
   if (b.dataset.act === 'budgets') { window.TwogetherWorkflow?.budget(plan.id); return; }
   if (b.dataset.act === 'confirm-trip') {
     if (tripPhase(plan.meta) !== 'past' || b.disabled) return;
+    const mismatches = paymentMismatchDetails(plan);
+    if (mismatches.length) {
+      toast('Fix payment assignment first: '+mismatches.map((item)=>item.title+' '+displayMoney(item.amount,true)).join(', ')+'.','warn');
+      return;
+    }
     const outstanding = settlementState(plan);
     if (outstanding.amount > .005) {
       toast('Pay back all owed money before confirming this trip.','warn');
@@ -1712,12 +1742,53 @@ function parseMoney(text) {
 
 function enhanceTripModal() {
   const root = $('#tripModalBody'); if (!root || !root.children.length) return;
-  const differences = $$('.difference-row', root); const total = parseMoney(root.querySelector('.trip-modal-total strong')?.textContent || '');
-  const paid = $$('.submission-card', root).map((card) => { const m = (card.querySelector(':scope > small')?.textContent || '').match(/Paid:\s*([^·]+)/i); return m ? parseMoney(m[1]) : null; }).filter((v) => v != null); const paidTotal = paid.length >= 2 ? paid.reduce((a, b) => a + b, 0) : null; const delta = total != null && paidTotal != null ? total - paidTotal : null;
-  const sig = `${differences.length}|${total}|${paidTotal}|${delta}`; if (root.dataset.v18WarningSig === sig) return; root.dataset.v18WarningSig = sig; root.querySelectorAll('.tw-trip-warning').forEach((x) => x.remove());
+  const differences = $$('.difference-row', root);
+  const total = parseMoney(root.querySelector('.trip-modal-total strong')?.textContent || '');
+  const paid = $$('.submission-card', root).map((card) => {
+    const match = (card.querySelector(':scope > small')?.textContent || '').match(/Paid:\s*([^·]+)/i);
+    return match ? parseMoney(match[1]) : null;
+  }).filter((value) => value != null);
+  const paidTotal = paid.length >= 2 ? paid.reduce((a, b) => a + b, 0) : null;
+
+  const tripId = String(root.dataset.tripId || '');
+  const plan = (remoteState?.plans || []).find((item) => String(item?.linkedTripId || '') === tripId) || null;
+  const exactMismatches = plan ? paymentMismatchDetails(plan) : [];
+  const jarTotal = plan ? planJarTotal(plan) : 0;
+  const assignedTotal = paidTotal == null ? null : paidTotal + jarTotal;
+  const delta = total != null && assignedTotal != null ? total - assignedTotal : null;
+  const hasMismatch = exactMismatches.length > 0 || (delta != null && Math.abs(delta) > .01);
+  const mismatchSig = exactMismatches.map((item) => item.id+':'+item.amount).join('|');
+  const sig = differences.length+'|'+total+'|'+paidTotal+'|'+jarTotal+'|'+delta+'|'+mismatchSig;
+  if (root.dataset.v18WarningSig === sig) return;
+  root.dataset.v18WarningSig = sig;
+  root.querySelectorAll('.tw-trip-warning').forEach((item) => item.remove());
+
   const anchor = root.querySelector('.difference-list') || root.querySelector('.submission-grid') || root.firstElementChild;
-  if (differences.length) { const box = document.createElement('div'); box.className = 'tw-trip-warning soft'; box.innerHTML = `<strong>${differences.length} detail${differences.length === 1 ? '' : 's'} still differ</strong>The trip stays unmatched until every highlighted detail matches.`; anchor?.parentNode?.insertBefore(box, anchor); }
-  if (delta != null && Math.abs(delta) > 0.01) { const box = document.createElement('div'); box.className = 'tw-trip-warning'; box.innerHTML = `<strong>Payment totals do not match the trip expenses</strong>${money(total)} of expenses are recorded, but ${money(paidTotal)} is assigned as paid. Difference: ${money(Math.abs(delta))}.`; const target = root.querySelector('.trip-budget-comparison') || root.querySelector('.budget-check') || anchor; target?.parentNode?.insertBefore(box, target?.nextSibling || null); }
+  if (differences.length) {
+    const box = document.createElement('div');
+    box.className = 'tw-trip-warning soft';
+    box.innerHTML = '<strong>'+differences.length+' detail'+(differences.length === 1 ? '' : 's')+' still differ</strong>The trip stays unmatched until every highlighted detail matches.';
+    anchor?.parentNode?.insertBefore(box, anchor);
+  }
+
+  if (hasMismatch) {
+    const box = document.createElement('div');
+    box.className = 'tw-trip-warning';
+    const details = exactMismatches.length
+      ? '<div class="tw-trip-warning-list">'+exactMismatches.map((item)=>'<span><b>'+esc(item.title)+'</b><i>'+esc(item.reason)+' · '+money(item.amount)+' unassigned</i></span>').join('')+'</div>'
+      : '<div class="tw-trip-warning-list"><span><b>Unassigned payment</b><i>'+money(Math.abs(delta))+' is not assigned to a payer. This older trip does not contain expense-level payer data.</i></span></div>';
+    box.innerHTML = '<strong>Payment totals do not match the trip expenses</strong>'+
+      (total != null && assignedTotal != null ? money(total)+' of expenses are recorded, while '+money(assignedTotal)+' is accounted for between both of you'+(jarTotal > .005 ? ' and the Shared Jar' : '')+'.' : '')+
+      details;
+    const target = root.querySelector('.trip-budget-comparison') || root.querySelector('.budget-check') || anchor;
+    target?.parentNode?.insertBefore(box, target?.nextSibling || null);
+  }
+
+  const confirm = root.querySelector('[data-confirm-own]');
+  if (confirm && hasMismatch) {
+    confirm.disabled = true;
+    confirm.textContent = 'Fix payment mismatch first';
+  }
 }
 
 // Card art (monogram/emoji placeholder, then a real destination photo).
