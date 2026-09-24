@@ -2392,20 +2392,6 @@ button.finance-owed-history-row:hover {
   font-size:12px;
 }
 
-.finance-owed-manage {
-  justify-self:end;
-  margin-top:4px;
-  padding:6px 0;
-  border:0;
-  background:transparent;
-  color:#6c6158;
-  font:inherit;
-  font-size:12px;
-  text-decoration:underline;
-  text-underline-offset:3px;
-  cursor:pointer;
-}
-
 .v33-shared-jar {
   margin-top:18px;
   border:1px solid #dccdaE;
