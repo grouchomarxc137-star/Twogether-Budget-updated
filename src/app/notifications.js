@@ -12,6 +12,12 @@ function esc(value) {
   }[char]));
 }
 
+function itemPriority(item) {
+  if (item?.priority === 'critical' || item?.urgent === true) return 2;
+  if (item?.priority === 'important') return 1;
+  return 0;
+}
+
 function currentGroups() {
   const a = actor();
   const groups = [...pendingSources.entries()].map(([source, items]) => ({
@@ -20,14 +26,14 @@ function currentGroups() {
   })).filter((group) => group.items.length);
 
   groups.forEach((group) => {
-    group.items.sort((left, right) => Number(right.urgent === true) - Number(left.urgent === true));
+    group.items.sort((left, right) => itemPriority(right) - itemPriority(left));
   });
 
-  const tripsUrgent = groups.some((group) => group.source === 'trips' && group.items.some((item) => item.urgent));
+  const tripsImportant = groups.some((group) => group.source === 'trips' && group.items.some((item) => itemPriority(item) > 0));
   const normalRank = { finances:0, trips:1 };
   groups.sort((left, right) => {
-    const leftRank = tripsUrgent && left.source === 'trips' ? -1 : (normalRank[left.source] ?? 10);
-    const rightRank = tripsUrgent && right.source === 'trips' ? -1 : (normalRank[right.source] ?? 10);
+    const leftRank = tripsImportant && left.source === 'trips' ? -1 : (normalRank[left.source] ?? 10);
+    const rightRank = tripsImportant && right.source === 'trips' ? -1 : (normalRank[right.source] ?? 10);
     return leftRank - rightRank;
   });
   return groups;
@@ -45,8 +51,9 @@ function groupMeta(source) {
 
 function renderGroup(group) {
   const meta = groupMeta(group.source);
-  const priority = group.source === 'trips' && group.items.some((item) => item.urgent);
-  return '<section class="tw-notification-group ' + meta.className + (priority ? ' is-priority' : '') + '">' +
+  const level = group.source === 'trips' ? Math.max(0, ...group.items.map(itemPriority)) : 0;
+  const priorityClass = level === 2 ? ' is-priority is-critical' : level === 1 ? ' is-priority is-important' : '';
+  return '<section class="tw-notification-group ' + meta.className + priorityClass + '">' +
     '<div class="tw-notification-group-head"><strong>' + esc(meta.title) + '</strong><span>' + group.items.length + '</span></div>' +
     '<div class="tw-notification-group-items">' + group.items.map(renderItem).join('') + '</div>' +
   '</section>';
@@ -97,7 +104,9 @@ function renderItem(item) {
   const openAction = item.openLabel
     ? '<div class="tw-notification-actions"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
     : '';
-  return '<article class="tw-notification-item' + (item.urgent ? ' is-urgent' : '') + '" data-notification-id="' + esc(item.id) + '">' +
+  const level = itemPriority(item);
+  const priorityClass = level === 2 ? ' is-urgent' : level === 1 ? ' is-important' : '';
+  return '<article class="tw-notification-item' + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
     '<div class="tw-notification-copy"><strong>' + esc(item.title || 'Reminder') + '</strong>' +
     (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
     important + packing + '</div>' + financeActions + openAction + '</article>';
@@ -163,6 +172,7 @@ function setPending(items = [], source = 'default') {
     kind: String(item?.kind || ''),
     openLabel: String(item?.openLabel || ''),
     urgent: item?.urgent === true,
+    priority: item?.priority === 'critical' ? 'critical' : item?.priority === 'important' ? 'important' : '',
     reminders: Array.isArray(item?.reminders) ? item.reminders.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
     packing: Array.isArray(item?.packing) ? item.packing.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
   })).filter((item) => item.id && item.title) : [];
