@@ -710,19 +710,15 @@ function renderCurrentPanel() {
   const holds = p.savingsReserved.length ? p.savingsReserved.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-hold="${i}"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></button>`).join('') : '<div class="finance-current-empty">Nothing earmarked yet.</div>';
   const tripOwedItems = tripReceivables();
   const activeManualOwed = p.receivables.map((x, i) => ({ item:x, index:i, remaining:loanRemaining(x) })).filter((x) => x.remaining > .005);
-  const latestTripOwed = tripOwedItems[tripOwedItems.length - 1] || null;
-  const latestManualOwed = activeManualOwed[activeManualOwed.length - 1] || null;
-  const owedPreview = latestTripOwed
-    ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestTripOwed.person)}<small>${esc(latestTripOwed.reason)} · ${esc(latestTripOwed.categories)}</small></span><strong>${money(latestTripOwed.amount)}</strong></button>`
-    : latestManualOwed
-      ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestManualOwed.item.person)}<small>${esc(latestManualOwed.item.reason || 'Reason not added')} · Loan</small></span><strong>${money(latestManualOwed.remaining)}</strong></button>`
-      : '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.<small>Tap to view past loans and owed-money history.</small></span><strong>€0.00</strong></button>';
+  const activeTripRows = tripOwedItems.map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · ${esc(x.categories)}</small></span><strong>${money(x.amount)}</strong></div>`).join('');
+  const activeManualRows = activeManualOwed.map(({ item, index, remaining }) => `<button class="finance-current-row finance-manual-owed" type="button" data-fin-repay-owed="${index}"><span>${esc(item.person)}<small>${esc(item.reason || 'Reason not added')} · Manual loan</small></span><strong>${money(remaining)}</strong></button>`).join('');
+  const owedPreview = activeTripRows + activeManualRows || '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.<small>Tap to view past loans and owed-money history.</small></span><strong>€0.00</strong></button>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
     <div class="finance-current-grid">
       <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Tap any bank to edit its balance. Not included in net worth.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Showing the latest current item. Tap it to see all owed money and loan history.</small></article>
+      <article class="finance-current-card tone-receivable"><button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">All active debts are shown here. Tap a manual loan to add a repayment, or tap the title to see the full history.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><strong>${money(inv.ownInvestments || 0)}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div><div><span>Sis</span><strong>${inv.investmentTotal == null ? '—' : money(inv.sisterInvestments)}</strong></div><div class="${gl?.value < 0 ? 'negative' : 'positive'}"><span>G/L p/m</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
@@ -731,7 +727,8 @@ function renderCurrentPanel() {
   $('[data-fin-add-hold]', root)?.addEventListener('click', () => openHoldModal(-1));
   $$('[data-fin-edit-hold]', root).forEach((btn) => btn.addEventListener('click', () => openHoldModal(Number(btn.dataset.finEditHold))));
   $('[data-fin-add-owed]', root)?.addEventListener('click', () => openOwedModal(-1));
-  $('[data-fin-open-owed-history]', root)?.addEventListener('click', openOwedHistory);
+  $('[data-fin-repay-owed]', root).forEach((btn) => btn.addEventListener('click', () => openLoanRepayment(Number(btn.dataset.finRepayOwed))));
+  $('[data-fin-open-owed-history]', root).forEach((btn) => btn.addEventListener('click', openOwedHistory));
 }
 
 function renderScenarioPanel() {
