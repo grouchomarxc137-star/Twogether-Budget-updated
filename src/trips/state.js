@@ -31,6 +31,7 @@ export function normalizeState(s) {
       confirmed: { Principessa: !!t?.confirmed?.Principessa, Principe: !!t?.confirmed?.Principe },
       budget: t?.budget ?? '',
     })) : [],
+    plans: Array.isArray(s?.plans) ? s.plans : [],
     compare: { ...DEFAULT_COMPARE, ...(s?.compare || {}) },
     audit: Array.isArray(s?.audit) ? s.audit.slice(-2) : [],
     updatedAt: s?.updatedAt || '',

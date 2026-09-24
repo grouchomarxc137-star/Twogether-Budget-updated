@@ -22,6 +22,8 @@ import { openSheet } from '../app/navigation.js';
 
 let openTripId = '';
 let selectedMonthlyKey = '';
+let monthlyViewMode = 'combined';
+let monthlyIgnoreClickUntil = 0;
 
 export function renderTripGallery() {
   const root = $('#tripGallery');
@@ -150,6 +152,60 @@ function monthlyDonutGradient(stat) {
   return `conic-gradient(${stops.join(',')})`;
 }
 
+function monthlyEntryKey(entry) {
+  if (entry?.category === 'accommodation') return 'accom';
+  if (entry?.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eat';
+  if (entry?.category === 'transport') {
+    if (entry.transportType === 'fuel') return 'fuel';
+    if (entry.transportType === 'tolls' || entry.transportType === 'parking-tolls') return 'tolls';
+    return 'travel';
+  }
+  return 'other';
+}
+
+function monthlyRepaymentKey(repayment) {
+  const map = {
+    stay: 'accom',
+    transport: 'travel',
+    car: 'fuel',
+    groceries: 'groceries',
+    'eating-out': 'eat',
+    activities: 'other',
+    other: 'other',
+  };
+  return map[repayment?.category] || 'other';
+}
+
+function personalMonthlyStat(state, monthKey, person, tripCount) {
+  const stat = { key: monthKey, trips: tripCount, accom:0, groceries:0, eat:0, travel:0, fuel:0, tolls:0, other:0, total:0, estimated:false, detailed:false };
+  const plans = (Array.isArray(state?.plans) ? state.plans : []).filter((plan) => String(plan?.meta?.start || '').slice(0,7) === monthKey);
+  plans.forEach((plan) => {
+    const entries = Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
+    if (entries.length) stat.detailed = true;
+    entries.forEach((entry) => {
+      const amount = Math.max(0, n(entry?.amount) - n(entry?.jarContribution));
+      if (amount <= .005) return;
+      const key = monthlyEntryKey(entry);
+      let paid = 0;
+      if (entry?.paidBy === 'both') paid = amount / 2;
+      else if (entry?.paidBy === person) paid = amount;
+      stat[key] += paid;
+      stat.estimated = stat.estimated || !!entry?.uncertain;
+    });
+    const repayments = Array.isArray(plan?.repayments) ? plan.repayments : [];
+    repayments.forEach((repayment) => {
+      const amount = Math.max(0, n(repayment?.amount));
+      if (amount <= .005) return;
+      const key = monthlyRepaymentKey(repayment);
+      if (repayment?.from === person) stat[key] += amount;
+      if (repayment?.to === person) stat[key] -= amount;
+    });
+  });
+  MONEY_FIELDS.forEach((key) => { stat[key] = Math.max(0, n(stat[key])); });
+  stat.total = MONEY_FIELDS.reduce((sum, key) => sum + stat[key], 0);
+  return stat;
+}
+
 export function renderMonthly() {
   const body = $('#monthlyBody');
   if (!body) return;
@@ -182,12 +238,15 @@ export function renderMonthly() {
   }
 
   const index = Math.max(0, keys.indexOf(selectedMonthlyKey));
-  const selected = stats[index] || stats[0];
-  if (!selected) {
+  const selectedCombined = stats[index] || stats[0];
+  if (!selectedCombined) {
     body.innerHTML = '<div class="empty-state"><strong>No monthly data yet</strong></div>';
     return;
   }
 
+  const me = actor();
+  const personal = monthlyViewMode === 'personal';
+  const selected = personal ? personalMonthlyStat(getState(), selectedCombined.key, me, selectedCombined.trips) : selectedCombined;
   const categories = MONEY_FIELDS.map((key) => ({
     key,
     label: MONEY_LABELS[key],
@@ -197,12 +256,18 @@ export function renderMonthly() {
   const categoryHtml = categories.length
     ? categories.map((item) => {
         const percent = selected.total > .005 ? (item.amount / selected.total) * 100 : 0;
-        return `<div class="trip-monthly-category"><i style="--trip-monthly-color:${item.color}" aria-hidden="true"></i><span><strong>${esc(item.label)}</strong><small>${percent.toFixed(0)}% of this month</small></span><b>${money(item.amount)}</b></div>`;
+        return `<div class="trip-monthly-category"><i style="--trip-monthly-color:${item.color}" aria-hidden="true"></i><span><strong>${esc(item.label)}</strong><small>${percent.toFixed(0)}% of ${personal ? 'your spending' : 'this month'}</small></span><b>${money(item.amount)}</b></div>`;
       }).join('')
-    : '<div class="trip-monthly-empty">No trip spending logged for this month.</div>';
+    : `<div class="trip-monthly-empty">${personal && !selected.detailed ? 'No detailed personal payer data is available for this month.' : personal ? 'You have no personal Trip spending logged for this month.' : 'No trip spending logged for this month.'}</div>`;
 
-  const options = stats.map((month) => `<option value="${esc(month.key)}" ${month.key === selected.key ? 'selected' : ''}>${esc(fullMonthLabel(month.key))}</option>`).join('');
-  const tripLabel = selected.trips === 1 ? '1 trip' : `${selected.trips} trips`;
+  const options = stats.map((month) => `<option value="${esc(month.key)}" ${month.key === selectedCombined.key ? 'selected' : ''}>${esc(fullMonthLabel(month.key))}</option>`).join('');
+  const tripLabel = selectedCombined.trips === 1 ? '1 trip' : `${selectedCombined.trips} trips`;
+  const personalClass = personal ? ` is-personal is-${me.toLowerCase()}` : '';
+  const modeLabel = personal ? me : 'Together';
+  const detailLine = personal
+    ? (selected.detailed ? `${money(selected.total)} paid by you` : 'Personal payer details unavailable')
+    : (selectedCombined.trips ? `${money(selectedCombined.total / 2)} per person` : 'Nothing spent on trips yet');
+  const toggleHint = personal ? 'Tap for Together · swipe months' : `Tap for ${esc(me)} · swipe months`;
   body.innerHTML = `
     <div class="trip-monthly-nav">
       <button type="button" data-month-prev aria-label="Previous month" ${index <= 0 ? 'disabled' : ''}>‹</button>
@@ -212,21 +277,22 @@ export function renderMonthly() {
       </label>
       <button type="button" data-month-next aria-label="Next month" ${index >= stats.length - 1 ? 'disabled' : ''}>›</button>
     </div>
-    <section class="trip-monthly-card" data-month-swipe>
+    <section class="trip-monthly-card${personalClass}" data-month-swipe data-month-toggle role="button" tabindex="0" aria-label="Show ${personal ? 'combined' : 'your personal'} monthly trip spending">
+      <span class="trip-monthly-mode">${esc(modeLabel)}</span>
       <div class="trip-monthly-visual">
         <div class="trip-monthly-donut" style="--trip-monthly-donut:${monthlyDonutGradient(selected)}">
           <div class="trip-monthly-donut-center">
-            <span>Total spent</span>
+            <span>${personal ? 'You spent' : 'Total spent'}</span>
             <strong>${selected.estimated ? '~ ' : ''}${money(selected.total)}</strong>
           </div>
         </div>
         <div class="trip-monthly-meta">
-          <span class="panel-kicker">${esc(fullMonthLabel(selected.key))}</span>
+          <span class="panel-kicker">${esc(fullMonthLabel(selectedCombined.key))}</span>
           <h2>${esc(tripLabel)}</h2>
-          <p>${selected.trips ? `${money(selected.total / 2)} per person` : 'Nothing spent on trips yet'}${selected.estimated ? ' · includes estimates' : ''}</p>
+          <p>${detailLine}${selected.estimated ? ' · includes estimates' : ''}</p>
         </div>
       </div>
-      <div class="trip-monthly-breakdown-head"><h3>Where it went</h3><span>Swipe left or right for another month</span></div>
+      <div class="trip-monthly-breakdown-head"><h3>${personal ? 'Your spending' : 'Where it went'}</h3><span>${toggleHint}</span></div>
       <div class="trip-monthly-breakdown">${categoryHtml}</div>
     </section>`;
 
@@ -243,6 +309,10 @@ export function renderMonthly() {
     renderMonthly();
   });
 
+  const toggleMonthlyView = () => {
+    monthlyViewMode = monthlyViewMode === 'personal' ? 'combined' : 'personal';
+    renderMonthly();
+  };
   const swipe = $('[data-month-swipe]', body);
   if (swipe) {
     let startX = 0, startY = 0, tracking = false;
@@ -255,9 +325,19 @@ export function renderMonthly() {
       tracking = false;
       const dx = event.clientX - startX, dy = event.clientY - startY;
       if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.15) return;
+      monthlyIgnoreClickUntil = Date.now() + 350;
       move(dx < 0 ? 1 : -1);
     });
     swipe.addEventListener('pointercancel', () => { tracking = false; });
+    swipe.addEventListener('click', (event) => {
+      if (Date.now() < monthlyIgnoreClickUntil || event.target.closest('button,select,input,a')) return;
+      toggleMonthlyView();
+    });
+    swipe.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      toggleMonthlyView();
+    });
   }
 }
 

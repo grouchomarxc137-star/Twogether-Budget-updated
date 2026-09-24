@@ -5239,12 +5239,54 @@ body.tv2-locked{overflow:hidden}
   color:#91877e;
 }
 #monthly .trip-monthly-card {
+  position:relative;
   border:1px solid #e6dbcf;
   border-radius:24px;
   background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);
   padding:22px;
   box-shadow:0 10px 28px rgba(62,45,31,.055);
   touch-action:pan-y;
+  cursor:pointer;
+  transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+#monthly .trip-monthly-card.is-personal.is-principessa {
+  border-color:#d6ad45;
+  box-shadow:0 0 0 2px rgba(214,173,69,.18),0 10px 28px rgba(96,72,24,.08);
+  background:linear-gradient(180deg,#fffdf5 0%,#fbf5e5 100%);
+}
+#monthly .trip-monthly-card.is-personal.is-principe {
+  border-color:#e68145;
+  box-shadow:0 0 0 2px rgba(230,129,69,.18),0 10px 28px rgba(114,62,27,.08);
+  background:linear-gradient(180deg,#fffaf6 0%,#fcf0e7 100%);
+}
+#monthly .trip-monthly-card:focus-visible {
+  outline:2px solid rgba(102,86,69,.55);
+  outline-offset:3px;
+}
+#monthly .trip-monthly-mode {
+  position:absolute;
+  top:14px;
+  right:14px;
+  z-index:1;
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 10px;
+  border:1px solid rgba(112,94,75,.12);
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  color:#74685e;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.04em;
+}
+#monthly .trip-monthly-card.is-principessa .trip-monthly-mode {
+  border-color:rgba(214,173,69,.35);
+  color:#8a6814;
+}
+#monthly .trip-monthly-card.is-principe .trip-monthly-mode {
+  border-color:rgba(230,129,69,.35);
+  color:#a65220;
 }
 #monthly .trip-monthly-visual {
   display:grid;
