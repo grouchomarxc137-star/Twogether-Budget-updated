@@ -2374,7 +2374,7 @@ function openOwedHistory() {
 
   showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong></div><div class="finance-jar-history-head"><h3>Currently owed</h3><span>${tripItems.length + activeManualItems.length} ${tripItems.length + activeManualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${activeRows}</div>${pastSection}<div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
 
-  $('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
     const key = btn.dataset.finHistoryExpand;
     const panel = document.querySelector('[data-fin-history-panel="'+key+'"]');
     if (!panel) return;
