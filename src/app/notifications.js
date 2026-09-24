@@ -3,7 +3,7 @@ import { actor } from '../lib/session.js';
 const PANEL_ID = 'twNotificationCenter';
 const BUTTON_ID = 'twNotificationButton';
 
-let pending = [];
+const pendingSources = new Map();
 let actorObserver = null;
 
 function esc(value) {
@@ -14,7 +14,7 @@ function esc(value) {
 
 function currentItems() {
   const a = actor();
-  return pending.filter((item) => !item.actor || item.actor === a);
+  return [...pendingSources.values()].flat().filter((item) => !item.actor || item.actor === a);
 }
 
 function ensureUi() {
@@ -49,6 +49,25 @@ function ensureUi() {
   return { button, layer };
 }
 
+function renderItem(item) {
+  const important = item.reminders?.length
+    ? '<div class="tw-notification-prep-block is-important"><b>Important reminders</b>' + item.reminders.map((text) => '<span>• ' + esc(text) + '</span>').join('') + '</div>'
+    : '';
+  const packing = item.packing?.length
+    ? '<div class="tw-notification-prep-block"><b>Packing / checklist</b>' + item.packing.map((text) => '<span>• ' + esc(text) + '</span>').join('') + '</div>'
+    : '';
+  const financeActions = item.actionable
+    ? '<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="' + esc(item.id) + '">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="' + esc(item.id) + '">Yes</button></div>'
+    : '';
+  const openAction = item.openLabel
+    ? '<div class="tw-notification-actions"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
+    : '';
+  return '<article class="tw-notification-item" data-notification-id="' + esc(item.id) + '">' +
+    '<div class="tw-notification-copy"><strong>' + esc(item.title || 'Reminder') + '</strong>' +
+    (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
+    important + packing + '</div>' + financeActions + openAction + '</article>';
+}
+
 function render() {
   const ui = ensureUi();
   if (!ui) return;
@@ -67,24 +86,18 @@ function render() {
     count.hidden = items.length === 0;
   }
   ui.button.classList.toggle('has-pending', items.length > 0);
-  ui.button.setAttribute('aria-label', items.length ? `Open notifications, ${items.length} pending` : 'Open notifications');
+  ui.button.setAttribute('aria-label', items.length ? 'Open notifications, ' + items.length + ' pending' : 'Open notifications');
 
   const body = document.getElementById('twNotificationBody');
   if (!body) return;
-  body.innerHTML = `
-    <span class="panel-kicker">REMINDERS</span>
-    <h2 id="twNotificationTitle">Notifications</h2>
-    <div class="tw-notification-heading"><strong>Pending</strong><span>${items.length}</span></div>
-    <div class="tw-notification-list">
-      ${items.length ? items.map((item) => `
-        <article class="tw-notification-item" data-notification-id="${esc(item.id)}">
-          <div class="tw-notification-copy"><strong>${esc(item.title || 'Reminder')}</strong>${item.detail ? `<small>${esc(item.detail)}</small>` : ''}</div>
-          ${item.actionable ? `<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="${esc(item.id)}">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="${esc(item.id)}">Yes</button></div>` : ''}
-        </article>`).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>'}
-    </div>
-  `;
+  body.innerHTML =
+    '<span class="panel-kicker">REMINDERS</span>' +
+    '<h2 id="twNotificationTitle">Notifications</h2>' +
+    '<div class="tw-notification-heading"><strong>Pending</strong><span>' + items.length + '</span></div>' +
+    '<div class="tw-notification-list">' +
+      (items.length ? items.map(renderItem).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>') +
+    '</div>';
 }
-
 function open() {
   const ui = ensureUi();
   if (!ui || !actor()) return;
@@ -104,18 +117,21 @@ function close() {
   ui.button.setAttribute('aria-expanded', 'false');
 }
 
-function setPending(items = []) {
-  pending = Array.isArray(items) ? items.map((item) => ({
+function setPending(items = [], source = 'default') {
+  const normalized = Array.isArray(items) ? items.map((item) => ({
     id: String(item?.id || ''),
     actor: String(item?.actor || ''),
     title: String(item?.title || ''),
     detail: String(item?.detail || ''),
     actionable: item?.actionable === true,
     kind: String(item?.kind || ''),
+    openLabel: String(item?.openLabel || ''),
+    reminders: Array.isArray(item?.reminders) ? item.reminders.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
+    packing: Array.isArray(item?.packing) ? item.packing.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
   })).filter((item) => item.id && item.title) : [];
+  pendingSources.set(String(source || 'default'), normalized);
   render();
 }
-
 export function initNotifications() {
   const ui = ensureUi();
   if (!ui) return;
@@ -139,7 +155,7 @@ export function initNotifications() {
       document.dispatchEvent(new CustomEvent('twogether:notification-action', { detail:{ id, choice, kind:item.kind } }));
       return;
     }
-    if (choice === 'yes') {
+    if (choice === 'yes' || choice === 'open') {
       close();
       document.dispatchEvent(new CustomEvent('twogether:notification-action', { detail:{ id, choice, kind:item.kind } }));
     }
