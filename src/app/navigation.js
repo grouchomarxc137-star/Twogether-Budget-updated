@@ -245,6 +245,259 @@ function installDropdownRefinement() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { suppressHover = false; unpinAndFadeAll(); } }, true);
 }
 
+
+let surfaceNavigationInstalled = false;
+let surfaceHomeBusy = false;
+let surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null };
+
+const SURFACE_SELECTORS = [
+  '.tv2-confirm-layer',
+  'dialog.finance-log-host[open]',
+  '.tv2-layer',
+  '.finance-mini-modal.show',
+  '#v27Modal:not([hidden])',
+  '#v33PrepModal.show',
+  '#workflowBudgetModal.show',
+  '#tripModal.show',
+  'dialog[open]',
+  '#workflowV5Overlay.show',
+  '#twCurrentTrips.tv2-trip-view',
+];
+
+function surfaceVisible(el) {
+  if (!el || el.id === 'identityModal' || el.closest?.('#identityModal')) return false;
+  if (el.hidden || el.getAttribute?.('aria-hidden') === 'true') return false;
+  const style = getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (el.matches?.('dialog') && !el.open) return false;
+  return !!(el.getClientRects().length || el.matches?.('#twCurrentTrips.tv2-trip-view'));
+}
+
+function surfaceZ(el) {
+  const value = Number.parseInt(getComputedStyle(el).zIndex, 10);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function topSurface() {
+  const seen = new Set();
+  const found = [];
+  SURFACE_SELECTORS.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((el) => {
+      if (!seen.has(el) && surfaceVisible(el)) {
+        seen.add(el);
+        found.push(el);
+      }
+    });
+  });
+  if (!found.length) return null;
+  return found.reduce((top, candidate) => {
+    if (!top) return candidate;
+    if (top.contains(candidate)) return candidate;
+    if (candidate.contains(top)) return top;
+    const topZ = surfaceZ(top), candidateZ = surfaceZ(candidate);
+    if (candidateZ !== topZ) return candidateZ > topZ ? candidate : top;
+    return (top.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) ? candidate : top;
+  }, null);
+}
+
+function surfaceCard(surface) {
+  if (!surface) return null;
+  if (surface.matches('.tv2-confirm-layer')) return surface.querySelector('.tv2-confirm-card');
+  if (surface.matches('.finance-mini-modal')) return surface.querySelector('.finance-mini-card');
+  if (surface.matches('#v27Modal')) return surface.querySelector('.v27-modal-card');
+  if (surface.matches('#v33PrepModal')) return surface.querySelector('.v33-prep-card');
+  if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-card');
+  if (surface.matches('#tripModal')) return surface.querySelector('.trip-modal-card');
+  if (surface.matches('.tv2-layer')) return surface.querySelector('.tv2-sheet');
+  if (surface.matches('dialog.current-overview')) return surface.querySelector('.overview-trip-shell,.overview-shell') || surface.firstElementChild;
+  if (surface.matches('#workflowV5Overlay')) return surface.querySelector('.v5-question') || surface;
+  if (surface.matches('#twCurrentTrips.tv2-trip-view')) return surface;
+  return surface.querySelector?.('[role="dialog"]') || surface.firstElementChild;
+}
+
+function surfaceBackControl(surface) {
+  if (!surface) return null;
+  const exact = surface.querySelector(
+    '[data-site-nav-back],[data-fin-mini-back],[data-fin-recurring-back],[data-category-back],[data-wizard-back],[data-other-back],[data-act="cancel-budget-editor"]'
+  );
+  if (exact) return exact;
+  return [...surface.querySelectorAll('button')].find((button) => {
+    if (!button.getClientRects().length) return false;
+    const text = String(button.textContent || '').trim();
+    return text.startsWith('‹') || /^Back\b/i.test(text);
+  }) || null;
+}
+
+function surfaceCloseControl(surface) {
+  if (!surface) return null;
+  if (surface.matches('#twCurrentTrips.tv2-trip-view')) return surface.querySelector('[data-act="home"]');
+  return surface.querySelector(
+    '[data-fin-log-close],[data-fin-mini-close],[data-v27-close],[data-prep-close],[data-v5-budget-close],[data-close-trip],[data-overview-close],[data-fin-month-close],[data-close],[data-confirm-cancel],[data-fin-month-confirm-cancel],[data-fin-recurring-confirm-cancel],[data-v5-close],button[aria-label*="close" i]'
+  );
+}
+
+function closeSurface(surface, home = false) {
+  if (!surface) return false;
+  const custom = home ? surface._twogetherHome : surface._twogetherBack;
+  if (typeof custom === 'function') {
+    custom();
+    return true;
+  }
+  if (!home) {
+    const back = surfaceBackControl(surface);
+    if (back) {
+      back.click();
+      return true;
+    }
+  }
+  const close = surfaceCloseControl(surface);
+  if (close) {
+    close.click();
+    return true;
+  }
+  if (surface.matches('dialog') && typeof surface.close === 'function') {
+    const cancel = new Event('cancel', { cancelable:true });
+    surface.dispatchEvent(cancel);
+    if (surface.open) surface.close();
+    return true;
+  }
+  return false;
+}
+
+function goSurfaceBack(surface = topSurface()) {
+  if (!surface || surfaceHomeBusy) return;
+  closeSurface(surface, false);
+}
+
+function goSurfaceHome() {
+  if (surfaceHomeBusy) return;
+  surfaceHomeBusy = true;
+  let count = 0;
+  const closeNext = () => {
+    const surface = topSurface();
+    if (!surface || count++ >= 10) {
+      surfaceHomeBusy = false;
+      return;
+    }
+    if (!closeSurface(surface, true)) {
+      surfaceHomeBusy = false;
+      return;
+    }
+    setTimeout(closeNext, 0);
+  };
+  closeNext();
+}
+
+function resetSurfaceSwipe() {
+  surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null };
+}
+
+function installSurfaceNavigation() {
+  if (surfaceNavigationInstalled) return;
+  surfaceNavigationInstalled = true;
+
+  document.addEventListener('click', (event) => {
+    const surface = topSurface();
+    if (!surface) return;
+    const target = event.target;
+    if (!(target instanceof Element) || !surface.contains(target) && target !== surface) return;
+
+    const explicitClose = target.closest(
+      '.finance-mini-close,.v27-modal-close,.v33-prep-close,.v5-budget-close,.trip-close,.tv2-x,[data-fin-log-close]'
+    );
+    const card = surfaceCard(surface);
+    const outside = !!card && !card.contains(target);
+
+    if (!explicitClose && !outside) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    goSurfaceHome();
+  }, true);
+
+  document.addEventListener('touchstart', (event) => {
+    if (!isMobile() || event.touches.length !== 1 || surfaceHomeBusy) return;
+    const surface = topSurface();
+    if (!surface) return;
+    const touch = event.touches[0];
+    const card = surfaceCard(surface);
+    const scrollRoot = card || surface;
+    const canRight = touch.clientX <= 46;
+    const canDown = (scrollRoot.scrollTop || 0) <= 1;
+    if (!canRight && !canDown) return;
+    surfaceSwipe = {
+      tracking:true,
+      active:false,
+      mode:'',
+      startX:touch.clientX,
+      startY:touch.clientY,
+      lastX:touch.clientX,
+      lastY:touch.clientY,
+      surface,
+    };
+  }, { passive:true, capture:true });
+
+  document.addEventListener('touchmove', (event) => {
+    if (!surfaceSwipe.tracking || event.touches.length !== 1) return;
+    if (!surfaceSwipe.surface?.isConnected) {
+      resetSurfaceSwipe();
+      return;
+    }
+    const touch = event.touches[0];
+    const dx = touch.clientX - surfaceSwipe.startX;
+    const dy = touch.clientY - surfaceSwipe.startY;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    surfaceSwipe.lastX = touch.clientX;
+    surfaceSwipe.lastY = touch.clientY;
+
+    if (!surfaceSwipe.active) {
+      if (ax < 9 && ay < 9) return;
+      if (ax > ay * 1.25) {
+        if (dx > 10 && surfaceSwipe.startX <= 46) {
+          surfaceSwipe.active = true;
+          surfaceSwipe.mode = 'right';
+        } else {
+          resetSurfaceSwipe();
+          return;
+        }
+      } else if (ay > ax * 1.15) {
+        const scrollRoot = surfaceCard(surfaceSwipe.surface) || surfaceSwipe.surface;
+        if (dy > 10 && (scrollRoot.scrollTop || 0) <= 1) {
+          surfaceSwipe.active = true;
+          surfaceSwipe.mode = 'down';
+        } else {
+          resetSurfaceSwipe();
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    if (!surfaceSwipe.active) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchend', (event) => {
+    if (!surfaceSwipe.tracking) return;
+    const { active, mode, startX, startY, lastX, lastY, surface } = surfaceSwipe;
+    const dx = lastX - startX;
+    const dy = lastY - startY;
+    const complete = active && (
+      (mode === 'right' && dx >= Math.min(92, window.innerWidth * .24)) ||
+      (mode === 'down' && dy >= Math.min(110, window.innerHeight * .16))
+    );
+    resetSurfaceSwipe();
+    if (!complete) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (mode === 'right') goSurfaceBack(surface);
+    else goSurfaceHome();
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchcancel', () => resetSurfaceSwipe(), { passive:true, capture:true });
+}
+
 export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
@@ -252,6 +505,7 @@ export function initNavigation() {
 
   ensureNavigation();
   installDropdownRefinement();
+  installSurfaceNavigation();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
   document.querySelectorAll('.tab').forEach((tab) => {
     if (tab.dataset.hub) return;
