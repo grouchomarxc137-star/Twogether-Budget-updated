@@ -2166,7 +2166,6 @@ function openOwedHistory() {
       </button>
       <div class="finance-owed-transactions" data-fin-history-panel="loan-${index}" hidden>
         ${manualLoanTransactionsHtml(item, remaining)}
-        <button class="finance-owed-manage" type="button" data-fin-history-manage-loan="${index}">Manage loan</button>
       </div>
     </div>`).join('');
   const rows = tripRows + manualRows || '<div class="finance-current-empty">No owed-money history yet.</div>';
@@ -2181,7 +2180,6 @@ function openOwedHistory() {
     btn.closest('.finance-owed-history-item')?.classList.toggle('is-expanded', !expanded);
     panel.hidden = expanded;
   }));
-  $$('[data-fin-history-manage-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryManageLoan))));
   $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1));
 }
 
