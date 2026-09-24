@@ -3882,3 +3882,259 @@ dialog.finance-log-host .tv2-backdrop {
   touch-action:none!important;
   overscroll-behavior:none!important;
 }
+
+
+/* Recurring items card redesign */
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2>.tv2-page {
+  padding:22px 22px 28px;
+}
+.finance-mini-modal.is-recurring-manager .finance-recurring-page-head {
+  margin-bottom:18px;
+}
+.finance-mini-modal.is-recurring-manager .finance-recurring-page-head h1 {
+  margin-top:12px!important;
+  font-size:38px!important;
+  line-height:1.08!important;
+  letter-spacing:-.02em!important;
+}
+.finance-recurring-list {
+  display:grid;
+  gap:24px;
+}
+.finance-recurring-section-block {
+  display:grid;
+  gap:12px;
+}
+.finance-recurring-tv2-head {
+  margin:0!important;
+}
+.finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head h2 {
+  font-size:24px!important;
+  font-weight:700!important;
+  letter-spacing:-.02em!important;
+}
+.finance-recurring-add {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:38px;
+  padding:0 14px;
+  border:1px solid #ded6cb;
+  border-radius:13px;
+  background:rgba(255,253,249,.75);
+  color:#6d655d;
+  font:inherit;
+  font-size:15px;
+  cursor:pointer;
+}
+.finance-recurring-add span {
+  font-size:21px;
+  line-height:1;
+}
+.finance-recurring-card {
+  overflow:hidden;
+  border:1px solid var(--finance-recurring-border,#ddd6cd);
+  border-radius:22px;
+  background:var(--tv2-card);
+  box-shadow:0 8px 24px rgba(62,52,43,.035);
+}
+.finance-recurring-card-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 18px;
+  background:var(--finance-recurring-head,#f5f2ec);
+}
+.finance-recurring-card-title {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.finance-recurring-card-title h3 {
+  margin:0;
+  color:var(--tv2-ink);
+  font-size:20px;
+  font-weight:700;
+  letter-spacing:-.015em;
+}
+.finance-recurring-card-icon {
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  width:44px;
+  height:44px;
+  border:1px solid var(--finance-recurring-icon-border,#ddd6cd);
+  border-radius:14px;
+  background:rgba(255,255,255,.35);
+  font-size:22px;
+}
+.finance-recurring-card-total {
+  display:flex;
+  align-items:baseline;
+  justify-content:flex-end;
+  gap:6px;
+  flex-wrap:wrap;
+  text-align:right;
+}
+.finance-recurring-card-total span {
+  color:var(--tv2-muted);
+  font-size:14px;
+  font-weight:500;
+}
+.finance-recurring-card-total strong {
+  color:var(--tv2-ink);
+  font-size:20px;
+  font-weight:750;
+  letter-spacing:-.01em;
+}
+.finance-recurring-card-body {
+  padding:0 14px;
+}
+.finance-recurring-card .finance-recurring-swipe-row {
+  --finance-recurring-line:var(--finance-recurring-border,#e6dfd6);
+}
+.finance-recurring-card .finance-recurring-swipe-row:last-child>.finance-recurring-tv2-row {
+  border-bottom:0;
+}
+.finance-recurring-tv2-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  width:100%;
+  min-height:68px;
+  padding:12px 8px;
+  border:0;
+  border-bottom:1px solid var(--finance-recurring-line);
+  background:transparent;
+  color:var(--tv2-ink);
+  text-align:left;
+  font:inherit;
+}
+.finance-recurring-item-main {
+  min-width:0;
+}
+.finance-recurring-item-main strong {
+  display:block;
+  font-size:17px;
+  font-weight:700;
+  line-height:1.2;
+}
+.finance-recurring-item-main small {
+  display:block;
+  margin-top:3px;
+  color:var(--tv2-muted);
+  font-size:13px;
+  line-height:1.25;
+}
+.finance-recurring-item-amount {
+  flex:0 0 auto;
+  font-size:17px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.finance-recurring-empty-card {
+  padding:18px;
+  border:1px dashed #d9d1c7;
+  border-radius:18px;
+  color:var(--tv2-muted);
+  text-align:center;
+  background:rgba(255,253,249,.5);
+}
+.finance-recurring-outflow-block {
+  margin-top:2px;
+}
+
+/* Tone colours intentionally stay soft to match the existing Twogether palette. */
+.finance-recurring-card-income {
+  --finance-recurring-head:#eef3e8;
+  --finance-recurring-border:#d2dfbd;
+  --finance-recurring-icon-border:#c8d7af;
+}
+.finance-recurring-card-fixed {
+  --finance-recurring-head:#f7ece6;
+  --finance-recurring-border:#e8c9bc;
+  --finance-recurring-icon-border:#dfb9a9;
+}
+.finance-recurring-card-medical {
+  --finance-recurring-head:#edf4fb;
+  --finance-recurring-border:#c9dcef;
+  --finance-recurring-icon-border:#b7d0e9;
+}
+.finance-recurring-card-subscriptions {
+  --finance-recurring-head:#f9eeee;
+  --finance-recurring-border:#eccaca;
+  --finance-recurring-icon-border:#e3baba;
+}
+.finance-recurring-card-budgets {
+  --finance-recurring-head:#f7f2df;
+  --finance-recurring-border:#e2d6a8;
+  --finance-recurring-icon-border:#d7c98f;
+}
+.finance-recurring-card-wealth {
+  --finance-recurring-head:#eef3e8;
+  --finance-recurring-border:#d2dfbd;
+  --finance-recurring-icon-border:#c8d7af;
+}
+.finance-recurring-card-other {
+  --finance-recurring-head:#f3f0ec;
+  --finance-recurring-border:#dfd7ce;
+  --finance-recurring-icon-border:#d5ccc2;
+}
+
+@media(max-width:760px) {
+  .finance-mini-modal.is-recurring-manager .finance-recurring-tv2>.tv2-page {
+    padding:18px 14px 22px;
+  }
+  .finance-mini-modal.is-recurring-manager .finance-recurring-page-head h1 {
+    font-size:30px!important;
+  }
+  .finance-recurring-list {
+    gap:22px;
+  }
+  .finance-mini-modal.is-recurring-manager .finance-recurring-tv2-head h2 {
+    font-size:22px!important;
+  }
+  .finance-recurring-card {
+    border-radius:20px;
+  }
+  .finance-recurring-card-head {
+    padding:14px 14px;
+  }
+  .finance-recurring-card-title {
+    gap:10px;
+  }
+  .finance-recurring-card-icon {
+    width:40px;
+    height:40px;
+    border-radius:13px;
+    font-size:20px;
+  }
+  .finance-recurring-card-title h3 {
+    font-size:18px;
+  }
+  .finance-recurring-card-total {
+    max-width:48%;
+    gap:4px;
+  }
+  .finance-recurring-card-total span {
+    font-size:13px;
+  }
+  .finance-recurring-card-total strong {
+    font-size:18px;
+  }
+  .finance-recurring-card-body {
+    padding:0 12px;
+  }
+  .finance-recurring-tv2-row {
+    min-height:64px;
+    padding:11px 6px;
+  }
+  .finance-recurring-item-main strong,
+  .finance-recurring-item-amount {
+    font-size:16px;
+  }
+}
