@@ -580,6 +580,55 @@ test('past planned trips stay open until both users confirm the current logged e
   }
 });
 
+test('blocks trip confirmation when payments do not cover the trip total', () => {
+  const c = setup();
+  try {
+    const meta = { location:'Italy', city:'Test', start:'2020-01-01', end:'2020-01-03' };
+    const created = action(c.database, 'savePlan', { meta, budget:300 });
+    const principessa = { ...meta, accom:0, groceries:100, eat:0, travel:0, fuel:0, tolls:0, other:0, otherNote:'', paid:50, uncertain:{} };
+    const principe = { ...principessa, paid:20 };
+    const first = action(c.database, 'savePlanSubmission', { planId:created.planId, submission:principessa });
+    assert.equal(first.ok, true);
+    assert.equal(action(c.database, 'savePlanSubmission', { planId:created.planId, submission:principe }, 'Principe').ok, true);
+
+    const result = action(c.database, 'confirmTrip', { id:first.tripId });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /payments do not match trip expenses/i);
+    assert.deepEqual(getState().trips[0].confirmed, { Principessa:false, Principe:false });
+  } finally {
+    c.cleanup();
+  }
+});
+
+test('Shared Jar contributions count as assigned payment when confirming a planned trip', () => {
+  const c = setup();
+  try {
+    const created = action(c.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Test', start:'2020-01-01', end:'2020-01-03' },
+      budget:600,
+    });
+    action(c.database, 'saveTripExpense', {
+      planId:created.planId,
+      expense:{ category:'accommodation', amount:500, paidBy:'Principessa', split:'shared', date:'2020-01-02', useJar:true },
+    });
+    const repayment = action(c.database, 'saveTripRepayment', {
+      planId:created.planId, amount:200, date:'2020-01-04', category:'stay',
+    }, 'Principe');
+    assert.equal(repayment.ok, true);
+
+    const first = action(c.database, 'confirmPlanTrip', { planId:created.planId });
+    assert.equal(first.ok, true);
+    assert.equal(first.locked, false);
+    const second = action(c.database, 'confirmPlanTrip', { planId:created.planId }, 'Principe');
+    assert.equal(second.ok, true);
+    assert.equal(second.locked, true);
+    assert.equal(getState().trips[0].confirmed.Principessa, true);
+    assert.equal(getState().trips[0].confirmed.Principe, true);
+  } finally {
+    c.cleanup();
+  }
+});
+
 test('planned trips cannot be confirmed before their end date has passed', () => {
   const c = setup();
   try {
