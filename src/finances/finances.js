@@ -2061,6 +2061,85 @@ function openHoldModal(index) {
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.savingsReserved.splice(index, 1); saveProfile(next, 'Savings hold removed'); });
 }
 
+function owedTransactionSortValue(item, index = 0) {
+  const at = String(item?.at || item?.createdAt || '');
+  const date = String(item?.date || '');
+  const month = String(item?.month || '');
+  return (at || date || month || '0000-00') + '|' + String(index).padStart(5, '0');
+}
+
+function manualLoanTransactionsHtml(item, remaining) {
+  let repayments = (Array.isArray(item?.repayments) ? item.repayments : []).map((repayment, index) => ({
+    repayment,
+    index,
+    stamp: owedTransactionSortValue(repayment, index),
+  })).sort((a, b) => b.stamp.localeCompare(a.stamp));
+
+  if (remaining <= .005 && repayments.length) repayments = repayments.slice(0, 1);
+  if (!repayments.length) return '<div class="finance-owed-transactions-empty">No repayment transactions yet.</div>';
+
+  return repayments.map(({ repayment }, rowIndex) => {
+    const month = String(repayment.month || '');
+    const dateLabel = financeDateLabel(String(repayment.at || '').slice(0, 10));
+    const label = /^\d{4}-\d{2}$/.test(month) ? monthLabel(month) : (dateLabel || 'Repayment');
+    const finalPayment = remaining <= .005 && rowIndex === 0;
+    return '<div class="finance-owed-transaction">'+
+      '<span><strong>'+esc(label)+'</strong><small>'+(finalPayment ? 'Final repayment' : 'Repayment')+'</small></span>'+
+      '<b class="is-repayment">−'+money(repayment.amount)+'</b>'+
+    '</div>';
+  }).join('');
+}
+
+function tripOwedTransactionsHtml(item) {
+  const plan = (Array.isArray(financeState.plans) ? financeState.plans : []).find((candidate) => String(candidate?.id || '') === String(item?.id || ''));
+  if (!plan) return '<div class="finance-owed-transactions-empty">No trip transactions available.</div>';
+  const owner = actor();
+  const labels = Object.fromEntries(TRIP_DEBT_CATEGORIES);
+  const rows = [];
+
+  (Array.isArray(plan.expenseEntries) ? plan.expenseEntries : []).forEach((entry, index) => {
+    const value = Math.max(0, n(entry?.amount) - n(entry?.jarContribution));
+    if (value <= .005) return;
+    const paidByOwner = entry?.paidBy === 'both' ? value / 2 : entry?.paidBy === owner ? value : 0;
+    const forActor = entry?.forActor === 'Principe' ? 'Principe' : 'Principessa';
+    const ownerShare = entry?.split === 'personal' ? (forActor === owner ? value : 0) : value / 2;
+    const effect = paidByOwner - ownerShare;
+    if (Math.abs(effect) <= .005) return;
+    const category = labels[tripDebtCategoryKey(entry)] || 'Other';
+    const date = String(entry?.date || entry?.createdAt || '').slice(0, 10);
+    rows.push({
+      stamp: owedTransactionSortValue(entry, index),
+      title: String(entry?.name || category),
+      meta: [financeDateLabel(date), category].filter(Boolean).join(' · ') || category,
+      amount: effect,
+      repayment: false,
+    });
+  });
+
+  (Array.isArray(plan.repayments) ? plan.repayments : []).forEach((repayment, index) => {
+    const value = n(repayment?.amount);
+    if (value <= .005) return;
+    const effect = repayment?.to === owner ? -value : repayment?.from === owner ? value : 0;
+    if (Math.abs(effect) <= .005) return;
+    const other = repayment?.from === owner ? repayment?.to : repayment?.from;
+    const date = String(repayment?.date || repayment?.createdAt || '').slice(0, 10);
+    rows.push({
+      stamp: owedTransactionSortValue(repayment, index),
+      title: repayment?.to === owner ? 'Repayment received' : 'Repayment sent',
+      meta: [financeDateLabel(date), other].filter(Boolean).join(' · ') || 'Trip repayment',
+      amount: effect,
+      repayment: true,
+    });
+  });
+
+  rows.sort((a, b) => b.stamp.localeCompare(a.stamp));
+  if (!rows.length) return '<div class="finance-owed-transactions-empty">No trip transactions available.</div>';
+  return rows.map((row) => '<div class="finance-owed-transaction">'+
+    '<span><strong>'+esc(row.title)+'</strong><small>'+esc(row.meta)+'</small></span>'+
+    '<b class="'+(row.amount < 0 ? 'is-repayment' : 'is-added')+'">'+(row.amount < 0 ? '−' : '+')+money(Math.abs(row.amount))+'</b>'+
+  '</div>').join('');
+}
+
 function openOwedHistory() {
   const p = profile();
   const tripItems = tripReceivables();
@@ -2071,11 +2150,38 @@ function openOwedHistory() {
     remaining: loanRemaining(item),
   }));
   const total = manualItems.reduce((sum, x) => sum + x.remaining, 0) + tripItems.reduce((sum, x) => sum + n(x.amount), 0);
-  const tripRows = tripItems.map((item) => `<div class="finance-owed-history-row is-trip"><span><strong>${esc(item.person)}</strong><small>${esc(item.reason)} · ${esc(item.categories)} · Trip</small></span><b>${money(item.amount)}</b></div>`).join('');
-  const manualRows = [...manualItems].reverse().map(({ item, index, paid, remaining }) => `<button class="finance-owed-history-row is-loan ${remaining <= .005 ? 'is-paid' : ''}" type="button" data-fin-history-loan="${index}"><span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(paid)}${remaining <= .005 ? ' · Paid back' : ''}</small></span><b>${money(remaining)}</b></button>`).join('');
+  const tripRows = tripItems.map((item, index) => `
+    <div class="finance-owed-history-item">
+      <button class="finance-owed-history-row is-trip" type="button" data-fin-history-expand="trip-${index}" aria-expanded="false">
+        <span><strong>${esc(item.person)}</strong><small>${esc(item.reason)} · ${esc(item.categories)} · Trip</small></span>
+        <span class="finance-owed-history-side"><b>${money(item.amount)}</b><i aria-hidden="true">⌄</i></span>
+      </button>
+      <div class="finance-owed-transactions" data-fin-history-panel="trip-${index}" hidden>${tripOwedTransactionsHtml(item)}</div>
+    </div>`).join('');
+  const manualRows = [...manualItems].reverse().map(({ item, index, paid, remaining }) => `
+    <div class="finance-owed-history-item">
+      <button class="finance-owed-history-row is-loan ${remaining <= .005 ? 'is-paid' : ''}" type="button" data-fin-history-expand="loan-${index}" aria-expanded="false">
+        <span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(paid)}${remaining <= .005 ? ' · Paid back' : ''}</small></span>
+        <span class="finance-owed-history-side"><b>${money(remaining)}</b><i aria-hidden="true">⌄</i></span>
+      </button>
+      <div class="finance-owed-transactions" data-fin-history-panel="loan-${index}" hidden>
+        ${manualLoanTransactionsHtml(item, remaining)}
+        <button class="finance-owed-manage" type="button" data-fin-history-manage-loan="${index}">Manage loan</button>
+      </div>
+    </div>`).join('');
   const rows = tripRows + manualRows || '<div class="finance-current-empty">No owed-money history yet.</div>';
   showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong><small>Trip debts sync automatically. Manual loans stay here with their repayment history.</small></div><div class="finance-jar-history-head"><h3>All owed money</h3><span>${tripItems.length + manualItems.length} ${tripItems.length + manualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
-  $('[data-fin-history-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryLoan))));
+
+  $('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
+    const key = btn.dataset.finHistoryExpand;
+    const panel = document.querySelector('[data-fin-history-panel="'+key+'"]');
+    if (!panel) return;
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    btn.closest('.finance-owed-history-item')?.classList.toggle('is-expanded', !expanded);
+    panel.hidden = expanded;
+  }));
+  $('[data-fin-history-manage-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryManageLoan))));
   $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1));
 }
 
