@@ -3235,6 +3235,14 @@ button.finance-owed-history-row:hover {
   border-color:#bd8626;
 }
 
+.finance-log-layer #financeLogDate {
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+
 .finance-log-layer .trip-expense-hint {
   min-height:18px;
   margin:-4px 0 0;
