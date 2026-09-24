@@ -1122,6 +1122,23 @@ body.finance-month-focus {
 .finance-recurring-category {
   margin-top:6px;
 }
+.finance-recurring-category-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 2px;
+}
+.finance-recurring-category-head h2 {
+  margin:0;
+}
+.finance-recurring-category-total {
+  flex:0 0 auto;
+  color:var(--tv2-muted);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.01em;
+}
 .finance-recurring-swipe-row {
   display:block;
 }
