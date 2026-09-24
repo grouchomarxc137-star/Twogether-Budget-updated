@@ -265,9 +265,7 @@ export function initNavigation() {
 
   financeHub.addEventListener('click', () => {
     if (isInsideHub('finances')) return;
-    setHub('finances');
-    ensureFinanceSheet();
-    setTimeout(() => activateFinanceView('monthly'), 0);
+    activateFinanceView('monthly');
   });
 
   $$('.trip-subnav .tab').forEach((btn) => btn.addEventListener('click', () => {
