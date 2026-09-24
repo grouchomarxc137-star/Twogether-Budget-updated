@@ -693,6 +693,13 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       } else {
         trip.submissions.Principessa = planTripSnapshotSubmission_(plan, 'Principessa', now);
         trip.submissions.Principe = planTripSnapshotSubmission_(plan, 'Principe', now);
+        const a = trip.submissions.Principessa, b = trip.submissions.Principe;
+        const expenseTotal = MONEY_FIELDS.reduce(function(sum,key){ return sum + Number(a && a[key] || 0); }, 0);
+        const accountedTotal = Number(a && a.paid || 0) + Number(b && b.paid || 0) + planJarTotal_(plan);
+        const paymentDifference = money2_(Math.abs(expenseTotal - accountedTotal));
+        if (paymentDifference > .005) {
+          throw new Error('Payment totals do not match trip expenses. €' + paymentDifference.toFixed(2) + ' is still unassigned. Fix it before confirming the trip.');
+        }
       }
       trip.sharedExpenses = sanitizeSharedExpenses_(plan.sharedExpenses);
       const pBudget = plan.budgets && plan.budgets.Principessa !== '' ? Number(plan.budgets.Principessa) : 0;
