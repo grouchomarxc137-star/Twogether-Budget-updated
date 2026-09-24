@@ -48,6 +48,27 @@ button,input {
   color:inherit;
 }
 
+/* Keep browser tap/text-selection highlights from sticking to app UI.
+   Editable fields remain selectable so typing and cursor controls still work. */
+html,
+body,
+body * {
+  -webkit-tap-highlight-color:transparent;
+}
+
+body *:not(input):not(textarea):not(select):not(option):not([contenteditable="true"]) {
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  user-select:text;
+  -webkit-user-select:text;
+}
+
 .hidden {
   display:none!important;
 }
