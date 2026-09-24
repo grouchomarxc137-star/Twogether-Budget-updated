@@ -249,7 +249,7 @@ function installDropdownRefinement() {
 let surfaceNavigationInstalled = false;
 let surfaceHomeBusy = false;
 let surfaceActionDispatching = false;
-let surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null };
+let surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null, visual:null };
 
 const SURFACE_SELECTORS = [
   '.tv2-confirm-layer',
@@ -314,6 +314,123 @@ function surfaceCard(surface) {
   if (surface.matches('#workflowV5Overlay')) return surface.querySelector('.v5-question') || surface;
   if (surface.matches('#twCurrentTrips.tv2-trip-view')) return surface;
   return surface.querySelector?.('[role="dialog"]') || surface.firstElementChild;
+}
+
+function surfaceUsesNativeSwipe(surface) {
+  return !!surface?.matches?.('.finance-month-overview,#twCurrentTrips.tv2-trip-view');
+}
+
+function surfaceBackdrop(surface) {
+  if (!surface) return null;
+  if (surface.matches('.finance-mini-modal')) return surface.querySelector('.finance-mini-backdrop');
+  if (surface.matches('#v27Modal')) return surface.querySelector('.v27-modal-backdrop');
+  if (surface.matches('#v33PrepModal')) return surface.querySelector('.v33-prep-backdrop');
+  if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-backdrop');
+  if (surface.matches('#tripModal')) return surface.querySelector('.trip-modal-backdrop');
+  if (surface.matches('.tv2-confirm-layer')) return surface.querySelector('.tv2-confirm-backdrop');
+  if (surface.matches('.tv2-layer,dialog.finance-log-host')) return surface.querySelector('.tv2-backdrop');
+  return null;
+}
+
+function surfaceVisualTarget(surface) {
+  if (!surface) return null;
+  if (surface.matches('dialog.current-overview')) return surface;
+  if (surface.matches('#workflowV5Overlay')) return surface;
+  return surfaceCard(surface) || surface;
+}
+
+function rememberInlineStyle(el, properties) {
+  if (!el) return null;
+  const values = {};
+  properties.forEach((name) => {
+    values[name] = {
+      value: el.style.getPropertyValue(name),
+      priority: el.style.getPropertyPriority(name),
+    };
+  });
+  return values;
+}
+
+function restoreInlineStyle(el, values) {
+  if (!el || !values) return;
+  Object.entries(values).forEach(([name, entry]) => {
+    if (entry.value) el.style.setProperty(name, entry.value, entry.priority || '');
+    else el.style.removeProperty(name);
+  });
+}
+
+function createSurfaceVisual(surface) {
+  const target = surfaceVisualTarget(surface);
+  const backdrop = surfaceBackdrop(surface);
+  if (!target) return null;
+  const computedTransform = getComputedStyle(target).transform;
+  return {
+    target,
+    backdrop,
+    baseTransform: computedTransform && computedTransform !== 'none' ? computedTransform : '',
+    targetStyle: rememberInlineStyle(target, ['transform','transition','opacity','will-change']),
+    backdropStyle: rememberInlineStyle(backdrop, ['transition','opacity']),
+  };
+}
+
+function surfaceSwipeTransform(visual, mode, distance) {
+  const move = mode === 'right'
+    ? 'translate3d('+distance+'px,0,0)'
+    : 'translate3d(0,'+distance+'px,0)';
+  return visual.baseTransform ? visual.baseTransform+' '+move : move;
+}
+
+function paintSurfaceSwipe(visual, mode, distance) {
+  if (!visual?.target?.isConnected) return;
+  const viewport = mode === 'right' ? window.innerWidth : window.innerHeight;
+  visual.target.style.setProperty('transition','none','important');
+  visual.target.style.setProperty('will-change','transform, opacity','important');
+  visual.target.style.setProperty('transform',surfaceSwipeTransform(visual,mode,distance),'important');
+  visual.target.style.setProperty('opacity',String(Math.max(.82,1-distance/(viewport*2.2))),'important');
+  if (visual.backdrop?.isConnected) {
+    visual.backdrop.style.setProperty('transition','none','important');
+    visual.backdrop.style.setProperty('opacity',String(Math.max(.45,1-distance/(viewport*.95))),'important');
+  }
+}
+
+function resetSurfaceVisual(visual, animate = true) {
+  if (!visual?.target?.isConnected) return;
+  if (!animate) {
+    restoreInlineStyle(visual.target,visual.targetStyle);
+    restoreInlineStyle(visual.backdrop,visual.backdropStyle);
+    return;
+  }
+  const target = visual.target;
+  const backdrop = visual.backdrop;
+  target.style.setProperty('transition','transform .2s cubic-bezier(.22,.8,.28,1), opacity .18s ease','important');
+  target.style.setProperty('transform',visual.baseTransform || 'none','important');
+  target.style.setProperty('opacity','1','important');
+  if (backdrop?.isConnected) {
+    backdrop.style.setProperty('transition','opacity .18s ease','important');
+    backdrop.style.setProperty('opacity','1','important');
+  }
+  setTimeout(() => {
+    if (target.isConnected) restoreInlineStyle(target,visual.targetStyle);
+    if (backdrop?.isConnected) restoreInlineStyle(backdrop,visual.backdropStyle);
+  },220);
+}
+
+function finishSurfaceVisual(visual, mode, done) {
+  if (!visual?.target?.isConnected) {
+    done();
+    return;
+  }
+  const target = visual.target;
+  const backdrop = visual.backdrop;
+  const distance = mode === 'right' ? window.innerWidth : window.innerHeight;
+  target.style.setProperty('transition','transform .22s cubic-bezier(.22,.8,.28,1), opacity .18s ease','important');
+  target.style.setProperty('transform',surfaceSwipeTransform(visual,mode,distance),'important');
+  target.style.setProperty('opacity','.72','important');
+  if (backdrop?.isConnected) {
+    backdrop.style.setProperty('transition','opacity .18s ease','important');
+    backdrop.style.setProperty('opacity','0','important');
+  }
+  setTimeout(done,190);
 }
 
 function surfaceBackControl(surface) {
@@ -391,8 +508,10 @@ function goSurfaceHome() {
   closeNext();
 }
 
-function resetSurfaceSwipe() {
-  surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null };
+function resetSurfaceSwipe(resetVisual = false) {
+  const visual = surfaceSwipe.visual;
+  surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null, visual:null };
+  if (resetVisual && visual) resetSurfaceVisual(visual,true);
 }
 
 function installSurfaceNavigation() {
@@ -421,7 +540,7 @@ function installSurfaceNavigation() {
   document.addEventListener('touchstart', (event) => {
     if (!isMobile() || event.touches.length !== 1 || surfaceHomeBusy) return;
     const surface = topSurface();
-    if (!surface) return;
+    if (!surface || surfaceUsesNativeSwipe(surface)) return;
     const touch = event.touches[0];
     const card = surfaceCard(surface);
     const scrollRoot = card || surface;
@@ -437,13 +556,14 @@ function installSurfaceNavigation() {
       lastX:touch.clientX,
       lastY:touch.clientY,
       surface,
+      visual:createSurfaceVisual(surface),
     };
   }, { passive:true, capture:true });
 
   document.addEventListener('touchmove', (event) => {
     if (!surfaceSwipe.tracking || event.touches.length !== 1) return;
     if (!surfaceSwipe.surface?.isConnected) {
-      resetSurfaceSwipe();
+      resetSurfaceSwipe(false);
       return;
     }
     const touch = event.touches[0];
@@ -460,7 +580,7 @@ function installSurfaceNavigation() {
           surfaceSwipe.active = true;
           surfaceSwipe.mode = 'right';
         } else {
-          resetSurfaceSwipe();
+          resetSurfaceSwipe(false);
           return;
         }
       } else if (ay > ax * 1.15) {
@@ -469,7 +589,7 @@ function installSurfaceNavigation() {
           surfaceSwipe.active = true;
           surfaceSwipe.mode = 'down';
         } else {
-          resetSurfaceSwipe();
+          resetSurfaceSwipe(false);
           return;
         }
       } else {
@@ -480,26 +600,35 @@ function installSurfaceNavigation() {
     if (!surfaceSwipe.active) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    const distance = surfaceSwipe.mode === 'right'
+      ? Math.max(0,Math.min(dx,window.innerWidth*.82))
+      : Math.max(0,Math.min(dy,window.innerHeight*.72));
+    paintSurfaceSwipe(surfaceSwipe.visual,surfaceSwipe.mode,distance);
   }, { passive:false, capture:true });
 
   document.addEventListener('touchend', (event) => {
     if (!surfaceSwipe.tracking) return;
-    const { active, mode, startX, startY, lastX, lastY, surface } = surfaceSwipe;
+    const { active, mode, startX, startY, lastX, lastY, surface, visual } = surfaceSwipe;
     const dx = lastX - startX;
     const dy = lastY - startY;
     const complete = active && (
       (mode === 'right' && dx >= Math.min(92, window.innerWidth * .24)) ||
       (mode === 'down' && dy >= Math.min(110, window.innerHeight * .16))
     );
-    resetSurfaceSwipe();
-    if (!complete) return;
+    surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null, visual:null };
+    if (!complete) {
+      if (active && visual) resetSurfaceVisual(visual,true);
+      return;
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (mode === 'right') goSurfaceBack(surface);
-    else goSurfaceHome();
+    finishSurfaceVisual(visual,mode,() => {
+      if (mode === 'right') goSurfaceBack(surface);
+      else goSurfaceHome();
+    });
   }, { passive:false, capture:true });
 
-  document.addEventListener('touchcancel', () => resetSurfaceSwipe(), { passive:true, capture:true });
+  document.addEventListener('touchcancel', () => resetSurfaceSwipe(true), { passive:true, capture:true });
 }
 
 export function initNavigation() {
