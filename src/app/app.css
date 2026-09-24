@@ -704,14 +704,49 @@ body.dev-v21 #loggedUserBadge {
 .tw-notification-item {
   display:flex;
   align-items:center;
+  flex-wrap:wrap;
   gap:12px;
   padding:13px 2px;
   border-bottom:1px solid rgba(100,80,65,.1);
 }
 
+.tw-notification-item.is-urgent {
+  margin:4px -8px;
+  padding:13px 10px;
+  border:1px solid rgba(181,91,91,.18);
+  border-radius:14px;
+  background:rgba(181,91,91,.055);
+}
+
 .tw-notification-copy {
   min-width:0;
   flex:1 1 auto;
+}
+
+.tw-notification-prep-block {
+  display:grid;
+  gap:3px;
+  margin-top:10px;
+  padding:9px 10px;
+  border-radius:12px;
+  background:rgba(126,104,91,.06);
+}
+
+.tw-notification-prep-block.is-important {
+  background:rgba(186,142,63,.10);
+}
+
+.tw-notification-prep-block b {
+  margin-bottom:2px;
+  color:var(--ink);
+  font-size:11px;
+}
+
+.tw-notification-prep-block span {
+  display:block;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.35;
 }
 
 .tw-notification-actions {
