@@ -249,6 +249,9 @@ function installDropdownRefinement() {
 let surfaceNavigationInstalled = false;
 let surfaceHomeBusy = false;
 let surfaceActionDispatching = false;
+let surfacePageScrollLock = null;
+let surfaceScrollObserver = null;
+let surfaceScrollSyncQueued = false;
 let surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null, visual:null };
 
 const SURFACE_SELECTORS = [
@@ -265,6 +268,12 @@ const SURFACE_SELECTORS = [
   '#twCurrentTrips.tv2-trip-view',
 ];
 
+const SCROLL_LOCK_SELECTORS = [
+  ...SURFACE_SELECTORS,
+  '.identity-modal[aria-hidden="false"]',
+  '[role="dialog"][aria-modal="true"]',
+];
+
 function surfaceVisible(el) {
   if (!el || el.id === 'identityModal' || el.closest?.('#identityModal')) return false;
   if (el.hidden || el.getAttribute?.('aria-hidden') === 'true') return false;
@@ -272,6 +281,79 @@ function surfaceVisible(el) {
   if (style.display === 'none' || style.visibility === 'hidden') return false;
   if (el.matches?.('dialog') && !el.open) return false;
   return !!(el.getClientRects().length || el.matches?.('#twCurrentTrips.tv2-trip-view'));
+}
+
+function hasBlockingSurface() {
+  const seen = new Set();
+  for (const selector of SCROLL_LOCK_SELECTORS) {
+    const nodes = document.querySelectorAll(selector);
+    for (const el of nodes) {
+      if (seen.has(el)) continue;
+      seen.add(el);
+      if (surfaceVisible(el)) return true;
+    }
+  }
+  return false;
+}
+
+function featureOwnsFixedPageLock() {
+  const body = document.body;
+  return body.classList.contains('finance-month-page-locked') ||
+    body.classList.contains('tv2-trip-focus');
+}
+
+function setSurfacePageScrollLock(locked) {
+  const body = document.body;
+  const html = document.documentElement;
+  if (!body || !html) return;
+
+  if (locked) {
+    if (surfacePageScrollLock || featureOwnsFixedPageLock()) return;
+    const scrollY = window.scrollY || html.scrollTop || body.scrollTop || 0;
+    surfacePageScrollLock = { scrollY };
+    body.style.setProperty('--tw-card-scroll-top','-'+scrollY+'px');
+    html.classList.add('tw-card-scroll-locked');
+    body.classList.add('tw-card-scroll-locked');
+    return;
+  }
+
+  if (!surfacePageScrollLock) return;
+  const { scrollY } = surfacePageScrollLock;
+  surfacePageScrollLock = null;
+  html.classList.remove('tw-card-scroll-locked');
+  body.classList.remove('tw-card-scroll-locked');
+  body.style.removeProperty('--tw-card-scroll-top');
+  if (!featureOwnsFixedPageLock()) {
+    window.scrollTo({ top:scrollY, left:0, behavior:'auto' });
+  }
+}
+
+function syncSurfacePageScrollLock() {
+  surfaceScrollSyncQueued = false;
+  const shouldLock = hasBlockingSurface();
+  if (shouldLock && featureOwnsFixedPageLock()) {
+    if (surfacePageScrollLock) setSurfacePageScrollLock(false);
+    return;
+  }
+  setSurfacePageScrollLock(shouldLock);
+}
+
+function queueSurfacePageScrollSync() {
+  if (surfaceScrollSyncQueued) return;
+  surfaceScrollSyncQueued = true;
+  requestAnimationFrame(syncSurfacePageScrollLock);
+}
+
+function installSurfacePageScrollLock() {
+  if (surfaceScrollObserver) return;
+  surfaceScrollObserver = new MutationObserver(queueSurfacePageScrollSync);
+  surfaceScrollObserver.observe(document.documentElement,{
+    subtree:true,
+    childList:true,
+    attributes:true,
+    attributeFilter:['class','hidden','open','aria-hidden'],
+  });
+  queueSurfacePageScrollSync();
 }
 
 function surfaceZ(el) {
@@ -643,6 +725,7 @@ export function initNavigation() {
   ensureNavigation();
   installDropdownRefinement();
   installSurfaceNavigation();
+  installSurfacePageScrollLock();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
   document.querySelectorAll('.tab').forEach((tab) => {
     if (tab.dataset.hub) return;
