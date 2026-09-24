@@ -797,6 +797,58 @@ const CHECKLIST_DEFAULTS = {
 function checklistSeed(list) {
   return list.map((text) => ({ id: uid(), text, done:false }));
 }
+function tripPrepSnapshot(plan) {
+  const stored = plan?.prep || {};
+  return {
+    packing: stored.packing?.length ? stored.packing : checklistSeed(CHECKLIST_DEFAULTS.packing),
+    reminders: stored.reminders?.length ? stored.reminders : checklistSeed(CHECKLIST_DEFAULTS.reminders),
+  };
+}
+
+function tripPrepNotificationItems() {
+  if (!remoteState || !actor()) return [];
+  const today = localToday();
+  return (remoteState.plans || []).map((plan) => {
+    const trip = plan?.linkedTripId ? (remoteState.trips || []).find((item) => item.id === plan.linkedTripId) : null;
+    if (trip && isLocked(trip)) return null;
+    const meta = plan?.meta || {};
+    const start = localDate(meta.start);
+    if (!start) return null;
+    const days = dayDiff(today, start);
+    if (days < 0 || days > 3) return null;
+
+    const prep = tripPrepSnapshot(plan);
+    const reminders = (prep.reminders || []).filter((item) => !item.done && String(item.text || '').trim());
+    const packing = (prep.packing || []).filter((item) => !item.done && String(item.text || '').trim());
+    if (!reminders.length && !packing.length) return null;
+
+    const name = String(meta.city || locationLabel(meta) || 'Your trip').trim();
+    const title = days === 0
+      ? name + ' starts today ♡'
+      : days === 1
+        ? name + ' is tomorrow — final checks'
+        : name + ' is in ' + days + ' days ♡';
+    const parts = [];
+    if (reminders.length) parts.push(reminders.length + ' important reminder' + (reminders.length === 1 ? '' : 's'));
+    if (packing.length) parts.push(packing.length + ' packing item' + (packing.length === 1 ? '' : 's'));
+
+    return {
+      id: 'trip-prep:' + plan.id,
+      actor: actor(),
+      kind: 'trip-prep',
+      title,
+      detail: parts.join(' · '),
+      openLabel: 'Open checklist',
+      reminders: reminders.map((item) => item.text),
+      packing: packing.map((item) => item.text),
+    };
+  }).filter(Boolean);
+}
+
+function publishTripPrepNotifications() {
+  window.TwogetherNotifications?.setPending(tripPrepNotificationItems(), 'trips');
+}
+
 function openSimplifiedChecklist(plan) {
   if (!plan) return;
   closeSimplifiedSheet();
@@ -1577,7 +1629,7 @@ function decorateTripStories() {
 
 export async function refreshState(force = false) {
   if (refreshing || !window.TwogetherAPI) return; refreshing = true;
-  try { remoteState = await window.TwogetherAPI.state(); renderCurrentTrips(); filterTripStories(); enhanceTripModal(); }
+  try { remoteState = await window.TwogetherAPI.state(); renderCurrentTrips(); filterTripStories(); enhanceTripModal(); publishTripPrepNotifications(); }
   catch (err) { if (force) toast(err.message || 'Could not refresh shared trips', 'warn'); }
   finally { refreshing = false; }
 }
@@ -1678,6 +1730,13 @@ export function initCurrentTrips() {
   setTimeout(() => refreshState(true), 180);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshState(false); });
   document.addEventListener('twogether:saved', () => setTimeout(() => refreshState(false), 120));
+  document.addEventListener('twogether:notification-action', (event) => {
+    if (event.detail?.kind !== 'trip-prep' || event.detail?.choice !== 'open') return;
+    const id = String(event.detail?.id || '').replace(/^trip-prep:/, '');
+    const plan = (remoteState?.plans || []).find((item) => item.id === id);
+    if (plan) openSimplifiedChecklist(plan);
+    else refreshState(false);
+  });
   window.addEventListener('focus', () => refreshState(false), { passive: true });
   window.TwogetherV18 = { refresh: refreshState, get state() { return remoteState; } };
 }
