@@ -273,6 +273,9 @@ test('keeps optional finance dates and recurring usual days', () => {
             { id: 'expense-flex', group: 'other', name: 'Flexible', amount: 12, day: 40 },
           ],
         },
+        financeReminders: [
+          { id: 'finance:Principessa:2026-09:income::salary', kind: 'income', name: 'Salary', amount: 1550, month: '2026-09', date: '2026-09-24', createdAt: '2026-09-24T08:00:00Z' },
+        ],
       },
     });
     assert.equal(profileResult.ok, true);
@@ -294,6 +297,8 @@ test('keeps optional finance dates and recurring usual days', () => {
     assert.equal(state.financeProfiles.Principessa.recurring.incomes[0].day, 24);
     assert.equal(state.financeProfiles.Principessa.recurring.expenses[0].day, 30);
     assert.equal(state.financeProfiles.Principessa.recurring.expenses[1].day, '');
+    assert.equal(state.financeProfiles.Principessa.financeReminders[0].date, '2026-09-24');
+    assert.equal(state.financeProfiles.Principessa.financeReminders[0].name, 'Salary');
     assert.equal(state.finances.Principessa[0].incomes[0].date, '2026-09-24');
     assert.equal(state.finances.Principessa[0].expenses.find((x) => x.name === 'Odido').date, '2026-09-30');
     assert.equal(state.finances.Principessa[0].expenses.find((x) => x.name === 'Wrong month').date, '');
