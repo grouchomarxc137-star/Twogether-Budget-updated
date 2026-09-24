@@ -699,6 +699,78 @@ body.dev-v21 #loggedUserBadge {
 
 .tw-notification-list {
   display:grid;
+  gap:12px;
+  padding-top:12px;
+}
+
+.tw-notification-group {
+  display:grid;
+  gap:0;
+  padding:0 12px;
+  border:1px solid rgba(126,104,91,.16);
+  border-radius:16px;
+  background:rgba(255,255,255,.34);
+}
+
+.tw-notification-group.is-finances {
+  border-color:rgba(193,151,67,.24);
+  box-shadow:inset 3px 0 0 rgba(193,151,67,.28);
+}
+
+.tw-notification-group.is-trips {
+  border-color:rgba(91,124,92,.22);
+  box-shadow:inset 3px 0 0 rgba(91,124,92,.24);
+}
+
+.tw-notification-group.is-trips.is-priority {
+  border-color:rgba(181,91,91,.28);
+  box-shadow:inset 3px 0 0 rgba(181,91,91,.34);
+}
+
+.tw-notification-group-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 2px 8px;
+  border-bottom:1px solid rgba(100,80,65,.08);
+}
+
+.tw-notification-group-head strong {
+  font-family:Georgia,serif;
+  font-size:15px;
+}
+
+.tw-notification-group-head span {
+  min-width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:rgba(126,104,91,.08);
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+}
+
+.tw-notification-group.is-finances .tw-notification-group-head strong {
+  color:#8a681f;
+}
+
+.tw-notification-group.is-trips .tw-notification-group-head strong {
+  color:#557150;
+}
+
+.tw-notification-group.is-trips.is-priority .tw-notification-group-head strong {
+  color:#9e4f4f;
+}
+
+.tw-notification-group-items {
+  display:grid;
+}
+
+.tw-notification-group-items .tw-notification-item:last-child {
+  border-bottom:0;
 }
 
 .tw-notification-item {
