@@ -21,6 +21,7 @@ import { beginEdit, beginJoin } from './wizard.js';
 import { openSheet } from '../app/navigation.js';
 
 let openTripId = '';
+let selectedMonthlyKey = '';
 
 export function renderTripGallery() {
   const root = $('#tripGallery');
@@ -116,6 +117,39 @@ function submissionCard(name, s) {
   return `<div class="submission-card"><span>${esc(name)}</span><strong>${money(tripTotalSubmission(s))}</strong><small>Paid: ${money(s.paid)}</small><div class="submission-mini">${MONEY_FIELDS.map((k) => `<div><span>${esc(MONEY_LABELS[k])}</span><b>${s?.uncertain?.[k] ? '~ ' : ''}${money(s[k])}</b></div>`).join('')}</div></div>`;
 }
 
+const MONTHLY_CATEGORY_COLORS = {
+  accom: '#819174',
+  groceries: '#c89d56',
+  eat: '#c77f68',
+  travel: '#7188a1',
+  fuel: '#a88d57',
+  tolls: '#8d7b6d',
+  other: '#b6aaa0',
+};
+
+function fullMonthLabel(key) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  if (!match) return String(key || '');
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+function monthlyDonutGradient(stat) {
+  const values = MONEY_FIELDS.map((key) => Math.max(0, n(stat?.[key])));
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (total <= .005) return 'conic-gradient(#e8e2d9 0 100%)';
+  let cursor = 0;
+  const stops = [];
+  MONEY_FIELDS.forEach((key, index) => {
+    const value = values[index];
+    if (value <= .005) return;
+    const start = cursor;
+    cursor += (value / total) * 100;
+    stops.push(`${MONTHLY_CATEGORY_COLORS[key]} ${start.toFixed(3)}% ${cursor.toFixed(3)}%`);
+  });
+  return `conic-gradient(${stops.join(',')})`;
+}
+
 export function renderMonthly() {
   const body = $('#monthlyBody');
   if (!body) return;
@@ -130,15 +164,101 @@ export function renderMonthly() {
     return s;
   });
 
-  body.innerHTML = stats.map((s) => `<tr><td>${s.label}</td><td>${s.trips}</td>${MONEY_FIELDS.map((k) => `<td>${money(s[k])}</td>`).join('')}<td>${s.estimated ? '~ ' : ''}${money(s.total)}</td><td>${s.estimated ? '~ ' : ''}${money(s.total / 2)}</td></tr>`).join('');
-  const total = stats.reduce((sum, m) => sum + m.total, 0);
-  const tripCount = stats.reduce((sum, m) => sum + m.trips, 0);
-  const activeMonths = stats.filter((m) => m.trips > 0).length || 1;
+  const total = stats.reduce((sum, month) => sum + month.total, 0);
+  const tripCount = stats.reduce((sum, month) => sum + month.trips, 0);
+  const activeMonths = stats.filter((month) => month.trips > 0).length || 1;
   $('#kpiTotal').textContent = money(total);
   $('#kpiMonth').textContent = money(total / activeMonths);
   $('#kpiPerson').textContent = money(total / activeMonths / 2);
   $('#kpiTrip').textContent = money(tripCount ? total / tripCount : 0);
   $('#kpiTrips').textContent = String(tripCount);
+
+  const keys = stats.map((month) => month.key);
+  if (!keys.includes(selectedMonthlyKey)) {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const latestActive = [...stats].reverse().find((month) => month.trips > 0);
+    selectedMonthlyKey = keys.includes(currentKey) ? currentKey : (latestActive?.key || keys[0] || '');
+  }
+
+  const index = Math.max(0, keys.indexOf(selectedMonthlyKey));
+  const selected = stats[index] || stats[0];
+  if (!selected) {
+    body.innerHTML = '<div class="empty-state"><strong>No monthly data yet</strong></div>';
+    return;
+  }
+
+  const categories = MONEY_FIELDS.map((key) => ({
+    key,
+    label: MONEY_LABELS[key],
+    amount: Math.max(0, n(selected[key])),
+    color: MONTHLY_CATEGORY_COLORS[key],
+  })).filter((item) => item.amount > .005);
+  const categoryHtml = categories.length
+    ? categories.map((item) => {
+        const percent = selected.total > .005 ? (item.amount / selected.total) * 100 : 0;
+        return `<div class="trip-monthly-category"><i style="--trip-monthly-color:${item.color}" aria-hidden="true"></i><span><strong>${esc(item.label)}</strong><small>${percent.toFixed(0)}% of this month</small></span><b>${money(item.amount)}</b></div>`;
+      }).join('')
+    : '<div class="trip-monthly-empty">No trip spending logged for this month.</div>';
+
+  const options = stats.map((month) => `<option value="${esc(month.key)}" ${month.key === selected.key ? 'selected' : ''}>${esc(fullMonthLabel(month.key))}</option>`).join('');
+  const tripLabel = selected.trips === 1 ? '1 trip' : `${selected.trips} trips`;
+  body.innerHTML = `
+    <div class="trip-monthly-nav">
+      <button type="button" data-month-prev aria-label="Previous month" ${index <= 0 ? 'disabled' : ''}>‹</button>
+      <label class="trip-monthly-picker">
+        <select id="tripMonthlyPicker" aria-label="Choose month">${options}</select>
+        <span aria-hidden="true">⌄</span>
+      </label>
+      <button type="button" data-month-next aria-label="Next month" ${index >= stats.length - 1 ? 'disabled' : ''}>›</button>
+    </div>
+    <section class="trip-monthly-card" data-month-swipe>
+      <div class="trip-monthly-visual">
+        <div class="trip-monthly-donut" style="--trip-monthly-donut:${monthlyDonutGradient(selected)}">
+          <div class="trip-monthly-donut-center">
+            <span>Total spent</span>
+            <strong>${selected.estimated ? '~ ' : ''}${money(selected.total)}</strong>
+          </div>
+        </div>
+        <div class="trip-monthly-meta">
+          <span class="panel-kicker">${esc(fullMonthLabel(selected.key))}</span>
+          <h2>${esc(tripLabel)}</h2>
+          <p>${selected.trips ? `${money(selected.total / 2)} per person` : 'Nothing spent on trips yet'}${selected.estimated ? ' · includes estimates' : ''}</p>
+        </div>
+      </div>
+      <div class="trip-monthly-breakdown-head"><h3>Where it went</h3><span>Swipe left or right for another month</span></div>
+      <div class="trip-monthly-breakdown">${categoryHtml}</div>
+    </section>`;
+
+  const move = (step) => {
+    const nextIndex = Math.max(0, Math.min(stats.length - 1, index + step));
+    if (nextIndex === index) return;
+    selectedMonthlyKey = stats[nextIndex].key;
+    renderMonthly();
+  };
+  $('[data-month-prev]', body)?.addEventListener('click', () => move(-1));
+  $('[data-month-next]', body)?.addEventListener('click', () => move(1));
+  $('#tripMonthlyPicker', body)?.addEventListener('change', (event) => {
+    selectedMonthlyKey = event.target.value;
+    renderMonthly();
+  });
+
+  const swipe = $('[data-month-swipe]', body);
+  if (swipe) {
+    let startX = 0, startY = 0, tracking = false;
+    swipe.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('button,select,input,a')) return;
+      startX = event.clientX; startY = event.clientY; tracking = true;
+    });
+    swipe.addEventListener('pointerup', (event) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = event.clientX - startX, dy = event.clientY - startY;
+      if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.15) return;
+      move(dx < 0 ? 1 : -1);
+    });
+    swipe.addEventListener('pointercancel', () => { tracking = false; });
+  }
 }
 
 function actualCurrentSituation() {

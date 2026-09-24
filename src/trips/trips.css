@@ -5177,3 +5177,213 @@ body.tv2-locked{overflow:hidden}
 .current-overview.current-overview-trip{position:fixed}
 .current-overview.current-overview-trip>.tv2-layer{position:absolute;inset:0;z-index:20}
 .current-overview.current-overview-trip>.tv2-layer .tv2-backdrop{position:absolute}
+
+
+/* Monthly Trips: one calm month at a time instead of the wide 12-row table. */
+#monthly .trip-monthly-browser {
+  max-width:720px;
+  margin:0 auto;
+}
+#monthly .trip-monthly-nav {
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr) 46px;
+  align-items:center;
+  gap:10px;
+  margin:0 0 12px;
+}
+#monthly .trip-monthly-nav>button {
+  width:46px;
+  height:46px;
+  border:1px solid #e3d7ca;
+  border-radius:15px;
+  background:#fffdf9;
+  color:#443b34;
+  font:inherit;
+  font-size:27px;
+  cursor:pointer;
+}
+#monthly .trip-monthly-nav>button:disabled {
+  opacity:.28;
+  cursor:default;
+}
+#monthly .trip-monthly-picker {
+  position:relative;
+  min-width:0;
+}
+#monthly .trip-monthly-picker select {
+  width:100%;
+  min-height:46px;
+  appearance:none;
+  border:1px solid #e3d7ca;
+  border-radius:15px;
+  background:#fffdf9;
+  color:#2f2924;
+  padding:0 42px 0 16px;
+  font:inherit;
+  font-size:17px;
+  font-weight:650;
+  text-align:center;
+  outline:none;
+  cursor:pointer;
+}
+#monthly .trip-monthly-picker select:focus-visible {
+  border-color:#8a785f;
+  box-shadow:0 0 0 3px rgba(138,120,95,.12);
+}
+#monthly .trip-monthly-picker>span {
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);
+  pointer-events:none;
+  color:#91877e;
+}
+#monthly .trip-monthly-card {
+  border:1px solid #e6dbcf;
+  border-radius:24px;
+  background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);
+  padding:22px;
+  box-shadow:0 10px 28px rgba(62,45,31,.055);
+  touch-action:pan-y;
+}
+#monthly .trip-monthly-visual {
+  display:grid;
+  grid-template-columns:minmax(180px,230px) minmax(0,1fr);
+  align-items:center;
+  gap:28px;
+  padding:4px 4px 20px;
+}
+#monthly .trip-monthly-donut {
+  width:min(230px,100%);
+  aspect-ratio:1;
+  justify-self:center;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--trip-monthly-donut);
+  box-shadow:inset 0 0 0 1px rgba(75,61,48,.04);
+}
+#monthly .trip-monthly-donut-center {
+  width:66%;
+  aspect-ratio:1;
+  border-radius:50%;
+  display:grid;
+  place-content:center;
+  justify-items:center;
+  gap:3px;
+  padding:10px;
+  background:#fffdf9;
+  text-align:center;
+  box-shadow:0 1px 0 rgba(74,57,43,.05);
+}
+#monthly .trip-monthly-donut-center span {
+  color:#857a70;
+  font-size:12px;
+}
+#monthly .trip-monthly-donut-center strong {
+  font-size:22px;
+  line-height:1.05;
+  font-variant-numeric:tabular-nums;
+}
+#monthly .trip-monthly-meta {
+  min-width:0;
+}
+#monthly .trip-monthly-meta .panel-kicker {
+  display:block;
+  margin-bottom:5px;
+}
+#monthly .trip-monthly-meta h2 {
+  margin:0;
+  font-size:28px;
+  line-height:1.1;
+}
+#monthly .trip-monthly-meta p {
+  margin:8px 0 0;
+  color:#7d7269;
+  font-size:14px;
+  line-height:1.45;
+}
+#monthly .trip-monthly-breakdown-head {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:14px;
+  padding:17px 2px 8px;
+  border-top:1px solid rgba(110,89,70,.1);
+}
+#monthly .trip-monthly-breakdown-head h3 {
+  margin:0;
+  font-size:17px;
+}
+#monthly .trip-monthly-breakdown-head span {
+  color:#91877e;
+  font-size:11px;
+  text-align:right;
+}
+#monthly .trip-monthly-breakdown {
+  display:grid;
+}
+#monthly .trip-monthly-category {
+  display:grid;
+  grid-template-columns:10px minmax(0,1fr) auto;
+  align-items:center;
+  gap:11px;
+  min-height:51px;
+  border-top:1px solid rgba(110,89,70,.08);
+}
+#monthly .trip-monthly-category:first-child {
+  border-top:0;
+}
+#monthly .trip-monthly-category>i {
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:var(--trip-monthly-color);
+}
+#monthly .trip-monthly-category>span {
+  min-width:0;
+  display:grid;
+  gap:1px;
+}
+#monthly .trip-monthly-category>span strong {
+  font-size:14px;
+  font-weight:620;
+}
+#monthly .trip-monthly-category>span small {
+  color:#91877e;
+  font-size:11px;
+}
+#monthly .trip-monthly-category>b {
+  font-size:14px;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+#monthly .trip-monthly-empty {
+  padding:24px 4px 12px;
+  color:#91877e;
+  font-size:14px;
+  text-align:center;
+}
+@media(max-width:620px) {
+  #monthly .trip-monthly-card {
+    padding:18px 16px;
+    border-radius:21px;
+  }
+  #monthly .trip-monthly-visual {
+    grid-template-columns:1fr;
+    gap:16px;
+    text-align:center;
+  }
+  #monthly .trip-monthly-donut {
+    width:min(205px,72vw);
+  }
+  #monthly .trip-monthly-meta h2 {
+    font-size:24px;
+  }
+  #monthly .trip-monthly-breakdown-head {
+    align-items:flex-start;
+  }
+  #monthly .trip-monthly-breakdown-head span {
+    max-width:150px;
+  }
+}
