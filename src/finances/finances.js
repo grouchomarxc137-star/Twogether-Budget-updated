@@ -102,6 +102,7 @@ let financeMonthSwipeAbort = null;
 let financeMonthSwipeIgnoreUntil = 0;
 let financeMonthDeleteConfirmLayer = null;
 let financeLogBackgroundLock = null;
+let financeMonthPageLock = null;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1170,6 +1171,29 @@ function financeGroupForTone(tone, name = '') {
   if (tone === 'wealth') return lower.includes('invest') ? 'investments' : 'savings';
   return 'other';
 }
+function setFinanceMonthPageLock(locked) {
+  const body=document.body;
+  const html=document.documentElement;
+  if(locked){
+    if(financeMonthPageLock)return;
+    const scrollY=window.scrollY||html.scrollTop||body.scrollTop||0;
+    financeMonthPageLock={scrollY,bodyTop:body.style.top,htmlScrollBehavior:html.style.scrollBehavior};
+    body.style.top='-'+scrollY+'px';
+    html.classList.add('finance-month-page-locked');
+    body.classList.add('finance-month-page-locked');
+    return;
+  }
+  const lock=financeMonthPageLock;
+  html.classList.remove('finance-month-page-locked');
+  body.classList.remove('finance-month-page-locked');
+  if(!lock)return;
+  body.style.top=lock.bodyTop;
+  financeMonthPageLock=null;
+  html.style.scrollBehavior='auto';
+  window.scrollTo(0,lock.scrollY);
+  html.style.scrollBehavior=lock.htmlScrollBehavior;
+}
+
 function closeFinanceTransactionSheet() {
   document.querySelector('.finance-log-layer')?.remove();
 
@@ -1874,8 +1898,10 @@ function closeFinanceMonthDialog() {
   financeMonthSwipeAbort?.abort();
   financeMonthSwipeAbort=null;
   closeFinanceMonthDeleteConfirm();
+  if(document.querySelector('.finance-log-layer'))closeFinanceTransactionSheet();
   financeMonthDialog?.remove();
   financeMonthDialog=null;
+  setFinanceMonthPageLock(false);
 }
 
 function renderDetail(rec) {
@@ -1922,6 +1948,7 @@ function renderDetail(rec) {
   });
 
   document.body.appendChild(financeMonthDialog);
+  setFinanceMonthPageLock(true);
   financeMonthDialog.showModal();
   financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();closeFinanceMonthDialog();});
   financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',closeFinanceMonthDialog);
