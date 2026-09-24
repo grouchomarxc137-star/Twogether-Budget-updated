@@ -3235,8 +3235,8 @@ button.finance-owed-history-row:hover {
   border-color:#bd8626;
 }
 
-.finance-log-layer .trip-expense-more-fields,
-.finance-log-layer .trip-expense-more-fields>label {
+.finance-log-layer .tv2-more,
+.finance-log-layer .tv2-more .tv2-field {
   box-sizing:border-box;
   width:100%;
   max-width:100%;
@@ -3245,16 +3245,21 @@ button.finance-owed-history-row:hover {
 }
 
 .finance-log-layer #financeLogDate {
-  display:block;
+  display:block!important;
   box-sizing:border-box!important;
   width:100%!important;
   max-width:100%!important;
   min-width:0!important;
   inline-size:100%!important;
   max-inline-size:100%!important;
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  margin:0!important;
 }
 
 .finance-log-layer #financeLogDate::-webkit-date-and-time-value {
+  width:100%;
+  min-width:0;
   text-align:center;
 }
 
