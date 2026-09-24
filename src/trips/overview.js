@@ -72,6 +72,7 @@ export function refreshModalIfOpen() {
 function renderTripModal(id) {
   const root = $('#tripModalBody');
   const state = getState();
+  if (root) root.dataset.tripId = id;
   const t = state.trips.find((x) => x.id === id);
   if (!root || !t) return;
   const e = effectiveTrip(t), m = tripMeta(t), diff = differences(t), budget = budgetInfo(t);
