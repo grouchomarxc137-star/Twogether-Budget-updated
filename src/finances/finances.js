@@ -968,11 +968,13 @@ function openRecurringManager() {
   const expenseRows = config.expenses.map((x,i)=>({...x,index:i,tone:groupTone(x.group)}));
   const grouped = {};
   expenseRows.forEach((x)=>(grouped[x.tone]||(grouped[x.tone]=[])).push(x));
-  const expenses = categoryOrder().filter((tone)=>grouped[tone]?.length).map((tone)=>
-    '<div class="tv2-day finance-recurring-category"><h2>'+esc(categoryLabel(tone))+'</h2>'+
+  const expenses = categoryOrder().filter((tone)=>grouped[tone]?.length).map((tone)=>{
+    const total=grouped[tone].reduce((sum,x)=>sum+n(x.amount),0);
+    return '<div class="tv2-day finance-recurring-category">'+
+      '<div class="finance-recurring-category-head"><h2>'+esc(categoryLabel(tone))+'</h2><span class="finance-recurring-category-total">Total '+money(total)+'</span></div>'+
       grouped[tone].map((x)=>recurringRow('expense',x,x.index)).join('')+
-    '</div>'
-  ).join('') || '<div class="tv2-empty-list">No recurring expenses yet.</div>';
+    '</div>';
+  }).join('') || '<div class="tv2-empty-list">No recurring expenses yet.</div>';
 
   showMini(
     '<div class="tv2-root finance-recurring-tv2">'+
