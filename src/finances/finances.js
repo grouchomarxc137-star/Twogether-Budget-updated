@@ -718,7 +718,7 @@ function renderCurrentPanel() {
     <div class="finance-current-grid">
       <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Tap any bank to edit its balance. Not included in net worth.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable"><button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">All active debts are shown here. Tap a manual loan to add a repayment, or tap the title to see the full history.</small></article>
+      <article class="finance-current-card tone-receivable" data-fin-owed-card><button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">All active debts are shown here. Tap a manual loan to add a repayment, or tap the title to see the full history.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><strong>${money(inv.ownInvestments || 0)}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div><div><span>Sis</span><strong>${inv.investmentTotal == null ? '—' : money(inv.sisterInvestments)}</strong></div><div class="${gl?.value < 0 ? 'negative' : 'positive'}"><span>G/L p/m</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
@@ -729,6 +729,10 @@ function renderCurrentPanel() {
   $('[data-fin-add-owed]', root)?.addEventListener('click', () => openOwedModal(-1));
   $('[data-fin-repay-owed]', root).forEach((btn) => btn.addEventListener('click', () => openLoanRepayment(Number(btn.dataset.finRepayOwed))));
   $('[data-fin-open-owed-history]', root).forEach((btn) => btn.addEventListener('click', openOwedHistory));
+  $('[data-fin-owed-card]', root)?.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    openOwedHistory();
+  });
 }
 
 function renderScenarioPanel() {
