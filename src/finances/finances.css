@@ -2197,6 +2197,80 @@ body.finance-month-focus {
   font-variant-numeric:tabular-nums;
 }
 
+[data-fin-view="balances"] .finance-owed-preview {
+  background:linear-gradient(90deg,rgba(237,246,232,.72),rgba(255,253,249,.18));
+}
+[data-fin-view="balances"] .finance-owed-preview:hover {
+  background:linear-gradient(90deg,rgba(228,241,220,.9),rgba(255,253,249,.34))!important;
+}
+.finance-owed-summary {
+  display:grid;
+  gap:3px;
+  margin:14px 0 20px;
+  padding:16px 17px;
+  border:1px solid #dce5d4;
+  border-radius:17px;
+  background:linear-gradient(135deg,#f4f8ef,#fbfaf4);
+}
+.finance-owed-summary span,
+.finance-owed-summary small {
+  color:var(--muted);
+  font-size:12px;
+}
+.finance-owed-summary strong {
+  font-size:28px;
+  line-height:1.05;
+}
+.finance-owed-history {
+  display:grid;
+}
+.finance-owed-history-row {
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 2px;
+  border:0;
+  border-top:1px solid rgba(100,80,65,.1);
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  font:inherit;
+}
+button.finance-owed-history-row {
+  cursor:pointer;
+}
+button.finance-owed-history-row:hover {
+  background:rgba(244,248,239,.72);
+}
+.finance-owed-history-row span {
+  min-width:0;
+}
+.finance-owed-history-row strong {
+  display:block;
+  font-size:15px;
+  font-weight:650;
+}
+.finance-owed-history-row small {
+  display:block;
+  margin-top:2px;
+  color:var(--muted);
+  font-size:12px;
+}
+.finance-owed-history-row b {
+  flex:0 0 auto;
+  color:#4f6f4a;
+  font-size:15px;
+  font-variant-numeric:tabular-nums;
+}
+.finance-owed-history-row.is-paid {
+  opacity:.62;
+}
+.finance-owed-history-row.is-paid b {
+  color:var(--muted);
+}
+
 .v33-shared-jar {
   margin-top:18px;
   border:1px solid #dccdaE;

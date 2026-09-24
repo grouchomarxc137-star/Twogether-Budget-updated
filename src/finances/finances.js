@@ -708,15 +708,21 @@ function renderCurrentPanel() {
   const { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth } = profileStats();
   const banks = p.bankAccounts.length ? p.bankAccounts.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-bank="${i}"><span>${esc(x.name)}</span><strong>${money(x.balance)}</strong></button>`).join('') : '<div class="finance-current-empty">No bank balances added yet.</div>';
   const holds = p.savingsReserved.length ? p.savingsReserved.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-hold="${i}"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></button>`).join('') : '<div class="finance-current-empty">Nothing earmarked yet.</div>';
-  const manualOwed = p.receivables.map((x, i) => { const paid = loanPaid(x), remaining = loanRemaining(x); return `<button class="finance-current-row" type="button" data-fin-edit-owed="${i}"><span>${esc(x.person)}<small>${esc(x.reason || 'Reason not added')} · Lent ${money(x.principal)} · Repaid ${money(paid)}</small></span><strong>${money(remaining)}</strong></button>`; }).join('');
-  const tripOwed = tripReceivables().map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · ${esc(x.categories)}</small></span><strong>${money(x.amount)}</strong></div>`).join('');
-  const owed = manualOwed + tripOwed || '<div class="finance-current-empty">Nobody logged as owing you money.</div>';
+  const tripOwedItems = tripReceivables();
+  const activeManualOwed = p.receivables.map((x, i) => ({ item:x, index:i, remaining:loanRemaining(x) })).filter((x) => x.remaining > .005);
+  const latestTripOwed = tripOwedItems[tripOwedItems.length - 1] || null;
+  const latestManualOwed = activeManualOwed[activeManualOwed.length - 1] || null;
+  const owedPreview = latestTripOwed
+    ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestTripOwed.person)}<small>${esc(latestTripOwed.reason)} · ${esc(latestTripOwed.categories)}</small></span><strong>${money(latestTripOwed.amount)}</strong></button>`
+    : latestManualOwed
+      ? `<button class="finance-current-row finance-owed-preview" type="button" data-fin-open-owed-history><span>${esc(latestManualOwed.item.person)}<small>${esc(latestManualOwed.item.reason || 'Reason not added')} · Loan</small></span><strong>${money(latestManualOwed.remaining)}</strong></button>`
+      : '<div class="finance-current-empty">Nobody currently owes you money.</div>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
     <div class="finance-current-grid">
       <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Tap any bank to edit its balance. Not included in net worth.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owed}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Trip debts sync automatically. Tap a manually added loan to see its repayment history.</small></article>
+      <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Showing the latest current item. Tap it to see all owed money and loan history.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><strong>${money(inv.ownInvestments || 0)}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div><div><span>Sis</span><strong>${inv.investmentTotal == null ? '—' : money(inv.sisterInvestments)}</strong></div><div class="${gl?.value < 0 ? 'negative' : 'positive'}"><span>G/L p/m</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
@@ -725,7 +731,7 @@ function renderCurrentPanel() {
   $('[data-fin-add-hold]', root)?.addEventListener('click', () => openHoldModal(-1));
   $$('[data-fin-edit-hold]', root).forEach((btn) => btn.addEventListener('click', () => openHoldModal(Number(btn.dataset.finEditHold))));
   $('[data-fin-add-owed]', root)?.addEventListener('click', () => openOwedModal(-1));
-  $$('[data-fin-edit-owed]', root).forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finEditOwed))));
+  $('[data-fin-open-owed-history]', root)?.addEventListener('click', openOwedHistory);
 }
 
 function renderScenarioPanel() {
@@ -1975,6 +1981,24 @@ function openHoldModal(index) {
   showMini(`<span class="panel-kicker">SAVINGS ON HOLD</span><h2>${item ? 'Edit earmarked money' : 'Add savings on hold'}</h2><p>This stays inside your total savings, but is subtracted from the amount you consider actually available.</p><div class="finance-mini-fields"><label>What is it reserved for?<input id="finMiniName" value="${esc(item?.name || '')}" placeholder="e.g. Driving licence"></label><label>Amount<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', () => { const name = String($('#finMiniName')?.value || '').trim(), amount = $('#finMiniAmount')?.value || ''; if (!name) return toast('Add what this money is for', 'warn'); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); const next = profile(); const row = { id: item?.id || uid(), name, amount: n(amount) }; if (index >= 0) next.savingsReserved[index] = row; else next.savingsReserved.push(row); saveProfile(next, 'Savings hold saved'); });
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.savingsReserved.splice(index, 1); saveProfile(next, 'Savings hold removed'); });
+}
+
+function openOwedHistory() {
+  const p = profile();
+  const tripItems = tripReceivables();
+  const manualItems = p.receivables.map((item, index) => ({
+    item,
+    index,
+    paid: loanPaid(item),
+    remaining: loanRemaining(item),
+  }));
+  const total = manualItems.reduce((sum, x) => sum + x.remaining, 0) + tripItems.reduce((sum, x) => sum + n(x.amount), 0);
+  const tripRows = tripItems.map((item) => `<div class="finance-owed-history-row is-trip"><span><strong>${esc(item.person)}</strong><small>${esc(item.reason)} · ${esc(item.categories)} · Trip</small></span><b>${money(item.amount)}</b></div>`).join('');
+  const manualRows = [...manualItems].reverse().map(({ item, index, paid, remaining }) => `<button class="finance-owed-history-row is-loan ${remaining <= .005 ? 'is-paid' : ''}" type="button" data-fin-history-loan="${index}"><span><strong>${esc(item.person)}</strong><small>${esc(item.reason || 'Reason not added')} · Lent ${money(item.principal)} · Repaid ${money(paid)}${remaining <= .005 ? ' · Paid back' : ''}</small></span><b>${money(remaining)}</b></button>`).join('');
+  const rows = tripRows + manualRows || '<div class="finance-current-empty">No owed-money history yet.</div>';
+  showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong><small>Trip debts sync automatically. Manual loans stay here with their repayment history.</small></div><div class="finance-jar-history-head"><h3>All owed money</h3><span>${tripItems.length + manualItems.length} ${tripItems.length + manualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
+  $('[data-fin-history-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryLoan))));
+  $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1));
 }
 
 function openOwedModal(index) {
