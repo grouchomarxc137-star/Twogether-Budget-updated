@@ -640,8 +640,9 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       amountField+
       '<div class="tv2-cats" role="group" aria-label="Category">'+categories.map(([k,l,i])=>{
         const selectedDebt = owedMode && state.owedCategory===k;
+        const hasOwedBalance = owedMode && k !== 'owed' && owedCategoryAmount(plan,k,me) > .005;
         const cls = state.category===k || selectedDebt ? 'on' : '';
-        return '<button type="button" class="tv2-cat '+cls+(selectedDebt?' is-owed-target':'')+'" data-cat="'+k+'" aria-pressed="'+((state.category===k||selectedDebt)?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>';
+        return '<button type="button" class="tv2-cat '+cls+(selectedDebt?' is-owed-target':'')+(hasOwedBalance?' has-owed-balance':'')+'" data-cat="'+k+'" aria-pressed="'+((state.category===k||selectedDebt)?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>';
       }).join('')+'</div>'+
       owedPanel+normalOptions+
       '<p class="tv2-hint" aria-live="polite"></p>'+

@@ -185,6 +185,21 @@ body.tv2-locked { overflow: hidden; }
   border-color:var(--tv2-good)!important;
   box-shadow:inset 0 0 0 1px var(--tv2-good);
 }
+.tv2-sheet.is-owed .tv2-cat.has-owed-balance {
+  position:relative;
+  background:linear-gradient(180deg,var(--tv2-card),var(--tv2-good-soft))!important;
+}
+.tv2-sheet.is-owed .tv2-cat.has-owed-balance::after {
+  content:'';
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--tv2-good);
+  box-shadow:0 0 0 3px rgba(79,111,74,.12);
+}
 .tv2-owed-total {
   display:grid;
   justify-items:center;
