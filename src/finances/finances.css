@@ -3936,7 +3936,7 @@ dialog.finance-log-host .tv2-backdrop {
   overflow:hidden;
   border:1px solid var(--finance-recurring-border,#ddd6cd);
   border-radius:22px;
-  background:var(--tv2-card);
+  background:var(--tv2-bg);
   box-shadow:0 8px 24px rgba(62,52,43,.035);
 }
 .finance-recurring-card-head {
