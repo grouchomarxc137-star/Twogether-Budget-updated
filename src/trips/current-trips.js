@@ -1557,6 +1557,17 @@ function bindSimplifiedSwipe(section) {
 }
 
 async function handleSimplifiedClick(e) {
+  if (simplifiedView.name === 'trip') {
+    const tripCard = e.currentTarget.querySelector('#twCurrentTrips.tv2-trip-view');
+    if (tripCard && !tripCard.contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
+      renderCurrentTrips();
+      return;
+    }
+  }
+
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
