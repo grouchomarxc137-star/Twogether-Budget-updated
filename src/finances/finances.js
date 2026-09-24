@@ -278,16 +278,142 @@ function tripSettlement(plan) {
     amount: Math.abs(delta),
   };
 }
+const TRIP_DEBT_CATEGORIES = [
+  ['stay', 'Stay'],
+  ['transport', 'Transport'],
+  ['car', 'Car'],
+  ['groceries', 'Groceries'],
+  ['eating-out', 'Eating out'],
+  ['activities', 'Activities'],
+  ['other', 'Other'],
+];
+function tripDebtCategoryKey(entry) {
+  if (entry?.category === 'accommodation') return 'stay';
+  if (entry?.category === 'transport') return entry?.transportType === 'fuel' ? 'car' : 'transport';
+  if (entry?.category === 'food') return entry?.foodType === 'groceries' ? 'groceries' : 'eating-out';
+  if (entry?.category === 'activities') return 'activities';
+  return 'other';
+}
+function tripDebtCategoryBreakdown(plan, debtor) {
+  const keys = TRIP_DEBT_CATEGORIES.map(([key]) => key);
+  const balances = Object.fromEntries(keys.map((key) => [key, 0]));
+  const opened = Object.fromEntries(keys.map((key) => [key, '']));
+  let pendingPositive = 0, pendingNegative = 0;
+  const sign = (value) => value > .005 ? 1 : value < -.005 ? -1 : 0;
+  const applyDelta = (key, delta, stamp) => {
+    const before = balances[key] || 0, beforeSign = sign(before);
+    balances[key] = before + delta;
+    const afterSign = sign(balances[key]);
+    if (!afterSign) {
+      balances[key] = 0;
+      opened[key] = '';
+    } else if (afterSign !== beforeSign) {
+      opened[key] = stamp;
+    }
+  };
+  const consumePending = (key, stamp) => {
+    if (balances[key] < -.005 && pendingPositive > .005) {
+      const used = Math.min(pendingPositive, -balances[key]);
+      applyDelta(key, used, stamp);
+      pendingPositive -= used;
+    }
+    if (balances[key] > .005 && pendingNegative > .005) {
+      const used = Math.min(pendingNegative, balances[key]);
+      applyDelta(key, -used, stamp);
+      pendingNegative -= used;
+    }
+  };
+  const consumeLegacy = (effect, stamp) => {
+    const wantsNegative = effect > 0;
+    let remaining = Math.abs(effect);
+    const eligible = keys.filter((key) => wantsNegative ? balances[key] < -.005 : balances[key] > .005)
+      .sort((a, b) => String(opened[a] || '').localeCompare(String(opened[b] || '')) || keys.indexOf(a) - keys.indexOf(b));
+    for (const key of eligible) {
+      if (remaining <= .005) break;
+      const due = wantsNegative ? -balances[key] : balances[key];
+      const used = Math.min(remaining, due);
+      applyDelta(key, wantsNegative ? used : -used, stamp);
+      remaining -= used;
+    }
+    if (remaining > .005) {
+      if (wantsNegative) pendingPositive += remaining;
+      else pendingNegative += remaining;
+    }
+  };
+  const eventStamp = (item, index, kind) => {
+    const created = String(item?.createdAt || '');
+    const day = String(item?.date || created.slice(0, 10) || '9999-12-31');
+    const time = created.includes('T') ? created.slice(11) : (kind === 'expense' ? '00:00:00' : '23:59:59');
+    return day + 'T' + time + '|' + String(index).padStart(5, '0') + '|' + kind;
+  };
+  const entries = Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
+  const repayments = Array.isArray(plan?.repayments) ? plan.repayments : [];
+  const events = entries.map((entry, index) => ({ kind: 'expense', entry, stamp: eventStamp(entry, index, 'expense') }))
+    .concat(repayments.map((repayment, index) => ({ kind: 'repayment', repayment, stamp: eventStamp(repayment, index, 'repayment') })))
+    .sort((a, b) => a.stamp.localeCompare(b.stamp));
+
+  events.forEach((event) => {
+    if (event.kind === 'expense') {
+      const entry = event.entry, key = tripDebtCategoryKey(entry);
+      const remaining = Math.max(0, n(entry?.amount) - n(entry?.jarContribution));
+      const paidPrincipessa = entry?.paidBy === 'both' ? remaining / 2 : entry?.paidBy === 'Principessa' ? remaining : 0;
+      const owner = entry?.forActor === 'Principe' ? 'Principe' : 'Principessa';
+      const sharePrincipessa = entry?.split === 'personal' ? (owner === 'Principessa' ? remaining : 0) : remaining / 2;
+      applyDelta(key, paidPrincipessa - sharePrincipessa, event.stamp);
+      consumePending(key, event.stamp);
+      return;
+    }
+    const repayment = event.repayment, value = n(repayment?.amount);
+    const effect = repayment?.from === 'Principessa' && repayment?.to === 'Principe'
+      ? value
+      : repayment?.from === 'Principe' && repayment?.to === 'Principessa'
+        ? -value : 0;
+    if (!effect) return;
+    if (repayment?.category && keys.includes(repayment.category)) applyDelta(repayment.category, effect, event.stamp);
+    else consumeLegacy(effect, event.stamp);
+  });
+
+  if (pendingPositive > .005) applyDelta('other', pendingPositive, '9999-12-31T23:59:59|legacy');
+  if (pendingNegative > .005) applyDelta('other', -pendingNegative, '9999-12-31T23:59:59|legacy');
+
+  const overall = tripSettlement(plan);
+  const targetCents = overall.debtor === debtor ? Math.max(0, Math.round(n(overall.amount) * 100)) : 0;
+  if (!targetCents) return [];
+  const wantsNegative = debtor === 'Principessa';
+  const debts = keys.map((key) => ({
+    key,
+    cents: Math.max(0, Math.round((wantsNegative ? -balances[key] : balances[key]) * 100)),
+    opened: opened[key] || '9999-12-31T23:59:59',
+  })).filter((item) => item.cents > 0);
+
+  let excess = Math.max(0, debts.reduce((sum, item) => sum + item.cents, 0) - targetCents);
+  debts.sort((a, b) => a.opened.localeCompare(b.opened) || keys.indexOf(a.key) - keys.indexOf(b.key));
+  debts.forEach((item) => {
+    const reduce = Math.min(excess, item.cents);
+    item.cents -= reduce;
+    excess -= reduce;
+  });
+  const assigned = debts.reduce((sum, item) => sum + item.cents, 0);
+  if (assigned < targetCents) {
+    const other = debts.find((item) => item.key === 'other');
+    if (other) other.cents += targetCents - assigned;
+    else debts.push({ key: 'other', cents: targetCents - assigned, opened: '9999-12-31T23:59:59' });
+  }
+  const labels = Object.fromEntries(TRIP_DEBT_CATEGORIES);
+  return debts.filter((item) => item.cents > 0).map((item) => labels[item.key] || 'Other');
+}
 function tripReceivables(owner = actor()) {
   return (Array.isArray(financeState.plans) ? financeState.plans : []).map((plan) => {
     const settlement = tripSettlement(plan);
     if (!owner || settlement.creditor !== owner || settlement.amount <= .005) return null;
     const meta = plan?.meta || {};
     const place = String(meta.city || meta.otherLocation || meta.location || 'Trip').trim();
+    const categories = tripDebtCategoryBreakdown(plan, settlement.debtor);
     return {
       id: plan?.id || '',
       person: settlement.debtor,
       reason: 'Trip · ' + place,
+      categories: categories.join(' + ') || 'Other',
       amount: settlement.amount,
     };
   }).filter(Boolean);
@@ -583,7 +709,7 @@ function renderCurrentPanel() {
   const banks = p.bankAccounts.length ? p.bankAccounts.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-bank="${i}"><span>${esc(x.name)}</span><strong>${money(x.balance)}</strong></button>`).join('') : '<div class="finance-current-empty">No bank balances added yet.</div>';
   const holds = p.savingsReserved.length ? p.savingsReserved.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-hold="${i}"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></button>`).join('') : '<div class="finance-current-empty">Nothing earmarked yet.</div>';
   const manualOwed = p.receivables.map((x, i) => { const paid = loanPaid(x), remaining = loanRemaining(x); return `<button class="finance-current-row" type="button" data-fin-edit-owed="${i}"><span>${esc(x.person)}<small>${esc(x.reason || 'Reason not added')} · Lent ${money(x.principal)} · Repaid ${money(paid)}</small></span><strong>${money(remaining)}</strong></button>`; }).join('');
-  const tripOwed = tripReceivables().map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · Synced from Trips</small></span><strong>${money(x.amount)}</strong></div>`).join('');
+  const tripOwed = tripReceivables().map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · ${esc(x.categories)}</small></span><strong>${money(x.amount)}</strong></div>`).join('');
   const owed = manualOwed + tripOwed || '<div class="finance-current-empty">Nobody logged as owing you money.</div>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
