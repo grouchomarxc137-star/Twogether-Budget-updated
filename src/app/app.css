@@ -557,3 +557,219 @@ body.dev-v21 #loggedUserBadge {
     animation:v26MenuOut .08s cubic-bezier(.4,0,1,1) both!important;
   }
 }
+
+
+/* Pending reminder center beside the active profile badge. */
+.tw-notification-button {
+  position:relative;
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--card);
+  color:var(--ink);
+  cursor:pointer;
+  box-shadow:var(--shadow-sm);
+}
+
+.tw-notification-button svg {
+  width:17px;
+  height:17px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.tw-notification-button:hover,
+.tw-notification-button:focus-visible {
+  background:#f5f0e9;
+  outline:none;
+}
+
+.tw-notification-button.has-pending {
+  border-color:#d8bd73;
+}
+
+.tw-notification-count {
+  position:absolute;
+  top:-5px;
+  right:-5px;
+  min-width:17px;
+  height:17px;
+  padding:0 4px;
+  display:grid;
+  place-items:center;
+  border:2px solid var(--card);
+  border-radius:999px;
+  background:#a97218;
+  color:#fff;
+  font-size:9px;
+  font-weight:800;
+  line-height:1;
+  box-sizing:border-box;
+}
+
+.tw-notification-count[hidden] {
+  display:none!important;
+}
+
+.tw-notification-layer {
+  position:fixed;
+  inset:0;
+  z-index:1750;
+  display:none;
+  align-items:flex-start;
+  justify-content:flex-end;
+  padding:78px 24px 24px;
+  box-sizing:border-box;
+}
+
+.tw-notification-layer.show {
+  display:flex;
+}
+
+.tw-notification-backdrop {
+  position:absolute;
+  inset:0;
+  background:rgba(40,34,30,.34);
+  -webkit-backdrop-filter:blur(6px);
+  backdrop-filter:blur(6px);
+}
+
+.tw-notification-card {
+  position:relative;
+  width:min(390px,100%);
+  max-height:min(620px,calc(100dvh - 102px));
+  overflow:auto;
+  overscroll-behavior:contain;
+  box-sizing:border-box;
+  padding:24px;
+  border:1px solid var(--line);
+  border-radius:24px;
+  background:var(--card);
+  color:var(--ink);
+  box-shadow:0 24px 70px rgba(45,35,29,.22);
+}
+
+.tw-notification-card h2 {
+  margin:5px 36px 20px 0;
+  font-family:Georgia,serif;
+  font-size:28px;
+  line-height:1.05;
+}
+
+.tw-notification-close {
+  position:absolute;
+  top:12px;
+  right:14px;
+  width:30px;
+  height:30px;
+  border:0;
+  background:transparent;
+  color:var(--ink);
+  font:inherit;
+  font-size:24px;
+  line-height:1;
+  cursor:pointer;
+}
+
+.tw-notification-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 2px 9px;
+  border-bottom:1px solid var(--line);
+}
+
+.tw-notification-heading strong {
+  font-size:15px;
+}
+
+.tw-notification-heading span {
+  color:var(--muted);
+  font-size:12px;
+}
+
+.tw-notification-list {
+  display:grid;
+}
+
+.tw-notification-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:13px 2px;
+  border-bottom:1px solid rgba(100,80,65,.1);
+}
+
+.tw-notification-item strong,
+.tw-notification-item small {
+  display:block;
+}
+
+.tw-notification-item strong {
+  font-size:15px;
+}
+
+.tw-notification-item small {
+  margin-top:2px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.tw-notification-empty {
+  display:grid;
+  justify-items:center;
+  gap:7px;
+  padding:34px 12px 20px;
+  color:var(--muted);
+  text-align:center;
+}
+
+.tw-notification-empty span {
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:var(--sage-soft);
+  color:#557150;
+  font-size:17px;
+}
+
+.tw-notification-empty strong {
+  color:var(--ink);
+  font-size:14px;
+}
+
+@media(max-width:760px) {
+  .tw-notification-button {
+    width:32px;
+    height:32px;
+    flex-basis:32px;
+    border-radius:11px;
+  }
+
+  .tw-notification-layer {
+    justify-content:center;
+    padding:
+      max(72px,env(safe-area-inset-top))
+      max(10px,env(safe-area-inset-right))
+      max(10px,env(safe-area-inset-bottom))
+      max(10px,env(safe-area-inset-left));
+  }
+
+  .tw-notification-card {
+    width:100%;
+    max-height:calc(100dvh - max(82px,env(safe-area-inset-top)));
+    border-radius:22px;
+    padding:22px;
+  }
+}
