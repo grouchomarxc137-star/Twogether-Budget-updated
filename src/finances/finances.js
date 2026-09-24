@@ -2365,8 +2365,8 @@ function openOwedHistory() {
   const pastSection = pastLoans.length
     ? `<div class="finance-past-loans-section">
         <button class="finance-owed-history-row finance-past-loans-toggle" type="button" data-fin-past-loans-toggle aria-expanded="false">
-          <span><strong>Past loans</strong><small>Fully repaid</small></span>
-          <span class="finance-owed-history-side"><b>${pastLoans.length} ${pastLoans.length === 1 ? 'loan' : 'loans'}</b><i aria-hidden="true">⌄</i></span>
+          <span><strong>Past loans</strong></span>
+          <span class="finance-owed-history-side"><i aria-hidden="true">⌄</i></span>
         </button>
         <div class="finance-past-loans" data-fin-past-loans-panel hidden>${pastRows}</div>
       </div>`
