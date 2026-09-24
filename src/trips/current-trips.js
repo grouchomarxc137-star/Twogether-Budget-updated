@@ -839,6 +839,7 @@ function tripPrepNotificationItems() {
       title,
       detail: parts.join(' · '),
       openLabel: 'Open checklist',
+      urgent: days <= 1,
       reminders: reminders.map((item) => item.text),
       packing: packing.map((item) => item.text),
     };
