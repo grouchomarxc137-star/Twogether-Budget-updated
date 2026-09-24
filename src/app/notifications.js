@@ -156,6 +156,7 @@ export function initNotifications() {
   window.TwogetherNotifications = {
     setPending,
     refresh: render,
+    open,
     close,
   };
 
