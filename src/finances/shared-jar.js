@@ -2,8 +2,38 @@
 // Its balance still comes from the shared server state and is updated by
 // accommodation contributions in the existing trip-finance flow.
 import { $ } from '../lib/dom.js';
-import { n, money } from '../lib/format.js';
+import { esc, n, money } from '../lib/format.js';
 import { currentState, profile } from './planner-state.js';
+
+function jarDateLabel(value) {
+  const date = new Date(value || '');
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function jarHistory(state) {
+  const plans = Array.isArray(state?.plans) ? state.plans : [];
+  const transactions = Array.isArray(state?.sharedJar?.transactions) ? state.sharedJar.transactions : [];
+  return transactions.map((transaction, index) => {
+    const plan = plans.find((item) => item?.id === transaction?.planId);
+    const expense = transaction?.expenseId
+      ? (Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : []).find((item) => item?.id === transaction.expenseId)
+      : null;
+    const meta = plan?.meta || {};
+    const trip = String(meta.city || meta.otherLocation || meta.location || 'Trip').trim();
+    const category = expense?.category === 'accommodation' || !expense ? 'Stay' : 'Trip expense';
+    return {
+      id: transaction?.expenseId || transaction?.planId || String(index),
+      trip,
+      category,
+      amount: n(transaction?.amount),
+      actor: String(transaction?.actor || ''),
+      at: String(transaction?.at || ''),
+      date: jarDateLabel(transaction?.at),
+    };
+  }).filter((item) => item.amount > 0)
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
 
 export function renderSharedJar() {
   const root = $('#financeCurrent'); if (!root) return;
@@ -14,9 +44,11 @@ export function renderSharedJar() {
   const cashCard = $('[data-fin-current-cash]', root) || $('.finance-current-card', root);
   if (!cashCard) return;
 
-  const jar = currentState()?.sharedJar || { balance: 870, initialBalance: 870, transactions: [] };
+  const state = currentState();
+  const jar = state?.sharedJar || { balance: 870, initialBalance: 870, transactions: [] };
   const jarBalance = n(jar.balance ?? 870);
-  const used = Math.max(0, n(jar.initialBalance || 870) - jarBalance);
+  const history = jarHistory(state);
+  const latest = history[0] || null;
   const bankTotal = (profile()?.bankAccounts || []).reduce((sum, account) => sum + n(account?.balance), 0);
 
   let row = $('.v33-shared-jar-bank', cashCard);
@@ -24,7 +56,7 @@ export function renderSharedJar() {
     const nextRow = document.createElement('button');
     nextRow.type = 'button';
     nextRow.className = 'finance-current-row v33-shared-jar-bank';
-    nextRow.setAttribute('aria-label', 'Edit Shared Jar balance');
+    nextRow.setAttribute('aria-label', 'View Shared Jar transaction history');
     const addBankButton = $('[data-fin-add-bank]', cashCard);
     if (row) row.replaceWith(nextRow);
     else if (addBankButton) cashCard.insertBefore(nextRow, addBankButton);
@@ -32,8 +64,17 @@ export function renderSharedJar() {
     row = nextRow;
   }
 
-  row.innerHTML = `<span>Shared Jar<small>Shared · ${used ? `${money(used)} used for accommodation` : 'ready for accommodation'} · tap to edit</small></span><strong>${money(jarBalance)}</strong>`;
-  row.onclick = () => document.dispatchEvent(new CustomEvent('twogether:edit-shared-jar', { detail: { balance: jarBalance } }));
+  const latestText = latest
+    ? `Latest · ${esc(latest.trip)} · ${esc(latest.category)} · −${money(latest.amount)}${latest.date ? ` · ${esc(latest.date)}` : ''}`
+    : 'No transactions yet';
+  row.innerHTML = `<span>Shared Jar<small>${latestText}</small></span><strong>${money(jarBalance)}</strong>`;
+  row.onclick = () => document.dispatchEvent(new CustomEvent('twogether:open-shared-jar', {
+    detail: {
+      balance: jarBalance,
+      initialBalance: n(jar.initialBalance ?? jarBalance),
+      transactions: history,
+    },
+  }));
 
   const empty = $('.finance-current-empty', cashCard);
   if (empty) empty.remove();

@@ -2132,6 +2132,71 @@ body.finance-month-focus {
   color:#9b7b45;
 }
 
+.finance-jar-summary {
+  display:grid;
+  gap:3px;
+  margin:14px 0 20px;
+  padding:16px 17px;
+  border:1px solid #e5d7bc;
+  border-radius:17px;
+  background:linear-gradient(135deg,#fff9ea,#fbf4e4);
+}
+.finance-jar-summary span,
+.finance-jar-summary small {
+  color:var(--muted);
+  font-size:12px;
+}
+.finance-jar-summary strong {
+  font-size:28px;
+  line-height:1.05;
+}
+.finance-jar-history-head {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 7px;
+}
+.finance-jar-history-head h3 {
+  margin:0;
+  font-size:17px;
+}
+.finance-jar-history-head span {
+  color:var(--muted);
+  font-size:12px;
+}
+.finance-jar-history {
+  display:grid;
+}
+.finance-jar-history-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 2px;
+  border-top:1px solid rgba(100,80,65,.1);
+}
+.finance-jar-history-row span {
+  min-width:0;
+}
+.finance-jar-history-row strong {
+  display:block;
+  font-size:15px;
+  font-weight:650;
+}
+.finance-jar-history-row small {
+  display:block;
+  margin-top:2px;
+  color:var(--muted);
+  font-size:12px;
+}
+.finance-jar-history-row b {
+  flex:0 0 auto;
+  color:#9b6c32;
+  font-size:15px;
+  font-variant-numeric:tabular-nums;
+}
+
 .v33-shared-jar {
   margin-top:18px;
   border:1px solid #dccdaE;

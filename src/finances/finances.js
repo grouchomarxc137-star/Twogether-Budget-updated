@@ -1925,6 +1925,17 @@ async function saveProfile(next, message = 'Balances updated') {
   catch (err) { toast(err.message || 'Could not save', 'warn'); }
 }
 
+function openSharedJarHistory(detail = {}) {
+  const balance = n(detail.balance);
+  const initialBalance = n(detail.initialBalance);
+  const transactions = Array.isArray(detail.transactions) ? detail.transactions : [];
+  const rows = transactions.length
+    ? transactions.map((transaction) => `<div class="finance-jar-history-row"><span><strong>${esc(transaction.trip || 'Trip')}</strong><small>${esc(transaction.category || 'Stay')}${transaction.date ? ' · ' + esc(transaction.date) : ''}${transaction.actor ? ' · ' + esc(transaction.actor) : ''}</small></span><b>−${money(transaction.amount)}</b></div>`).join('')
+    : '<div class="finance-current-empty">No Shared Jar transactions yet.</div>';
+  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Shared Jar</h2><div class="finance-jar-summary"><span>Current balance</span><strong>${money(balance)}</strong><small>Started with ${money(initialBalance)}</small></div><div class="finance-jar-history-head"><h3>Past transactions</h3><span>${transactions.length} ${transactions.length === 1 ? 'transaction' : 'transactions'}</span></div><div class="finance-jar-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-jar-edit>Edit balance</button></div>`);
+  $('[data-fin-jar-edit]')?.addEventListener('click', () => openSharedJarModal(balance));
+}
+
 function openSharedJarModal(balance) {
   showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><p>Change how much is currently in the shared account. Existing accommodation contributions stay linked and future 20% contributions will continue to update this balance.</p><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', async () => {
@@ -2577,6 +2588,7 @@ function init() {
   ensureMiniModal();
   tab.addEventListener('click', () => { renderPage(); setTimeout(loadState, 50); });
   $('#financeManageRecurring')?.addEventListener('click', openRecurringManager);
+  document.addEventListener('twogether:open-shared-jar', (e) => openSharedJarHistory(e.detail || {}));
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });
   const obs = new MutationObserver(() => { if ($('#finances')?.classList.contains('active')) { flow = null; renderPage(); setTimeout(loadState, 40); } });
