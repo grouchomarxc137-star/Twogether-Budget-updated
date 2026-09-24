@@ -3235,12 +3235,27 @@ button.finance-owed-history-row:hover {
   border-color:#bd8626;
 }
 
-.finance-log-layer #financeLogDate {
-  display:block;
+.finance-log-layer .trip-expense-more-fields,
+.finance-log-layer .trip-expense-more-fields>label {
   box-sizing:border-box;
   width:100%;
   max-width:100%;
   min-width:0;
+  overflow:hidden;
+}
+
+.finance-log-layer #financeLogDate {
+  display:block;
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  inline-size:100%!important;
+  max-inline-size:100%!important;
+}
+
+.finance-log-layer #financeLogDate::-webkit-date-and-time-value {
+  text-align:center;
 }
 
 .finance-log-layer .trip-expense-hint {
