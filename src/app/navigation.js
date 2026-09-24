@@ -248,6 +248,7 @@ function installDropdownRefinement() {
 
 let surfaceNavigationInstalled = false;
 let surfaceHomeBusy = false;
+let surfaceActionDispatching = false;
 let surfaceSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, lastX:0, lastY:0, surface:null };
 
 const SURFACE_SELECTORS = [
@@ -346,13 +347,15 @@ function closeSurface(surface, home = false) {
   if (!home) {
     const back = surfaceBackControl(surface);
     if (back) {
-      back.click();
+      surfaceActionDispatching = true;
+      try { back.click(); } finally { surfaceActionDispatching = false; }
       return true;
     }
   }
   const close = surfaceCloseControl(surface);
   if (close) {
-    close.click();
+    surfaceActionDispatching = true;
+    try { close.click(); } finally { surfaceActionDispatching = false; }
     return true;
   }
   if (surface.matches('dialog') && typeof surface.close === 'function') {
@@ -397,6 +400,7 @@ function installSurfaceNavigation() {
   surfaceNavigationInstalled = true;
 
   document.addEventListener('click', (event) => {
+    if (surfaceActionDispatching) return;
     const surface = topSurface();
     if (!surface) return;
     const target = event.target;
