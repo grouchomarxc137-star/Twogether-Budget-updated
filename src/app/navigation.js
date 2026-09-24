@@ -259,6 +259,7 @@ const SURFACE_SELECTORS = [
   'dialog.finance-log-host[open]',
   '.tv2-layer',
   '.finance-mini-modal.show',
+  '.tw-notification-layer.show',
   '#v27Modal:not([hidden])',
   '#v33PrepModal.show',
   '#workflowBudgetModal.show',
@@ -387,6 +388,7 @@ function surfaceCard(surface) {
   if (!surface) return null;
   if (surface.matches('.tv2-confirm-layer')) return surface.querySelector('.tv2-confirm-card');
   if (surface.matches('.finance-mini-modal')) return surface.querySelector('.finance-mini-card');
+  if (surface.matches('.tw-notification-layer')) return surface.querySelector('.tw-notification-card');
   if (surface.matches('#v27Modal')) return surface.querySelector('.v27-modal-card');
   if (surface.matches('#v33PrepModal')) return surface.querySelector('.v33-prep-card');
   if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-card');
@@ -405,6 +407,7 @@ function surfaceUsesNativeSwipe(surface) {
 function surfaceBackdrop(surface) {
   if (!surface) return null;
   if (surface.matches('.finance-mini-modal')) return surface.querySelector('.finance-mini-backdrop');
+  if (surface.matches('.tw-notification-layer')) return surface.querySelector('.tw-notification-backdrop');
   if (surface.matches('#v27Modal')) return surface.querySelector('.v27-modal-backdrop');
   if (surface.matches('#v33PrepModal')) return surface.querySelector('.v33-prep-backdrop');
   if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-backdrop');
@@ -536,7 +539,7 @@ function surfaceCloseControl(surface) {
   if (!surface) return null;
   if (surface.matches('#twCurrentTrips.tv2-trip-view')) return surface.querySelector('[data-act="home"]');
   return surface.querySelector(
-    '[data-fin-log-close],[data-fin-mini-close],[data-v27-close],[data-prep-close],[data-v5-budget-close],[data-close-trip],[data-overview-close],[data-fin-month-close],[data-close],[data-confirm-cancel],[data-fin-month-confirm-cancel],[data-fin-recurring-confirm-cancel],[data-v5-close],button[aria-label*="close" i]'
+    '[data-fin-log-close],[data-fin-mini-close],[data-tw-notification-close],[data-v27-close],[data-prep-close],[data-v5-budget-close],[data-close-trip],[data-overview-close],[data-fin-month-close],[data-close],[data-confirm-cancel],[data-fin-month-confirm-cancel],[data-fin-recurring-confirm-cancel],[data-v5-close],button[aria-label*="close" i]'
   );
 }
 
@@ -612,7 +615,7 @@ function installSurfaceNavigation() {
     if (!(target instanceof Element) || !surface.contains(target) && target !== surface) return;
 
     const explicitClose = target.closest(
-      '.finance-mini-close,.v27-modal-close,.v33-prep-close,.v5-budget-close,.trip-close,.tv2-x,[data-fin-log-close]'
+      '.finance-mini-close,.tw-notification-close,.v27-modal-close,.v33-prep-close,.v5-budget-close,.trip-close,.tv2-x,[data-fin-log-close]'
     );
     const card = surfaceCard(surface);
     const outside = !!card && !card.contains(target);
