@@ -1192,6 +1192,7 @@ function closeFinanceTransactionSheet() {
   document.body.classList.remove('trip-expense-open');
 }
 async function saveDirectMonthRecord(rec, message = 'Transaction saved') {
+  if (!rec || rec.finalized === true) throw new Error('This month is final and locked');
   const next = cloneRecord(rec);
   next.finalized = false;
   next.finalizedAt = '';
@@ -1543,6 +1544,7 @@ function financeMonthDayLabel(value) {
   return new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short'}).format(date);
 }
 function financeMonthTimeline(rec) {
+  const locked=rec?.finalized===true;
   const rows=(rec.incomes||[]).map((item,index)=>({
     kind:'income',date:item.date||'',item,index,tone:'income',
   })).concat((rec.expenses||[]).map((item,index)=>({
@@ -1571,7 +1573,7 @@ function financeMonthTimeline(rec) {
       const income=row.kind==='income';
       const tone=income?'income':row.tone;
       const meta=income?'Income':categoryLabel(tone);
-      const editable=row.kind!=='summary';
+      const editable=row.kind!=='summary'&&!locked;
       const rowHtml=tripExpenseRowHtml({
         attr:editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable,
@@ -1620,6 +1622,7 @@ function closeFinanceMonthDeleteConfirm() {
 }
 
 function openFinanceMonthDeleteConfirm(rec, kind, index) {
+  if (!rec || rec.finalized === true) return;
   closeFinanceMonthDeleteConfirm();
   const list=kind==='income'?(rec.incomes||[]):(rec.expenses||[]);
   const item=list[index];
