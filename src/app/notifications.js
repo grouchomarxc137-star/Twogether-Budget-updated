@@ -12,9 +12,44 @@ function esc(value) {
   }[char]));
 }
 
-function currentItems() {
+function currentGroups() {
   const a = actor();
-  return [...pendingSources.values()].flat().filter((item) => !item.actor || item.actor === a);
+  const groups = [...pendingSources.entries()].map(([source, items]) => ({
+    source,
+    items: items.filter((item) => !item.actor || item.actor === a),
+  })).filter((group) => group.items.length);
+
+  groups.forEach((group) => {
+    group.items.sort((left, right) => Number(right.urgent === true) - Number(left.urgent === true));
+  });
+
+  const tripsUrgent = groups.some((group) => group.source === 'trips' && group.items.some((item) => item.urgent));
+  const normalRank = { finances:0, trips:1 };
+  groups.sort((left, right) => {
+    const leftRank = tripsUrgent && left.source === 'trips' ? -1 : (normalRank[left.source] ?? 10);
+    const rightRank = tripsUrgent && right.source === 'trips' ? -1 : (normalRank[right.source] ?? 10);
+    return leftRank - rightRank;
+  });
+  return groups;
+}
+
+function currentItems() {
+  return currentGroups().flatMap((group) => group.items);
+}
+
+function groupMeta(source) {
+  if (source === 'finances') return { title:'Finances', className:'is-finances' };
+  if (source === 'trips') return { title:'Trips', className:'is-trips' };
+  return { title:'Other', className:'is-other' };
+}
+
+function renderGroup(group) {
+  const meta = groupMeta(group.source);
+  const priority = group.source === 'trips' && group.items.some((item) => item.urgent);
+  return '<section class="tw-notification-group ' + meta.className + (priority ? ' is-priority' : '') + '">' +
+    '<div class="tw-notification-group-head"><strong>' + esc(meta.title) + '</strong><span>' + group.items.length + '</span></div>' +
+    '<div class="tw-notification-group-items">' + group.items.map(renderItem).join('') + '</div>' +
+  '</section>';
 }
 
 function ensureUi() {
@@ -79,7 +114,8 @@ function render() {
     return;
   }
 
-  const items = currentItems();
+  const groups = currentGroups();
+  const items = groups.flatMap((group) => group.items);
   const count = ui.button.querySelector('.tw-notification-count');
   if (count) {
     count.textContent = String(items.length);
@@ -95,7 +131,7 @@ function render() {
     '<h2 id="twNotificationTitle">Notifications</h2>' +
     '<div class="tw-notification-heading"><strong>Pending</strong><span>' + items.length + '</span></div>' +
     '<div class="tw-notification-list">' +
-      (items.length ? items.map(renderItem).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>') +
+      (items.length ? groups.map(renderGroup).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>') +
     '</div>';
 }
 function open() {
