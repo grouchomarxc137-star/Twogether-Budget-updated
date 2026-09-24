@@ -14,7 +14,7 @@ const FIN_VIEW_KEY = 'twogether_fin_subview_v1';
 const isMobile = () => window.matchMedia?.('(max-width: 760px)')?.matches || false;
 
 function setHub(name) {
-  $('[data-hub]').forEach((btn) => btn.classList.toggle('active', btn.dataset.hub === name));
+  document.querySelectorAll('[data-hub]').forEach((btn) => btn.classList.toggle('active', btn.dataset.hub === name));
   $('#wishlistHub')?.classList.remove('active');
   $('#tripSubnav')?.classList.toggle('hidden', name !== 'trips');
   $('#financeSubnav')?.classList.toggle('hidden', name !== 'finances');
