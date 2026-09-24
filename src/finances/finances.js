@@ -2351,14 +2351,16 @@ function openOwedHistory() {
       .sort((a, b) => b.stamp.localeCompare(a.stamp));
     const finalRepayment = repayments[0]?.repayment || null;
     const finalDate = normalizeFinanceDate(finalRepayment?.date) || normalizeFinanceDate(String(finalRepayment?.at || '').slice(0, 10));
-    return { item, finalDate, stamp: finalRepayment ? owedTransactionSortValue(finalRepayment) : '' };
+    const finalMonth = String(finalRepayment?.month || '');
+    const finalLabel = financeDateLabel(finalDate) || (/^\d{4}-\d{2}$/.test(finalMonth) ? monthLabel(finalMonth) : '—');
+    return { item, finalLabel, stamp: finalRepayment ? owedTransactionSortValue(finalRepayment) : '' };
   }).sort((a, b) => b.stamp.localeCompare(a.stamp));
 
-  const pastRows = pastLoans.map(({ item, finalDate }) => `
+  const pastRows = pastLoans.map(({ item, finalLabel }) => `
     <div class="finance-past-loan-row">
       <strong>${esc(item.person)}</strong>
       <span>${esc(item.reason || 'Reason not added')}</span>
-      <time>${esc(financeDateLabel(finalDate) || '—')}</time>
+      <time>${esc(finalLabel)}</time>
       <b>${money(item.principal)}</b>
     </div>`).join('');
 
