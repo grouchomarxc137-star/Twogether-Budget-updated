@@ -789,18 +789,30 @@ function renderScenarioPanel() {
 
 function recurringRow(kind, item, index) {
   const tone = kind === 'income' ? 'income' : groupTone(item.group);
-  const sub = kind === 'income' ? 'Income' : (actor() === 'Principe' ? categoryLabel(tone) : groupLabel(item.group));
   const day = normalizeRecurringDay(item.day);
   const timing = day === '' ? '' : 'Usually '+ordinalDay(day);
-  const detail = [sub,timing].filter(Boolean).join(' · ');
   return '<div class="finance-recurring-swipe-row finance-recurring-tone-'+tone+'" data-fin-recurring-kind="'+kind+'" data-fin-recurring-index="'+index+'">'+
     '<div class="finance-recurring-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
     '<div class="finance-recurring-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
-    '<button class="tv2-row finance-recurring-tv2-row" type="button" data-fin-recurring-open>'+
-      '<span class="tv2-ic finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone,kind)+'</span>'+
-      '<span class="tv2-row-main"><strong>'+esc(item.name)+'</strong><small>'+esc(detail)+'</small></span>'+
-      '<span class="tv2-amt">'+money(item.amount)+'</span>'+
+    '<button class="finance-recurring-tv2-row" type="button" data-fin-recurring-open>'+
+      '<span class="finance-recurring-item-main"><strong>'+esc(item.name)+'</strong>'+(timing?'<small>'+esc(timing)+'</small>':'')+'</span>'+
+      '<span class="finance-recurring-item-amount">'+money(item.amount)+'</span>'+
     '</button>'+
+  '</div>';
+}
+
+function recurringCategoryCard(kind, tone, label, items) {
+  const total = items.reduce((sum, x) => sum + n(x.item.amount), 0);
+  const rows = items.map((x) => recurringRow(kind, x.item, x.index)).join('');
+  return '<div class="finance-recurring-card finance-recurring-card-'+tone+'">'+
+    '<div class="finance-recurring-card-head">'+
+      '<div class="finance-recurring-card-title">'+
+        '<span class="finance-recurring-card-icon finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone, kind)+'</span>'+
+        '<h3>'+esc(label)+'</h3>'+
+      '</div>'+
+      '<span class="finance-recurring-card-total"><span>Total</span><strong>'+money(total)+'</strong></span>'+
+    '</div>'+
+    '<div class="finance-recurring-card-body">'+rows+'</div>'+
   '</div>';
 }
 
@@ -989,30 +1001,32 @@ function bindRecurringItemSwipe(root) {
 
 function openRecurringManager() {
   const config = recurringConfig();
-  const incomes = config.incomes.length
-    ? config.incomes.map((x,i)=>recurringRow('income',x,i)).join('')
-    : '<div class="tv2-empty-list">No recurring income yet.</div>';
-  const expenseRows = config.expenses.map((x,i)=>({...x,index:i,tone:groupTone(x.group)}));
+  const incomeItems = config.incomes.map((item,index)=>({item,index}));
+  const incomes = incomeItems.length
+    ? recurringCategoryCard('income','income','Income',incomeItems)
+    : '<div class="finance-recurring-empty-card">No recurring income yet.</div>';
+
+  const expenseRows = config.expenses.map((item,index)=>({item,index,tone:groupTone(item.group)}));
   const grouped = {};
   expenseRows.forEach((x)=>(grouped[x.tone]||(grouped[x.tone]=[])).push(x));
-  const expenses = categoryOrder().filter((tone)=>grouped[tone]?.length).map((tone)=>{
-    const total=grouped[tone].reduce((sum,x)=>sum+n(x.amount),0);
-    return '<div class="tv2-day finance-recurring-category">'+
-      '<div class="finance-recurring-category-head"><h2>'+esc(categoryLabel(tone))+'</h2><span class="finance-recurring-category-total">Total '+money(total)+'</span></div>'+
-      grouped[tone].map((x)=>recurringRow('expense',x,x.index)).join('')+
-    '</div>';
-  }).join('') || '<div class="tv2-empty-list">No recurring expenses yet.</div>';
+  const expenses = categoryOrder().filter((tone)=>grouped[tone]?.length).map((tone)=>
+    recurringCategoryCard('expense',tone,categoryLabel(tone),grouped[tone])
+  ).join('') || '<div class="finance-recurring-empty-card">No recurring expenses yet.</div>';
 
   showMini(
     '<div class="tv2-root finance-recurring-tv2">'+
       '<div class="tv2-page">'+
-        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-recurring-close>‹ Finances</button><span></span></div>'+
+        '<header class="tv2-trip-head finance-recurring-page-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-recurring-close>‹ Finances</button><span></span></div>'+
           '<h1>Manage recurring items</h1></header>'+
-        '<section class="tv2-list finance-recurring-list">'+
-          '<div class="finance-recurring-tv2-head"><h2>Income</h2><button type="button" class="tv2-link" data-fin-recurring-add="income">＋ Add</button></div>'+
-          incomes+
-          '<div class="finance-recurring-tv2-head is-outflow"><h2>Outflow</h2><button type="button" class="tv2-link" data-fin-recurring-add="expense">＋ Add</button></div>'+
-          expenses+
+        '<section class="finance-recurring-list">'+
+          '<div class="finance-recurring-section-block">'+
+            '<div class="finance-recurring-tv2-head"><h2>Income</h2><button type="button" class="finance-recurring-add" data-fin-recurring-add="income"><span aria-hidden="true">＋</span> Add</button></div>'+
+            incomes+
+          '</div>'+
+          '<div class="finance-recurring-section-block finance-recurring-outflow-block">'+
+            '<div class="finance-recurring-tv2-head is-outflow"><h2>Outflow</h2><button type="button" class="finance-recurring-add" data-fin-recurring-add="expense"><span aria-hidden="true">＋</span> Add</button></div>'+
+            expenses+
+          '</div>'+
         '</section>'+
       '</div>'+
     '</div>',
