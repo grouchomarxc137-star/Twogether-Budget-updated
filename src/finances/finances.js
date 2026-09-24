@@ -88,6 +88,7 @@ let financeState = {
   version: 0,
   finances: { Principessa: [], Principe: [] },
   financeProfiles: { Principessa: freshProfile(), Principe: freshProfile() },
+  plans: [],
 };
 let flow = null;
 let selectedMonth = '2026-09';
@@ -240,6 +241,58 @@ function profile() {
   return a ? normalizeProfile(financeState.financeProfiles?.[a]) : freshProfile();
 }
 
+function tripSettlement(plan) {
+  const paid = { Principessa: 0, Principe: 0 };
+  const share = { Principessa: 0, Principe: 0 };
+  const entries = Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
+  const repayments = Array.isArray(plan?.repayments) ? plan.repayments : [];
+  entries.forEach((entry) => {
+    const remaining = Math.max(0, n(entry?.amount) - n(entry?.jarContribution));
+    if (entry?.paidBy === 'both') {
+      paid.Principessa += remaining / 2;
+      paid.Principe += remaining / 2;
+    } else if (paid[entry?.paidBy] != null) {
+      paid[entry.paidBy] += remaining;
+    }
+    if (entry?.split === 'personal') share[entry?.forActor === 'Principe' ? 'Principe' : 'Principessa'] += remaining;
+    else {
+      share.Principessa += remaining / 2;
+      share.Principe += remaining / 2;
+    }
+  });
+  repayments.forEach((repayment) => {
+    const value = n(repayment?.amount);
+    if (repayment?.from === 'Principessa' && repayment?.to === 'Principe') {
+      paid.Principessa += value;
+      paid.Principe -= value;
+    } else if (repayment?.from === 'Principe' && repayment?.to === 'Principessa') {
+      paid.Principe += value;
+      paid.Principessa -= value;
+    }
+  });
+  const delta = paid.Principessa - share.Principessa;
+  if (Math.abs(delta) < .005) return { debtor: '', creditor: '', amount: 0 };
+  return {
+    debtor: delta > 0 ? 'Principe' : 'Principessa',
+    creditor: delta > 0 ? 'Principessa' : 'Principe',
+    amount: Math.abs(delta),
+  };
+}
+function tripReceivables(owner = actor()) {
+  return (Array.isArray(financeState.plans) ? financeState.plans : []).map((plan) => {
+    const settlement = tripSettlement(plan);
+    if (!owner || settlement.creditor !== owner || settlement.amount <= .005) return null;
+    const meta = plan?.meta || {};
+    const place = String(meta.city || meta.otherLocation || meta.location || 'Trip').trim();
+    return {
+      id: plan?.id || '',
+      person: settlement.debtor,
+      reason: 'Trip · ' + place,
+      amount: settlement.amount,
+    };
+  }).filter(Boolean);
+}
+
 function recurringDefaults() {
   const rules = financeRules();
   const latest = [...ownMonths()].sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
@@ -390,7 +443,7 @@ function profileStats() {
   const savingsTotal = n(p.savingsTotal);
   const heldTotal = p.savingsReserved.reduce((sum, x) => sum + n(x.amount), 0);
   const availableSavings = savingsTotal - heldTotal;
-  const owedTotal = p.receivables.reduce((sum, x) => sum + loanRemaining(x), 0);
+  const owedTotal = p.receivables.reduce((sum, x) => sum + loanRemaining(x), 0) + tripReceivables().reduce((sum, x) => sum + n(x.amount), 0);
   const latestInvestment = [...ownMonths()].filter((x) => hasValue(x.investmentTotal)).sort((a, b) => String(b.month).localeCompare(String(a.month)))[0] || null;
   const inv = latestInvestment ? calc(latestInvestment) : { investmentTotal: null, sisterInvestments: 0, ownInvestments: null };
   const gl = latestInvestment ? investmentGL(latestInvestment) : null;
@@ -436,6 +489,7 @@ async function loadState() {
           Principessa: normalizeProfile(state?.financeProfiles?.Principessa),
           Principe: normalizeProfile(state?.financeProfiles?.Principe),
         },
+        plans: Array.isArray(state?.plans) ? state.plans : [],
       };
       renderPage();
     }
@@ -528,13 +582,15 @@ function renderCurrentPanel() {
   const { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth } = profileStats();
   const banks = p.bankAccounts.length ? p.bankAccounts.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-bank="${i}"><span>${esc(x.name)}</span><strong>${money(x.balance)}</strong></button>`).join('') : '<div class="finance-current-empty">No bank balances added yet.</div>';
   const holds = p.savingsReserved.length ? p.savingsReserved.map((x, i) => `<button class="finance-current-row" type="button" data-fin-edit-hold="${i}"><span>${esc(x.name)}</span><strong>${money(x.amount)}</strong></button>`).join('') : '<div class="finance-current-empty">Nothing earmarked yet.</div>';
-  const owed = p.receivables.length ? p.receivables.map((x, i) => { const paid = loanPaid(x), remaining = loanRemaining(x); return `<button class="finance-current-row" type="button" data-fin-edit-owed="${i}"><span>${esc(x.person)}<small>${esc(x.reason || 'Reason not added')} · Lent ${money(x.principal)} · Repaid ${money(paid)}</small></span><strong>${money(remaining)}</strong></button>`; }).join('') : '<div class="finance-current-empty">Nobody logged as owing you money.</div>';
+  const manualOwed = p.receivables.map((x, i) => { const paid = loanPaid(x), remaining = loanRemaining(x); return `<button class="finance-current-row" type="button" data-fin-edit-owed="${i}"><span>${esc(x.person)}<small>${esc(x.reason || 'Reason not added')} · Lent ${money(x.principal)} · Repaid ${money(paid)}</small></span><strong>${money(remaining)}</strong></button>`; }).join('');
+  const tripOwed = tripReceivables().map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · Synced from Trips</small></span><strong>${money(x.amount)}</strong></div>`).join('');
+  const owed = manualOwed + tripOwed || '<div class="finance-current-empty">Nobody logged as owing you money.</div>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2><p>Bank balances are informational only. Loan repayments go back into Saved up automatically, but never count as monthly income.</p></div></div>
     <div class="finance-current-grid">
       <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button><small class="finance-card-note">Tap any bank to edit its balance. Not included in net worth.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owed}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Tap a loan to see original amount, repayment history and what is still left.</small></article>
+      <article class="finance-current-card tone-receivable"><div class="finance-current-title"><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></div>${owed}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button><small class="finance-card-note">Trip debts sync automatically. Tap a manually added loan to see its repayment history.</small></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><strong>${money(inv.ownInvestments || 0)}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div><div><span>Sis</span><strong>${inv.investmentTotal == null ? '—' : money(inv.sisterInvestments)}</strong></div><div class="${gl?.value < 0 ? 'negative' : 'positive'}"><span>G/L p/m</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div></div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
