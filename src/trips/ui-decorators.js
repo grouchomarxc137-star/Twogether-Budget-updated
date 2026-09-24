@@ -254,9 +254,9 @@ function confirmedPersonalCategories(plan, person) {
 function decorateConfirmedSpend() {
   const root = document.getElementById('tripModalBody');
   if (!root || root.querySelector('.confirmed-spend-overview')) return;
-  const confirmed = $('.match-box.ok strong', root).some((el) => /confirmed by both/i.test(el.textContent || ''));
+  const confirmed = [...root.querySelectorAll('.match-box.ok strong')].some((el) => /confirmed by both/i.test(el.textContent || ''));
   if (!confirmed) return;
-  const cards = $('.submission-card', root);
+  const cards = [...root.querySelectorAll('.submission-card')];
   if (cards.length < 2) return;
 
   const state = getState();
