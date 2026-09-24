@@ -2172,7 +2172,7 @@ function openOwedHistory() {
   const rows = tripRows + manualRows || '<div class="finance-current-empty">No owed-money history yet.</div>';
   showMini(`<span class="panel-kicker">PAYBACK</span><h2>Money owed to me</h2><div class="finance-owed-summary"><span>Currently owed</span><strong>${money(total)}</strong><small>Trip debts sync automatically. Manual loans stay here with their repayment history.</small></div><div class="finance-jar-history-head"><h3>All owed money</h3><span>${tripItems.length + manualItems.length} ${tripItems.length + manualItems.length === 1 ? 'item' : 'items'}</span></div><div class="finance-owed-history">${rows}</div><div class="finance-mini-actions"><span></span><button class="btn ghost" type="button" data-fin-history-add-loan>+ Add loan</button></div>`);
 
-  $('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-fin-history-expand]').forEach((btn) => btn.addEventListener('click', () => {
     const key = btn.dataset.finHistoryExpand;
     const panel = document.querySelector('[data-fin-history-panel="'+key+'"]');
     if (!panel) return;
@@ -2181,7 +2181,7 @@ function openOwedHistory() {
     btn.closest('.finance-owed-history-item')?.classList.toggle('is-expanded', !expanded);
     panel.hidden = expanded;
   }));
-  $('[data-fin-history-manage-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryManageLoan))));
+  $$('[data-fin-history-manage-loan]').forEach((btn) => btn.addEventListener('click', () => openOwedModal(Number(btn.dataset.finHistoryManageLoan))));
   $('[data-fin-history-add-loan]')?.addEventListener('click', () => openOwedModal(-1));
 }
 
