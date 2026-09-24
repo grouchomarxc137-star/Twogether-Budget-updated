@@ -211,15 +211,20 @@ function installDropdownRefinement() {
         return;
       }
       suppressHover = false;
+      if (pinned === w) {
+        pinned = null;
+        hardClose(w);
+        return;
+      }
       if (isMobile()) {
-        if (pinned === w) { openWrap(w); return; }
         const old = pinned; pinned = w;
         if (old && old !== w) fadeClose(old);
         openWrap(w);
         return;
       }
-      if (pinned === w) { pinned = null; openWrap(w); scheduleClose(w); }
-      else { const old = pinned; pinned = w; if (old && old !== w) fadeClose(old); openWrap(w); }
+      const old = pinned; pinned = w;
+      if (old && old !== w) fadeClose(old);
+      openWrap(w);
     }, true);
     menu?.addEventListener('click', () => { suppressHover = false; closeAfterAction(); });
   });
