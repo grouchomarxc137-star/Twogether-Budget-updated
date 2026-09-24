@@ -162,7 +162,9 @@ test('persists finance and wishlist data independently', () => {
     assert.equal(month.twosDelta, 650);
 
     const profile = {
-      bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], compareLab: {},
+      bankAccounts: [], savingsTotal: '', savingsReserved: [],
+      receivables: [{ id: 'loan-1', person: 'Sis', reason: 'Test loan', principal: 100, repayments: [{ id: 'repay-1', month: '2026-09', date: '2026-09-24', amount: 40, at: '2026-09-24T12:00:00Z' }] }],
+      scenarios: [], compareLab: {},
       wishlist: [{ id: 'wish-1', name: 'Weekend bag', price: 40, priority: 2, createdAt: '2026-09-01T00:00:00Z' }],
     };
     assert.equal(action(context.database, 'saveFinanceProfile', { profile }).ok, true);
@@ -171,6 +173,7 @@ test('persists finance and wishlist data independently', () => {
     const state = getState();
     assert.equal(state.finances.Principessa.length, 1);
     assert.equal(state.financeProfiles.Principessa.wishlist[0].unlockedBy, 'Principessa');
+    assert.equal(state.financeProfiles.Principessa.receivables[0].repayments[0].date, '2026-09-24');
     assert.equal(state.game.Principessa.twos, 610);
     assert.equal(state.game.Principessa.lovis, 8);
   } finally {
