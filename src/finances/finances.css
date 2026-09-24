@@ -3843,6 +3843,20 @@ dialog.finance-log-host .tv2-sheet {
 }
 
 
+/* Lock the whole website behind an open finance month/detail view. */
+html.finance-month-page-locked,
+body.finance-month-page-locked {
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+
+body.finance-month-page-locked {
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+}
+
 /* Lock the page behind the Log finance Trips-style sheet. */
 html.finance-log-locked,
 body.finance-log-locked {
