@@ -104,7 +104,6 @@ function repairRewards(root) {
   updateRewardSide(layout, root);
 }
 
-const BIRDS = `<svg viewBox="0 0 320 100" role="img" aria-label="Two little birds together"><path d="M38 78c45-13 83-11 119-3 39 9 81 10 127-5"></path><path d="M82 72c-11-4-18-13-18-25 0-16 13-29 29-29 15 0 27 11 29 25 2 14-6 25-20 31"></path><path d="M78 48c8-8 22-9 31-1-3 10-13 16-24 13"></path><circle class="v32-bird-eye" cx="102" cy="33" r="1.6"></circle><path d="m120 37 12 5-12 5"></path><path d="M86 72v9m14-8v8m-18 0h9m5 0h9"></path><path d="M190 73c-13-5-20-16-18-31 2-14 14-25 29-25 16 0 29 13 29 29 0 12-7 22-18 27"></path><path d="M185 47c9-8 23-7 31 2-4 10-14 15-25 12"></path><circle class="v32-bird-eye" cx="192" cy="32" r="1.6"></circle><path d="m174 37-12 5 12 5"></path><path d="M196 72v9m14-9v9m-18 0h9m5 0h9"></path><path d="M139 70c7-8 15-9 22-2m0 0c7-8 15-8 22-1"></path><path class="v32-bird-heart" d="M151 24c5-8 16-3 12 6-3 6-12 12-12 12s-9-6-12-12c-4-9 7-14 12-6Z"></path><path d="M56 79c-8 3-14 8-18 15m234-19c9 2 16 7 21 14"></path></svg>`;
 const FIN_ICONS = [
   `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"></rect><path d="M5 6.4 16.5 3.8c1.2-.3 2.2.6 2.2 1.7V6"></path><path d="M15 10h6v5h-6a2.5 2.5 0 0 1 0-5Z"></path><circle cx="16" cy="12.5" r=".7"></circle></svg>`,
   `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20v-8"></path><path d="M12 14c-4.7 0-7.2-2.8-7.2-7.7 4.9 0 7.2 2.6 7.2 7.7Z"></path><path d="M12 11.5c0-4.5 2.4-7 7.2-7.5 0 4.8-2.5 7.5-7.2 7.5Z"></path><path d="M7 20h10"></path></svg>`,
@@ -114,21 +113,15 @@ const FIN_ICONS = [
 
 function repairBalances() {
   const root = $('#financeCurrent'); if (!root) return;
+  $('.v31-finance-love-note', root)?.remove();
   const grid = $('.finance-current-grid', root);
   if (grid) {
     $$('.finance-current-card', grid).forEach((card, i) => {
       if (!$('.v31-fin-icon', card)) { const icon = document.createElement('div'); icon.className = 'v31-fin-icon'; icon.innerHTML = FIN_ICONS[i] || FIN_ICONS[0]; card.appendChild(icon); }
     });
-    if (!$('.v31-finance-love-note', root)) {
-      const note = document.createElement('section'); note.className = 'v31-finance-love-note';
-      note.innerHTML = `<div><span class="eyebrow">SMALL STEPS TOGETHER</span><h3>Money today, more tomorrows.</h3><p>Every balance, saving and little loan brings us closer to the life we’re building together.</p></div><div><div class="v31-birds" aria-hidden="true"></div><div class="v31-birds-note">“A little progress every day adds up.” ♡</div></div>`;
-      grid.insertAdjacentElement('afterend', note);
-    }
   }
   const investment = $$('.finance-current-card', root).find((card) => $('.finance-current-title span', card)?.textContent.trim().toUpperCase() === 'INVESTMENTS');
   if (investment) setText($('.finance-current-title h3', investment), 'My investments');
-  const birds = $('.v31-birds', root);
-  if (birds && birds.dataset.v32Birds !== '1') { birds.dataset.v32Birds = '1'; birds.innerHTML = BIRDS; }
 }
 
 export function surprise() {

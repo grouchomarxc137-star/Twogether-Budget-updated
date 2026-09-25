@@ -4593,3 +4593,64 @@ dialog.finance-log-host .tv2-backdrop {
     font-size:20px!important;
   }
 }
+
+
+/* Wallet carousel controls: arrows beside the cards, explore hint directly below. */
+.finance-wallet-arrow {
+  display:none;
+}
+
+@media(max-width:760px) {
+  [data-fin-view="balances"] .finance-wallet-stage {
+    position:relative;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-arrow {
+    position:absolute;
+    top:50%;
+    z-index:8;
+    display:grid;
+    place-items:center;
+    width:38px;
+    height:38px;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    background:rgba(255,253,249,.9);
+    color:#7c6657;
+    box-shadow:0 4px 14px rgba(62,45,31,.08);
+    font:inherit;
+    font-size:32px;
+    line-height:1;
+    cursor:pointer;
+    transform:translateY(-50%);
+    touch-action:manipulation;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-arrow-prev {
+    left:-4px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-arrow-next {
+    right:-4px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-arrow:active {
+    transform:translateY(-50%) scale(.92);
+  }
+
+  [data-fin-view="balances"] .finance-wallet-explore {
+    margin-top:-2px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-swipe-hint {
+    display:block;
+    width:auto;
+    margin:0 auto -1px;
+    text-align:center;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav {
+    margin:0;
+  }
+}
