@@ -234,9 +234,7 @@ function installDropdownRefinement() {
   const onScroll = () => { if (scrollQueued) return; scrollQueued = true; requestAnimationFrame(() => { scrollQueued = false; closeForScroll(); }); };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('wheel', closeForScroll, { passive: true, capture: true });
-  document.addEventListener('touchmove', () => {
-    if (isMobile() && !hubSubHold.selecting) closeForScroll();
-  }, { passive: true, capture: true });
+  document.addEventListener('touchmove', () => { if (isMobile()) closeForScroll(); }, { passive: true, capture: true });
   document.addEventListener('pointermove', (e) => {
     if (isMobile()) return;
     const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2;
@@ -722,154 +720,238 @@ function installSurfaceNavigation() {
   document.addEventListener('touchcancel', () => resetSurfaceSwipe(true), { passive:true, capture:true });
 }
 
-let hubSubHoldInstalled = false;
-let hubSubHold = {
+let edgeSubnavInstalled = false;
+let edgeSubnav = {
   timer:null,
   tracking:false,
   selecting:false,
-  pointerId:null,
-  wrap:null,
-  hub:null,
-  menu:null,
-  current:null,
-  ignoreClickUntil:0,
-  dispatching:false,
+  touchId:null,
+  startX:0,
+  startY:0,
+  lastX:0,
+  lastY:0,
+  moved:false,
+  choices:[],
+  selectedIndex:-1,
+  overlay:null,
 };
 
-function hubSelectionHaptic(pattern = 12) {
+function edgeSubnavHaptic(pattern = 14) {
   try {
-    if (typeof navigator.vibrate === 'function') {
-      const result = navigator.vibrate(pattern);
-      return result !== false;
-    }
+    if (typeof navigator.vibrate === 'function') return navigator.vibrate(pattern) !== false;
   } catch {}
   return false;
 }
 
-function submenuChoiceAt(menu, x, y) {
-  if (!menu) return null;
-  const direct = document.elementFromPoint(x, y)?.closest?.('.tw-nav-menu button');
-  if (direct && menu.contains(direct)) return direct;
-  return [...menu.querySelectorAll('button')].find((button) => {
-    const rect = button.getBoundingClientRect();
-    return x >= rect.left - 8 && x <= rect.right + 8 && y >= rect.top && y <= rect.bottom;
-  }) || null;
-}
+function currentEdgeSection() {
+  if ($('#wishlistHub')?.classList.contains('active')) return null;
 
-function paintSubmenuChoice(button, vibrate = true) {
-  if (!hubSubHold.selecting || !hubSubHold.menu || !button || hubSubHold.current === button) return;
-  hubSubHold.menu.querySelectorAll('button').forEach((item) => item.classList.toggle('is-hold-preview', item === button));
-  hubSubHold.current = button;
-  if (vibrate) hubSelectionHaptic(14);
-}
-
-function closeSubmenuHoldVisual() {
-  hubSubHold.wrap?.classList.remove('is-hold-selecting');
-  hubSubHold.menu?.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
-  if (hubSubHold.wrap) hardClose(hubSubHold.wrap);
-}
-
-function resetSubmenuHold({ keepIgnore = false, keepOpen = false } = {}) {
-  if (hubSubHold.timer) clearTimeout(hubSubHold.timer);
-  hubSubHold.timer = null;
-  hubSubHold.tracking = false;
-  hubSubHold.selecting = false;
-  hubSubHold.pointerId = null;
-  if (!keepOpen) closeSubmenuHoldVisual();
-  else {
-    hubSubHold.wrap?.classList.remove('is-hold-selecting');
-    hubSubHold.menu?.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
+  const finance = $('#finances');
+  const financeView = $('[data-fin-view].active', finance || document);
+  if (finance?.classList.contains('active') && financeView?.dataset.finView !== 'wishlist') {
+    const items = [
+      ['Log Finances', $('#financeSubnav [data-fin-subview="monthly"]'), financeView?.dataset.finView === 'monthly'],
+      ['Monthly', $('#financeSubnav [data-fin-subview="overview"]'), financeView?.dataset.finView === 'overview'],
+      ['Wallet', $('#financeSubnav [data-fin-subview="balances"]'), financeView?.dataset.finView === 'balances'],
+      ['Test scenarios', $('#financeSubnav [data-fin-subview="scenarios"]'), financeView?.dataset.finView === 'scenarios'],
+    ].filter((item) => item[1]);
+    return { label:'My finances', items };
   }
-  hubSubHold.wrap = null;
-  hubSubHold.hub = null;
-  hubSubHold.menu = null;
-  hubSubHold.current = null;
-  if (!keepIgnore) hubSubHold.ignoreClickUntil = 0;
+
+  const activeSheet = $('.sheet.active');
+  if (activeSheet && ['log','monthly','compare'].includes(activeSheet.id)) {
+    const items = [
+      ['Trips', $('#tripSubnav [data-sheet="log"]'), activeSheet.id === 'log'],
+      ['Monthly', $('#tripSubnav [data-sheet="monthly"]'), activeSheet.id === 'monthly'],
+      ['Compare', $('#tripSubnav [data-sheet="compare"]'), activeSheet.id === 'compare'],
+    ].filter((item) => item[1]);
+    return { label:'Trips', items };
+  }
+
+  return null;
 }
 
-function installHubSubmenuHoldSelector() {
-  if (hubSubHoldInstalled) return;
-  const tabs = document.querySelector('.hub-tabs');
-  if (!tabs) return;
-  hubSubHoldInstalled = true;
+function ensureEdgeSubnavOverlay() {
+  let overlay = document.getElementById('twEdgeSubnav');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'twEdgeSubnav';
+  overlay.className = 'tw-edge-subnav';
+  overlay.hidden = true;
+  overlay.setAttribute('aria-hidden','true');
+  document.body.appendChild(overlay);
+  return overlay;
+}
 
-  tabs.addEventListener('contextmenu', (event) => {
-    if (hubSubHold.tracking || hubSubHold.selecting) event.preventDefault();
+function renderEdgeSubnav(section) {
+  const overlay = ensureEdgeSubnavOverlay();
+  overlay.innerHTML =
+    '<div class="tw-edge-subnav-title">' + section.label + '</div>' +
+    '<div class="tw-edge-subnav-list">' +
+      section.items.map(([label, _target, current], index) =>
+        '<div class="tw-edge-subnav-item' + (current ? ' is-current' : '') + '" data-edge-subnav-index="' + index + '">' +
+          '<span>' + label + '</span><i aria-hidden="true"></i>' +
+        '</div>'
+      ).join('') +
+    '</div>' +
+    '<small>Release to open</small>';
+  return overlay;
+}
+
+function positionEdgeSubnav(startY) {
+  const overlay = edgeSubnav.overlay;
+  if (!overlay) return;
+  overlay.style.top = '0px';
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden','false');
+  overlay.classList.add('show');
+  const height = overlay.getBoundingClientRect().height || 220;
+  const top = Math.max(58, Math.min(window.innerHeight - height - 18, startY - 16));
+  overlay.style.top = top + 'px';
+}
+
+function edgeSubnavIndexAt(y) {
+  const overlay = edgeSubnav.overlay;
+  if (!overlay) return -1;
+  const rows = [...overlay.querySelectorAll('[data-edge-subnav-index]')];
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom) return Number(row.dataset.edgeSubnavIndex);
+  }
+  if (!rows.length) return -1;
+  let nearest = -1, distance = Infinity;
+  rows.forEach((row) => {
+    const rect = row.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const d = Math.abs(y - center);
+    if (d < distance) { distance = d; nearest = Number(row.dataset.edgeSubnavIndex); }
   });
+  return distance <= 30 ? nearest : -1;
+}
 
-  tabs.addEventListener('click', (event) => {
-    if (hubSubHold.dispatching) return;
-    if (Date.now() < hubSubHold.ignoreClickUntil) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
+function previewEdgeSubnav(index) {
+  if (index < 0 || index === edgeSubnav.selectedIndex || !edgeSubnav.overlay) return;
+  edgeSubnav.selectedIndex = index;
+  edgeSubnav.overlay.querySelectorAll('[data-edge-subnav-index]').forEach((row) => {
+    row.classList.toggle('is-preview', Number(row.dataset.edgeSubnavIndex) === index);
+  });
+  edgeSubnavHaptic(16);
+}
+
+function hideEdgeSubnav() {
+  const overlay = edgeSubnav.overlay || document.getElementById('twEdgeSubnav');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  overlay.hidden = true;
+  overlay.style.top = '';
+}
+
+function resetEdgeSubnav() {
+  if (edgeSubnav.timer) clearTimeout(edgeSubnav.timer);
+  edgeSubnav.timer = null;
+  edgeSubnav.tracking = false;
+  edgeSubnav.selecting = false;
+  edgeSubnav.touchId = null;
+  edgeSubnav.startX = 0;
+  edgeSubnav.startY = 0;
+  edgeSubnav.lastX = 0;
+  edgeSubnav.lastY = 0;
+  edgeSubnav.moved = false;
+  edgeSubnav.choices = [];
+  edgeSubnav.selectedIndex = -1;
+  hideEdgeSubnav();
+}
+
+function touchById(list, id) {
+  return [...(list || [])].find((touch) => touch.identifier === id) || null;
+}
+
+function installEdgeSubnavSelector() {
+  if (edgeSubnavInstalled) return;
+  edgeSubnavInstalled = true;
+
+  document.addEventListener('contextmenu', (event) => {
+    if (edgeSubnav.tracking || edgeSubnav.selecting) event.preventDefault();
   }, true);
 
-  tabs.addEventListener('pointerdown', (event) => {
-    if (!isMobile() || event.pointerType === 'mouse' || event.button !== 0) return;
-    const hub = event.target.closest?.('.tw-nav-wrap > .hub-tab');
-    const wrap = hub?.closest?.('.tw-nav-wrap');
-    const menu = wrap?.querySelector?.('.tw-nav-menu');
-    if (!hub || !wrap || !menu || !menu.querySelector('button')) return;
+  document.addEventListener('touchstart', (event) => {
+    if (!isMobile() || edgeSubnav.tracking || event.touches.length !== 1 || hasBlockingSurface()) return;
+    const touch = event.touches[0];
+    if (touch.clientX < window.innerWidth - 28) return;
 
-    resetSubmenuHold();
-    hubSubHold.tracking = true;
-    hubSubHold.pointerId = event.pointerId;
-    hubSubHold.wrap = wrap;
-    hubSubHold.hub = hub;
-    hubSubHold.menu = menu;
+    const section = currentEdgeSection();
+    if (!section?.items?.length) return;
 
-    hubSubHold.timer = setTimeout(() => {
-      if (!hubSubHold.tracking || !hubSubHold.wrap) return;
-      hubSubHold.timer = null;
-      hubSubHold.selecting = true;
-      hubSubHold.ignoreClickUntil = Date.now() + 900;
-      suppressHover = false;
-      pinned = hubSubHold.wrap;
-      openWrap(hubSubHold.wrap);
-      hubSubHold.wrap.classList.add('is-hold-selecting');
-      hubSubHold.menu.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
-      hubSelectionHaptic([18, 18, 10]);
-      try { hubSubHold.hub.setPointerCapture?.(event.pointerId); } catch {}
-    }, 380);
-  }, { passive:true });
+    resetEdgeSubnav();
+    edgeSubnav.tracking = true;
+    edgeSubnav.touchId = touch.identifier;
+    edgeSubnav.startX = touch.clientX;
+    edgeSubnav.startY = touch.clientY;
+    edgeSubnav.lastX = touch.clientX;
+    edgeSubnav.lastY = touch.clientY;
+    edgeSubnav.choices = section.items;
+    edgeSubnav.overlay = renderEdgeSubnav(section);
 
-  tabs.addEventListener('pointermove', (event) => {
-    if (!hubSubHold.tracking || event.pointerId !== hubSubHold.pointerId || !hubSubHold.selecting) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const choice = submenuChoiceAt(hubSubHold.menu, event.clientX, event.clientY);
-    if (choice) paintSubmenuChoice(choice, true);
-  }, { passive:false });
+    edgeSubnav.timer = setTimeout(() => {
+      if (!edgeSubnav.tracking) return;
+      edgeSubnav.timer = null;
+      edgeSubnav.selecting = true;
+      edgeSubnav.moved = false;
+      positionEdgeSubnav(edgeSubnav.startY);
+      document.documentElement.classList.add('tw-edge-subnav-active');
+      document.body.classList.add('tw-edge-subnav-active');
+      edgeSubnavHaptic([20,16,12]);
+    }, 360);
+  }, { passive:true, capture:true });
 
-  const finish = (event, cancelled = false) => {
-    if (!hubSubHold.tracking || (event.pointerId != null && event.pointerId !== hubSubHold.pointerId)) return;
-    if (hubSubHold.timer) clearTimeout(hubSubHold.timer);
-    hubSubHold.timer = null;
+  document.addEventListener('touchmove', (event) => {
+    if (!edgeSubnav.tracking) return;
+    const touch = touchById(event.touches, edgeSubnav.touchId);
+    if (!touch) return;
+    edgeSubnav.lastX = touch.clientX;
+    edgeSubnav.lastY = touch.clientY;
 
-    const wasSelecting = hubSubHold.selecting;
-    const choice = wasSelecting && !cancelled
-      ? (submenuChoiceAt(hubSubHold.menu, event.clientX, event.clientY) || hubSubHold.current)
-      : null;
-
-    if (wasSelecting) {
-      event.preventDefault();
-      event.stopPropagation();
-      hubSubHold.ignoreClickUntil = Date.now() + 900;
-      if (choice) {
-        hubSelectionHaptic(20);
-        hubSubHold.dispatching = true;
-        try { choice.click(); } finally { hubSubHold.dispatching = false; }
-      }
+    if (!edgeSubnav.selecting) {
+      if (Math.hypot(touch.clientX - edgeSubnav.startX, touch.clientY - edgeSubnav.startY) > 11) resetEdgeSubnav();
+      return;
     }
 
-    const ignore = hubSubHold.ignoreClickUntil;
-    resetSubmenuHold({ keepIgnore:true });
-    hubSubHold.ignoreClickUntil = ignore;
-  };
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (Math.abs(touch.clientY - edgeSubnav.startY) >= 6) edgeSubnav.moved = true;
+    if (edgeSubnav.moved) previewEdgeSubnav(edgeSubnavIndexAt(touch.clientY));
+  }, { passive:false, capture:true });
 
-  tabs.addEventListener('pointerup', (event) => finish(event, false), { passive:false });
-  tabs.addEventListener('pointercancel', (event) => finish(event, true), { passive:false });
+  document.addEventListener('touchend', (event) => {
+    if (!edgeSubnav.tracking) return;
+    const touch = touchById(event.changedTouches, edgeSubnav.touchId);
+    if (!touch) return;
+
+    if (!edgeSubnav.selecting) {
+      resetEdgeSubnav();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const index = edgeSubnav.moved ? edgeSubnavIndexAt(touch.clientY) : -1;
+    const choice = index >= 0 ? edgeSubnav.choices[index] : null;
+    const target = choice?.[1] || null;
+    edgeSubnavHaptic(target ? 22 : 8);
+
+    document.documentElement.classList.remove('tw-edge-subnav-active');
+    document.body.classList.remove('tw-edge-subnav-active');
+    resetEdgeSubnav();
+    if (target) target.click();
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchcancel', () => {
+    if (!edgeSubnav.tracking) return;
+    document.documentElement.classList.remove('tw-edge-subnav-active');
+    document.body.classList.remove('tw-edge-subnav-active');
+    resetEdgeSubnav();
+  }, { passive:true, capture:true });
 }
 
 export function initNavigation() {
@@ -879,7 +961,7 @@ export function initNavigation() {
 
   ensureNavigation();
   installDropdownRefinement();
-  installHubSubmenuHoldSelector();
+  installEdgeSubnavSelector();
   installSurfaceNavigation();
   installSurfacePageScrollLock();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
