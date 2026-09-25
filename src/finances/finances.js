@@ -523,6 +523,7 @@ function publishFinanceNotifications() {
     title:financeReminderQuestion(item),
     detail:item.kind==='investment-snapshot'?'Update '+monthLabel(item.month)+' investment value':money(item.amount)+' · '+financeDateLabel(item.date),
     actionable:true,
+    actionLabel:item.kind==='investment-snapshot'?'Log':'Yes',
   }));
   window.TwogetherNotifications?.setPending(items,'finances');
 }
