@@ -1379,3 +1379,19 @@ body.dev-v21 #loggedUserBadge {
     border-radius:13px;
   }
 }
+
+
+/* Category bottom shadows for notifications */
+.tw-notification-source-list.is-trips .tw-notification-item {
+  border-color:rgba(126,104,91,.11);
+  box-shadow:
+    0 3px 10px rgba(45,35,29,.02),
+    0 9px 13px -10px rgba(91,124,92,.52);
+}
+
+.tw-notification-source-list.is-finances .tw-notification-item {
+  border-color:rgba(126,104,91,.11);
+  box-shadow:
+    0 3px 10px rgba(45,35,29,.02),
+    0 9px 13px -10px rgba(193,151,67,.56);
+}
