@@ -1379,3 +1379,20 @@ body.dev-v21 #loggedUserBadge {
     border-radius:13px;
   }
 }
+
+
+/* Category-tinted notification section backgrounds */
+.tw-notification-source-list.is-trips {
+  background:var(--sage-soft);
+}
+
+.tw-notification-source-list.is-finances {
+  background:var(--accent-soft);
+}
+
+/* Keep the individual notification cards neutral; only the outer section is tinted. */
+.tw-notification-source-list .tw-notification-item,
+.tw-notification-item.is-urgent,
+.tw-notification-item.is-important {
+  background:var(--card);
+}
