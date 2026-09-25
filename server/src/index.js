@@ -106,6 +106,14 @@ app.post('/api/push/messages', (req, res) => {
   }
 });
 
+app.post('/api/push/test', (req, res) => {
+  try {
+    res.json(pushService.scheduleTest(req.body?.endpoint));
+  } catch (error) {
+    res.status(400).json({ ok:false, error:error?.message || 'Could not schedule test notification' });
+  }
+});
+
 // Serves the built frontend (npm run build -> dist/) so one process can
 // answer both the app and the API in production. In local dev, run the
 // frontend separately with `npm run dev` (Vite, hot reload) instead --

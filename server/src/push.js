@@ -301,6 +301,7 @@ export function createPushService({ db, readState }) {
   let evaluating = false;
   let queued = false;
   let soonTimer = null;
+  const testTimers = new Set();
 
   async function sendWake(subscription) {
     const jwt = vapidToken(keys.privateJwk, subscription.endpoint);
@@ -404,6 +405,34 @@ export function createPushService({ db, readState }) {
     })) };
   }
 
+  function scheduleTest(endpointValue) {
+    const endpoint = cleanText(endpointValue, 4000);
+    const subscription = endpoint ? subscriptionByEndpoint.get(endpoint) : null;
+    if (!subscription) throw new Error('Phone notifications are not enabled on this device');
+
+    const timer = setTimeout(async () => {
+      testTimers.delete(timer);
+      const current = subscriptionByEndpoint.get(endpoint);
+      if (!current) return;
+      const now = new Date().toISOString();
+      const eventKey = 'push-test:' + Date.now() + ':' + current.id;
+      insertMessage.run(
+        current.id,
+        eventKey,
+        'push-test',
+        'test',
+        'Test notification ♡',
+        'Phone notifications are working.',
+        './',
+        now,
+      );
+      await sendWake(current);
+    }, 60000);
+    timer.unref?.();
+    testTimers.add(timer);
+    return { ok:true, delaySeconds:60 };
+  }
+
   const interval = setInterval(() => evaluate().catch((error) => console.warn('Push evaluation failed:', error?.message || error)), 5 * 60 * 1000);
   interval.unref?.();
   const initial = setTimeout(() => evaluate().catch((error) => console.warn('Initial push evaluation failed:', error?.message || error)), 5000);
@@ -414,11 +443,14 @@ export function createPushService({ db, readState }) {
     subscribe,
     unsubscribe,
     claim,
+    scheduleTest,
     evaluateSoon,
     close() {
       clearInterval(interval);
       clearTimeout(initial);
       if (soonTimer) clearTimeout(soonTimer);
+      for (const timer of testTimers) clearTimeout(timer);
+      testTimers.clear();
     },
   };
 }

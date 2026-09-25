@@ -133,6 +133,11 @@ function ensurePushPrompt() {
     if (!api) return;
     action.disabled = true;
     const mode = String(action.dataset.twPushPromptAction || '');
+    if (mode === 'test') {
+      await api.scheduleTest?.();
+      renderPushPrompt();
+      return;
+    }
     if (mode === 'disable') await api.disable?.();
     else await api.enable?.();
     const status = api.status?.() || {};
@@ -175,6 +180,7 @@ function renderPushPrompt() {
     '<p>' + esc(detail) + '</p>' +
     (status.message ? '<small class="tw-push-prompt-message">' + esc(status.message) + '</small>' : '') +
     '<div class="tw-push-prompt-actions">' +
+      (status.enabled ? '<button type="button" data-tw-push-prompt-action="test"' + (status.busy ? ' disabled' : '') + '>Test in 1 min</button>' : '') +
       '<button type="button" data-tw-push-close>Cancel</button>' +
       (action ? '<button type="button" class="is-primary" data-tw-push-prompt-action="' + action + '"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : actionLabel) + '</button>' : '') +
     '</div>';

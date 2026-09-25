@@ -133,6 +133,29 @@ async function disable() {
   return { ...state };
 }
 
+
+async function scheduleTest() {
+  if (state.busy || !supported()) return { ...state };
+  setState({ busy:true, message:'' });
+  try {
+    const reg = await registration();
+    const subscription = await reg.pushManager.getSubscription();
+    if (!subscription || Notification.permission !== 'granted') {
+      setState({ busy:false, enabled:false, message:'Turn phone notifications on first.' });
+      return { ...state };
+    }
+    await jsonFetch('/api/push/test', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ endpoint:subscription.endpoint }),
+    });
+    setState({ busy:false, enabled:true, message:'Test scheduled — it should arrive in about 1 minute.' });
+  } catch (error) {
+    setState({ busy:false, message:error?.message || 'Could not schedule the test notification' });
+  }
+  return { ...state };
+}
+
 function scheduleActorSync() {
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
@@ -149,6 +172,7 @@ export function initPushNotifications() {
     refresh,
     enable,
     disable,
+    scheduleTest,
   };
   refresh({ sync:true }).catch(() => {});
   actorObserver?.disconnect?.();
