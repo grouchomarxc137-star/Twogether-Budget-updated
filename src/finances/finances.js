@@ -970,18 +970,35 @@ function renderPage() {
     <button type="button" data-fin-year-next aria-label="Next year" ${financeViewYear>=yearBounds.max?'disabled':''}>›</button>
   </div>`;
   const monthCards=financeMonthsForYear(financeViewYear).map(([key, label]) => {
-    const rec = recordFor(key), c = calc(rec || {});
+    const rec=recordFor(key), c=calc(rec || {});
     const status=rec ? (rec.finalized?'final':'draft') : 'empty';
-    const pillText=rec ? (rec.finalized?'Locked':'Draft') : (key===currentKey?'Current':'Not logged');
-    const amountText=rec ? money(Math.abs(c.leftover)) : '';
-    const amountLabel=rec ? (c.leftover<0?'over':'left') : 'Tap to start';
-    const meta=rec ? `${money(c.income)} in · ${money(c.outflow)} out` : '';
-    return `<button class="tv2-card finance-month-tv2-card status-${status}" type="button" data-fin-month="${key}">
-      <div class="tv2-card-top"><strong>${esc(label)}</strong><span class="tv2-pill">${esc(pillText)}</span></div>
-      <div class="tv2-card-money">${meta?`<span>${esc(meta)}</span>`:''}<b class="${rec&&c.leftover<0?'is-over':''}">${amountText?amountText+' ':''}${esc(amountLabel)}</b></div>
+    const statusText=rec ? (rec.finalized?'Locked':'Draft') : 'Not logged';
+    const isCurrent=key===currentKey;
+    const isOver=!!rec&&c.leftover<0;
+    const progress=rec
+      ? (c.income>0 ? Math.min(100,Math.max(0,(c.outflow/c.income)*100)) : (c.outflow>0 ? 100 : 0))
+      : 0;
+    return `<button class="finance-month-overview-card status-${status}${isCurrent?' is-current':''}" type="button" data-fin-month="${key}">
+      <div class="finance-month-card-heading">
+        <strong>${esc(label)}</strong>
+        ${isCurrent?'<span class="finance-month-current-tag">This month</span>':''}
+      </div>
+      <div class="finance-month-status-line"><i aria-hidden="true"></i><span>${esc(statusText)}</span></div>
+      ${rec
+        ? `<div class="finance-month-result ${isOver?'is-over':'is-left'}"><strong>${money(Math.abs(c.leftover))}</strong><span>${isOver?'over':'left'}</span></div>`
+        : '<div class="finance-month-start-chip">+ Start</div>'}
+      <div class="finance-month-flow${rec?'':' is-empty'}">
+        <span class="is-in"><small>In</small><b>${rec?money(c.income):'—'}</b></span>
+        <span class="is-out"><small>Out</small><b>${rec?money(c.outflow):'—'}</b></span>
+      </div>
+      <div class="finance-month-progress ${isOver?'is-over':rec?'is-left':'is-empty'}" aria-hidden="true"><span style="width:${progress.toFixed(1)}%"></span></div>
     </button>`;
-  }).join('');
-  root.innerHTML=yearControls+monthCards;
+  });
+  const monthPairs=[];
+  for(let index=0;index<monthCards.length;index+=2){
+    monthPairs.push(`<div class="finance-month-pair">${monthCards[index]||''}${monthCards[index+1]||''}</div>`);
+  }
+  root.innerHTML=yearControls+monthPairs.join('');
   $$('[data-fin-month]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectedMonth = btn.dataset.finMonth;
     renderDetail(directMonthRecord(selectedMonth));

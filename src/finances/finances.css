@@ -4612,3 +4612,313 @@ dialog.finance-log-host .tv2-backdrop {
     margin:0;
   }
 }
+
+
+/* Log finances paired month overview */
+.finance-months-tv2 {
+  grid-template-columns:1fr!important;
+  gap:12px!important;
+}
+
+.finance-year-switcher {
+  grid-template-columns:44px auto 44px!important;
+  justify-content:center;
+  gap:16px;
+  min-height:50px!important;
+  margin:2px 0 6px!important;
+}
+
+.finance-year-switcher strong {
+  min-width:70px;
+  font-size:22px!important;
+  font-weight:700!important;
+  letter-spacing:-.01em;
+}
+
+.finance-year-switcher button {
+  width:42px!important;
+  height:42px!important;
+  border:1px solid #dfd3c3!important;
+  background:rgba(255,253,249,.72)!important;
+  color:#78685a!important;
+  box-shadow:0 3px 10px rgba(62,45,31,.025);
+  cursor:pointer;
+  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+
+.finance-year-switcher button:not(:disabled):hover {
+  background:#fffaf3!important;
+  border-color:#cdbb9f!important;
+}
+
+.finance-year-switcher button:not(:disabled):active {
+  transform:scale(.94);
+}
+
+.finance-month-pair {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  overflow:hidden;
+  border:1px solid #ebe1d5;
+  border-radius:22px;
+  background:rgba(255,253,249,.82);
+  box-shadow:0 8px 22px rgba(62,45,31,.035);
+}
+
+.finance-month-overview-card {
+  position:relative;
+  display:grid;
+  align-content:start;
+  gap:7px;
+  min-width:0;
+  min-height:164px;
+  padding:15px 16px 13px;
+  border:0;
+  background:transparent;
+  color:var(--tv2-ink);
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.finance-month-overview-card + .finance-month-overview-card {
+  border-left:1px solid #e6d8c6;
+}
+
+.finance-month-overview-card.is-current {
+  background:linear-gradient(135deg,rgba(255,248,229,.75),rgba(255,253,249,.35));
+  box-shadow:inset 0 0 0 1px rgba(206,166,94,.18);
+}
+
+.finance-month-overview-card:active {
+  background-color:rgba(242,236,228,.48);
+}
+
+.finance-month-card-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:7px;
+  min-width:0;
+}
+
+.finance-month-card-heading strong {
+  min-width:0;
+  color:var(--tv2-ink);
+  font-family:inherit;
+  font-size:20px;
+  font-weight:700;
+  line-height:1.05;
+  letter-spacing:-.02em;
+}
+
+.finance-month-current-tag {
+  flex:0 0 auto;
+  padding:4px 7px;
+  border-radius:999px;
+  background:#f7e8c7;
+  color:#806338;
+  font-size:9.5px;
+  font-weight:650;
+  line-height:1;
+  white-space:nowrap;
+}
+
+.finance-month-status-line {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:var(--tv2-muted);
+  font-size:12px;
+  line-height:1.15;
+}
+
+.finance-month-status-line i {
+  width:9px;
+  height:9px;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#b8b5b0;
+  box-shadow:0 0 0 2px rgba(184,181,176,.08);
+}
+
+.finance-month-overview-card.status-final .finance-month-status-line {
+  color:#60765d;
+}
+
+.finance-month-overview-card.status-final .finance-month-status-line i {
+  background:#9eb69a;
+}
+
+.finance-month-overview-card.status-draft .finance-month-status-line {
+  color:#8a7761;
+}
+
+.finance-month-overview-card.status-draft .finance-month-status-line i {
+  background:#d6c5aa;
+}
+
+.finance-month-result {
+  display:flex;
+  align-items:baseline;
+  gap:5px;
+  min-width:0;
+  margin-top:2px;
+}
+
+.finance-month-result strong {
+  min-width:0;
+  color:var(--tv2-ink);
+  font-size:clamp(17px,4.7vw,22px);
+  font-weight:750;
+  line-height:1;
+  letter-spacing:-.02em;
+  white-space:nowrap;
+}
+
+.finance-month-result span {
+  flex:0 0 auto;
+  font-size:12px;
+  font-weight:650;
+}
+
+.finance-month-result.is-left span {
+  color:var(--tv2-good);
+}
+
+.finance-month-result.is-over strong,
+.finance-month-result.is-over span {
+  color:var(--tv2-over);
+}
+
+.finance-month-start-chip {
+  justify-self:start;
+  margin-top:2px;
+  padding:5px 11px;
+  border:1px solid #dfd3c3;
+  border-radius:999px;
+  background:rgba(255,253,249,.78);
+  color:#765c38;
+  font-size:12px;
+  font-weight:650;
+  line-height:1;
+}
+
+.finance-month-flow {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  margin-top:1px;
+}
+
+.finance-month-flow span {
+  min-width:0;
+  display:grid;
+  gap:1px;
+}
+
+.finance-month-flow small {
+  color:var(--tv2-muted);
+  font-size:9.5px;
+  font-weight:600;
+  line-height:1;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+.finance-month-flow b {
+  min-width:0;
+  overflow:hidden;
+  color:#4f4943;
+  font-size:11.5px;
+  font-weight:650;
+  line-height:1.15;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.finance-month-flow .is-in b {
+  color:#60765d;
+}
+
+.finance-month-flow .is-out b {
+  color:#7f5c52;
+}
+
+.finance-month-flow.is-empty b {
+  color:var(--tv2-faint,#a39c93);
+}
+
+.finance-month-progress {
+  align-self:end;
+  overflow:hidden;
+  height:4px;
+  margin-top:auto;
+  border-radius:999px;
+  background:#ece6de;
+}
+
+.finance-month-progress span {
+  display:block;
+  height:100%;
+  min-width:0;
+  border-radius:inherit;
+  background:#b7c9b2;
+  transition:width .24s ease;
+}
+
+.finance-month-progress.is-over {
+  background:#f0deda;
+}
+
+.finance-month-progress.is-over span {
+  background:#d7aaa0;
+}
+
+.finance-month-progress.is-empty {
+  background:#e9e2d9;
+}
+
+.finance-month-progress.is-empty span {
+  display:none;
+}
+
+@media(max-width:390px) {
+  .finance-month-pair {
+    border-radius:19px;
+  }
+
+  .finance-month-overview-card {
+    min-height:158px;
+    padding:14px 12px 12px;
+    gap:6px;
+  }
+
+  .finance-month-card-heading {
+    align-items:flex-start;
+    flex-wrap:wrap;
+    row-gap:5px;
+  }
+
+  .finance-month-card-heading strong {
+    font-size:18px;
+  }
+
+  .finance-month-current-tag {
+    padding:3px 6px;
+    font-size:9px;
+  }
+
+  .finance-month-result strong {
+    font-size:clamp(16px,4.4vw,19px);
+  }
+
+  .finance-month-flow {
+    gap:5px;
+  }
+
+  .finance-month-flow b {
+    font-size:10.5px;
+  }
+}
