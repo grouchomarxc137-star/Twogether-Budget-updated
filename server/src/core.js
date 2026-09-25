@@ -1373,12 +1373,13 @@ function sanitizeFinanceRecurring_(value) {
 
 function sanitizeFinanceReminder_(item) {
   const source=item&&typeof item==='object'?item:{};
-  const kind=String(source.kind)==='income'?'income':'expense';
+  const rawKind=String(source.kind||'');
+  const kind=rawKind==='income'?'income':rawKind==='investment-snapshot'?'investment-snapshot':'expense';
   return {
     id: cleanText_(source.id,180) || Utilities.getUuid(),
     kind: kind,
     name: cleanText_(source.name,120),
-    group: kind==='expense' ? cleanText_(source.group,40) : '',
+    group: kind==='expense'||kind==='investment-snapshot' ? cleanText_(source.group,40) : '',
     amount: cleanMoney_(source.amount),
     month: cleanText_(source.month,10),
     date: cleanFinanceDate_(source.date),
@@ -1417,7 +1418,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
     compareLab: source.compareLab && typeof source.compareLab === 'object' ? sanitizeCompareLab_(source.compareLab) : {},
     recurring: sanitizeFinanceRecurring_(source.recurring),
-    financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && x.amount !== '' && x.month && x.date; }) : [],
+    financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && (x.kind==='investment-snapshot' || x.amount !== '') && x.month && x.date; }) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
   };
