@@ -1217,33 +1217,47 @@ body.dev-v21 #loggedUserBadge {
   display:block;
   overflow:hidden;
   padding:0;
+  border-radius:14px;
   touch-action:pan-y;
-  background:transparent;
+  isolation:isolate;
+  background:linear-gradient(90deg,rgba(91,124,92,.10) 0%,rgba(91,124,92,.045) 54%,rgba(91,124,92,0) 100%);
 }
 
 .tw-notification-swipe-reveal {
   position:absolute;
-  inset:0;
+  top:0;
+  bottom:0;
+  left:0;
   z-index:1;
+  width:116px;
   display:flex;
   align-items:center;
   gap:7px;
-  padding:0 14px;
-  background:rgba(91,124,92,.13);
+  padding:0 11px;
+  border-radius:14px 0 0 14px;
+  background:linear-gradient(90deg,rgba(91,124,92,.12),rgba(91,124,92,.055) 74%,rgba(91,124,92,0));
   color:#557150;
-  font-size:12px;
+  font-size:11.5px;
   font-weight:750;
   pointer-events:none;
+  box-sizing:border-box;
 }
 
 .tw-notification-swipe-reveal b {
   display:grid;
   place-items:center;
-  width:23px;
-  height:23px;
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
   border-radius:50%;
-  background:rgba(85,113,80,.14);
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(85,113,80,.12);
+  box-shadow:0 2px 7px rgba(45,35,29,.04);
   font-size:12px;
+}
+
+.tw-notification-swipe-reveal span {
+  white-space:nowrap;
 }
 
 .tw-notification-swipe-content {
@@ -1255,12 +1269,16 @@ body.dev-v21 #loggedUserBadge {
   gap:12px;
   min-height:100%;
   padding:13px 2px;
+  border-radius:14px;
   background:var(--card);
+  box-shadow:0 0 0 1px rgba(126,104,91,.025);
+  backface-visibility:hidden;
+  transform:translateZ(0);
   will-change:transform,opacity;
 }
 
 .tw-notification-item.is-finance.is-actionable.is-swiping-confirm .tw-notification-swipe-content {
-  box-shadow:-8px 0 20px rgba(45,35,29,.04);
+  box-shadow:-10px 0 20px rgba(45,35,29,.055),0 0 0 1px rgba(126,104,91,.025);
 }
 
 @media(prefers-reduced-motion:reduce) {
