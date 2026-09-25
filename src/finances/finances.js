@@ -1013,33 +1013,67 @@ function bindFinanceWalletCarousel(root) {
   if(!cards.length)return;
   const mobile=window.matchMedia('(max-width:760px)');
   let scrollFrame=0;
+  let settleTimer=0;
 
-  const setActive=(index,{scroll=false,behavior='smooth'}={})=>{
-    const safe=Math.max(0,Math.min(cards.length-1,Number(index)||0));
+  const wrapIndex=(index)=>((Number(index)||0)%cards.length+cards.length)%cards.length;
+  const scrollCardIntoCenter=(card,behavior='smooth')=>{
+    if(!card||!mobile.matches)return;
+    const left=card.offsetLeft-(rail.clientWidth-card.offsetWidth)/2;
+    rail.scrollTo({left:Math.max(0,left),behavior});
+  };
+  const paintActive=(index,activeCard=null)=>{
+    const safe=wrapIndex(index);
     financeWalletIndex=safe;
-    cards.forEach((card,i)=>card.classList.toggle('is-active',i===safe));
+    rail.querySelectorAll('[data-fin-wallet-card]').forEach((card)=>card.classList.remove('is-active'));
+    (activeCard||cards[safe])?.classList.add('is-active');
     nav.forEach((button,i)=>{
       const active=i===safe;
       button.classList.toggle('is-active',active);
       button.setAttribute('aria-current',active?'true':'false');
     });
-    if(scroll&&mobile.matches){
-      const card=cards[safe];
-      const left=card.offsetLeft-(rail.clientWidth-card.offsetWidth)/2;
-      rail.scrollTo({left:Math.max(0,left),behavior});
-    }
+    return safe;
   };
+  const setActive=(index,{scroll=false,behavior='smooth'}={})=>{
+    const safe=paintActive(index);
+    if(scroll)scrollCardIntoCenter(cards[safe],behavior);
+  };
+
+  if(mobile.matches&&cards.length>1){
+    const before=cards[cards.length-1].cloneNode(true);
+    before.dataset.finWalletClone=String(cards.length-1);
+    before.setAttribute('aria-hidden','true');
+    before.inert=true;
+    const after=cards[0].cloneNode(true);
+    after.dataset.finWalletClone='0';
+    after.setAttribute('aria-hidden','true');
+    after.inert=true;
+    rail.insertBefore(before,cards[0]);
+    rail.appendChild(after);
+  }
 
   const syncToScroll=()=>{
     if(!mobile.matches)return;
+    const physical=[...rail.querySelectorAll('[data-fin-wallet-card]')];
     const center=rail.scrollLeft+rail.clientWidth/2;
-    let best=0, distance=Infinity;
-    cards.forEach((card,index)=>{
-      const cardCenter=card.offsetLeft+card.offsetWidth/2;
-      const nextDistance=Math.abs(cardCenter-center);
-      if(nextDistance<distance){distance=nextDistance;best=index;}
+    let closest=null, distance=Infinity;
+    physical.forEach((card)=>{
+      const nextDistance=Math.abs((card.offsetLeft+card.offsetWidth/2)-center);
+      if(nextDistance<distance){distance=nextDistance;closest=card;}
     });
-    setActive(best);
+    if(!closest)return;
+    const cloneTarget=closest.dataset.finWalletClone;
+    if(cloneTarget!=null){
+      const target=wrapIndex(Number(cloneTarget));
+      paintActive(target,closest);
+      clearTimeout(settleTimer);
+      settleTimer=setTimeout(()=>{
+        paintActive(target);
+        scrollCardIntoCenter(cards[target],'auto');
+      },90);
+      return;
+    }
+    const index=cards.indexOf(closest);
+    if(index>=0)paintActive(index,closest);
   };
 
   rail.addEventListener('scroll',()=>{
@@ -1051,7 +1085,7 @@ function bindFinanceWalletCarousel(root) {
   root.querySelector('[data-fin-wallet-prev]')?.addEventListener('click',()=>setActive(financeWalletIndex-1,{scroll:true}));
   root.querySelector('[data-fin-wallet-next]')?.addEventListener('click',()=>setActive(financeWalletIndex+1,{scroll:true}));
 
-  setActive(Math.min(financeWalletIndex,cards.length-1));
+  setActive(financeWalletIndex);
   requestAnimationFrame(()=>setActive(financeWalletIndex,{scroll:true,behavior:'auto'}));
 }
 
@@ -1068,15 +1102,15 @@ function renderCurrentPanel() {
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2></div></div>
     <div class="finance-current-grid" role="region" aria-label="Wallets">
+      <article class="finance-current-card tone-receivable" data-fin-owed-card data-fin-wallet-card="owed">${financeWalletIcon('owed')}<button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button></article>
       <article class="finance-current-card tone-other" data-fin-current-cash data-fin-wallet-card="cash">${financeWalletIcon('cash')}<div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button></article>
       <article class="finance-current-card tone-wealth" data-fin-wallet-card="savings">${financeWalletIcon('savings')}<div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable" data-fin-owed-card data-fin-wallet-card="owed">${financeWalletIcon('owed')}<button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button></article>
       <article class="finance-current-card tone-wealth finance-investment-card" data-fin-wallet-card="investments">${financeWalletIcon('investments')}<div class="finance-current-title"><div><span>INVESTMENTS</span><h3>My investments</h3></div><strong>${money(inv.ownInvestments || 0).replace(/([.,])00$/,'')}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div>${latestInvestment || actor()==='Principe' ? '<button class="text-btn finance-investment-edit" type="button" data-fin-edit-investment-value>Edit</button>' : ''}</article>
     </div>
     <div class="finance-wallet-nav" aria-label="Wallet carousel">
+      <button type="button" data-fin-wallet-jump="owed">${financeWalletIcon('owed')}<span>Money owed</span></button>
       <button type="button" data-fin-wallet-jump="cash">${financeWalletIcon('cash')}<span>Current cash</span></button>
       <button type="button" data-fin-wallet-jump="savings">${financeWalletIcon('savings')}<span>Saved up</span></button>
-      <button type="button" data-fin-wallet-jump="owed">${financeWalletIcon('owed')}<span>Money owed</span></button>
       <button type="button" data-fin-wallet-jump="investments">${financeWalletIcon('investments')}<span>Investments</span></button>
     </div>
     <div class="finance-wallet-swipe-hint" aria-label="Swipe between wallets">
@@ -3215,6 +3249,12 @@ function init() {
   document.addEventListener('twogether:open-shared-jar', (e) => openSharedJarHistory(e.detail || {}));
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });
+  document.addEventListener('twogether:finance-view',(event)=>{
+    const view=String(event.detail?.view||'');
+    if(view!=='balances'){financeWalletIndex=1;return;}
+    financeWalletIndex=1;
+    renderCurrentPanel();
+  });
   document.addEventListener('twogether:notification-action',(event)=>{
     if(event.detail?.kind!=='finance-recurring')return;
     if(event.detail?.choice==='not-yet'){publishFinanceNotifications();return;}
