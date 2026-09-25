@@ -237,7 +237,7 @@ function normalizeProfile(profileData) {
     recurring: normalizeRecurringConfig(p.recurring),
     financeReminders: Array.isArray(p.financeReminders) ? p.financeReminders.map((item) => ({
       id: String(item?.id || ''),
-      kind: item?.kind === 'income' ? 'income' : 'expense',
+      kind: item?.kind === 'income' ? 'income' : item?.kind === 'investment-snapshot' ? 'investment-snapshot' : 'expense',
       name: String(item?.name || ''),
       group: String(item?.group || ''),
       amount: item?.amount ?? '',
@@ -462,6 +462,11 @@ function localFinanceToday() {
 function financeReminderMatchesLogged(reminder) {
   const rec=recordFor(reminder.month);
   if (!rec) return false;
+  if(reminder.kind==='investment-snapshot'){
+    const snapshotAt=String(rec.updatedAt||'');
+    const requestedAt=String(reminder.createdAt||'');
+    return hasValue(rec.investmentTotal)&&!!snapshotAt&&(!requestedAt||snapshotAt>=requestedAt);
+  }
   const list=reminder.kind==='income'?(rec.incomes||[]):(rec.expenses||[]);
   const name=String(reminder.name||'').trim().toLowerCase();
   return list.some((item)=>{
@@ -504,6 +509,7 @@ function dueFinanceReminderSnapshots() {
   }).filter(Boolean);
 }
 function financeReminderQuestion(reminder) {
+  if(reminder.kind==='investment-snapshot')return "What's your investment worth now?";
   return reminder.kind==='income'
     ? 'Has '+reminder.name+' arrived?'
     : 'Has '+reminder.name+' been charged?';
@@ -515,7 +521,7 @@ function publishFinanceNotifications() {
     actor:actor(),
     kind:'finance-recurring',
     title:financeReminderQuestion(item),
-    detail:money(item.amount)+' · '+financeDateLabel(item.date),
+    detail:item.kind==='investment-snapshot'?'Update '+monthLabel(item.month)+' investment value':money(item.amount)+' · '+financeDateLabel(item.date),
     actionable:true,
   }));
   window.TwogetherNotifications?.setPending(items,'finances');
@@ -553,11 +559,55 @@ async function removeFinanceReminder(id) {
   publishFinanceNotifications();
   try{await post('saveFinanceProfile',{profile:next});}catch{}
 }
+async function queueInvestmentSnapshotReminder(month,date='') {
+  const a=actor();
+  if(!a||!financeRules(a).investmentTracking||!/^[0-9]{4}-[0-9]{2}$/.test(String(month||'')))return;
+  const today=new Date();
+  const fallbackDate=month+'-'+String(Math.min(today.getDate(),daysInFinanceMonth(month))).padStart(2,'0');
+  const reminderDate=normalizeFinanceDate(date,month)||fallbackDate;
+  const id=['finance',a,month,'investment-snapshot'].join(':');
+  const next=profile();
+  const reminder={id,kind:'investment-snapshot',name:'Investment value',group:'investments',amount:'',month,date:reminderDate,createdAt:new Date().toISOString()};
+  next.financeReminders=(next.financeReminders||[]).filter((item)=>item.id!==id).concat(reminder);
+  financeState.financeProfiles[a]=normalizeProfile(next);
+  publishFinanceNotifications();
+  try{await post('saveFinanceProfile',{profile:next});}catch{}
+}
 function openFinanceReminderConfirm(reminder) {
   if(!reminder)return;
   const rec=recordFor(reminder.month);
   if(rec?.finalized===true){publishFinanceNotifications();return toast('This month is final and locked','warn');}
   const back=()=>{closeMini();window.TwogetherNotifications?.open?.();};
+  if(reminder.kind==='investment-snapshot'){
+    const current=rec&&hasValue(rec.investmentTotal)?String(n(rec.investmentTotal)):'';
+    showMini(
+      '<span class="panel-kicker">INVESTMENTS</span>'+ 
+      '<h2>What’s your investment worth now?</h2>'+ 
+      '<p>Enter the current value of your investment account for '+esc(monthLabel(reminder.month))+'.</p>'+ 
+      '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label></div>'+ 
+      '<div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-reminder-back>Back</button><button class="btn primary" type="button" data-fin-investment-snapshot-save>Save value</button></div>',
+      '',
+      {back}
+    );
+    $('[data-fin-reminder-back]')?.addEventListener('click',back);
+    $('[data-fin-investment-snapshot-save]')?.addEventListener('click',async()=>{
+      const raw=$('#finInvestmentSnapshotValue')?.value||'';
+      if(raw===''||!Number.isFinite(Number(raw.replace(',','.')))||n(raw)<0)return toast('Enter a valid investment value','warn');
+      const button=$('[data-fin-investment-snapshot-save]'); if(button)button.disabled=true;
+      try{
+        const next=directMonthRecord(reminder.month);
+        if(next.finalized===true)throw new Error('This month is final and locked');
+        next.investmentTotal=n(raw);
+        closeMini();
+        await saveDirectMonthRecord(next,'Investment value updated',{openDetail:false});
+        await removeFinanceReminder(reminder.id);
+      }catch(error){
+        if(button)button.disabled=false;
+        toast(error?.message||'Could not save investment value','warn');
+      }
+    });
+    return;
+  }
   showMini(
     '<span class="panel-kicker">FINANCE REMINDER</span>'+
     '<h2>'+esc(financeReminderQuestion(reminder))+'</h2>'+
@@ -587,6 +637,7 @@ function openFinanceReminderConfirm(reminder) {
       if(!recordFor(reminder.month))next.partialOnly=true;
       closeMini();
       await saveDirectMonthRecord(next,reminder.name+' logged',{openDetail:false});
+      if(reminder.kind==='expense'&&normalizeGroup(reminder.group)==='investments')await queueInvestmentSnapshotReminder(reminder.month,reminder.date);
       await removeFinanceReminder(reminder.id);
     }catch(error){
       if(button)button.disabled=false;
@@ -1667,6 +1718,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       const next=cloneRecord(rec);
       next.incomes=[...(next.incomes||[])];
       next.expenses=[...(next.expenses||[])];
+      let investmentLogged=false;
 
       if(state.category==='income'){
         const row={name:state.name.trim(),amount:amount(),date:state.date};
@@ -1677,6 +1729,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
         }
       } else {
         const row={group:state.group||financeGroupForTone(state.category,state.name),name:state.name.trim(),amount:amount(),date:state.date};
+        investmentLogged=normalizeGroup(row.group)==='investments';
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
         else {
           if(editingKind==='income'&&editingIndex>=0) next.incomes.splice(editingIndex,1);
@@ -1688,6 +1741,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       try {
         closeFinanceTransactionSheet();
         await saveDirectMonthRecord(next,editingItem?'Finance updated':state.category==='income'?'Income added':'Expense added');
+        if(investmentLogged)await queueInvestmentSnapshotReminder(next.month,state.date);
       } catch(error) {
         state.busy=false;
         state.error=error?.message||'Could not save this item.';
