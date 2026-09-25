@@ -6,6 +6,7 @@ const BUTTON_ID = 'twNotificationButton';
 const pendingSources = new Map();
 let actorObserver = null;
 let activeSource = 'trips';
+const expandedTripNotifications = new Set();
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -81,7 +82,7 @@ function renderGroup(group) {
   const priorityClass = level === 2 ? ' is-priority is-critical' : level === 1 ? ' is-priority is-important' : '';
   return '<section class="tw-notification-group ' + meta.className + priorityClass + '">' +
     '<div class="tw-notification-group-head"><strong>' + esc(meta.title) + '</strong><span>' + group.items.length + '</span></div>' +
-    '<div class="tw-notification-group-items">' + group.items.map(renderItem).join('') + '</div>' +
+    '<div class="tw-notification-group-items">' + group.items.map((item) => renderItem(item, group.source)).join('') + '</div>' +
   '</section>';
 }
 
@@ -117,7 +118,7 @@ function ensureUi() {
   return { button, layer };
 }
 
-function renderItem(item) {
+function renderItem(item, source = activeSource) {
   const important = item.reminders?.length
     ? '<div class="tw-notification-prep-block is-important"><b>Important reminders</b>' + item.reminders.map((text) => '<span>• ' + esc(text) + '</span>').join('') + '</div>'
     : '';
@@ -128,17 +129,31 @@ function renderItem(item) {
     ? '<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="' + esc(item.id) + '">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="' + esc(item.id) + '">' + esc(item.actionLabel || 'Yes') + '</button></div>'
     : '';
   const openAction = item.openLabel
-    ? '<div class="tw-notification-actions"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
+    ? '<div class="tw-notification-actions tw-notification-open-action"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
     : '';
   const level = itemPriority(item);
   const priorityClass = level === 2 ? ' is-urgent' : level === 1 ? ' is-important' : '';
   const priorityCue = level > 0
     ? '<span class="tw-notification-priority-cue" aria-label="' + (level === 2 ? 'Final checks' : 'Important') + '"><span aria-hidden="true">▲</span>' + (level === 2 ? 'Final checks' : 'Important') + '</span>'
     : '';
-  return '<article class="tw-notification-item' + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
-    '<div class="tw-notification-copy"><div class="tw-notification-title-row"><strong>' + esc(item.title || 'Reminder') + '</strong>' + priorityCue + '</div>' +
+  const isTrip = source === 'trips';
+  const expandable = isTrip && (!!item.reminders?.length || !!item.packing?.length);
+  const expanded = expandable && expandedTripNotifications.has(item.id);
+  const titleContent = '<strong>' + esc(item.title || 'Reminder') + '</strong>' + priorityCue;
+  const titleRow = expandable
+    ? '<button type="button" class="tw-notification-expand" data-tw-notification-expand="' + esc(item.id) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
+        '<span class="tw-notification-title-row">' + titleContent + '</span><span class="tw-notification-chevron" aria-hidden="true">⌄</span>' +
+      '</button>'
+    : '<div class="tw-notification-title-row">' + titleContent + '</div>';
+  const details = expandable
+    ? '<div class="tw-notification-expandable" ' + (expanded ? '' : 'hidden') + '>' + important + packing + '</div>'
+    : important + packing;
+  const sourceClass = isTrip ? ' is-trip' : ' is-finance';
+  const expandableClass = expandable ? ' is-expandable' + (expanded ? ' is-expanded' : '') : '';
+  return '<article class="tw-notification-item' + sourceClass + expandableClass + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
+    '<div class="tw-notification-copy">' + titleRow +
     (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
-    important + packing + '</div>' + financeActions + openAction + '</article>';
+    details + '</div>' + financeActions + openAction + '</article>';
 }
 
 function render() {
@@ -175,7 +190,7 @@ function render() {
     renderSourceTabs(groups) +
     '<div class="tw-notification-list tw-notification-source-list is-' + esc(activeSource) + '" role="tabpanel">' +
       (visibleItems.length
-        ? visibleItems.map(renderItem).join('')
+        ? visibleItems.map((item) => renderItem(item, activeSource)).join('')
         : '<div class="tw-notification-empty"><span>✓</span><strong>' + esc(emptyLabel) + '</strong></div>') +
     '</div>';
 }
@@ -238,6 +253,16 @@ export function initNotifications() {
       const source = String(tab.dataset.twNotificationTab || '');
       if (source === 'trips' || source === 'finances') {
         activeSource = source;
+        render();
+      }
+      return;
+    }
+    const expander = event.target.closest?.('[data-tw-notification-expand]');
+    if (expander) {
+      const id = String(expander.dataset.twNotificationExpand || '');
+      if (id) {
+        if (expandedTripNotifications.has(id)) expandedTripNotifications.delete(id);
+        else expandedTripNotifications.add(id);
         render();
       }
       return;

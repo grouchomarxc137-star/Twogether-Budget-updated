@@ -1140,3 +1140,72 @@ body.dev-v21 #loggedUserBadge {
     height:21px;
   }
 }
+
+
+/* Expandable trip notifications */
+.tw-notification-item.is-trip {
+  align-items:stretch;
+  flex-direction:column;
+  gap:0;
+}
+
+.tw-notification-expand {
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.tw-notification-expand .tw-notification-title-row {
+  min-width:0;
+  flex:1 1 auto;
+}
+
+.tw-notification-chevron {
+  flex:0 0 auto;
+  color:var(--muted);
+  font-size:17px;
+  line-height:1;
+  transition:transform .18s ease;
+}
+
+.tw-notification-item.is-expanded .tw-notification-chevron {
+  transform:rotate(180deg);
+}
+
+.tw-notification-expandable[hidden] {
+  display:none!important;
+}
+
+.tw-notification-item.is-trip .tw-notification-open-action {
+  width:100%;
+  justify-content:flex-start;
+  margin-top:11px;
+}
+
+.tw-notification-item.is-trip .tw-notification-open-action button {
+  min-width:118px;
+}
+
+.tw-notification-item.is-trip .tw-notification-copy>small {
+  margin-top:4px;
+}
+
+.tw-notification-item.is-trip .tw-notification-expandable {
+  margin-top:2px;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .tw-notification-chevron {
+    transition:none;
+  }
+}
