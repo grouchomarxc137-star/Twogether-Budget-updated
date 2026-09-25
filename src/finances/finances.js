@@ -580,12 +580,20 @@ function openFinanceReminderConfirm(reminder) {
   if(rec?.finalized===true){publishFinanceNotifications();return toast('This month is final and locked','warn');}
   const back=()=>{closeMini();window.TwogetherNotifications?.open?.();};
   if(reminder.kind==='investment-snapshot'){
+    const isPrincipessa=actor()==='Principessa';
     const current=rec&&hasValue(rec.investmentTotal)?String(n(rec.investmentTotal)):'';
+    const currentSis=isPrincipessa&&rec&&hasValue(rec.sisterInvestments)?String(n(rec.sisterInvestments)):'';
+    const investmentFields=isPrincipessa
+      ? '<div class="finance-mini-fields">'+
+          '<label class="full">Total investment account value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label>'+
+          '<label class="full">Sis’s value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotSisValue" inputmode="decimal" value="'+esc(currentSis)+'" placeholder="0.00"></div></label>'+
+        '</div>'
+      : '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label></div>';
     showMini(
-      '<span class="panel-kicker">INVESTMENTS</span>'+ 
-      '<h2>What’s your investment worth now?</h2>'+ 
-      '<p>Enter the current value of your investment account for '+esc(monthLabel(reminder.month))+'.</p>'+ 
-      '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label></div>'+ 
+      '<span class="panel-kicker">INVESTMENTS</span>'+
+      '<h2>What’s your investment worth now?</h2>'+
+      '<p>'+(isPrincipessa?'Enter the full account value and Sis’s part for ':'Enter the current value of your investment account for ')+esc(monthLabel(reminder.month))+'.</p>'+
+      investmentFields+
       '<div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-reminder-back>Back</button><button class="btn primary" type="button" data-fin-investment-snapshot-save>Save value</button></div>',
       '',
       {back}
@@ -593,12 +601,16 @@ function openFinanceReminderConfirm(reminder) {
     $('[data-fin-reminder-back]')?.addEventListener('click',back);
     $('[data-fin-investment-snapshot-save]')?.addEventListener('click',async()=>{
       const raw=$('#finInvestmentSnapshotValue')?.value||'';
+      const sisRaw=isPrincipessa?($('#finInvestmentSnapshotSisValue')?.value||''):'';
       if(raw===''||!Number.isFinite(Number(raw.replace(',','.')))||n(raw)<0)return toast('Enter a valid investment value','warn');
+      if(isPrincipessa&&(sisRaw===''||!Number.isFinite(Number(sisRaw.replace(',','.')))||n(sisRaw)<0))return toast('Enter a valid value for Sis','warn');
+      if(isPrincipessa&&n(sisRaw)>n(raw))return toast('Sis’s value cannot be higher than the total account value','warn');
       const button=$('[data-fin-investment-snapshot-save]'); if(button)button.disabled=true;
       try{
         const next=directMonthRecord(reminder.month);
         if(next.finalized===true)throw new Error('This month is final and locked');
         next.investmentTotal=n(raw);
+        if(isPrincipessa)next.sisterInvestments=n(sisRaw);
         closeMini();
         await saveDirectMonthRecord(next,'Investment value updated',{openDetail:false});
         await removeFinanceReminder(reminder.id);
