@@ -1416,14 +1416,18 @@ function financeRecurringItemsForCategory(category) {
     })).filter((item)=>item.name);
   }
   if (!category || category === 'other') return [];
-  return (config.expenses || []).filter((item)=>groupTone(item.group)===category).map((item)=>({
+  const items=(config.expenses || []).filter((item)=>groupTone(item.group)===category).map((item)=>({
     id:item.id || item.name,
     name:String(item.name || ''),
     amount:item.amount,
     day:normalizeRecurringDay(item.day),
-    group:normalizeGroup(item.group),
+    group:/invest/i.test(String(item.name||''))?'investments':normalizeGroup(item.group),
     tone:category,
   })).filter((item)=>item.name);
+  if(actor()==='Principe'&&category==='wealth'&&!items.some((item)=>normalizeGroup(item.group)==='investments')){
+    items.push({id:'principe-investments',name:'Investments',amount:'',day:'',group:'investments',tone:'wealth'});
+  }
+  return items;
 }
 
 function financeGroupForTone(tone, name = '') {
