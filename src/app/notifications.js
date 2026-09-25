@@ -99,7 +99,7 @@ function renderItem(item) {
     ? '<div class="tw-notification-prep-block"><b>Packing / checklist</b>' + item.packing.map((text) => '<span>• ' + esc(text) + '</span>').join('') + '</div>'
     : '';
   const financeActions = item.actionable
-    ? '<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="' + esc(item.id) + '">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="' + esc(item.id) + '">Yes</button></div>'
+    ? '<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="' + esc(item.id) + '">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="' + esc(item.id) + '">' + esc(item.actionLabel || 'Yes') + '</button></div>'
     : '';
   const openAction = item.openLabel
     ? '<div class="tw-notification-actions"><button type="button" class="is-primary" data-tw-notification-action="open" data-notification-id="' + esc(item.id) + '">' + esc(item.openLabel) + '</button></div>'
@@ -169,6 +169,7 @@ function setPending(items = [], source = 'default') {
     title: String(item?.title || ''),
     detail: String(item?.detail || ''),
     actionable: item?.actionable === true,
+    actionLabel: String(item?.actionLabel || ''),
     kind: String(item?.kind || ''),
     openLabel: String(item?.openLabel || ''),
     urgent: item?.urgent === true,
