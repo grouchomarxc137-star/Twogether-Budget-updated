@@ -40,44 +40,67 @@ test('starts with a complete empty state stored in SQLite tables', () => {
   }
 });
 
-test('recurrent trip checklist defaults apply only to newly created trips', () => {
+test('recurrent trip checklist updates upcoming trips while preserving custom items and checkmarks', () => {
   const context = setup();
   try {
     const savedDefaults = action(context.database, 'saveTripPrepDefaults', {
       prep: {
-        packing: [{ id:'packing-passport', text:'Passport', done:true }],
+        packing: [{ id:'packing-passport', text:'Passport', done:false }],
         reminders: [{ id:'reminder-checkin', text:'Check in online', done:false }],
       },
     });
     assert.equal(savedDefaults.ok, true);
-    assert.equal(savedDefaults.prep.packing[0].done, false);
 
-    const first = action(context.database, 'savePlan', {
-      meta: { location:'Italy', city:'Lonato', start:'2026-10-10', end:'2026-10-12' },
+    const upcoming = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2099-10-10', end:'2099-10-12' },
       budget: '',
     });
-    const firstPlan = getState().plans.find((item) => item.id === first.planId);
-    assert.deepEqual(firstPlan.prep.packing.map((item) => item.text), ['Passport']);
-    assert.deepEqual(firstPlan.prep.reminders.map((item) => item.text), ['Check in online']);
+    let upcomingPlan = getState().plans.find((item) => item.id === upcoming.planId);
+    const passport = upcomingPlan.prep.packing.find((item) => item.recurrentId === 'packing-passport');
+    passport.done = true;
+    upcomingPlan.prep.packing.push({ id:'custom-camera', text:'Film camera', done:true });
+    assert.equal(action(context.database, 'saveTripPrep', { planId:upcoming.planId, prep:upcomingPlan.prep }).ok, true);
 
-    action(context.database, 'saveTripPrepDefaults', {
+    const past = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Rome', start:'2000-01-01', end:'2000-01-03' },
+      budget: '',
+    });
+    const pastBefore = getState().plans.find((item) => item.id === past.planId).prep.packing.map((item) => item.text);
+
+    const updatedDefaults = action(context.database, 'saveTripPrepDefaults', {
       prep: {
-        packing: [{ id:'packing-charger', text:'Chargers', done:false }],
+        packing: [
+          { id:'packing-passport', text:'Passport & ID', done:false },
+          { id:'packing-chargers', text:'Chargers', done:false },
+        ],
         reminders: [],
       },
     });
+    assert.equal(updatedDefaults.ok, true);
+    assert.ok(updatedDefaults.updatedPlans >= 1);
 
-    const afterDefaultsChange = getState().plans.find((item) => item.id === first.planId);
-    assert.deepEqual(afterDefaultsChange.prep.packing.map((item) => item.text), ['Passport']);
+    upcomingPlan = getState().plans.find((item) => item.id === upcoming.planId);
+    const updatedPassport = upcomingPlan.prep.packing.find((item) => item.recurrentId === 'packing-passport');
+    const chargers = upcomingPlan.prep.packing.find((item) => item.recurrentId === 'packing-chargers');
+    const custom = upcomingPlan.prep.packing.find((item) => item.id === 'custom-camera');
+    assert.equal(updatedPassport.text, 'Passport & ID');
+    assert.equal(updatedPassport.done, true);
+    assert.equal(chargers.text, 'Chargers');
+    assert.equal(chargers.done, false);
+    assert.equal(custom.text, 'Film camera');
+    assert.equal(custom.done, true);
+    assert.deepEqual(upcomingPlan.prep.reminders, []);
 
-    const second = action(context.database, 'savePlan', {
-      meta: { location:'Italy', city:'Verona', start:'2026-11-01', end:'2026-11-03' },
+    const pastAfter = getState().plans.find((item) => item.id === past.planId).prep.packing.map((item) => item.text);
+    assert.deepEqual(pastAfter, pastBefore);
+
+    const future = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Verona', start:'2099-11-01', end:'2099-11-03' },
       budget: '',
     });
-    const secondPlan = getState().plans.find((item) => item.id === second.planId);
-    assert.deepEqual(secondPlan.prep.packing.map((item) => item.text), ['Chargers']);
-    assert.deepEqual(secondPlan.prep.reminders, []);
-    assert.ok(secondPlan.prep.updatedAt);
+    const futurePlan = getState().plans.find((item) => item.id === future.planId);
+    assert.deepEqual(futurePlan.prep.packing.map((item) => item.text), ['Passport & ID', 'Chargers']);
+    assert.deepEqual(futurePlan.prep.reminders, []);
   } finally {
     context.cleanup();
   }

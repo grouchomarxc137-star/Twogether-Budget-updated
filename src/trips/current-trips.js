@@ -1000,8 +1000,7 @@ function openSimplifiedChecklist(plan) {
     if (!sheet) return;
     sheet.innerHTML =
       '<div class="tv2-sheet-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
-      '<button type="button" class="tv2-check-recurrent" data-check-recurrent><span><strong>Recurrent items</strong><small>Edit the standard checklist used for new trips</small></span><b aria-hidden="true">›</b></button>'+
-      '<p class="tv2-check-intro">Keep the little things together before the trip. Changes save automatically.</p>'+
+      '<button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button>'+
       activeSection('packing','Packing / things to take')+
       activeSection('reminders','Important reminders')+
       completedSection()+
@@ -1021,8 +1020,8 @@ function openSimplifiedChecklist(plan) {
   }
   function cleanPrep() {
     return {
-      packing: prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:!!item.done})),
-      reminders: prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:!!item.done})),
+      packing: prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done})),
+      reminders: prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done})),
     };
   }
   function autoSaveChecklist() {
@@ -1110,14 +1109,33 @@ function openRecurrentChecklistItems(plan) {
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
 
+  const textMeasureCanvas = document.createElement('canvas');
+  const textMeasureContext = textMeasureCanvas.getContext('2d');
+  function syncRecurrentTextWidth(input) {
+    const scroller=input?.closest('[data-check-scroll]'); if(!input||!scroller)return;
+    const style=getComputedStyle(input);
+    if(textMeasureContext){
+      textMeasureContext.font=[style.fontStyle,style.fontVariant,style.fontWeight,style.fontSize,style.fontFamily].filter(Boolean).join(' ');
+      const text=input.value||'';
+      const spacing=Number.parseFloat(style.letterSpacing)||0;
+      const exact=Math.ceil(textMeasureContext.measureText(text).width+Math.max(0,text.length-1)*spacing);
+      input.style.width=Math.max(scroller.clientWidth,exact)+'px';
+    }else input.style.width='100%';
+    const maxScroll=Math.max(0,input.getBoundingClientRect().width-scroller.clientWidth);
+    if(scroller.scrollLeft>maxScroll)scroller.scrollLeft=maxScroll;
+  }
+  function syncAllRecurrentTextWidths(){
+    sheet.querySelectorAll('[data-check-text]').forEach(syncRecurrentTextWidth);
+  }
+
   function render() {
     sheet.innerHTML =
       '<div class="tv2-sheet-head"><div><button type="button" class="tv2-check-back" data-check-back>‹ Checklist</button><h2>Recurrent items</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
-      '<p class="tv2-check-intro">These items become the starting checklist for trips you create after saving. Existing trips stay unchanged.</p>'+
       sectionHtml('packing','Packing / things to take')+
       sectionHtml('reminders','Important reminders')+
       '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
       '<button type="button" class="tv2-primary tv2-check-save" data-check-defaults-save '+(state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save recurrent items')+'</button>';
+    requestAnimationFrame(syncAllRecurrentTextWidths);
   }
 
   function findItem(row) {
@@ -1142,8 +1160,10 @@ function openRecurrentChecklistItems(plan) {
       const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor());
       if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
       closeSimplifiedSheet();
-      openSimplifiedChecklist(plan);
-      simplifiedSnack('Recurrent items saved for new trips');
+      await refreshState(true);
+      const refreshedPlan=(remoteState?.plans||[]).find((item)=>item.id===plan.id)||plan;
+      openSimplifiedChecklist(refreshedPlan);
+      simplifiedSnack('Recurrent items saved');
     }catch(err){
       state.busy=false;state.error=err?.message||'Could not save recurrent items';render();
     }
@@ -1153,6 +1173,7 @@ function openRecurrentChecklistItems(plan) {
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
     if(item)item.text=e.target.value;
+    syncRecurrentTextWidth(e.target);
   });
   sheet.addEventListener('change',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;

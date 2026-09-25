@@ -353,13 +353,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
     }
 
     if (action === 'saveTripPrepDefaults') {
+      const previous = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
       const next = sanitizeTripPrepDefaults_(payload.prep || {});
-      next.updatedAt = new Date().toISOString();
+      const now = new Date().toISOString();
+      next.updatedAt = now;
       next.updatedBy = actor;
+      const updatedPlans = syncRecurrentPrepIntoUpcomingPlans_(state, previous, next, actor, now);
       state.tripPrepDefaults = next;
       addAudit_(state, actor, 'saveTripPrepDefaults', 'trip-prep-defaults');
       saveState_(state);
-      return output_({ok:true,prep:state.tripPrepDefaults});
+      return output_({ok:true,prep:state.tripPrepDefaults,updatedPlans:updatedPlans});
     }
 
     if (action === 'saveTripPrep') {
@@ -1022,7 +1025,7 @@ function sanitizeAccommodationMeta_(value){
   const upfrontBy=cleanActor_(s.upfrontBy)==='Unknown'?'':cleanActor_(s.upfrontBy),debtor=cleanActor_(r.debtor)==='Unknown'?'':cleanActor_(r.debtor),creditor=cleanActor_(r.creditor)==='Unknown'?'':cleanActor_(r.creditor);
   return {useJar:s.useJar===true,jarContribution:cleanMoney_(s.jarContribution)===''?0:cleanMoney_(s.jarContribution),jarBalanceAfter:cleanMoney_(s.jarBalanceAfter)===''?870:cleanMoney_(s.jarBalanceAfter),remaining:cleanMoney_(s.remaining),paymentType:paymentType==='solo'||paymentType==='shared'?paymentType:'',paidUpfront:s.paidUpfront===true,upfrontBy:upfrontBy,shareEach:cleanMoney_(s.shareEach),repayment:{debtor:debtor,creditor:creditor,amount:cleanMoney_(r.amount),status:status,confirmedAt:cleanText_(r.confirmedAt,40)}};
 }
-function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),text:cleanText_(x&&x.text,160),done:!!(x&&x.done)};}
+function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
@@ -1055,11 +1058,71 @@ function sanitizeTripPrepDefaults_(value){
 function tripPrepForNewPlan_(value,actor,now){
   const source=sanitizeTripPrepDefaults_(value);
   return {
-    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),text:item.text,done:false};}),
-    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),text:item.text,done:false};}),
+    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false};}),
+    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false};}),
     updatedAt:now||new Date().toISOString(),
     updatedBy:actor
   };
+}
+
+function normalizedPrepText_(value){return cleanText_(value,160).trim().toLowerCase();}
+function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
+  const existing=Array.isArray(existingItems)?existingItems.map(prepItem_):[];
+  const previous=Array.isArray(previousDefaults)?previousDefaults:[];
+  const next=Array.isArray(nextDefaults)?nextDefaults:[];
+  const previousById={};
+  previous.forEach(function(item){if(item&&item.id)previousById[item.id]=item;});
+  const matchedByDefaultId={};
+  const custom=[];
+  const usedPrevious={};
+
+  existing.forEach(function(item){
+    let recurrentId=cleanText_(item.recurrentId,80);
+    if(recurrentId && previousById[recurrentId]){
+      matchedByDefaultId[recurrentId]=item;
+      usedPrevious[recurrentId]=true;
+      return;
+    }
+    const text=normalizedPrepText_(item.text);
+    const legacy=previous.find(function(candidate){
+      return candidate && candidate.id && !usedPrevious[candidate.id] && normalizedPrepText_(candidate.text)===text;
+    });
+    if(legacy){
+      item.recurrentId=legacy.id;
+      matchedByDefaultId[legacy.id]=item;
+      usedPrevious[legacy.id]=true;
+      return;
+    }
+    custom.push(item);
+  });
+
+  const recurrent=next.map(function(item){
+    const prior=matchedByDefaultId[item.id];
+    return prior
+      ? {id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done}
+      : {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false};
+  });
+  return recurrent.concat(custom);
+}
+function syncRecurrentPrepIntoUpcomingPlans_(state,previousDefaults,nextDefaults,actor,now){
+  const today=new Date().toISOString().slice(0,10);
+  let updated=0;
+  state.plans=(Array.isArray(state.plans)?state.plans:[]).map(function(rawPlan){
+    const plan=sanitizePlan_(rawPlan);
+    const start=cleanText_(plan.meta&&plan.meta.start,20);
+    if(!start || start<today)return plan;
+    const linked=plan.linkedTripId?state.trips.find(function(item){return item.id===plan.linkedTripId;}):null;
+    if(linked&&isTripLocked_(linked))return plan;
+    plan.prep.packing=mergeRecurrentPrepKind_(plan.prep.packing,previousDefaults.packing,nextDefaults.packing);
+    plan.prep.reminders=mergeRecurrentPrepKind_(plan.prep.reminders,previousDefaults.reminders,nextDefaults.reminders);
+    plan.prep.updatedAt=now;
+    plan.prep.updatedBy=actor;
+    plan.updatedAt=now;
+    plan.updatedBy=actor;
+    updated+=1;
+    return plan;
+  });
+  return updated;
 }
 
 function emptySharedExpense_() {
