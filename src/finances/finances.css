@@ -1962,8 +1962,8 @@ body.finance-month-focus {
   border:1px solid #ead8b7;
 }
 
-[data-fin-view="balances"] .finance-current-card:nth-child(2) .v31-fin-icon,
-[data-fin-view="balances"] .finance-current-card:nth-child(4) .v31-fin-icon {
+[data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="savings"] .v31-fin-icon,
+[data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="investments"] .v31-fin-icon {
   color:#5d8051;
   background:linear-gradient(145deg,#f1f6eb,#e7efdf);
   border-color:#dbe6d2;
@@ -2113,7 +2113,7 @@ body.finance-month-focus {
 
 }
 
-[data-fin-view="balances"] .finance-current-card:last-child .finance-current-title h3 {
+[data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="investments"] .finance-current-title h3 {
   white-space:nowrap!important;
   font-size:20px!important;
   line-height:1.08!important;
@@ -4326,7 +4326,7 @@ dialog.finance-log-host .tv2-backdrop {
     width:auto!important;
     max-width:none!important;
     margin:0 -16px!important;
-    padding:14px max(9vw,34px) 22px!important;
+    padding:14px max(9vw,34px) 9px!important;
     overflow-x:auto!important;
     overflow-y:visible!important;
     scroll-snap-type:x mandatory;
@@ -4486,8 +4486,8 @@ dialog.finance-log-host .tv2-backdrop {
     box-shadow:none!important;
   }
 
-  [data-fin-view="balances"] .finance-wallet-nav button:nth-child(2) .v31-fin-icon,
-  [data-fin-view="balances"] .finance-wallet-nav button:nth-child(4) .v31-fin-icon {
+  [data-fin-view="balances"] .finance-wallet-nav button[data-fin-wallet-jump="savings"] .v31-fin-icon,
+  [data-fin-view="balances"] .finance-wallet-nav button[data-fin-wallet-jump="investments"] .v31-fin-icon {
     color:#5d8051;
     background:#eef5e8;
     border-color:#dbe6d2;
@@ -4507,7 +4507,7 @@ dialog.finance-log-host .tv2-backdrop {
     grid-template-columns:44px 1fr 44px;
     align-items:center;
     gap:8px;
-    margin:10px auto 2px;
+    margin:0 auto 4px;
     width:min(290px,88%);
     color:#7c6657;
   }
@@ -4579,5 +4579,17 @@ dialog.finance-log-host .tv2-backdrop {
   [data-fin-view="balances"] .finance-investment-edit {
     right:14px;
     bottom:11px;
+  }
+}
+
+@media(max-width:760px) {
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="cash"] .finance-current-title h3,
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-current-title h3,
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="savings"] .finance-current-title h3 {
+    font-size:22px!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="investments"] .finance-current-title h3 {
+    font-size:20px!important;
   }
 }
