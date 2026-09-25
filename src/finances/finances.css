@@ -3470,11 +3470,34 @@ button.finance-owed-history-row:hover {
 
 .finance-log-recurring-link {
   flex:0 0 auto;
-  min-height:36px;
-  padding:6px 0;
-  color:var(--tv2-muted);
-  font-size:15px;
+  min-height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:8px 11px!important;
+  border:1px solid #dfd3c3!important;
+  border-radius:13px!important;
+  background:rgba(255,253,249,.72)!important;
+  color:var(--tv2-ink)!important;
+  box-shadow:0 3px 10px rgba(62,45,31,.025);
+  font-size:13px;
+  font-weight:650;
+  line-height:1;
   white-space:nowrap;
+}
+
+.finance-log-recurring-link b {
+  color:var(--tv2-muted);
+  font-size:18px;
+  font-weight:500;
+  line-height:1;
+  transform:translateY(-.5px);
+}
+
+.finance-log-recurring-link:hover {
+  background:#fffaf3!important;
+  border-color:#cdbb9f!important;
 }
 
 .finance-log-home-head p {
@@ -4944,6 +4967,8 @@ dialog.finance-log-host .tv2-backdrop {
   }
 
   .finance-log-recurring-link {
-    font-size:13px;
+    min-height:36px;
+    padding:7px 10px!important;
+    font-size:12px;
   }
 }
