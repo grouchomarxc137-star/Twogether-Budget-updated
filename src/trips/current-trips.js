@@ -825,9 +825,29 @@ function checklistSeed(list) {
 }
 function tripPrepSnapshot(plan) {
   const stored = plan?.prep || {};
+  const initialized = !!stored.updatedAt || (Array.isArray(stored.packing) && stored.packing.length > 0) || (Array.isArray(stored.reminders) && stored.reminders.length > 0);
+  if (!initialized) {
+    return {
+      packing: checklistSeed(CHECKLIST_DEFAULTS.packing),
+      reminders: checklistSeed(CHECKLIST_DEFAULTS.reminders),
+    };
+  }
   return {
-    packing: stored.packing?.length ? stored.packing : checklistSeed(CHECKLIST_DEFAULTS.packing),
-    reminders: stored.reminders?.length ? stored.reminders : checklistSeed(CHECKLIST_DEFAULTS.reminders),
+    packing: Array.isArray(stored.packing) ? stored.packing : [],
+    reminders: Array.isArray(stored.reminders) ? stored.reminders : [],
+  };
+}
+
+function recurrentPrepSnapshot() {
+  const stored = remoteState?.tripPrepDefaults || {};
+  const initialized = !!stored.updatedAt || Array.isArray(stored.packing) || Array.isArray(stored.reminders);
+  const source = initialized ? stored : {
+    packing: checklistSeed(CHECKLIST_DEFAULTS.packing),
+    reminders: checklistSeed(CHECKLIST_DEFAULTS.reminders),
+  };
+  return {
+    packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false })),
+    reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false })),
   };
 }
 
@@ -916,12 +936,8 @@ function publishTripNotifications() {
 function openSimplifiedChecklist(plan) {
   if (!plan) return;
   closeSimplifiedSheet();
-  const stored = plan.prep || {};
-  const prep = {
-    packing: stored.packing?.length ? JSON.parse(JSON.stringify(stored.packing)) : checklistSeed(CHECKLIST_DEFAULTS.packing),
-    reminders: stored.reminders?.length ? JSON.parse(JSON.stringify(stored.reminders)) : checklistSeed(CHECKLIST_DEFAULTS.reminders),
-  };
-  const state = { busy:false, error:'' };
+  const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
+  const state = { error:'' };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
@@ -984,12 +1000,12 @@ function openSimplifiedChecklist(plan) {
     if (!sheet) return;
     sheet.innerHTML =
       '<div class="tv2-sheet-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
-      '<p class="tv2-check-intro">Keep the little things together before the trip.</p>'+
+      '<button type="button" class="tv2-check-recurrent" data-check-recurrent><span><strong>Recurrent items</strong><small>Edit the standard checklist used for new trips</small></span><b aria-hidden="true">›</b></button>'+
+      '<p class="tv2-check-intro">Keep the little things together before the trip. Changes save automatically.</p>'+
       activeSection('packing','Packing / things to take')+
       activeSection('reminders','Important reminders')+
       completedSection()+
-      '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
-      '<button type="button" class="tv2-primary tv2-check-save" data-check-save '+(state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save checklist')+'</button>';
+      '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>';
     requestAnimationFrame(() => {
       syncAllChecklistTextWidths();
       if (moveId) {
@@ -1003,26 +1019,30 @@ function openSimplifiedChecklist(plan) {
     const kind = row?.dataset.checkKind, id = row?.dataset.checkId;
     return kind && Array.isArray(prep[kind]) ? prep[kind].find((item)=>item.id===id) : null;
   }
+  function cleanPrep() {
+    return {
+      packing: prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:!!item.done})),
+      reminders: prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:!!item.done})),
+    };
+  }
+  function autoSaveChecklist() {
+    const snapshot = cleanPrep();
+    state.error='';
+    window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:snapshot},actor()).then((result)=>{
+      if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
+      publishTripNotifications();
+    }).catch((err)=>{
+      state.error=err?.message||'Could not update checklist';
+      render();
+    });
+  }
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
     const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
     prep[kind].push({ id:uid(), text, done:false });
     render();
+    autoSaveChecklist();
     requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
-  }
-  async function saveChecklist() {
-    if (state.busy) return;
-    state.busy=true; state.error=''; render();
-    prep.packing = prep.packing.filter((item)=>String(item.text||'').trim());
-    prep.reminders = prep.reminders.filter((item)=>String(item.text||'').trim());
-    try {
-      await window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep},actor());
-      closeSimplifiedSheet();
-      await refreshState(true);
-      simplifiedSnack('Checklist saved');
-    } catch (err) {
-      state.busy=false; state.error=err?.message||'Could not save checklist'; render();
-    }
   }
 
   sheet.addEventListener('change',(e)=>{
@@ -1030,9 +1050,13 @@ function openSimplifiedChecklist(plan) {
     const item=findItem(row); if(!item)return;
     if(e.target.matches('[data-check-toggle]')){
       item.done=e.target.checked;
+      autoSaveChecklist();
       row.classList.add('is-moving');
       setTimeout(()=>render(item.id),180);
-    } else if(e.target.matches('[data-check-text]')) item.text=e.target.value.trim();
+    } else if(e.target.matches('[data-check-text]')) {
+      item.text=e.target.value.trim();
+      autoSaveChecklist();
+    }
   });
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
@@ -1047,13 +1071,109 @@ function openSimplifiedChecklist(plan) {
   sheet.addEventListener('click',(e)=>{
     const b=e.target.closest('button'); if(!b)return;
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
+    if(b.hasAttribute('data-check-recurrent')){openRecurrentChecklistItems(plan);return;}
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
     if(b.hasAttribute('data-check-remove')){
       const row=b.closest('.tv2-check-row'),kind=row?.dataset.checkKind,id=row?.dataset.checkId;
       if(kind&&Array.isArray(prep[kind]))prep[kind]=prep[kind].filter((item)=>item.id!==id);
-      render(); return;
+      render(); autoSaveChecklist(); return;
     }
-    if(b.hasAttribute('data-check-save'))saveChecklist();
+  });
+  simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
+  simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
+  render();
+}
+
+function openRecurrentChecklistItems(plan) {
+  closeSimplifiedSheet();
+  const prep = JSON.parse(JSON.stringify(recurrentPrepSnapshot()));
+  const state = { busy:false, error:'' };
+  simplifiedLayer = document.createElement('div');
+  simplifiedLayer.className = 'tv2-layer';
+  simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet tv2-recurrent-sheet" role="dialog" aria-modal="true" aria-label="Recurrent checklist items"></div>';
+  document.body.appendChild(simplifiedLayer);
+  document.body.classList.add('tv2-locked');
+  const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
+
+  bindChecklistSwipeDown(simplifiedLayer, sheet);
+
+  const rowHtml = (kind,item) =>
+    '<div class="tv2-check-row tv2-recurrent-row" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+      '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
+      '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
+      '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove recurrent item">×</button>'+
+    '</div>';
+
+  const sectionHtml = (kind,title) =>
+    '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+prep[kind].length+'</span></div>'+
+      '<div class="tv2-check-list">'+(prep[kind].length?prep[kind].map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">No standard items here.</p>')+'</div>'+
+      '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
+    '</section>';
+
+  function render() {
+    sheet.innerHTML =
+      '<div class="tv2-sheet-head"><div><button type="button" class="tv2-check-back" data-check-back>‹ Checklist</button><h2>Recurrent items</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+      '<p class="tv2-check-intro">These items become the starting checklist for trips you create after saving. Existing trips stay unchanged.</p>'+
+      sectionHtml('packing','Packing / things to take')+
+      sectionHtml('reminders','Important reminders')+
+      '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
+      '<button type="button" class="tv2-primary tv2-check-save" data-check-defaults-save '+(state.busy?'disabled':'')+'>'+(state.busy?'Saving…':'Save recurrent items')+'</button>';
+  }
+
+  function findItem(row) {
+    const kind=row?.dataset.checkKind,id=row?.dataset.checkId;
+    return kind&&Array.isArray(prep[kind])?prep[kind].find((item)=>item.id===id):null;
+  }
+  function addItem(kind) {
+    const input=sheet.querySelector('[data-check-new="'+kind+'"]');
+    const text=input?.value?.trim(); if(!text||!Array.isArray(prep[kind]))return;
+    prep[kind].push({id:uid(),text,done:false});
+    render();
+    requestAnimationFrame(()=>sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
+  }
+  async function saveDefaults() {
+    if(state.busy)return;
+    state.busy=true;state.error='';render();
+    const payload={
+      packing:prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false})),
+      reminders:prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false})),
+    };
+    try{
+      const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor());
+      if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
+      closeSimplifiedSheet();
+      openSimplifiedChecklist(plan);
+      simplifiedSnack('Recurrent items saved for new trips');
+    }catch(err){
+      state.busy=false;state.error=err?.message||'Could not save recurrent items';render();
+    }
+  }
+
+  sheet.addEventListener('input',(e)=>{
+    if(!e.target.matches('[data-check-text]'))return;
+    const item=findItem(e.target.closest('.tv2-check-row'));
+    if(item)item.text=e.target.value;
+  });
+  sheet.addEventListener('change',(e)=>{
+    if(!e.target.matches('[data-check-text]'))return;
+    const item=findItem(e.target.closest('.tv2-check-row'));
+    if(item)item.text=e.target.value.trim();
+  });
+  sheet.addEventListener('keydown',(e)=>{
+    const input=e.target.closest('[data-check-new]');if(!input||e.key!=='Enter')return;
+    e.preventDefault();addItem(input.dataset.checkNew);
+  });
+  sheet.addEventListener('click',(e)=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
+    if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan);return;}
+    if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
+    if(b.hasAttribute('data-check-remove')){
+      const row=b.closest('.tv2-check-row'),kind=row?.dataset.checkKind,id=row?.dataset.checkId;
+      if(kind&&Array.isArray(prep[kind]))prep[kind]=prep[kind].filter((item)=>item.id!==id);
+      render();return;
+    }
+    if(b.hasAttribute('data-check-defaults-save'))saveDefaults();
   });
   simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
   simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});

@@ -40,6 +40,49 @@ test('starts with a complete empty state stored in SQLite tables', () => {
   }
 });
 
+test('recurrent trip checklist defaults apply only to newly created trips', () => {
+  const context = setup();
+  try {
+    const savedDefaults = action(context.database, 'saveTripPrepDefaults', {
+      prep: {
+        packing: [{ id:'packing-passport', text:'Passport', done:true }],
+        reminders: [{ id:'reminder-checkin', text:'Check in online', done:false }],
+      },
+    });
+    assert.equal(savedDefaults.ok, true);
+    assert.equal(savedDefaults.prep.packing[0].done, false);
+
+    const first = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2026-10-10', end:'2026-10-12' },
+      budget: '',
+    });
+    const firstPlan = getState().plans.find((item) => item.id === first.planId);
+    assert.deepEqual(firstPlan.prep.packing.map((item) => item.text), ['Passport']);
+    assert.deepEqual(firstPlan.prep.reminders.map((item) => item.text), ['Check in online']);
+
+    action(context.database, 'saveTripPrepDefaults', {
+      prep: {
+        packing: [{ id:'packing-charger', text:'Chargers', done:false }],
+        reminders: [],
+      },
+    });
+
+    const afterDefaultsChange = getState().plans.find((item) => item.id === first.planId);
+    assert.deepEqual(afterDefaultsChange.prep.packing.map((item) => item.text), ['Passport']);
+
+    const second = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Verona', start:'2026-11-01', end:'2026-11-03' },
+      budget: '',
+    });
+    const secondPlan = getState().plans.find((item) => item.id === second.planId);
+    assert.deepEqual(secondPlan.prep.packing.map((item) => item.text), ['Chargers']);
+    assert.deepEqual(secondPlan.prep.reminders, []);
+    assert.ok(secondPlan.prep.updatedAt);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('creates a trip plan without a budget when budget is skipped', () => {
   const context = setup();
   try {

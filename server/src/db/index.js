@@ -9,6 +9,24 @@ const DEFAULT_COMPARE = {
   carpay: 250, insurance: 90, tax: 45, carfuel: 120, maintenance: 50,
 };
 const DEFAULT_JAR = { initialBalance: 870, balance: 870, transactions: [] };
+const DEFAULT_TRIP_PREP_DEFAULTS = {
+  packing: [
+    { id:'default-packing-1', text:'Toothbrushes', done:false },
+    { id:'default-packing-2', text:'Slippers', done:false },
+    { id:'default-packing-3', text:'Hair brush', done:false },
+    { id:'default-packing-4', text:'Shampoo', done:false },
+    { id:'default-packing-5', text:'Conditioner', done:false },
+    { id:'default-packing-6', text:'Shower gel', done:false },
+    { id:'default-packing-7', text:'Dishwasher detergent', done:false },
+  ],
+  reminders: [
+    { id:'default-reminder-1', text:"Don't forget to put fuel", done:false },
+    { id:'default-reminder-2', text:"Don't forget to ask mom to make work sandwich", done:false },
+    { id:'default-reminder-3', text:"Don't forget to take pictures of the Airbnb when you arrive", done:false },
+  ],
+  updatedAt: '',
+  updatedBy: 'Unknown',
+};
 const DEFAULT_FINANCE_PROFILE = {
   bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [],
   scenarios: [], wishlist: [], compareLab: {},
@@ -43,6 +61,7 @@ export function openDatabase(databasePath) {
 
   const putAppState = db.prepare('INSERT OR IGNORE INTO app_state (key, json) VALUES (?, ?)');
   putAppState.run('sharedJar', encode(DEFAULT_JAR));
+  putAppState.run('tripPrepDefaults', encode(DEFAULT_TRIP_PREP_DEFAULTS));
   putAppState.run('compare', encode(DEFAULT_COMPARE));
   putAppState.run('gameSignals', '[]');
   putAppState.run('audit', '[]');
@@ -93,6 +112,7 @@ export function openDatabase(databasePath) {
       finances,
       financeProfiles,
       sharedJar: decode(appValue.get('sharedJar')?.json, DEFAULT_JAR),
+      tripPrepDefaults: decode(appValue.get('tripPrepDefaults')?.json, DEFAULT_TRIP_PREP_DEFAULTS),
       game,
       compare: decode(appValue.get('compare')?.json, DEFAULT_COMPARE),
       audit: decode(appValue.get('audit')?.json, []),
@@ -125,6 +145,7 @@ export function openDatabase(databasePath) {
     }
 
     upsertAppState.run('sharedJar', encode(state.sharedJar || DEFAULT_JAR));
+    upsertAppState.run('tripPrepDefaults', encode(state.tripPrepDefaults || DEFAULT_TRIP_PREP_DEFAULTS));
     upsertAppState.run('compare', encode(state.compare || DEFAULT_COMPARE));
     upsertAppState.run('gameSignals', encode(state.game?.signals || []));
     upsertAppState.run('audit', encode(state.audit || []));
@@ -136,6 +157,7 @@ export function openDatabase(databasePath) {
       version: 18, trips: [], plans: [], finances: { Principessa: [], Principe: [] },
       financeProfiles: { Principessa: clone(DEFAULT_FINANCE_PROFILE), Principe: clone(DEFAULT_FINANCE_PROFILE) },
       sharedJar: clone(DEFAULT_JAR),
+      tripPrepDefaults: clone(DEFAULT_TRIP_PREP_DEFAULTS),
       game: { Principessa: clone(DEFAULT_GAME_PROFILE), Principe: clone(DEFAULT_GAME_PROFILE), signals: [] },
       compare: clone(DEFAULT_COMPARE), audit: [], updatedAt: '',
     });

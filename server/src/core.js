@@ -22,6 +22,7 @@ function defaultState_() {
     version: 18,
     trips: [],
     plans: [],
+    tripPrepDefaults: defaultTripPrepDefaults_(),
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
       Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}},
@@ -47,6 +48,7 @@ function readState_() {
       version: 18,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
       plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
+      tripPrepDefaults: sanitizeTripPrepDefaults_(parsed.tripPrepDefaults),
       finances: sanitizeFinances_(parsed.finances),
       financeProfiles: sanitizeFinanceProfiles_(parsed.financeProfiles),
       sharedJar: sanitizeSharedJar_(parsed.sharedJar),
@@ -172,6 +174,7 @@ function saveState_(state) {
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
   state.trips = Array.isArray(state.trips) ? state.trips.map(sanitizeTripRecord_) : [];
+  state.tripPrepDefaults = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
   state.finances = sanitizeFinances_(state.finances);
   state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
   state.sharedJar = sanitizeSharedJar_(state.sharedJar);
@@ -217,7 +220,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
           budgets: {Principessa:'', Principe:''},
           partials: {Principessa:null, Principe:null},
           sharedExpenses: {},
-          prep: defaultTripPrep_(),
+          prep: tripPrepForNewPlan_(state.tripPrepDefaults, actor, now),
           linkedTripId: '',
           createdAt: now,
           createdBy: actor,
@@ -347,6 +350,16 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       addAudit_(state, actor, 'accommodationRepayment:' + repayment.status, plan.id);
       saveState_(state);
       return output_({ok:true,sharedExpense:plan.sharedExpenses.accom,sharedJar:sanitizeSharedJar_(state.sharedJar)});
+    }
+
+    if (action === 'saveTripPrepDefaults') {
+      const next = sanitizeTripPrepDefaults_(payload.prep || {});
+      next.updatedAt = new Date().toISOString();
+      next.updatedBy = actor;
+      state.tripPrepDefaults = next;
+      addAudit_(state, actor, 'saveTripPrepDefaults', 'trip-prep-defaults');
+      saveState_(state);
+      return output_({ok:true,prep:state.tripPrepDefaults});
     }
 
     if (action === 'saveTripPrep') {
@@ -1011,7 +1024,43 @@ function sanitizeAccommodationMeta_(value){
 }
 function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),text:cleanText_(x&&x.text,160),done:!!(x&&x.done)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
+function defaultTripPrepDefaults_(){
+  return {
+    packing:[
+      {id:'default-packing-1',text:'Toothbrushes',done:false},
+      {id:'default-packing-2',text:'Slippers',done:false},
+      {id:'default-packing-3',text:'Hair brush',done:false},
+      {id:'default-packing-4',text:'Shampoo',done:false},
+      {id:'default-packing-5',text:'Conditioner',done:false},
+      {id:'default-packing-6',text:'Shower gel',done:false},
+      {id:'default-packing-7',text:'Dishwasher detergent',done:false}
+    ],
+    reminders:[
+      {id:'default-reminder-1',text:"Don't forget to put fuel",done:false},
+      {id:'default-reminder-2',text:"Don't forget to ask mom to make work sandwich",done:false},
+      {id:'default-reminder-3',text:"Don't forget to take pictures of the Airbnb when you arrive",done:false}
+    ],
+    updatedAt:'',
+    updatedBy:'Unknown'
+  };
+}
 function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{};return {packing:(Array.isArray(s.packing)?s.packing:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),reminders:(Array.isArray(s.reminders)?s.reminders:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),updatedAt:cleanText_(s.updatedAt,40),updatedBy:cleanActor_(s.updatedBy)};}
+function sanitizeTripPrepDefaults_(value){
+  if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
+  const out=sanitizeTripPrep_(value);
+  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false};});
+  out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false};});
+  return out;
+}
+function tripPrepForNewPlan_(value,actor,now){
+  const source=sanitizeTripPrepDefaults_(value);
+  return {
+    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),text:item.text,done:false};}),
+    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),text:item.text,done:false};}),
+    updatedAt:now||new Date().toISOString(),
+    updatedBy:actor
+  };
+}
 
 function emptySharedExpense_() {
   return {
@@ -1850,7 +1899,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveTripPrepDefaults', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
