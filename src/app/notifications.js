@@ -94,28 +94,6 @@ function renderGroup(group) {
   '</section>';
 }
 
-function renderPushControl() {
-  const api = window.TwogetherPush;
-  if (!api?.status) return '';
-  const status = api.status();
-  let detail = 'Get these reminders even when Twogether is closed.';
-  let button = '';
-
-  if (!status.supported) {
-    detail = 'Install Twogether on your Home Screen to use lock-screen alerts.';
-  } else if (status.permission === 'denied') {
-    detail = 'Notifications are blocked in your phone settings.';
-  } else if (status.enabled) {
-    detail = 'Lock-screen alerts are on for this phone.';
-    button = '<button type="button" data-tw-push-action="disable"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : 'Turn off') + '</button>';
-  } else {
-    button = '<button type="button" class="is-primary" data-tw-push-action="enable"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : 'Enable') + '</button>';
-  }
-
-  const message = status.message ? '<small class="tw-push-message">' + esc(status.message) + '</small>' : '';
-  return '<div class="tw-push-control"><div><strong>Phone notifications</strong><small>' + esc(detail) + '</small>' + message + '</div>' + button + '</div>';
-}
-
 function clearPushDeepLink() {
   if (!pushDeepLinkSource) return;
   try {
@@ -123,6 +101,102 @@ function clearPushDeepLink() {
     url.searchParams.delete('notifications');
     history.replaceState(history.state, '', url.pathname + url.search + url.hash);
   } catch {}
+}
+
+const PUSH_PROMPT_ID = 'twPushPrompt';
+
+function ensurePushPrompt() {
+  let layer = document.getElementById(PUSH_PROMPT_ID);
+  if (layer) return layer;
+  layer = document.createElement('div');
+  layer.id = PUSH_PROMPT_ID;
+  layer.className = 'tw-push-prompt-layer';
+  layer.hidden = true;
+  layer.setAttribute('aria-hidden', 'true');
+  layer.innerHTML =
+    '<div class="tw-push-prompt-backdrop" data-tw-push-close></div>' +
+    '<section class="tw-push-prompt-card" role="dialog" aria-modal="true" aria-labelledby="twPushPromptTitle">' +
+      '<div id="twPushPromptBody"></div>' +
+    '</section>';
+  document.body.appendChild(layer);
+
+  layer.addEventListener('click', async (event) => {
+    if (event.target.closest?.('[data-tw-push-close]')) {
+      closePushPrompt();
+      return;
+    }
+    const action = event.target.closest?.('[data-tw-push-prompt-action]');
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const api = window.TwogetherPush;
+    if (!api) return;
+    action.disabled = true;
+    const mode = String(action.dataset.twPushPromptAction || '');
+    if (mode === 'disable') await api.disable?.();
+    else await api.enable?.();
+    const status = api.status?.() || {};
+    if ((mode === 'enable' && status.enabled) || (mode === 'disable' && !status.enabled && !status.message)) {
+      closePushPrompt();
+      return;
+    }
+    renderPushPrompt();
+  });
+
+  return layer;
+}
+
+function renderPushPrompt() {
+  const layer = ensurePushPrompt();
+  const body = layer.querySelector('#twPushPromptBody');
+  const api = window.TwogetherPush;
+  if (!body || !api?.status) return;
+  const status = api.status();
+
+  let title = status.enabled ? 'Turn phone notifications off?' : 'Turn phone notifications on?';
+  let detail = status.enabled
+    ? 'Twogether will stop sending reminders to this phone.'
+    : 'Twogether can show your Trips and Finances reminders on your lock screen.';
+  let action = status.enabled ? 'disable' : 'enable';
+  let actionLabel = status.enabled ? 'Turn off' : 'Turn on';
+
+  if (!status.supported) {
+    title = 'Phone notifications';
+    detail = 'Install Twogether on your Home Screen first to use lock-screen notifications.';
+    action = '';
+  } else if (status.permission === 'denied') {
+    title = 'Phone notifications are blocked';
+    detail = 'Allow notifications for Twogether in your phone settings, then try again.';
+    action = '';
+  }
+
+  body.innerHTML =
+    '<h3 id="twPushPromptTitle">' + esc(title) + '</h3>' +
+    '<p>' + esc(detail) + '</p>' +
+    (status.message ? '<small class="tw-push-prompt-message">' + esc(status.message) + '</small>' : '') +
+    '<div class="tw-push-prompt-actions">' +
+      '<button type="button" data-tw-push-close>Cancel</button>' +
+      (action ? '<button type="button" class="is-primary" data-tw-push-prompt-action="' + action + '"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : actionLabel) + '</button>' : '') +
+    '</div>';
+}
+
+async function openPushPrompt() {
+  close();
+  const api = window.TwogetherPush;
+  if (api?.refresh) await api.refresh().catch(() => {});
+  const layer = ensurePushPrompt();
+  renderPushPrompt();
+  layer.hidden = false;
+  layer.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => layer.classList.add('show'));
+}
+
+function closePushPrompt() {
+  const layer = document.getElementById(PUSH_PROMPT_ID);
+  if (!layer) return;
+  layer.classList.remove('show');
+  layer.setAttribute('aria-hidden', 'true');
+  layer.hidden = true;
 }
 
 function ensureUi() {
@@ -233,7 +307,6 @@ function render() {
       '<h2 id="twNotificationTitle">Notifications</h2>' +
       '<p>' + esc(pendingText) + '</p>' +
     '</div>' +
-    renderPushControl() +
     renderSourceTabs(groups) +
     '<div class="tw-notification-list tw-notification-source-list is-' + esc(activeSource) + '" role="tabpanel">' +
       (visibleItems.length
@@ -328,9 +401,45 @@ export function initNotifications() {
     }, 170);
   }
 
+  let bellPressTimer = null;
+  let bellPressStart = null;
+  let ignoreBellClickUntil = 0;
+
+  function cancelBellLongPress() {
+    if (bellPressTimer) clearTimeout(bellPressTimer);
+    bellPressTimer = null;
+    bellPressStart = null;
+    ui.button.classList.remove('is-long-pressing');
+  }
+
+  ui.button.addEventListener('pointerdown', (event) => {
+    if (event.button != null && event.button !== 0) return;
+    cancelBellLongPress();
+    bellPressStart = { x:event.clientX, y:event.clientY, pointerId:event.pointerId };
+    ui.button.classList.add('is-long-pressing');
+    bellPressTimer = setTimeout(() => {
+      bellPressTimer = null;
+      ignoreBellClickUntil = Date.now() + 700;
+      ui.button.classList.remove('is-long-pressing');
+      openPushPrompt().catch(() => {});
+    }, 550);
+  });
+
+  ui.button.addEventListener('pointermove', (event) => {
+    if (!bellPressStart || event.pointerId !== bellPressStart.pointerId) return;
+    if (Math.hypot(event.clientX - bellPressStart.x, event.clientY - bellPressStart.y) > 10) cancelBellLongPress();
+  });
+
+  ui.button.addEventListener('pointerup', cancelBellLongPress);
+  ui.button.addEventListener('pointercancel', cancelBellLongPress);
+  ui.button.addEventListener('pointerleave', (event) => {
+    if (event.pointerType === 'mouse') cancelBellLongPress();
+  });
+
   ui.button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (Date.now() < ignoreBellClickUntil) return;
     ui.layer.hidden ? open() : close();
   });
 
@@ -387,19 +496,6 @@ export function initNotifications() {
   }, { passive:true });
 
   ui.layer.addEventListener('click', async (event) => {
-    const pushAction = event.target.closest?.('[data-tw-push-action]');
-    if (pushAction) {
-      event.preventDefault();
-      event.stopPropagation();
-      const api = window.TwogetherPush;
-      if (!api) return;
-      pushAction.disabled = true;
-      const action = String(pushAction.dataset.twPushAction || '');
-      if (action === 'disable') await api.disable?.();
-      else await api.enable?.();
-      render();
-      return;
-    }
     if (event.target.closest?.('[data-tw-notification-close]')) { close(); return; }
     const tab = event.target.closest?.('[data-tw-notification-tab]');
     if (tab) {
@@ -441,7 +537,11 @@ export function initNotifications() {
     if (event.key === 'Escape' && !ui.layer.hidden) close();
   });
 
-  document.addEventListener('twogether:push-status', render);
+  document.addEventListener('twogether:push-status', () => {
+    render();
+    const prompt = document.getElementById(PUSH_PROMPT_ID);
+    if (prompt && !prompt.hidden) renderPushPrompt();
+  });
 
   if (actorObserver) actorObserver.disconnect();
   actorObserver = new MutationObserver(render);

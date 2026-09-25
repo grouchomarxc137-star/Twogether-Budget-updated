@@ -1396,67 +1396,103 @@ body.dev-v21 #loggedUserBadge {
     0 9px 13px -10px rgba(193,151,67,.56);
 }
 
+/* Phone notification long-press prompt */
+.tw-notification-button {
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
 
-/* Phone push notifications */
-.tw-push-control {
-  display:flex;
+.tw-notification-button.is-long-pressing {
+  transform:scale(.94);
+  opacity:.82;
+}
+
+.tw-push-prompt-layer {
+  position:fixed;
+  inset:0;
+  z-index:1800;
+  display:none;
   align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin:12px 0 4px;
-  padding:10px 12px;
-  border:1px solid rgba(126,104,91,.12);
-  border-radius:14px;
-  background:rgba(255,253,249,.58);
+  justify-content:center;
+  padding:24px;
+  box-sizing:border-box;
 }
 
-.tw-push-control>div {
-  display:grid;
-  gap:2px;
-  min-width:0;
+.tw-push-prompt-layer.show {
+  display:flex;
 }
 
-.tw-push-control strong {
-  font-size:12.5px;
+.tw-push-prompt-backdrop {
+  position:absolute;
+  inset:0;
+  background:rgba(40,34,30,.30);
+  -webkit-backdrop-filter:blur(5px);
+  backdrop-filter:blur(5px);
+}
+
+.tw-push-prompt-card {
+  position:relative;
+  width:min(330px,100%);
+  padding:20px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--card);
   color:var(--ink);
+  box-shadow:0 22px 60px rgba(45,35,29,.22);
 }
 
-.tw-push-control small {
-  display:block;
+.tw-push-prompt-card h3 {
+  margin:0 0 7px;
+  font-family:Georgia,serif;
+  font-size:20px;
+  line-height:1.15;
+}
+
+.tw-push-prompt-card p {
+  margin:0;
   color:var(--muted);
-  font-size:10.5px;
-  line-height:1.35;
+  font-size:12px;
+  line-height:1.45;
 }
 
-.tw-push-control .tw-push-message {
+.tw-push-prompt-message {
+  display:block;
+  margin-top:7px;
   color:#9a594f;
+  font-size:11px;
 }
 
-.tw-push-control button {
-  flex:0 0 auto;
-  min-width:72px;
-  padding:7px 10px;
+.tw-push-prompt-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:18px;
+}
+
+.tw-push-prompt-actions button {
+  padding:8px 12px;
   border:1px solid rgba(126,104,91,.16);
   border-radius:999px;
-  background:rgba(255,255,255,.66);
+  background:rgba(255,255,255,.68);
   color:var(--ink);
   font:inherit;
   font-size:11px;
   font-weight:750;
 }
 
-.tw-push-control button.is-primary {
-  border-color:rgba(193,151,67,.26);
-  background:rgba(193,151,67,.12);
+.tw-push-prompt-actions button.is-primary {
+  border-color:rgba(193,151,67,.28);
+  background:rgba(193,151,67,.13);
   color:#7d5e1e;
 }
 
-.tw-push-control button:disabled {
+.tw-push-prompt-actions button:disabled {
   opacity:.58;
 }
 
-@media(max-width:520px) {
-  .tw-push-control {
-    align-items:flex-start;
+@media(prefers-reduced-motion:no-preference) {
+  .tw-notification-button {
+    transition:transform .14s ease,opacity .14s ease;
   }
 }
