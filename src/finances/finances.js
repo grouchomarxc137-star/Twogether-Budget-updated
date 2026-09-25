@@ -575,8 +575,7 @@ async function queueInvestmentSnapshotReminder(month,date='') {
   try{await post('saveFinanceProfile',{profile:next});}catch{}
 }
 function openInvestmentSnapshotEditor(month) {
-  const rec=recordFor(month);
-  if(!rec)return toast('No investment value logged for this month yet','warn');
+  const rec=recordFor(month)||directMonthRecord(month);
   if(rec.finalized===true)return toast('This month is final and locked','warn');
   const isPrincipessa=actor()==='Principessa';
   const current=hasValue(rec.investmentTotal)?String(n(rec.investmentTotal)):'';
@@ -1011,13 +1010,14 @@ function renderCurrentPanel() {
       <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button></article>
       <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
       <article class="finance-current-card tone-receivable" data-fin-owed-card><button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button></article>
-      <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${latestInvestment ? '<button class="text-btn" type="button" data-fin-edit-investment-value>Edit</button>' : ''}<strong>${money(inv.ownInvestments || 0)}</strong></div></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
+      <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${latestInvestment || actor()==='Principe' ? '<button class="text-btn" type="button" data-fin-edit-investment-value>Edit</button>' : ''}<strong>${money(inv.ownInvestments || 0)}</strong></div></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div><div class="finance-networth"><span>Current net worth</span><strong>${money(netWorth)}</strong><small>${latestInvestment ? `Investment snapshot: ${monthLabel(latestInvestment.month)}` : 'Log an investment snapshot in a month'}</small></div></article>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
   $$('[data-fin-edit-bank]', root).forEach((btn) => btn.addEventListener('click', () => openBankModal(Number(btn.dataset.finEditBank))));
   $('[data-fin-edit-savings]', root)?.addEventListener('click', openSavingsModal);
   $('[data-fin-edit-investment-value]', root)?.addEventListener('click', () => {
-    if(latestInvestment)openInvestmentSnapshotEditor(latestInvestment.month);
+    const month=latestInvestment?.month || (actor()==='Principe'?localFinanceToday().month:'');
+    if(month)openInvestmentSnapshotEditor(month);
   });
   $('[data-fin-add-hold]', root)?.addEventListener('click', () => openHoldModal(-1));
   $$('[data-fin-edit-hold]', root).forEach((btn) => btn.addEventListener('click', () => openHoldModal(Number(btn.dataset.finEditHold))));
