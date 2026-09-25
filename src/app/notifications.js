@@ -7,6 +7,14 @@ const pendingSources = new Map();
 let actorObserver = null;
 let activeSource = 'trips';
 const expandedTripNotifications = new Set();
+let pushDeepLinkSource = (() => {
+  try {
+    const value = new URLSearchParams(window.location.search).get('notifications') || '';
+    return value === 'trips' || value === 'finances' ? value : '';
+  } catch {
+    return '';
+  }
+})();
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -84,6 +92,37 @@ function renderGroup(group) {
     '<div class="tw-notification-group-head"><strong>' + esc(meta.title) + '</strong><span>' + group.items.length + '</span></div>' +
     '<div class="tw-notification-group-items">' + group.items.map((item) => renderItem(item, group.source)).join('') + '</div>' +
   '</section>';
+}
+
+function renderPushControl() {
+  const api = window.TwogetherPush;
+  if (!api?.status) return '';
+  const status = api.status();
+  let detail = 'Get these reminders even when Twogether is closed.';
+  let button = '';
+
+  if (!status.supported) {
+    detail = 'Install Twogether on your Home Screen to use lock-screen alerts.';
+  } else if (status.permission === 'denied') {
+    detail = 'Notifications are blocked in your phone settings.';
+  } else if (status.enabled) {
+    detail = 'Lock-screen alerts are on for this phone.';
+    button = '<button type="button" data-tw-push-action="disable"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : 'Turn off') + '</button>';
+  } else {
+    button = '<button type="button" class="is-primary" data-tw-push-action="enable"' + (status.busy ? ' disabled' : '') + '>' + (status.busy ? 'Working…' : 'Enable') + '</button>';
+  }
+
+  const message = status.message ? '<small class="tw-push-message">' + esc(status.message) + '</small>' : '';
+  return '<div class="tw-push-control"><div><strong>Phone notifications</strong><small>' + esc(detail) + '</small>' + message + '</div>' + button + '</div>';
+}
+
+function clearPushDeepLink() {
+  if (!pushDeepLinkSource) return;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('notifications');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  } catch {}
 }
 
 function ensureUi() {
@@ -194,6 +233,7 @@ function render() {
       '<h2 id="twNotificationTitle">Notifications</h2>' +
       '<p>' + esc(pendingText) + '</p>' +
     '</div>' +
+    renderPushControl() +
     renderSourceTabs(groups) +
     '<div class="tw-notification-list tw-notification-source-list is-' + esc(activeSource) + '" role="tabpanel">' +
       (visibleItems.length
@@ -204,6 +244,7 @@ function render() {
 function open() {
   const ui = ensureUi();
   if (!ui || !actor()) return;
+  window.TwogetherPush?.refresh?.().catch?.(() => {});
   const groups = currentGroups();
   if (!itemsForSource(groups, activeSource).length) {
     if (itemsForSource(groups, 'trips').length) activeSource = 'trips';
@@ -240,8 +281,16 @@ function setPending(items = [], source = 'default') {
     reminders: Array.isArray(item?.reminders) ? item.reminders.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
     packing: Array.isArray(item?.packing) ? item.packing.map((text) => String(text || '')).filter(Boolean).slice(0, 8) : [],
   })).filter((item) => item.id && item.title) : [];
-  pendingSources.set(String(source || 'default'), normalized);
+  const sourceKey = String(source || 'default');
+  pendingSources.set(sourceKey, normalized);
+  const openFromPush = pushDeepLinkSource === sourceKey && (sourceKey === 'trips' || sourceKey === 'finances') && !!actor();
+  if (openFromPush) activeSource = sourceKey;
   render();
+  if (openFromPush) {
+    clearPushDeepLink();
+    pushDeepLinkSource = '';
+    setTimeout(() => open(), 0);
+  }
 }
 export function initNotifications() {
   const ui = ensureUi();
@@ -337,7 +386,20 @@ export function initNotifications() {
     if (financeSwipe.tracking) resetFinanceSwipe(true);
   }, { passive:true });
 
-  ui.layer.addEventListener('click', (event) => {
+  ui.layer.addEventListener('click', async (event) => {
+    const pushAction = event.target.closest?.('[data-tw-push-action]');
+    if (pushAction) {
+      event.preventDefault();
+      event.stopPropagation();
+      const api = window.TwogetherPush;
+      if (!api) return;
+      pushAction.disabled = true;
+      const action = String(pushAction.dataset.twPushAction || '');
+      if (action === 'disable') await api.disable?.();
+      else await api.enable?.();
+      render();
+      return;
+    }
     if (event.target.closest?.('[data-tw-notification-close]')) { close(); return; }
     const tab = event.target.closest?.('[data-tw-notification-tab]');
     if (tab) {
@@ -378,6 +440,8 @@ export function initNotifications() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !ui.layer.hidden) close();
   });
+
+  document.addEventListener('twogether:push-status', render);
 
   if (actorObserver) actorObserver.disconnect();
   actorObserver = new MutationObserver(render);

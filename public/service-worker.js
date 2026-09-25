@@ -1,4 +1,4 @@
-const CACHE = 'twogether-v3';
+const CACHE = 'twogether-v4';
 const FALLBACK = './index.html';
 
 self.addEventListener('install', (event) => {
@@ -28,10 +28,51 @@ self.addEventListener('fetch', (event) => {
   })());
 });
 
+self.addEventListener('push', (event) => {
+  event.waitUntil((async () => {
+    const subscription = await self.registration.pushManager.getSubscription();
+    if (!subscription?.endpoint) return;
+    try {
+      const response = await fetch(new URL('./api/push/messages', self.registration.scope), {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ endpoint:subscription.endpoint }),
+      });
+      const json = await response.json();
+      const messages = Array.isArray(json?.messages) ? json.messages : [];
+      for (const message of messages) {
+        await self.registration.showNotification(String(message.title || 'Twogether'), {
+          body:String(message.body || ''),
+          icon:'./app-icon.svg?v=3',
+          badge:'./app-icon.svg?v=3',
+          tag:String(message.tag || message.id || 'twogether-notification'),
+          renotify:true,
+          data:{ url:String(message.url || './') },
+        });
+      }
+    } catch {
+      await self.registration.showNotification('Twogether', {
+        body:'You have a new notification.',
+        icon:'./app-icon.svg?v=3',
+        badge:'./app-icon.svg?v=3',
+        tag:'twogether-notification',
+        data:{ url:'./' },
+      });
+    }
+  })());
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-    for (const client of list) if ('focus' in client) return client.focus();
-    return clients.openWindow('./');
+  const target = new URL(event.notification.data?.url || './', self.registration.scope).href;
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
+    for (const client of list) {
+      if (!('focus' in client)) continue;
+      try {
+        if ('navigate' in client && client.url !== target) await client.navigate(target);
+      } catch {}
+      return client.focus();
+    }
+    return clients.openWindow(target);
   }));
 });

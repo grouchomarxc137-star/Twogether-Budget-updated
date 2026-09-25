@@ -1395,3 +1395,68 @@ body.dev-v21 #loggedUserBadge {
     0 3px 10px rgba(45,35,29,.02),
     0 9px 13px -10px rgba(193,151,67,.56);
 }
+
+
+/* Phone push notifications */
+.tw-push-control {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:12px 0 4px;
+  padding:10px 12px;
+  border:1px solid rgba(126,104,91,.12);
+  border-radius:14px;
+  background:rgba(255,253,249,.58);
+}
+
+.tw-push-control>div {
+  display:grid;
+  gap:2px;
+  min-width:0;
+}
+
+.tw-push-control strong {
+  font-size:12.5px;
+  color:var(--ink);
+}
+
+.tw-push-control small {
+  display:block;
+  color:var(--muted);
+  font-size:10.5px;
+  line-height:1.35;
+}
+
+.tw-push-control .tw-push-message {
+  color:#9a594f;
+}
+
+.tw-push-control button {
+  flex:0 0 auto;
+  min-width:72px;
+  padding:7px 10px;
+  border:1px solid rgba(126,104,91,.16);
+  border-radius:999px;
+  background:rgba(255,255,255,.66);
+  color:var(--ink);
+  font:inherit;
+  font-size:11px;
+  font-weight:750;
+}
+
+.tw-push-control button.is-primary {
+  border-color:rgba(193,151,67,.26);
+  background:rgba(193,151,67,.12);
+  color:#7d5e1e;
+}
+
+.tw-push-control button:disabled {
+  opacity:.58;
+}
+
+@media(max-width:520px) {
+  .tw-push-control {
+    align-items:flex-start;
+  }
+}
