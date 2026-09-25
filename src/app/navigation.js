@@ -234,7 +234,9 @@ function installDropdownRefinement() {
   const onScroll = () => { if (scrollQueued) return; scrollQueued = true; requestAnimationFrame(() => { scrollQueued = false; closeForScroll(); }); };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('wheel', closeForScroll, { passive: true, capture: true });
-  document.addEventListener('touchmove', () => { if (isMobile()) closeForScroll(); }, { passive: true, capture: true });
+  document.addEventListener('touchmove', () => {
+    if (isMobile() && !hubSubHold.selecting) closeForScroll();
+  }, { passive: true, capture: true });
   document.addEventListener('pointermove', (e) => {
     if (isMobile()) return;
     const moved = !lastPointer || Math.hypot(e.clientX - lastPointer.x, e.clientY - lastPointer.y) > 2;
@@ -720,81 +722,84 @@ function installSurfaceNavigation() {
   document.addEventListener('touchcancel', () => resetSurfaceSwipe(true), { passive:true, capture:true });
 }
 
-let hubHoldInstalled = false;
-let hubHold = {
+let hubSubHoldInstalled = false;
+let hubSubHold = {
   timer:null,
   tracking:false,
   selecting:false,
   pointerId:null,
-  startX:0,
-  startY:0,
+  wrap:null,
+  hub:null,
+  menu:null,
   current:null,
   ignoreClickUntil:0,
   dispatching:false,
 };
 
-function hubHaptic(strength = 8) {
+function hubSelectionHaptic(pattern = 12) {
   try {
-    if (typeof navigator.vibrate === 'function') navigator.vibrate(strength);
+    if (typeof navigator.vibrate === 'function') {
+      const result = navigator.vibrate(pattern);
+      return result !== false;
+    }
   } catch {}
+  return false;
 }
 
-function hubChoiceAt(x, y) {
-  const hit = document.elementFromPoint(x, y);
-  const direct = hit?.closest?.('.hub-tab');
-  if (direct && direct.closest('.hub-tabs')) return direct;
-
-  const tabs = [...document.querySelectorAll('.hub-tabs .hub-tab')];
-  return tabs.find((button) => {
+function submenuChoiceAt(menu, x, y) {
+  if (!menu) return null;
+  const direct = document.elementFromPoint(x, y)?.closest?.('.tw-nav-menu button');
+  if (direct && menu.contains(direct)) return direct;
+  return [...menu.querySelectorAll('button')].find((button) => {
     const rect = button.getBoundingClientRect();
-    return x >= rect.left && x <= rect.right && y >= rect.top - 10 && y <= rect.bottom + 10;
+    return x >= rect.left - 8 && x <= rect.right + 8 && y >= rect.top && y <= rect.bottom;
   }) || null;
 }
 
-function paintHubHoldChoice(button, vibrate = true) {
-  if (!hubHold.selecting || !button || hubHold.current === button) return;
-  document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.toggle('is-hold-preview', item === button));
-  hubHold.current = button;
-  if (vibrate) hubHaptic(8);
+function paintSubmenuChoice(button, vibrate = true) {
+  if (!hubSubHold.selecting || !hubSubHold.menu || !button || hubSubHold.current === button) return;
+  hubSubHold.menu.querySelectorAll('button').forEach((item) => item.classList.toggle('is-hold-preview', item === button));
+  hubSubHold.current = button;
+  if (vibrate) hubSelectionHaptic(14);
 }
 
-function resetHubHold({ keepIgnore = false } = {}) {
-  if (hubHold.timer) clearTimeout(hubHold.timer);
-  hubHold.timer = null;
-  hubHold.tracking = false;
-  hubHold.selecting = false;
-  hubHold.pointerId = null;
-  hubHold.startX = 0;
-  hubHold.startY = 0;
-  hubHold.current = null;
-  document.querySelector('.hub-tabs')?.classList.remove('is-hold-selecting');
-  document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.remove('is-hold-preview'));
-  if (!keepIgnore) hubHold.ignoreClickUntil = 0;
+function closeSubmenuHoldVisual() {
+  hubSubHold.wrap?.classList.remove('is-hold-selecting');
+  hubSubHold.menu?.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
+  if (hubSubHold.wrap) hardClose(hubSubHold.wrap);
 }
 
-function chooseHeldHub(button) {
-  if (!button) return;
-  hubHold.dispatching = true;
-  try {
-    button.click();
-  } finally {
-    hubHold.dispatching = false;
+function resetSubmenuHold({ keepIgnore = false, keepOpen = false } = {}) {
+  if (hubSubHold.timer) clearTimeout(hubSubHold.timer);
+  hubSubHold.timer = null;
+  hubSubHold.tracking = false;
+  hubSubHold.selecting = false;
+  hubSubHold.pointerId = null;
+  if (!keepOpen) closeSubmenuHoldVisual();
+  else {
+    hubSubHold.wrap?.classList.remove('is-hold-selecting');
+    hubSubHold.menu?.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
   }
+  hubSubHold.wrap = null;
+  hubSubHold.hub = null;
+  hubSubHold.menu = null;
+  hubSubHold.current = null;
+  if (!keepIgnore) hubSubHold.ignoreClickUntil = 0;
 }
 
-function installHubHoldSelector() {
-  if (hubHoldInstalled) return;
+function installHubSubmenuHoldSelector() {
+  if (hubSubHoldInstalled) return;
   const tabs = document.querySelector('.hub-tabs');
   if (!tabs) return;
-  hubHoldInstalled = true;
+  hubSubHoldInstalled = true;
 
   tabs.addEventListener('contextmenu', (event) => {
-    if (hubHold.selecting || hubHold.tracking) event.preventDefault();
+    if (hubSubHold.tracking || hubSubHold.selecting) event.preventDefault();
   });
 
   tabs.addEventListener('click', (event) => {
-    if (hubHold.dispatching) return;
-    if (Date.now() < hubHold.ignoreClickUntil) {
+    if (hubSubHold.dispatching) return;
+    if (Date.now() < hubSubHold.ignoreClickUntil) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -802,68 +807,65 @@ function installHubHoldSelector() {
 
   tabs.addEventListener('pointerdown', (event) => {
     if (!isMobile() || event.pointerType === 'mouse' || event.button !== 0) return;
-    const button = event.target.closest?.('.hub-tab');
-    if (!button) return;
+    const hub = event.target.closest?.('.tw-nav-wrap > .hub-tab');
+    const wrap = hub?.closest?.('.tw-nav-wrap');
+    const menu = wrap?.querySelector?.('.tw-nav-menu');
+    if (!hub || !wrap || !menu || !menu.querySelector('button')) return;
 
-    resetHubHold();
-    hubHold.tracking = true;
-    hubHold.pointerId = event.pointerId;
-    hubHold.startX = event.clientX;
-    hubHold.startY = event.clientY;
-    hubHold.current = button;
+    resetSubmenuHold();
+    hubSubHold.tracking = true;
+    hubSubHold.pointerId = event.pointerId;
+    hubSubHold.wrap = wrap;
+    hubSubHold.hub = hub;
+    hubSubHold.menu = menu;
 
-    hubHold.timer = setTimeout(() => {
-      if (!hubHold.tracking) return;
-      hubHold.timer = null;
-      hubHold.selecting = true;
-      hubHold.ignoreClickUntil = Date.now() + 800;
-      tabs.classList.add('is-hold-selecting');
-      document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.toggle('is-hold-preview', item === hubHold.current));
-      hubHaptic(10);
-      try { tabs.setPointerCapture?.(event.pointerId); } catch {}
+    hubSubHold.timer = setTimeout(() => {
+      if (!hubSubHold.tracking || !hubSubHold.wrap) return;
+      hubSubHold.timer = null;
+      hubSubHold.selecting = true;
+      hubSubHold.ignoreClickUntil = Date.now() + 900;
+      suppressHover = false;
+      pinned = hubSubHold.wrap;
+      openWrap(hubSubHold.wrap);
+      hubSubHold.wrap.classList.add('is-hold-selecting');
+      hubSubHold.menu.querySelectorAll('button').forEach((item) => item.classList.remove('is-hold-preview'));
+      hubSelectionHaptic([18, 18, 10]);
+      try { hubSubHold.hub.setPointerCapture?.(event.pointerId); } catch {}
     }, 380);
   }, { passive:true });
 
   tabs.addEventListener('pointermove', (event) => {
-    if (!hubHold.tracking || event.pointerId !== hubHold.pointerId) return;
-    const dx = event.clientX - hubHold.startX;
-    const dy = event.clientY - hubHold.startY;
-
-    if (!hubHold.selecting) {
-      if (Math.hypot(dx, dy) > 12) resetHubHold();
-      return;
-    }
-
+    if (!hubSubHold.tracking || event.pointerId !== hubSubHold.pointerId || !hubSubHold.selecting) return;
     event.preventDefault();
-    const choice = hubChoiceAt(event.clientX, event.clientY);
-    if (choice) paintHubHoldChoice(choice, true);
+    event.stopPropagation();
+    const choice = submenuChoiceAt(hubSubHold.menu, event.clientX, event.clientY);
+    if (choice) paintSubmenuChoice(choice, true);
   }, { passive:false });
 
   const finish = (event, cancelled = false) => {
-    if (!hubHold.tracking || (event.pointerId != null && event.pointerId !== hubHold.pointerId)) return;
-    if (hubHold.timer) clearTimeout(hubHold.timer);
-    hubHold.timer = null;
+    if (!hubSubHold.tracking || (event.pointerId != null && event.pointerId !== hubSubHold.pointerId)) return;
+    if (hubSubHold.timer) clearTimeout(hubSubHold.timer);
+    hubSubHold.timer = null;
 
-    const wasSelecting = hubHold.selecting;
+    const wasSelecting = hubSubHold.selecting;
     const choice = wasSelecting && !cancelled
-      ? (hubChoiceAt(event.clientX, event.clientY) || hubHold.current)
+      ? (submenuChoiceAt(hubSubHold.menu, event.clientX, event.clientY) || hubSubHold.current)
       : null;
 
     if (wasSelecting) {
       event.preventDefault();
       event.stopPropagation();
-      hubHold.ignoreClickUntil = Date.now() + 800;
-      if (choice && !choice.classList.contains('active')) {
-        hubHaptic(12);
-        chooseHeldHub(choice);
-      } else if (choice) {
-        hubHaptic(8);
+      hubSubHold.ignoreClickUntil = Date.now() + 900;
+      if (choice) {
+        hubSelectionHaptic(20);
+        hubSubHold.dispatching = true;
+        try { choice.click(); } finally { hubSubHold.dispatching = false; }
       }
     }
 
-    const ignore = hubHold.ignoreClickUntil;
-    resetHubHold({ keepIgnore:true });
-    hubHold.ignoreClickUntil = ignore;
+    const ignore = hubSubHold.ignoreClickUntil;
+    resetSubmenuHold({ keepIgnore:true });
+    hubSubHold.ignoreClickUntil = ignore;
   };
 
   tabs.addEventListener('pointerup', (event) => finish(event, false), { passive:false });
@@ -877,7 +879,7 @@ export function initNavigation() {
 
   ensureNavigation();
   installDropdownRefinement();
-  installHubHoldSelector();
+  installHubSubmenuHoldSelector();
   installSurfaceNavigation();
   installSurfacePageScrollLock();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
