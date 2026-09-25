@@ -1107,16 +1107,16 @@ function renderCurrentPanel() {
       <article class="finance-current-card tone-wealth" data-fin-wallet-card="savings">${financeWalletIcon('savings')}<div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
       <article class="finance-current-card tone-wealth finance-investment-card" data-fin-wallet-card="investments">${financeWalletIcon('investments')}<div class="finance-current-title"><div><span>INVESTMENTS</span><h3>My investments</h3></div><strong>${money(inv.ownInvestments || 0).replace(/([.,])00$/,'')}</strong></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div>${latestInvestment || actor()==='Principe' ? '<button class="btn ghost finance-investment-edit" type="button" data-fin-edit-investment-value>Edit</button>' : ''}</article>
     </div>
+    <div class="finance-wallet-swipe-hint" aria-label="Swipe between wallets">
+      <button type="button" data-fin-wallet-prev aria-label="Previous wallet">‹</button>
+      <em>Swipe to explore</em>
+      <button type="button" data-fin-wallet-next aria-label="Next wallet">›</button>
+    </div>
     <div class="finance-wallet-nav" aria-label="Wallet carousel">
       <button type="button" data-fin-wallet-jump="owed">${financeWalletIcon('owed')}<span>Money owed</span></button>
       <button type="button" data-fin-wallet-jump="cash">${financeWalletIcon('cash')}<span>Current cash</span></button>
       <button type="button" data-fin-wallet-jump="savings">${financeWalletIcon('savings')}<span>Saved up</span></button>
       <button type="button" data-fin-wallet-jump="investments">${financeWalletIcon('investments')}<span>Investments</span></button>
-    </div>
-    <div class="finance-wallet-swipe-hint" aria-label="Swipe between wallets">
-      <button type="button" data-fin-wallet-prev aria-label="Previous wallet">‹</button>
-      <em>Swipe to explore</em>
-      <button type="button" data-fin-wallet-next aria-label="Next wallet">›</button>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
   $$('[data-fin-edit-bank]', root).forEach((btn) => btn.addEventListener('click', () => openBankModal(Number(btn.dataset.finEditBank))));
