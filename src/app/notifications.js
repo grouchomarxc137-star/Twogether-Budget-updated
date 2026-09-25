@@ -132,8 +132,11 @@ function renderItem(item) {
     : '';
   const level = itemPriority(item);
   const priorityClass = level === 2 ? ' is-urgent' : level === 1 ? ' is-important' : '';
+  const priorityCue = level > 0
+    ? '<span class="tw-notification-priority-cue" aria-label="' + (level === 2 ? 'Final checks' : 'Important') + '"><span aria-hidden="true">▲</span>' + (level === 2 ? 'Final checks' : 'Important') + '</span>'
+    : '';
   return '<article class="tw-notification-item' + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
-    '<div class="tw-notification-copy"><strong>' + esc(item.title || 'Reminder') + '</strong>' +
+    '<div class="tw-notification-copy"><div class="tw-notification-title-row"><strong>' + esc(item.title || 'Reminder') + '</strong>' + priorityCue + '</div>' +
     (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
     important + packing + '</div>' + financeActions + openAction + '</article>';
 }

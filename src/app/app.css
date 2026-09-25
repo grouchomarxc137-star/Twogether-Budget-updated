@@ -791,25 +791,59 @@ body.dev-v21 #loggedUserBadge {
   border-bottom:1px solid rgba(100,80,65,.1);
 }
 
-.tw-notification-item.is-urgent {
-  margin:4px -8px;
-  padding:13px 10px;
-  border:1px solid rgba(181,91,91,.18);
+.tw-notification-item.is-urgent,
+.tw-notification-item.is-important {
+  position:relative;
+  margin:4px -4px;
+  padding:13px 10px 13px 16px;
+  border:0;
   border-radius:14px;
-  background:rgba(181,91,91,.055);
+  background:rgba(255,253,249,.48);
 }
 
-.tw-notification-item.is-important {
-  margin:4px -8px;
-  padding:13px 10px;
-  border:1px solid rgba(210,135,54,.22);
-  border-radius:14px;
-  background:rgba(210,135,54,.065);
+.tw-notification-item.is-urgent::before,
+.tw-notification-item.is-important::before {
+  content:"";
+  position:absolute;
+  top:10px;
+  bottom:10px;
+  left:3px;
+  width:2px;
+  border-radius:999px;
+  background:#b84b3f;
 }
 
 .tw-notification-copy {
   min-width:0;
   flex:1 1 auto;
+}
+
+.tw-notification-title-row {
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  gap:6px 8px;
+}
+
+.tw-notification-title-row>strong {
+  min-width:0;
+}
+
+.tw-notification-priority-cue {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  color:#b14b3f;
+  font-size:11px;
+  font-weight:750;
+  line-height:1;
+  white-space:nowrap;
+}
+
+.tw-notification-priority-cue>span {
+  font-size:9px;
+  line-height:1;
+  transform:translateY(-1px);
 }
 
 .tw-notification-prep-block {
@@ -822,7 +856,7 @@ body.dev-v21 #loggedUserBadge {
 }
 
 .tw-notification-prep-block.is-important {
-  background:rgba(186,142,63,.10);
+  background:rgba(126,104,91,.055);
 }
 
 .tw-notification-prep-block b {
