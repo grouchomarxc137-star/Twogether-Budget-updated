@@ -1286,3 +1286,96 @@ body.dev-v21 #loggedUserBadge {
     transition:none!important;
   }
 }
+
+
+/* Individual notification cards + notification dot */
+.tw-notification-source-list {
+  gap:8px;
+  overflow:visible;
+  padding:10px;
+}
+
+.tw-notification-source-list .tw-notification-item {
+  margin:0;
+  padding:12px 12px;
+  border:1px solid rgba(126,104,91,.11);
+  border-radius:14px;
+  background:rgba(255,253,249,.72);
+  box-shadow:0 3px 10px rgba(45,35,29,.025);
+}
+
+.tw-notification-source-list.is-trips .tw-notification-item {
+  border-color:rgba(91,124,92,.14);
+}
+
+.tw-notification-source-list.is-finances .tw-notification-item {
+  border-color:rgba(193,151,67,.16);
+}
+
+.tw-notification-source-list .tw-notification-item + .tw-notification-item {
+  border-top-width:1px;
+}
+
+.tw-notification-source-list .tw-notification-item:last-child {
+  border-bottom:1px solid rgba(126,104,91,.11);
+}
+
+.tw-notification-copy {
+  position:relative;
+  padding-left:14px;
+}
+
+.tw-notification-copy::before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:5px;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#cfaa5a;
+  box-shadow:0 0 0 3px rgba(207,170,90,.10);
+}
+
+.tw-notification-item.is-urgent,
+.tw-notification-item.is-important {
+  margin:0;
+  padding:12px 12px 12px 17px;
+  border:1px solid rgba(181,91,91,.12);
+  border-radius:14px;
+  background:rgba(255,253,249,.74);
+}
+
+.tw-notification-item.is-urgent::before,
+.tw-notification-item.is-important::before {
+  top:9px;
+  bottom:9px;
+  left:4px;
+}
+
+.tw-notification-item.is-finance.is-actionable {
+  margin:0;
+  padding:0;
+  border:1px solid rgba(193,151,67,.16);
+  border-radius:14px;
+  box-shadow:0 3px 10px rgba(45,35,29,.025);
+}
+
+.tw-notification-item.is-finance.is-actionable .tw-notification-swipe-content {
+  padding:12px;
+}
+
+.tw-notification-item.is-finance.is-actionable .tw-notification-copy {
+  flex:1 1 auto;
+}
+
+@media(max-width:760px) {
+  .tw-notification-source-list {
+    gap:7px;
+    padding:8px;
+  }
+
+  .tw-notification-source-list .tw-notification-item {
+    border-radius:13px;
+  }
+}
