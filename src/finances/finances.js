@@ -1958,10 +1958,19 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
       next.expenses=[...(next.expenses||[])];
       const target=kind==='income'?next.incomes:next.expenses;
       if(!target[index]) throw new Error('This finance item no longer exists');
+      const deletingInvestment=kind==='expense'&&normalizeGroup(target[index]?.group)==='investments';
       target.splice(index,1);
+      const hasInvestmentLeft=next.expenses.some((entry)=>normalizeGroup(entry?.group)==='investments');
+      if(deletingInvestment&&!hasInvestmentLeft){
+        next.investmentTotal='';
+        next.sisterInvestments='';
+      }
       closeFinanceMonthDeleteConfirm();
       closeFinanceMonthSwipeRows();
       await saveDirectMonthRecord(next,'Finance deleted');
+      if(deletingInvestment&&!hasInvestmentLeft){
+        await removeFinanceReminder(['finance',actor(),next.month,'investment-snapshot'].join(':'));
+      }
     }catch(err){
       deleteButton.disabled=false;
       deleteButton.textContent='Delete';
