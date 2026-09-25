@@ -172,34 +172,138 @@ function financeDateBounds(month) {
   return { min: `${month}-01`, max: `${month}-${lastDay}` };
 }
 
+const CUSTOM_CATEGORY_PALETTE = [
+  { background:'#eee8f7', border:'#d8cbea', accent:'#78649a' },
+  { background:'#f7eadf', border:'#ead2bd', accent:'#956c4b' },
+  { background:'#e5f1ef', border:'#c6deda', accent:'#4f8178' },
+  { background:'#f5efd9', border:'#e5d9a9', accent:'#8a7742' },
+  { background:'#f7e5ef', border:'#e8c6d8', accent:'#965b78' },
+  { background:'#e7eef7', border:'#c8d8eb', accent:'#56718e' },
+  { background:'#eaf2e4', border:'#ceddbf', accent:'#668052' },
+  { background:'#f6e6e1', border:'#e7c9c0', accent:'#925f52' },
+];
+function isCustomGroupKey(value) {
+  return /^custom-[a-z0-9-]{1,64}$/.test(String(value || ''));
+}
+function safeCategoryColor(value, fallback) {
+  const text=String(value || '');
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+}
+function normalizeCustomCategories(value) {
+  const source=Array.isArray(value)?value:[];
+  const seen=new Set();
+  return source.slice(0,30).map((item,index)=>{
+    const key=String(item?.key || '').toLowerCase();
+    const label=String(item?.label || '').trim().slice(0,50);
+    if(!isCustomGroupKey(key)||!label||seen.has(key))return null;
+    seen.add(key);
+    const palette=CUSTOM_CATEGORY_PALETTE[index % CUSTOM_CATEGORY_PALETTE.length];
+    return {
+      key,
+      label,
+      background:safeCategoryColor(item?.background,palette.background),
+      border:safeCategoryColor(item?.border,palette.border),
+      accent:safeCategoryColor(item?.accent,palette.accent),
+    };
+  }).filter(Boolean);
+}
+function financeCustomCategories(owner = actor()) {
+  return normalizeCustomCategories(financeState.financeProfiles?.[owner]?.customCategories);
+}
+function customCategoryByKey(key, owner = actor()) {
+  return financeCustomCategories(owner).find((item)=>item.key===String(key || '')) || null;
+}
+function ensureCustomCategory(profileData, label) {
+  const clean=String(label || '').trim().replace(/\s+/g,' ').slice(0,50);
+  if(!clean)return { category:null, created:false };
+  const list=normalizeCustomCategories(profileData.customCategories);
+  const existing=list.find((item)=>item.label.toLowerCase()===clean.toLowerCase());
+  if(existing){
+    profileData.customCategories=list;
+    return { category:existing, created:false };
+  }
+  const palette=CUSTOM_CATEGORY_PALETTE[list.length % CUSTOM_CATEGORY_PALETTE.length];
+  const rawId=String(uid()).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,46);
+  const category={
+    key:'custom-'+(rawId || Date.now().toString(36)),
+    label:clean,
+    background:palette.background,
+    border:palette.border,
+    accent:palette.accent,
+  };
+  profileData.customCategories=[...list,category];
+  return { category, created:true };
+}
+function syncCustomCategoryStyles() {
+  let style=document.getElementById('financeCustomCategoryStyles');
+  if(!style){
+    style=document.createElement('style');
+    style.id='financeCustomCategoryStyles';
+    document.head.appendChild(style);
+  }
+  style.textContent=financeCustomCategories().map((item)=>{
+    const key=item.key,bg=item.background,border=item.border,accent=item.accent;
+    return [
+      '.finance-choice.finance-tone-'+key+',.finance-tone-'+key+'{background:'+bg+'!important;border-color:'+border+'!important;}',
+      '.finance-tv2-tone-'+key+'{color:'+accent+'!important;background:'+bg+'!important;border-color:'+border+'!important;}',
+      '.finance-log-layer .finance-tv2-cat.on.finance-tv2-tone-'+key+'{color:'+accent+'!important;background:'+bg+'!important;border-color:'+accent+'!important;box-shadow:inset 0 0 0 1px '+accent+';}',
+      '.finance-recurring-tone-'+key+'{--finance-recurring-line:'+border+';}',
+      '.finance-recurring-card-'+key+'{--finance-recurring-border:'+border+';--finance-recurring-head:'+bg+';--finance-recurring-icon-border:'+border+';}',
+    ].join('');
+  }).join('');
+}
+async function persistCustomCategory(label) {
+  const next=profile();
+  const result=ensureCustomCategory(next,label);
+  if(!result.category)return null;
+  if(!result.created)return result.category;
+  const normalized=normalizeProfile(next);
+  await post('saveFinanceProfile',{profile:normalized});
+  financeState.financeProfiles[actor()]=normalized;
+  syncCustomCategoryStyles();
+  return result.category;
+}
 function normalizeGroup(value) {
-  const g = String(value || 'other');
+  const g = String(value || 'other').toLowerCase();
   if (g === 'health') return 'medical';
   if (g === 'living') return 'rent';
   if (g === 'transport') return 'subscriptions';
+  if (isCustomGroupKey(g)) return g;
   return GROUPS.some((x) => x.key === g) ? g : 'other';
 }
 function groupMeta(value) {
   const key = normalizeGroup(value);
+  const custom=customCategoryByKey(key);
+  if(custom)return { key:custom.key, label:custom.label, tone:custom.key, named:true, custom:true };
   return GROUPS.find((x) => x.key === key) || GROUPS[GROUPS.length - 1];
 }
 function groupLabel(value) { return groupMeta(value).label; }
 function groupTone(value) { return groupMeta(value).tone; }
 function financeRules(owner = actor()) { return FINANCE_RULES[owner] || FINANCE_RULES.Principessa; }
 function categoryLabel(tone) {
+  const custom=customCategoryByKey(tone);
+  if(custom)return custom.label;
   if (actor() === 'Principe' && tone === 'budgets') return 'Variable expenses';
   if (actor() === 'Principe' && tone === 'wealth') return 'Savings';
   return CATEGORY_LABELS[tone] || tone;
 }
 function categoryOrder() {
-  return actor() === 'Principe'
+  const base=actor() === 'Principe'
     ? ['fixed', 'subscriptions', 'budgets', 'wealth', 'medical', 'other']
-    : CATEGORY_ORDER;
+    : [...CATEGORY_ORDER];
+  const custom=financeCustomCategories().map((item)=>item.key);
+  const otherIndex=base.indexOf('other');
+  if(otherIndex>=0)base.splice(otherIndex,0,...custom);
+  else base.push(...custom);
+  return base;
 }
 function manualGroups() {
-  if (actor() !== 'Principe') return GROUPS.filter((g) => g.manual !== false && !['fixed', 'variable'].includes(g.key));
-  const allowed = new Set(['fixed', 'subscriptions', 'variable', 'savings', 'other']);
-  return GROUPS.filter((g) => g.manual !== false && allowed.has(g.key));
+  const base=actor() !== 'Principe'
+    ? GROUPS.filter((g) => g.manual !== false && !['fixed', 'variable'].includes(g.key))
+    : GROUPS.filter((g) => g.manual !== false && new Set(['fixed', 'subscriptions', 'variable', 'savings', 'other']).has(g.key));
+  const custom=financeCustomCategories().map((item)=>({key:item.key,label:item.label,tone:item.key,named:true,custom:true}));
+  const other=base.filter((item)=>item.key==='other');
+  return [...base.filter((item)=>item.key!=='other'),...custom,...other];
 }
 function nextAfterExpensesStage() {
   const rules = financeRules();
@@ -219,7 +323,7 @@ function normalizeRecurringConfig(value) {
   };
 }
 function freshProfile() {
-  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, recurring: normalizeRecurringConfig({}), financeReminders: [], updatedAt: '', updatedBy: '' };
+  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, customCategories: [], recurring: normalizeRecurringConfig({}), financeReminders: [], updatedAt: '', updatedBy: '' };
 }
 function normalizeProfile(profileData) {
   const p = profileData && typeof profileData === 'object' ? profileData : {};
@@ -235,6 +339,7 @@ function normalizeProfile(profileData) {
     scenarios: Array.isArray(p.scenarios) ? p.scenarios.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), upfront: x.upfront ?? '', monthly: x.monthly ?? '' })) : [],
     wishlist: Array.isArray(p.wishlist) ? JSON.parse(JSON.stringify(p.wishlist)) : [],
     compareLab: p.compareLab && typeof p.compareLab === 'object' ? JSON.parse(JSON.stringify(p.compareLab)) : {},
+    customCategories: normalizeCustomCategories(p.customCategories),
     recurring: normalizeRecurringConfig(p.recurring),
     financeReminders: Array.isArray(p.financeReminders) ? p.financeReminders.map((item) => ({
       id: String(item?.id || ''),
@@ -700,7 +805,7 @@ function openFinanceReminderConfirm(reminder) {
 }
 
 function recurringExpenseGroups() {
-  return actor() === 'Principe'
+  const base=actor() === 'Principe'
     ? [
         { key: 'fixed', label: 'Fixed expenses' },
         { key: 'subscriptions', label: 'Subscriptions' },
@@ -715,10 +820,13 @@ function recurringExpenseGroups() {
         { key: 'wealth', label: 'Savings / Investments' },
         { key: 'other', label: 'Other' },
       ];
+  const custom=financeCustomCategories().map((item)=>({key:item.key,label:item.label}));
+  return [...base.filter((item)=>item.key!=='other'),...custom,...base.filter((item)=>item.key==='other')];
 }
 
 function recurringGroupForCategory(category, name, currentItem = null) {
   if (currentItem && groupTone(currentItem.group) === category) return currentItem.group;
+  if (isCustomGroupKey(category)) return category;
   if (category === 'fixed') return 'fixed';
   if (category === 'medical') return 'medical';
   if (category === 'subscriptions') return 'subscriptions';
@@ -917,6 +1025,7 @@ async function loadState() {
 
 function renderPage() {
   const sheet = $('#finances'); if (!sheet) return;
+  syncCustomCategoryStyles();
   const months = [...ownMonths()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
   const latest = months[months.length - 1] || null;
   const summary = calc(latest || {});
@@ -1477,7 +1586,8 @@ function openRecurringEditor(kind,index) {
   const bounds=financeDateBounds(referenceMonth);
   const selectedDate=financeDateForDay(referenceMonth,item?.day);
   const groupField=isExpense
-    ? '<label class="tv2-field"><span>Category</span><select id="finRecurringGroup" class="finance-recurring-select">'+groups.map((g)=>'<option value="'+g.key+'" '+(g.key===selectedGroup?'selected':'')+'>'+esc(g.label)+'</option>').join('')+'</select></label>'
+    ? '<label class="tv2-field"><span>Category</span><select id="finRecurringGroup" class="finance-recurring-select">'+groups.map((g)=>'<option value="'+g.key+'" '+(g.key===selectedGroup?'selected':'')+'>'+esc(g.label)+'</option>').join('')+'</select></label>'+
+      '<label class="tv2-field finance-new-category-field" id="finRecurringNewCategoryField" '+(selectedGroup==='other'?'':'hidden')+'><span>New category <small>Optional</small></span><input id="finRecurringNewCategory" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts"></label>'
     : '';
 
   showMini(
@@ -1501,6 +1611,13 @@ function openRecurringEditor(kind,index) {
   );
 
   $('[data-fin-recurring-back]')?.addEventListener('click',openRecurringManager);
+  const recurringGroupSelect=$('#finRecurringGroup');
+  const recurringNewCategoryField=$('#finRecurringNewCategoryField');
+  const syncRecurringNewCategoryField=()=>{
+    if(recurringNewCategoryField) recurringNewCategoryField.hidden=recurringGroupSelect?.value!=='other';
+  };
+  recurringGroupSelect?.addEventListener('change',syncRecurringNewCategoryField);
+  syncRecurringNewCategoryField();
   $('[data-fin-recurring-save]')?.addEventListener('click',async()=>{
     const name=String($('#finRecurringName')?.value||'').trim();
     const amount=$('#finRecurringAmount')?.value||'';
@@ -1515,7 +1632,12 @@ function openRecurringEditor(kind,index) {
     nextConfig.custom=true;
     const row={id:item?.id||uid(),name,amount:n(amount),day};
     if(isExpense) {
-      const category=$('#finRecurringGroup')?.value||selectedGroup;
+      let category=$('#finRecurringGroup')?.value||selectedGroup;
+      const newCategoryName=String($('#finRecurringNewCategory')?.value||'').trim();
+      if(category==='other'&&newCategoryName){
+        const result=ensureCustomCategory(next,newCategoryName);
+        if(result.category) category=result.category.key;
+      }
       row.group=recurringGroupForCategory(category,name,item);
     }
     const target=isExpense?nextConfig.expenses:nextConfig.incomes;
@@ -1677,6 +1799,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     selectedItemId:editingItem?'__editing__':'',
     name:editingItem?String(editingItem.name||''):'',
     group:editingKind==='expense'?normalizeGroup(editingItem?.group):'',
+    newCategoryName:'',
     date:editingItem?normalizeFinanceDate(editingItem.date,rec.month):'',
     more:!!editingItem,
     busy:false,
@@ -1689,7 +1812,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const selectedCategory=()=>categories.find((item)=>item.key===state.category)||null;
   const selectedItems=()=>financeRecurringItemsForCategory(state.category);
   const isOther=()=>state.category==='other';
-  const hasChosenItem=()=>!!state.selectedItemId || isOther();
+  const isCustomCategory=()=>isCustomGroupKey(state.category);
+  const hasChosenItem=()=>!!state.selectedItemId || isOther() || isCustomCategory();
   const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim();
 
   const layer=document.createElement('dialog');
@@ -1760,6 +1884,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     state.selectedItemId='';
     state.name='';
     state.group='';
+    state.newCategoryName='';
     state.date='';
     state.more=false;
     state.error='';
@@ -1812,8 +1937,10 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
       afterCategoriesHtml:isOther()
-        ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Gift, clothes, one-off purchase" value="'+esc(state.name)+'"></label>'
-        : '',
+        ? '<label class="tv2-field finance-log-name"><span>New category <small>Optional</small></span><input id="financeLogCategoryName" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts" value="'+esc(state.newCategoryName)+'"></label><label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Vet, haircut, birthday gift" value="'+esc(state.name)+'"></label>'
+        : isCustomCategory()
+          ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
+          : '',
       defaultsHtml:'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
@@ -1834,6 +1961,10 @@ function openFinanceTransactionSheet(rec, edit = null) {
         event.preventDefault();
         if(canSave()) sheet.querySelector('[data-fin-log-save]')?.click();
       }
+    });
+    sheet.querySelector('#financeLogCategoryName')?.addEventListener('input',(event)=>{
+      state.newCategoryName=event.target.value;
+      state.error='';
     });
     sheet.querySelector('#financeLogName')?.addEventListener('input',(event)=>{
       state.name=event.target.value;
@@ -1886,7 +2017,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.category=clicked;
       state.selectedItemId='';
       state.name='';
-      state.group=clicked==='other'?'other':'';
+      state.newCategoryName='';
+      state.group=clicked==='other'||isCustomGroupKey(clicked)?clicked:'';
       state.date='';
       state.more=false;
       state.error='';
@@ -1926,6 +2058,22 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.error='';
       refreshLive();
 
+      let categoryForSave=state.category;
+      if(categoryForSave==='other'&&state.newCategoryName.trim()){
+        try{
+          const custom=await persistCustomCategory(state.newCategoryName);
+          if(custom){
+            categoryForSave=custom.key;
+            state.group=custom.key;
+          }
+        }catch(error){
+          state.busy=false;
+          state.error=error?.message||'Could not create this category.';
+          refreshLive();
+          return;
+        }
+      }
+
       const next=cloneRecord(rec);
       next.incomes=[...(next.incomes||[])];
       next.expenses=[...(next.expenses||[])];
@@ -1939,7 +2087,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
           next.incomes.push(row);
         }
       } else {
-        const row={group:state.group||financeGroupForTone(state.category,state.name),name:state.name.trim(),amount:amount(),date:state.date};
+        const row={group:state.group||financeGroupForTone(categoryForSave,state.name),name:state.name.trim(),amount:amount(),date:state.date};
         investmentLogged=normalizeGroup(row.group)==='investments';
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
         else {

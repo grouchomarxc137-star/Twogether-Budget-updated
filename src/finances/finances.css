@@ -4972,3 +4972,16 @@ dialog.finance-log-host .tv2-backdrop {
     font-size:12px;
   }
 }
+
+
+/* User-created finance categories */
+.finance-new-category-field[hidden] {
+  display:none!important;
+}
+
+.finance-new-category-field small,
+.finance-log-name small {
+  color:var(--tv2-muted,var(--muted));
+  font-size:11px;
+  font-weight:500;
+}

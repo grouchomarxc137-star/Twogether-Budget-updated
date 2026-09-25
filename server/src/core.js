@@ -1298,13 +1298,19 @@ function sanitizeFinanceIncome_(item) {
   return {name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
 }
 
-function sanitizeFinanceExpense_(item) {
+function cleanFinanceGroup_(value) {
   const allowed = ['fixed','medical','subscriptions','rent','transport','groceries','variable','extra','savings','investments','other'];
-  let group = String(item && item.group || '');
+  let group = String(value || 'other').toLowerCase();
   if (group === 'health') group = 'medical';
   if (group === 'living') group = 'rent';
-  if (allowed.indexOf(group) < 0) group = 'other';
-  return {group:group, name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
+  if (group === 'transport') group = 'subscriptions';
+  if (allowed.indexOf(group) >= 0) return group;
+  if (/^custom-[a-z0-9-]{1,64}$/.test(group)) return group;
+  return 'other';
+}
+
+function sanitizeFinanceExpense_(item) {
+  return {group:cleanFinanceGroup_(item && item.group), name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
 }
 
 function sanitizeFinanceReserved_(item) {
@@ -1325,7 +1331,7 @@ function sanitizeFinanceExtraSpend_(item) {
 function sanitizeFinancePlanningItem_(item){
   const s=item&&typeof item==='object'?item:{},frequency=['one-time','monthly','yearly'].indexOf(String(s.frequency||''))>=0?String(s.frequency):'one-time',paymentTiming=['upfront','later'].indexOf(String(s.paymentTiming||''))>=0?String(s.paymentTiming):'';
   const kind=String(s.kind||'')==='income'?'income':'expense';
-  const allowed=['medical','subscriptions','rent','transport','groceries','extra','savings','investments','other']; let group=String(s.group||'other'); if(allowed.indexOf(group)<0)group='other';
+  const group=cleanFinanceGroup_(s.group);
   const planner=cleanMoney_(s.planner),actual=cleanMoney_(s.actual); let reserveMonthly='';
   if(frequency==='yearly'&&paymentTiming==='later'&&planner!=='')reserveMonthly=money2_(Number(planner)/12);
   return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240),custom:s.custom===true};
@@ -1460,14 +1466,9 @@ function sanitizeRecurringIncome_(item) {
 }
 
 function sanitizeRecurringExpense_(item) {
-  const allowed = ['fixed','medical','subscriptions','rent','transport','groceries','variable','extra','savings','investments','other'];
-  let group = String(item && item.group || 'other');
-  if (group === 'health') group = 'medical';
-  if (group === 'living') group = 'rent';
-  if (allowed.indexOf(group) < 0) group = 'other';
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
-    group: group,
+    group: cleanFinanceGroup_(item && item.group),
     name: cleanText_(item && item.name, 100),
     amount: cleanMoney_(item && item.amount),
     day: cleanRecurringDay_(item && item.day)
@@ -1519,6 +1520,26 @@ function sanitizeCompareLab_(value){
   return {id:cleanText_(v.id,80)||Utilities.getUuid(),titleA:cleanText_(v.titleA,120)||'Scenario A',titleB:cleanText_(v.titleB,120)||'Scenario B',rowsA:(Array.isArray(v.rowsA)?v.rowsA:[]).slice(0,30).map(sanitizeCompareRow_),rowsB:(Array.isArray(v.rowsB)?v.rowsB:[]).slice(0,30).map(sanitizeCompareRow_),updatedAt:cleanText_(v.updatedAt,40)||new Date().toISOString()};
 }
 
+function cleanFinanceCategoryColor_(value, fallback) {
+  const text=String(value || '');
+  return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : fallback;
+}
+
+function sanitizeFinanceCustomCategory_(item) {
+  const source=item&&typeof item==='object'?item:{};
+  const key=cleanText_(source.key,72).toLowerCase();
+  if(!/^custom-[a-z0-9-]{1,64}$/.test(key))return null;
+  const label=cleanText_(source.label,50);
+  if(!label)return null;
+  return {
+    key:key,
+    label:label,
+    background:cleanFinanceCategoryColor_(source.background,'#eee8f7'),
+    border:cleanFinanceCategoryColor_(source.border,'#d8cbea'),
+    accent:cleanFinanceCategoryColor_(source.accent,'#78649a')
+  };
+}
+
 function sanitizeFinanceProfile_(profile, actor) {
   const source = profile && typeof profile === 'object' ? profile : {};
   return {
@@ -1529,6 +1550,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
     wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
     compareLab: source.compareLab && typeof source.compareLab === 'object' ? sanitizeCompareLab_(source.compareLab) : {},
+    customCategories: Array.isArray(source.customCategories) ? source.customCategories.slice(0,30).map(sanitizeFinanceCustomCategory_).filter(Boolean) : [],
     recurring: sanitizeFinanceRecurring_(source.recurring),
     financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && (x.kind==='investment-snapshot' || x.amount !== '') && x.month && x.date; }) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
