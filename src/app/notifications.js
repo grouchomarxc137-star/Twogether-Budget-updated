@@ -125,7 +125,8 @@ function renderItem(item, source = activeSource) {
   const packing = item.packing?.length
     ? '<div class="tw-notification-prep-block"><b>Packing / checklist</b>' + item.packing.map((text) => '<span>• ' + esc(text) + '</span>').join('') + '</div>'
     : '';
-  const financeActions = item.actionable
+  const swipeConfirm = source === 'finances' && item.actionable;
+  const financeActions = item.actionable && !swipeConfirm
     ? '<div class="tw-notification-actions"><button type="button" data-tw-notification-action="not-yet" data-notification-id="' + esc(item.id) + '">Not yet</button><button type="button" class="is-primary" data-tw-notification-action="yes" data-notification-id="' + esc(item.id) + '">' + esc(item.actionLabel || 'Yes') + '</button></div>'
     : '';
   const openAction = item.openLabel
@@ -150,10 +151,16 @@ function renderItem(item, source = activeSource) {
     : important + packing;
   const sourceClass = isTrip ? ' is-trip' : ' is-finance';
   const expandableClass = expandable ? ' is-expandable' + (expanded ? ' is-expanded' : '') : '';
-  return '<article class="tw-notification-item' + sourceClass + expandableClass + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
+  const actionableClass = swipeConfirm ? ' is-actionable' : '';
+  const content =
     '<div class="tw-notification-copy">' + titleRow +
     (item.detail ? '<small>' + esc(item.detail) + '</small>' : '') +
-    details + '</div>' + financeActions + openAction + '</article>';
+    details + '</div>' + financeActions + openAction;
+  const swipeContent = swipeConfirm
+    ? '<span class="tw-notification-swipe-reveal" aria-hidden="true"><b>✓</b><span>Confirm</span></span><div class="tw-notification-swipe-content">' + content + '</div>'
+    : content;
+  return '<article class="tw-notification-item' + sourceClass + actionableClass + expandableClass + priorityClass + '" data-notification-id="' + esc(item.id) + '">' +
+    swipeContent + '</article>';
 }
 
 function render() {
@@ -240,11 +247,95 @@ export function initNotifications() {
   const ui = ensureUi();
   if (!ui) return;
 
+  let financeSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, item:null, content:null };
+
+  function resetFinanceSwipe(animate = true) {
+    const content = financeSwipe.content;
+    if (content?.isConnected) {
+      content.style.transition = animate ? 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease' : 'none';
+      content.style.transform = 'translateX(0)';
+      content.style.opacity = '1';
+      content.closest('.tw-notification-item')?.classList.remove('is-swiping-confirm');
+      if (animate) setTimeout(() => { if (content.isConnected) content.style.transition = ''; }, 220);
+    }
+    financeSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, item:null, content:null };
+  }
+
+  function confirmFinanceSwipe(itemEl) {
+    const id = String(itemEl?.dataset.notificationId || '');
+    const item = currentItems().find((candidate) => candidate.id === id);
+    if (!item || !item.actionable) { resetFinanceSwipe(true); return; }
+    const content = financeSwipe.content;
+    if (content?.isConnected) {
+      const width = itemEl.getBoundingClientRect().width || 280;
+      content.style.transition = 'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      content.style.transform = 'translateX(' + Math.max(width, 280) + 'px)';
+      content.style.opacity = '.72';
+    }
+    financeSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, item:null, content:null };
+    setTimeout(() => {
+      close();
+      document.dispatchEvent(new CustomEvent('twogether:notification-action', { detail:{ id, choice:'yes', kind:item.kind } }));
+    }, 170);
+  }
+
   ui.button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     ui.layer.hidden ? open() : close();
   });
+
+  ui.layer.addEventListener('touchstart', (event) => {
+    if (event.touches.length !== 1) return;
+    const item = event.target.closest?.('.tw-notification-item.is-finance.is-actionable');
+    if (!item) return;
+    const content = item.querySelector('.tw-notification-swipe-content');
+    if (!content) return;
+    const touch = event.touches[0];
+    resetFinanceSwipe(false);
+    financeSwipe = { tracking:true, active:false, startX:touch.clientX, startY:touch.clientY, lastX:touch.clientX, item, content };
+  }, { passive:true });
+
+  ui.layer.addEventListener('touchmove', (event) => {
+    if (!financeSwipe.tracking || !financeSwipe.item || !financeSwipe.content || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - financeSwipe.startX;
+    const dy = Math.abs(touch.clientY - financeSwipe.startY);
+    financeSwipe.lastX = touch.clientX;
+
+    if (!financeSwipe.active) {
+      if (Math.abs(dx) < 8 && dy < 8) return;
+      const horizontal = Math.abs(dx) > dy * 1.25;
+      if (horizontal && dx > 10) financeSwipe.active = true;
+      else if (dy >= Math.abs(dx) || dx < -10) { resetFinanceSwipe(false); return; }
+    }
+    if (!financeSwipe.active) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const width = financeSwipe.item.getBoundingClientRect().width || 280;
+    const distance = Math.max(0, Math.min(width * .72, dx));
+    financeSwipe.item.classList.add('is-swiping-confirm');
+    financeSwipe.content.style.transition = 'none';
+    financeSwipe.content.style.transform = 'translateX(' + distance + 'px)';
+    financeSwipe.content.style.opacity = String(1 - Math.min(.12, distance / width * .12));
+  }, { passive:false });
+
+  ui.layer.addEventListener('touchend', (event) => {
+    if (!financeSwipe.tracking || !financeSwipe.item) return;
+    const item = financeSwipe.item;
+    const dx = financeSwipe.lastX - financeSwipe.startX;
+    const width = item.getBoundingClientRect().width || 280;
+    const threshold = Math.max(92, width * .38);
+    const shouldConfirm = financeSwipe.active && dx >= threshold;
+    if (financeSwipe.active) event.stopPropagation();
+    if (shouldConfirm) confirmFinanceSwipe(item);
+    else resetFinanceSwipe(true);
+  }, { passive:true });
+
+  ui.layer.addEventListener('touchcancel', () => {
+    if (financeSwipe.tracking) resetFinanceSwipe(true);
+  }, { passive:true });
 
   ui.layer.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-tw-notification-close]')) { close(); return; }

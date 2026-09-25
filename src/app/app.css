@@ -1209,3 +1209,62 @@ body.dev-v21 #loggedUserBadge {
     transition:none;
   }
 }
+
+
+/* Swipe-to-confirm finance notifications */
+.tw-notification-item.is-finance.is-actionable {
+  position:relative;
+  display:block;
+  overflow:hidden;
+  padding:0;
+  touch-action:pan-y;
+  background:transparent;
+}
+
+.tw-notification-swipe-reveal {
+  position:absolute;
+  inset:0;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:0 14px;
+  background:rgba(91,124,92,.13);
+  color:#557150;
+  font-size:12px;
+  font-weight:750;
+  pointer-events:none;
+}
+
+.tw-notification-swipe-reveal b {
+  display:grid;
+  place-items:center;
+  width:23px;
+  height:23px;
+  border-radius:50%;
+  background:rgba(85,113,80,.14);
+  font-size:12px;
+}
+
+.tw-notification-swipe-content {
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:12px;
+  min-height:100%;
+  padding:13px 2px;
+  background:var(--card);
+  will-change:transform,opacity;
+}
+
+.tw-notification-item.is-finance.is-actionable.is-swiping-confirm .tw-notification-swipe-content {
+  box-shadow:-8px 0 20px rgba(45,35,29,.04);
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .tw-notification-swipe-content {
+    transition:none!important;
+  }
+}
