@@ -4349,28 +4349,27 @@ dialog.finance-log-host .tv2-backdrop {
     align-self:center;
     scroll-snap-align:center;
     scroll-snap-stop:always;
-    transform:scale(.93);
+    transform:translateZ(0) scale(.965);
     transform-origin:center;
-    opacity:.66;
-    filter:saturate(.86);
-    box-shadow:0 7px 18px rgba(62,45,31,.045)!important;
-    transition:transform .24s cubic-bezier(.22,.8,.28,1),opacity .2s ease,filter .2s ease,box-shadow .24s ease,border-color .24s ease!important;
+    opacity:.78;
+    backface-visibility:hidden;
+    will-change:transform,opacity;
+    box-shadow:0 10px 24px rgba(62,45,31,.065)!important;
+    transition:transform .30s cubic-bezier(.22,.78,.24,1),opacity .24s ease,border-color .24s ease!important;
   }
 
   [data-fin-view="balances"] .finance-current-card.is-active {
-    transform:scale(1);
+    transform:translateZ(0) scale(1);
     opacity:1;
-    filter:none;
     border-color:#d7c7aa!important;
-    box-shadow:0 15px 34px rgba(62,45,31,.095)!important;
   }
 
   [data-fin-view="balances"] .finance-current-card:hover {
-    transform:scale(.93);
+    transform:translateZ(0) scale(.965);
   }
 
   [data-fin-view="balances"] .finance-current-card.is-active:hover {
-    transform:scale(1);
+    transform:translateZ(0) scale(1);
   }
 
   [data-fin-view="balances"] .finance-current-title {

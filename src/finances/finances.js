@@ -1014,6 +1014,9 @@ function bindFinanceWalletCarousel(root) {
   const mobile=window.matchMedia('(max-width:760px)');
   let scrollFrame=0;
   let settleTimer=0;
+  let pendingClosest=null;
+  let beforeClone=null;
+  let afterClone=null;
 
   const wrapIndex=(index)=>((Number(index)||0)%cards.length+cards.length)%cards.length;
   const scrollCardIntoCenter=(card,behavior='smooth')=>{
@@ -1021,35 +1024,63 @@ function bindFinanceWalletCarousel(root) {
     const left=card.offsetLeft-(rail.clientWidth-card.offsetWidth)/2;
     rail.scrollTo({left:Math.max(0,left),behavior});
   };
+  const updateNav=(index)=>{
+    nav.forEach((button,i)=>{
+      const active=i===index;
+      button.classList.toggle('is-active',active);
+      button.setAttribute('aria-current',active?'true':'false');
+    });
+  };
   const paintActive=(index,activeCard=null)=>{
     const safe=wrapIndex(index);
     financeWalletIndex=safe;
     rail.querySelectorAll('[data-fin-wallet-card]').forEach((card)=>card.classList.remove('is-active'));
     (activeCard||cards[safe])?.classList.add('is-active');
-    nav.forEach((button,i)=>{
-      const active=i===safe;
-      button.classList.toggle('is-active',active);
-      button.setAttribute('aria-current',active?'true':'false');
-    });
+    updateNav(safe);
     return safe;
   };
-  const setActive=(index,{scroll=false,behavior='smooth'}={})=>{
-    const safe=paintActive(index);
-    if(scroll)scrollCardIntoCenter(cards[safe],behavior);
+  const goTo=(index,{behavior='smooth',edgeClone=null}={})=>{
+    const safe=wrapIndex(index);
+    financeWalletIndex=safe;
+    updateNav(safe);
+    scrollCardIntoCenter(edgeClone||cards[safe],behavior);
   };
 
   if(mobile.matches&&cards.length>1){
-    const before=cards[cards.length-1].cloneNode(true);
-    before.dataset.finWalletClone=String(cards.length-1);
-    before.setAttribute('aria-hidden','true');
-    before.inert=true;
-    const after=cards[0].cloneNode(true);
-    after.dataset.finWalletClone='0';
-    after.setAttribute('aria-hidden','true');
-    after.inert=true;
-    rail.insertBefore(before,cards[0]);
-    rail.appendChild(after);
+    beforeClone=cards[cards.length-1].cloneNode(true);
+    beforeClone.dataset.finWalletClone=String(cards.length-1);
+    beforeClone.setAttribute('aria-hidden','true');
+    beforeClone.inert=true;
+    afterClone=cards[0].cloneNode(true);
+    afterClone.dataset.finWalletClone='0';
+    afterClone.setAttribute('aria-hidden','true');
+    afterClone.inert=true;
+    rail.insertBefore(beforeClone,cards[0]);
+    rail.appendChild(afterClone);
   }
+
+  const settleClosest=()=>{
+    const closest=pendingClosest;
+    if(!closest)return;
+    const cloneTarget=closest.dataset.finWalletClone;
+    if(cloneTarget!=null){
+      const target=wrapIndex(Number(cloneTarget));
+      const original=cards[target];
+      financeWalletIndex=target;
+      updateNav(target);
+      rail.querySelectorAll('[data-fin-wallet-card]').forEach((card)=>card.classList.remove('is-active'));
+      closest.classList.add('is-active');
+      original.classList.add('is-active');
+      scrollCardIntoCenter(original,'auto');
+      requestAnimationFrame(()=>{
+        closest.classList.remove('is-active');
+        original.classList.add('is-active');
+      });
+      return;
+    }
+    const index=cards.indexOf(closest);
+    if(index>=0)paintActive(index,closest);
+  };
 
   const syncToScroll=()=>{
     if(!mobile.matches)return;
@@ -1061,19 +1092,9 @@ function bindFinanceWalletCarousel(root) {
       if(nextDistance<distance){distance=nextDistance;closest=card;}
     });
     if(!closest)return;
-    const cloneTarget=closest.dataset.finWalletClone;
-    if(cloneTarget!=null){
-      const target=wrapIndex(Number(cloneTarget));
-      paintActive(target,closest);
-      clearTimeout(settleTimer);
-      settleTimer=setTimeout(()=>{
-        paintActive(target);
-        scrollCardIntoCenter(cards[target],'auto');
-      },90);
-      return;
-    }
-    const index=cards.indexOf(closest);
-    if(index>=0)paintActive(index,closest);
+    pendingClosest=closest;
+    clearTimeout(settleTimer);
+    settleTimer=setTimeout(settleClosest,120);
   };
 
   rail.addEventListener('scroll',()=>{
@@ -1081,12 +1102,18 @@ function bindFinanceWalletCarousel(root) {
     scrollFrame=requestAnimationFrame(syncToScroll);
   },{passive:true});
 
-  nav.forEach((button,index)=>button.addEventListener('click',()=>setActive(index,{scroll:true})));
-  root.querySelector('[data-fin-wallet-prev]')?.addEventListener('click',()=>setActive(financeWalletIndex-1,{scroll:true}));
-  root.querySelector('[data-fin-wallet-next]')?.addEventListener('click',()=>setActive(financeWalletIndex+1,{scroll:true}));
+  nav.forEach((button,index)=>button.addEventListener('click',()=>goTo(index)));
+  root.querySelector('[data-fin-wallet-prev]')?.addEventListener('click',()=>{
+    if(financeWalletIndex===0&&beforeClone)return goTo(cards.length-1,{edgeClone:beforeClone});
+    goTo(financeWalletIndex-1);
+  });
+  root.querySelector('[data-fin-wallet-next]')?.addEventListener('click',()=>{
+    if(financeWalletIndex===cards.length-1&&afterClone)return goTo(0,{edgeClone:afterClone});
+    goTo(financeWalletIndex+1);
+  });
 
-  setActive(financeWalletIndex);
-  requestAnimationFrame(()=>setActive(financeWalletIndex,{scroll:true,behavior:'auto'}));
+  paintActive(financeWalletIndex);
+  requestAnimationFrame(()=>scrollCardIntoCenter(cards[financeWalletIndex],'auto'));
 }
 
 function renderCurrentPanel() {
