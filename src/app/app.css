@@ -925,3 +925,184 @@ body.dev-v21 #loggedUserBadge {
     padding:22px;
   }
 }
+
+
+/* Notification center category tabs */
+.tw-notification-card {
+  width:min(410px,100%);
+  padding:22px 20px 20px;
+}
+
+.tw-notification-title-block {
+  padding-right:38px;
+}
+
+.tw-notification-card .tw-notification-title-block h2 {
+  margin:0;
+  font-family:Georgia,serif;
+  font-size:29px;
+  line-height:1.05;
+}
+
+.tw-notification-title-block p {
+  margin:5px 0 0;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.tw-notification-tabs {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);
+  align-items:center;
+  gap:5px;
+  margin:18px 0 12px;
+  padding:4px;
+  border:1px solid #dfd3c5;
+  border-radius:15px;
+  background:rgba(255,253,249,.58);
+}
+
+.tw-notification-tab {
+  min-width:0;
+  min-height:43px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:7px 9px;
+  border:0;
+  border-radius:11px;
+  background:transparent;
+  color:var(--ink);
+  font:inherit;
+  cursor:pointer;
+  transition:background .18s ease,box-shadow .18s ease,transform .18s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.tw-notification-tab:active {
+  transform:scale(.98);
+}
+
+.tw-notification-tab.is-active.is-trips {
+  background:var(--sage-soft);
+  box-shadow:0 3px 10px rgba(72,91,67,.05);
+}
+
+.tw-notification-tab.is-active.is-finances {
+  background:var(--accent-soft);
+  box-shadow:0 3px 10px rgba(150,112,45,.05);
+}
+
+.tw-notification-tab-icon {
+  width:25px;
+  height:25px;
+  flex:0 0 25px;
+  display:grid;
+  place-items:center;
+}
+
+.tw-notification-tab-icon svg {
+  width:23px;
+  height:23px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.55;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.tw-notification-tab strong {
+  min-width:0;
+  font-family:Georgia,serif;
+  font-size:15px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.tw-notification-tab-count {
+  min-width:22px;
+  height:22px;
+  padding:0 6px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:rgba(126,104,91,.09);
+  color:#6f635a;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+  box-sizing:border-box;
+}
+
+.tw-notification-tab.is-trips.is-active .tw-notification-tab-count {
+  background:rgba(85,113,80,.12);
+  color:#557150;
+}
+
+.tw-notification-tab.is-finances.is-active .tw-notification-tab-count {
+  background:rgba(150,112,45,.12);
+  color:#8a681f;
+}
+
+.tw-notification-tab-divider {
+  width:1px;
+  height:24px;
+  background:#ddd2c5;
+}
+
+.tw-notification-source-list {
+  display:grid;
+  gap:0;
+  overflow:hidden;
+  padding:0 12px;
+  border:1px solid rgba(126,104,91,.14);
+  border-radius:16px;
+  background:rgba(255,255,255,.28);
+}
+
+.tw-notification-source-list.is-trips {
+  border-color:rgba(91,124,92,.18);
+}
+
+.tw-notification-source-list.is-finances {
+  border-color:rgba(193,151,67,.20);
+}
+
+.tw-notification-source-list .tw-notification-item:last-child {
+  border-bottom:0;
+}
+
+.tw-notification-source-list .tw-notification-empty {
+  padding:28px 12px;
+}
+
+@media(max-width:760px) {
+  .tw-notification-card {
+    padding:20px 16px 16px;
+  }
+
+  .tw-notification-tabs {
+    margin-top:16px;
+  }
+
+  .tw-notification-tab {
+    gap:6px;
+    padding-inline:7px;
+  }
+
+  .tw-notification-tab strong {
+    font-size:14px;
+  }
+
+  .tw-notification-tab-icon {
+    width:23px;
+    height:23px;
+    flex-basis:23px;
+  }
+
+  .tw-notification-tab-icon svg {
+    width:21px;
+    height:21px;
+  }
+}

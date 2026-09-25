@@ -5,6 +5,7 @@ const BUTTON_ID = 'twNotificationButton';
 
 const pendingSources = new Map();
 let actorObserver = null;
+let activeSource = 'trips';
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -47,6 +48,31 @@ function groupMeta(source) {
   if (source === 'finances') return { title:'Finances', className:'is-finances' };
   if (source === 'trips') return { title:'Trips', className:'is-trips' };
   return { title:'Other', className:'is-other' };
+}
+
+function itemsForSource(groups, source) {
+  return groups.find((group) => group.source === source)?.items || [];
+}
+
+function sourceIcon(source) {
+  if (source === 'finances') {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h15a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3v-11a3 3 0 0 1 3-3h11"/><path d="M3 7.5h14"/><path d="M15 11h6v5h-6a2.5 2.5 0 0 1 0-5Z"/><circle cx="16.5" cy="13.5" r=".7"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14a2 2 0 0 1 2 2v9H3v-9a2 2 0 0 1 2-2Z"/><path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8"/><path d="M8 8v11m8-11v11"/></svg>';
+}
+
+function renderSourceTabs(groups) {
+  const tripCount = itemsForSource(groups, 'trips').length;
+  const financeCount = itemsForSource(groups, 'finances').length;
+  return '<div class="tw-notification-tabs" role="tablist" aria-label="Notification category">' +
+    '<button type="button" role="tab" class="tw-notification-tab is-trips' + (activeSource === 'trips' ? ' is-active' : '') + '" data-tw-notification-tab="trips" aria-selected="' + (activeSource === 'trips' ? 'true' : 'false') + '">' +
+      '<span class="tw-notification-tab-icon">' + sourceIcon('trips') + '</span><strong>Trips</strong><span class="tw-notification-tab-count">' + tripCount + '</span>' +
+    '</button>' +
+    '<span class="tw-notification-tab-divider" aria-hidden="true"></span>' +
+    '<button type="button" role="tab" class="tw-notification-tab is-finances' + (activeSource === 'finances' ? ' is-active' : '') + '" data-tw-notification-tab="finances" aria-selected="' + (activeSource === 'finances' ? 'true' : 'false') + '">' +
+      '<span class="tw-notification-tab-icon">' + sourceIcon('finances') + '</span><strong>Finances</strong><span class="tw-notification-tab-count">' + financeCount + '</span>' +
+    '</button>' +
+  '</div>';
 }
 
 function renderGroup(group) {
@@ -125,6 +151,7 @@ function render() {
 
   const groups = currentGroups();
   const items = groups.flatMap((group) => group.items);
+  const visibleItems = itemsForSource(groups, activeSource);
   const count = ui.button.querySelector('.tw-notification-count');
   if (count) {
     count.textContent = String(items.length);
@@ -135,17 +162,28 @@ function render() {
 
   const body = document.getElementById('twNotificationBody');
   if (!body) return;
+  const pendingText = items.length + ' pending';
+  const emptyLabel = activeSource === 'finances' ? 'No finance notifications' : 'No trip notifications';
   body.innerHTML =
-    '<span class="panel-kicker">REMINDERS</span>' +
-    '<h2 id="twNotificationTitle">Notifications</h2>' +
-    '<div class="tw-notification-heading"><strong>Pending</strong><span>' + items.length + '</span></div>' +
-    '<div class="tw-notification-list">' +
-      (items.length ? groups.map(renderGroup).join('') : '<div class="tw-notification-empty"><span>✓</span><strong>Nothing pending</strong></div>') +
+    '<div class="tw-notification-title-block">' +
+      '<h2 id="twNotificationTitle">Notifications</h2>' +
+      '<p>' + esc(pendingText) + '</p>' +
+    '</div>' +
+    renderSourceTabs(groups) +
+    '<div class="tw-notification-list tw-notification-source-list is-' + esc(activeSource) + '" role="tabpanel">' +
+      (visibleItems.length
+        ? visibleItems.map(renderItem).join('')
+        : '<div class="tw-notification-empty"><span>✓</span><strong>' + esc(emptyLabel) + '</strong></div>') +
     '</div>';
 }
 function open() {
   const ui = ensureUi();
   if (!ui || !actor()) return;
+  const groups = currentGroups();
+  if (!itemsForSource(groups, activeSource).length) {
+    if (itemsForSource(groups, 'trips').length) activeSource = 'trips';
+    else if (itemsForSource(groups, 'finances').length) activeSource = 'finances';
+  }
   render();
   ui.layer.hidden = false;
   ui.layer.setAttribute('aria-hidden', 'false');
@@ -192,6 +230,15 @@ export function initNotifications() {
 
   ui.layer.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-tw-notification-close]')) { close(); return; }
+    const tab = event.target.closest?.('[data-tw-notification-tab]');
+    if (tab) {
+      const source = String(tab.dataset.twNotificationTab || '');
+      if (source === 'trips' || source === 'finances') {
+        activeSource = source;
+        render();
+      }
+      return;
+    }
     const action = event.target.closest?.('[data-tw-notification-action]');
     if (!action) return;
     const id = String(action.dataset.notificationId || '');
