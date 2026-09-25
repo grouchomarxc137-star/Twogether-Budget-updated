@@ -594,7 +594,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     category: uiCategoryFromEntry(existing),
     paidBy: existing?.paidBy || me,
     split: existing?.split || 'shared',
-    forActor: existing?.forActor || me,
+    forActor: existing?.split === 'personal' && existing?.paidBy && existing.paidBy !== 'both' ? existing.paidBy : (existing?.forActor || me),
     date: existing?.date || new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
     note: existing?.note || '',
     uncertain: !!existing?.uncertain,
@@ -648,16 +648,18 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         : '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0.00</strong></div><p>You’re even on this trip right now.</p></div>';
     }
 
+    const forOptions = state.paidBy === other
+      ? [['shared','Shared 50/50'],[other,'Just '+other]]
+      : [['shared','Shared 50/50'],[me,'Just you']];
     const normalOptions = owedMode ? '' :
       '<div class="tv2-jar-slot"></div>'+
       '<button type="button" class="tv2-defaults" data-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(summary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>'+
       '<div class="tv2-more" '+(state.more?'':'hidden')+'>'+
         '<div class="tv2-field"><span>Paid by</span><div class="tv2-seg">'+
           [[me,'You'],[other,other],['both','Each paid half']].map(([k,l])=>'<button type="button" data-payer="'+k+'" class="'+(state.paidBy===k?'on':'')+'">'+esc(l)+'</button>').join('')+
-          '<button type="button" data-jar-payer>Shared Jar</button>'+
         '</div></div>'+
         '<div class="tv2-field" '+(state.paidBy==='both'?'hidden':'')+'><span>For</span><div class="tv2-seg">'+
-          [['shared','Shared 50/50'],[me,'Just you'],[other,'Just '+other]].map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
+          forOptions.map(([k,l])=>'<button type="button" data-split="'+k+'" class="'+((k==='shared'&&state.split==='shared')||(k!=='shared'&&state.split==='personal'&&state.forActor===k)?'on':'')+'">'+esc(l)+'</button>').join('')+
         '</div></div>'+
         '<label class="tv2-field tv2-date-field"><span>Date</span><span class="tv2-date-box"><input type="date" id="tv2Date" value="'+esc(state.date)+'"></span></label>'+
         '<label class="tv2-field"><span>Note</span><input id="tv2Note" maxlength="180" placeholder="e.g. dinner by the canal" value="'+esc(state.note)+'"></label>'+
@@ -770,8 +772,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       if (b.hasAttribute('data-pay-full')) { state.amountText=maxCategoryRepayment().toFixed(2); mount(); return; }
       if (b.dataset.jar) { state.useJar=b.dataset.jar==='on'; refreshLive(); return; }
       if (b.hasAttribute('data-more')) { state.more=!state.more; mount(); return; }
-      if (b.dataset.payer) { state.paidBy=b.dataset.payer; if(state.paidBy==='both')state.split='shared'; mount(); return; }
-      if (b.hasAttribute('data-jar-payer')) { if(state.category!=='stay'){state.error='Shared Jar can only be used for Stay.';refreshLive();return;} state.useJar=true;state.error='Shared Jar contributes 20% to Stay; choose who paid the remaining amount.';refreshLive();return; }
+      if (b.dataset.payer) { state.paidBy=b.dataset.payer; if(state.paidBy==='both')state.split='shared'; else if(state.split==='personal')state.forActor=state.paidBy; mount(); return; }
       if (b.dataset.split) { if(b.dataset.split==='shared'){state.split='shared';}else{state.split='personal';state.forActor=b.dataset.split;} mount(); return; }
       if (b.hasAttribute('data-save')) { save(); return; }
       if (b.hasAttribute('data-delete')) { remove(); }
@@ -795,7 +796,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     try {
       await window.TwogetherAPI.post('saveTripExpense',{planId:plan.id,expense:{
         id:existing?.id||'',category:mapped.category,foodType:mapped.foodType,transportType:mapped.transportType,name:'',
-        amount:amount(),paidBy:state.paidBy,split:state.paidBy==='both'?'shared':state.split,forActor:state.split==='personal'?state.forActor:'',
+        amount:amount(),paidBy:state.paidBy,split:state.paidBy==='both'?'shared':state.split,forActor:state.split==='personal'?state.paidBy:'',
         date:state.date,note:state.note.trim(),uncertain:!!state.uncertain,useJar:state.category==='stay'&&!!state.useJar
       }},actor());
       const savedAmount=amount(), savedLabel=EXPENSE_CATS.find((x)=>x[0]===state.category)?.[1]||'Expense';
