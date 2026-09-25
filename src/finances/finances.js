@@ -104,6 +104,7 @@ let financeMonthDeleteConfirmLayer = null;
 let financeLogBackgroundLock = null;
 let financeMonthPageLock = null;
 let financeReminderSyncing = false;
+let financeWalletIndex = 1;
 
 const signedMoney = (v) => `${n(v) >= 0 ? '+' : '−'}${money(Math.abs(n(v)))}`;
 const FINANCE_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -994,6 +995,66 @@ function renderPage() {
   const detail = $('#financeDetail'); if (detail && !recordFor(selectedMonth)) detail.innerHTML = '';
 }
 
+function financeWalletIcon(kind) {
+  const icons={
+    cash:'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10.5h17a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-14a4 4 0 0 1 4-4h14"/><path d="M5 10.5h17"/><path d="M20 16h7v6h-7a3 3 0 0 1 0-6Z"/><circle cx="21.5" cy="19" r=".8"/></svg>',
+    savings:'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28V14"/><path d="M16 16C9 16 6 12 6 7c6 0 10 3 10 9Z"/><path d="M16 13c1-6 5-9 11-9 0 6-4 10-11 10"/><path d="M10 28h12"/></svg>',
+    owed:'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11h18"/><path d="m20 6 5 5-5 5"/><path d="M25 21H7"/><path d="m12 16-5 5 5 5"/></svg>',
+    investments:'<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27h23"/><rect x="7" y="18" width="4" height="9" rx="1"/><rect x="14" y="13" width="4" height="14" rx="1"/><rect x="21" y="7" width="4" height="20" rx="1"/></svg>',
+  };
+  return '<span class="v31-fin-icon" aria-hidden="true">'+(icons[kind]||icons.cash)+'</span>';
+}
+
+function bindFinanceWalletCarousel(root) {
+  const rail=root?.querySelector('.finance-current-grid');
+  if(!rail)return;
+  const cards=[...rail.querySelectorAll('[data-fin-wallet-card]')];
+  const nav=[...root.querySelectorAll('[data-fin-wallet-jump]')];
+  if(!cards.length)return;
+  const mobile=window.matchMedia('(max-width:760px)');
+  let scrollFrame=0;
+
+  const setActive=(index,{scroll=false,behavior='smooth'}={})=>{
+    const safe=Math.max(0,Math.min(cards.length-1,Number(index)||0));
+    financeWalletIndex=safe;
+    cards.forEach((card,i)=>card.classList.toggle('is-active',i===safe));
+    nav.forEach((button,i)=>{
+      const active=i===safe;
+      button.classList.toggle('is-active',active);
+      button.setAttribute('aria-current',active?'true':'false');
+    });
+    if(scroll&&mobile.matches){
+      const card=cards[safe];
+      const left=card.offsetLeft-(rail.clientWidth-card.offsetWidth)/2;
+      rail.scrollTo({left:Math.max(0,left),behavior});
+    }
+  };
+
+  const syncToScroll=()=>{
+    if(!mobile.matches)return;
+    const center=rail.scrollLeft+rail.clientWidth/2;
+    let best=0, distance=Infinity;
+    cards.forEach((card,index)=>{
+      const cardCenter=card.offsetLeft+card.offsetWidth/2;
+      const nextDistance=Math.abs(cardCenter-center);
+      if(nextDistance<distance){distance=nextDistance;best=index;}
+    });
+    setActive(best);
+  };
+
+  rail.addEventListener('scroll',()=>{
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame=requestAnimationFrame(syncToScroll);
+  },{passive:true});
+
+  nav.forEach((button,index)=>button.addEventListener('click',()=>setActive(index,{scroll:true})));
+  root.querySelector('[data-fin-wallet-prev]')?.addEventListener('click',()=>setActive(financeWalletIndex-1,{scroll:true}));
+  root.querySelector('[data-fin-wallet-next]')?.addEventListener('click',()=>setActive(financeWalletIndex+1,{scroll:true}));
+
+  setActive(Math.min(financeWalletIndex,cards.length-1));
+  requestAnimationFrame(()=>setActive(financeWalletIndex,{scroll:true,behavior:'auto'}));
+}
+
 function renderCurrentPanel() {
   const root = $('#financeCurrent'); if (!root) return;
   const { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth } = profileStats();
@@ -1006,11 +1067,22 @@ function renderCurrentPanel() {
   const owedPreview = activeTripRows + activeManualRows || '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.</span><strong>€0.00</strong></button>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2></div></div>
-    <div class="finance-current-grid">
-      <article class="finance-current-card tone-other" data-fin-current-cash><div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button></article>
-      <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
-      <article class="finance-current-card tone-receivable" data-fin-owed-card><button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button></article>
-      <article class="finance-current-card tone-wealth"><div class="finance-current-title"><div><span>INVESTMENTS</span><h3>Your investment value</h3></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${latestInvestment || actor()==='Principe' ? '<button class="text-btn" type="button" data-fin-edit-investment-value>Edit</button>' : ''}<strong>${money(inv.ownInvestments || 0)}</strong></div></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div></article>
+    <div class="finance-current-grid" role="region" aria-label="Wallets">
+      <article class="finance-current-card tone-other" data-fin-current-cash data-fin-wallet-card="cash">${financeWalletIcon('cash')}<div class="finance-current-title"><div><span>BANKS</span><h3>Current cash</h3></div><strong data-fin-current-cash-total>${money(bankTotal)}</strong></div>${banks}<button class="btn ghost finance-add" type="button" data-fin-add-bank>+ Add bank</button></article>
+      <article class="finance-current-card tone-wealth" data-fin-wallet-card="savings">${financeWalletIcon('savings')}<div class="finance-current-title"><div><span>SAVINGS</span><h3>Saved up</h3></div><strong>${money(availableSavings)}</strong></div><div class="finance-current-metrics"><div><span>Total saved</span><strong>${money(savingsTotal)}</strong></div><div><span>On hold</span><strong>${money(heldTotal)}</strong></div><div class="${availableSavings < 0 ? 'negative' : ''}"><span>Actually available</span><strong>${money(availableSavings)}</strong></div></div>${holds}<div class="finance-card-actions"><button class="btn ghost" type="button" data-fin-edit-savings>Edit saved total</button><button class="btn ghost" type="button" data-fin-add-hold>+ Add hold</button></div></article>
+      <article class="finance-current-card tone-receivable" data-fin-owed-card data-fin-wallet-card="owed">${financeWalletIcon('owed')}<button class="finance-current-title finance-owed-title-open" type="button" data-fin-open-owed-history><div><span>PAYBACK</span><h3>Money owed to me</h3></div><strong>${money(owedTotal)}</strong></button>${owedPreview}<button class="btn ghost finance-add" type="button" data-fin-add-owed>+ Add loan</button></article>
+      <article class="finance-current-card tone-wealth" data-fin-wallet-card="investments">${financeWalletIcon('investments')}<div class="finance-current-title"><div><span>INVESTMENTS</span><h3>My investments</h3></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${latestInvestment || actor()==='Principe' ? '<button class="text-btn" type="button" data-fin-edit-investment-value>Edit</button>' : ''}<strong>${money(inv.ownInvestments || 0)}</strong></div></div><div class="finance-current-metrics"><div><span>Total account</span><strong>${inv.investmentTotal == null ? '—' : money(inv.investmentTotal)}</strong></div>${actor()==='Principessa'?'<div><span>Sis</span><strong>'+(inv.investmentTotal == null ? '—' : money(inv.sisterInvestments))+'</strong></div>':''}</div></article>
+    </div>
+    <div class="finance-wallet-nav" aria-label="Wallet carousel">
+      <button type="button" data-fin-wallet-jump="cash">${financeWalletIcon('cash')}<span>Current cash</span></button>
+      <button type="button" data-fin-wallet-jump="savings">${financeWalletIcon('savings')}<span>Saved up</span></button>
+      <button type="button" data-fin-wallet-jump="owed">${financeWalletIcon('owed')}<span>Money owed</span></button>
+      <button type="button" data-fin-wallet-jump="investments">${financeWalletIcon('investments')}<span>Investments</span></button>
+    </div>
+    <div class="finance-wallet-swipe-hint" aria-label="Swipe between wallets">
+      <button type="button" data-fin-wallet-prev aria-label="Previous wallet">‹</button>
+      <em>Swipe to explore</em>
+      <button type="button" data-fin-wallet-next aria-label="Next wallet">›</button>
     </div>`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
   $$('[data-fin-edit-bank]', root).forEach((btn) => btn.addEventListener('click', () => openBankModal(Number(btn.dataset.finEditBank))));
@@ -1028,6 +1100,7 @@ function renderCurrentPanel() {
     if (event.target.closest('button')) return;
     openOwedHistory();
   });
+  bindFinanceWalletCarousel(root);
 }
 
 function renderScenarioPanel() {

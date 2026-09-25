@@ -4300,3 +4300,232 @@ dialog.finance-log-host .tv2-backdrop {
     font-size:16px;
   }
 }
+
+
+/* Wallet carousel — mobile-first Balances & loans presentation */
+.finance-wallet-nav,
+.finance-wallet-swipe-hint {
+  display:none;
+}
+
+@media(max-width:760px) {
+  [data-fin-view="balances"] .finance-current {
+    margin-bottom:18px;
+    overflow:visible;
+  }
+
+  [data-fin-view="balances"] .finance-current-head {
+    margin-bottom:8px!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-grid {
+    display:flex!important;
+    grid-template-columns:none!important;
+    align-items:center!important;
+    gap:12px!important;
+    width:auto!important;
+    max-width:none!important;
+    margin:0 -16px!important;
+    padding:14px max(9vw,34px) 22px!important;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+    scroll-snap-type:x mandatory;
+    scroll-padding-inline:max(9vw,34px);
+    overscroll-behavior-x:contain;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  [data-fin-view="balances"] .finance-current-grid::-webkit-scrollbar {
+    display:none;
+  }
+
+  [data-fin-view="balances"] .finance-current-card {
+    flex:0 0 min(82vw,350px)!important;
+    width:min(82vw,350px)!important;
+    min-width:min(82vw,350px)!important;
+    max-width:min(82vw,350px)!important;
+    min-height:0!important;
+    align-self:center;
+    scroll-snap-align:center;
+    scroll-snap-stop:always;
+    transform:scale(.93);
+    transform-origin:center;
+    opacity:.66;
+    filter:saturate(.86);
+    box-shadow:0 7px 18px rgba(62,45,31,.045)!important;
+    transition:transform .24s cubic-bezier(.22,.8,.28,1),opacity .2s ease,filter .2s ease,box-shadow .24s ease,border-color .24s ease!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-card.is-active {
+    transform:scale(1);
+    opacity:1;
+    filter:none;
+    border-color:#d7c7aa!important;
+    box-shadow:0 15px 34px rgba(62,45,31,.095)!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-card:hover {
+    transform:scale(.93);
+  }
+
+  [data-fin-view="balances"] .finance-current-card.is-active:hover {
+    transform:scale(1);
+  }
+
+  [data-fin-view="balances"] .finance-current-title {
+    min-height:62px!important;
+    padding-left:62px!important;
+    padding-bottom:12px!important;
+    margin-bottom:12px!important;
+    align-items:flex-start!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-title h3 {
+    font-size:22px!important;
+    line-height:1.05!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-title>strong,
+  [data-fin-view="balances"] .finance-current-title>div:last-child>strong {
+    font-size:22px!important;
+  }
+
+  [data-fin-view="balances"] .v31-fin-icon {
+    left:16px!important;
+    top:17px!important;
+    width:46px!important;
+    height:46px!important;
+    border-radius:15px!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-row,
+  [data-fin-view="balances"] .finance-current-metrics {
+    font-size:14px;
+  }
+
+  [data-fin-view="balances"] .finance-card-actions {
+    display:grid!important;
+    grid-template-columns:1fr 1fr;
+    gap:8px!important;
+  }
+
+  [data-fin-view="balances"] .finance-card-actions .btn,
+  [data-fin-view="balances"] .finance-add {
+    min-height:42px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:4px;
+    margin:2px 0 0;
+    padding:0 2px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav button {
+    min-width:0;
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    padding:5px 1px 4px;
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:5px;
+    font:inherit;
+    font-size:10px;
+    line-height:1.08;
+    text-align:center;
+    cursor:pointer;
+    transition:color .18s ease,background .18s ease,transform .18s ease;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav button.is-active {
+    color:#486f43;
+    background:rgba(232,239,224,.55);
+    transform:translateY(-1px);
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav .v31-fin-icon {
+    position:static!important;
+    width:39px!important;
+    height:39px!important;
+    border-radius:50%!important;
+    display:grid!important;
+    place-items:center!important;
+    color:#9b6f28;
+    background:#fff8e9;
+    border:1px solid #ead8b7;
+    box-shadow:none!important;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav button:nth-child(2) .v31-fin-icon,
+  [data-fin-view="balances"] .finance-wallet-nav button:nth-child(4) .v31-fin-icon {
+    color:#5d8051;
+    background:#eef5e8;
+    border-color:#dbe6d2;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav button.is-active .v31-fin-icon {
+    box-shadow:0 0 0 4px rgba(111,143,94,.10)!important;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav .v31-fin-icon svg {
+    width:22px!important;
+    height:22px!important;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-swipe-hint {
+    display:grid;
+    grid-template-columns:44px 1fr 44px;
+    align-items:center;
+    gap:8px;
+    margin:10px auto 2px;
+    width:min(290px,88%);
+    color:#7c6657;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-swipe-hint em {
+    text-align:center;
+    font-size:13px;
+    font-style:italic;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-swipe-hint button {
+    width:38px;
+    height:38px;
+    justify-self:center;
+    border:0;
+    border-radius:50%;
+    background:transparent;
+    color:#7c6657;
+    font:inherit;
+    font-size:32px;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-swipe-hint button:active {
+    transform:scale(.92);
+  }
+}
+
+@media(max-width:390px) {
+  [data-fin-view="balances"] .finance-current-grid {
+    padding-inline:30px!important;
+    scroll-padding-inline:30px;
+  }
+
+  [data-fin-view="balances"] .finance-current-card {
+    flex-basis:84vw!important;
+    width:84vw!important;
+    min-width:84vw!important;
+    max-width:84vw!important;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-nav button {
+    font-size:9.5px;
+  }
+}
