@@ -3446,9 +3446,35 @@ button.finance-owed-history-row:hover {
 
 
 /* Trips-style Log Finances home */
+.finance-log-home>.tv2-page {
+  padding-top:0;
+}
+
 .finance-log-home-head {
-  display:grid;
-  gap:4px;
+  display:block;
+  margin:0;
+}
+
+.finance-log-title-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  min-width:0;
+}
+
+.finance-log-title-row h1 {
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.finance-log-recurring-link {
+  flex:0 0 auto;
+  min-height:36px;
+  padding:6px 0;
+  color:var(--tv2-muted);
+  font-size:15px;
+  white-space:nowrap;
 }
 
 .finance-log-home-head p {
@@ -3456,14 +3482,6 @@ button.finance-owed-history-row:hover {
   color:var(--tv2-muted);
   font-size:15px;
   line-height:1.4;
-}
-
-.finance-log-home-head .tv2-nav {
-  align-items:center;
-}
-
-.finance-log-home-head .tv2-link {
-  justify-self:end;
 }
 
 .finance-months-tv2 {
@@ -3505,10 +3523,6 @@ button.finance-owed-history-row:hover {
 
 
 /* Compact two-column month grid with legacy finance status colors. */
-.finance-log-home-head {
-  gap:0;
-}
-
 .finance-months-tv2 {
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:9px;
@@ -4920,5 +4934,16 @@ dialog.finance-log-host .tv2-backdrop {
 
   .finance-month-flow b {
     font-size:10.5px;
+  }
+}
+
+
+@media(max-width:430px) {
+  .finance-log-title-row {
+    gap:10px;
+  }
+
+  .finance-log-recurring-link {
+    font-size:13px;
   }
 }
