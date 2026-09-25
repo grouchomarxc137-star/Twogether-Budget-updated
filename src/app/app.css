@@ -1379,24 +1379,3 @@ body.dev-v21 #loggedUserBadge {
     border-radius:13px;
   }
 }
-
-
-/* Category-colored notification outlines */
-.tw-notification-source-list.is-trips,
-.tw-notification-source-list.is-finances {
-  background:rgba(255,255,255,.28);
-}
-
-.tw-notification-source-list.is-trips .tw-notification-item {
-  border-color:rgba(91,124,92,.34);
-}
-
-.tw-notification-source-list.is-finances .tw-notification-item {
-  border-color:rgba(193,151,67,.38);
-}
-
-.tw-notification-source-list .tw-notification-item,
-.tw-notification-item.is-urgent,
-.tw-notification-item.is-important {
-  background:var(--card);
-}
