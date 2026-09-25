@@ -323,7 +323,7 @@ function normalizeRecurringConfig(value) {
   };
 }
 function freshProfile() {
-  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, customCategories: [], recurring: normalizeRecurringConfig({}), financeReminders: [], updatedAt: '', updatedBy: '' };
+  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, customCategories: [], customCategoryCleanupV1: true, recurring: normalizeRecurringConfig({}), financeReminders: [], updatedAt: '', updatedBy: '' };
 }
 function normalizeProfile(profileData) {
   const p = profileData && typeof profileData === 'object' ? profileData : {};
@@ -340,6 +340,7 @@ function normalizeProfile(profileData) {
     wishlist: Array.isArray(p.wishlist) ? JSON.parse(JSON.stringify(p.wishlist)) : [],
     compareLab: p.compareLab && typeof p.compareLab === 'object' ? JSON.parse(JSON.stringify(p.compareLab)) : {},
     customCategories: normalizeCustomCategories(p.customCategories),
+    customCategoryCleanupV1: p.customCategoryCleanupV1 === true,
     recurring: normalizeRecurringConfig(p.recurring),
     financeReminders: Array.isArray(p.financeReminders) ? p.financeReminders.map((item) => ({
       id: String(item?.id || ''),
@@ -1406,7 +1407,15 @@ function openRecurringDeleteConfirm(kind,index) {
       nextConfig.custom=true;
       const target=kind==='income'?nextConfig.incomes:nextConfig.expenses;
       if(!target[index]) throw new Error('This recurring item no longer exists');
+      const removedItem=target[index];
+      const removedGroup=kind==='expense'?normalizeGroup(removedItem?.group):'';
       target.splice(index,1);
+      if(kind==='expense'&&isCustomGroupKey(removedGroup)){
+        const categoryStillUsed=nextConfig.expenses.some((entry)=>normalizeGroup(entry.group)===removedGroup);
+        if(!categoryStillUsed){
+          next.customCategories=normalizeCustomCategories(next.customCategories).filter((category)=>category.key!==removedGroup);
+        }
+      }
       next.recurring=nextConfig;
       const normalized=normalizeProfile(next);
       financeState.financeProfiles[actor()]=normalized;

@@ -25,8 +25,8 @@ function defaultState_() {
     tripPrepDefaults: defaultTripPrepDefaults_(),
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
-      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}},
-      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{}}
+      Principessa:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{},customCategories:[],customCategoryCleanupV1:true},
+      Principe:{bankAccounts:[],savingsTotal:'',savingsReserved:[],receivables:[],scenarios:[],wishlist:[],compareLab:{},customCategories:[],customCategoryCleanupV1:true}
     },
     sharedJar: defaultSharedJar_(),
     game: defaultGame_(),
@@ -1542,6 +1542,26 @@ function sanitizeFinanceCustomCategory_(item) {
 
 function sanitizeFinanceProfile_(profile, actor) {
   const source = profile && typeof profile === 'object' ? profile : {};
+  const cleanupDone=source.customCategoryCleanupV1===true;
+  let customCategories=Array.isArray(source.customCategories) ? source.customCategories.slice(0,30).map(sanitizeFinanceCustomCategory_).filter(Boolean) : [];
+  let recurring=sanitizeFinanceRecurring_(source.recurring);
+  if(!cleanupDone){
+    const removeLabels=new Set(['pets','test']);
+    const removedKeys=new Set();
+    customCategories=customCategories.filter(function(category){
+      if(removeLabels.has(String(category.label||'').trim().toLowerCase())){
+        removedKeys.add(category.key);
+        return false;
+      }
+      return true;
+    });
+    if(removedKeys.size){
+      recurring.expenses=recurring.expenses.map(function(item){
+        if(removedKeys.has(item.group)) item.group='other';
+        return item;
+      });
+    }
+  }
   return {
     bankAccounts: Array.isArray(source.bankAccounts) ? source.bankAccounts.slice(0,30).map(sanitizeFinanceBank_).filter(x => x.name && x.balance !== '') : [],
     savingsTotal: cleanMoney_(source.savingsTotal),
@@ -1550,8 +1570,9 @@ function sanitizeFinanceProfile_(profile, actor) {
     scenarios: Array.isArray(source.scenarios) ? source.scenarios.slice(0,40).map(sanitizeFinanceScenario_).filter(x => x.name && x.upfront !== '') : [],
     wishlist: Array.isArray(source.wishlist) ? source.wishlist.slice(0,100).map(sanitizeFinanceWishlistItem_).filter(x => x.name) : [],
     compareLab: source.compareLab && typeof source.compareLab === 'object' ? sanitizeCompareLab_(source.compareLab) : {},
-    customCategories: Array.isArray(source.customCategories) ? source.customCategories.slice(0,30).map(sanitizeFinanceCustomCategory_).filter(Boolean) : [],
-    recurring: sanitizeFinanceRecurring_(source.recurring),
+    customCategories: customCategories,
+    customCategoryCleanupV1: true,
+    recurring: recurring,
     financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && (x.kind==='investment-snapshot' || x.amount !== '') && x.month && x.date; }) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
