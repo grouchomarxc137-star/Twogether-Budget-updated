@@ -954,6 +954,211 @@ function installEdgeSubnavSelector() {
   }, { passive:true, capture:true });
 }
 
+let edgeHubInstalled = false;
+let edgeHub = {
+  timer:null,
+  tracking:false,
+  selecting:false,
+  touchId:null,
+  startX:0,
+  startY:0,
+  lastX:0,
+  lastY:0,
+  moved:false,
+  choices:[],
+  selectedIndex:-1,
+  overlay:null,
+};
+
+function currentMainAreaChoices() {
+  const trip = $('[data-hub="trips"]');
+  const finance = $('[data-hub="finances"]');
+  const wishlist = $('#wishlistHub');
+  return [
+    ['Trips', trip, !!trip?.classList.contains('active')],
+    ['My finances', finance, !!finance?.classList.contains('active')],
+    ['Wishlist', wishlist, !!wishlist?.classList.contains('active')],
+  ].filter((item) => item[1]);
+}
+
+function ensureEdgeHubOverlay() {
+  let overlay = document.getElementById('twEdgeHub');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'twEdgeHub';
+  overlay.className = 'tw-edge-hub';
+  overlay.hidden = true;
+  overlay.setAttribute('aria-hidden','true');
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function renderEdgeHub(choices) {
+  const overlay = ensureEdgeHubOverlay();
+  overlay.innerHTML =
+    '<div class="tw-edge-hub-list">' +
+      choices.map(([label, _target, current], index) =>
+        '<div class="tw-edge-hub-item' + (current ? ' is-current' : '') + '" data-edge-hub-index="' + index + '">' +
+          '<i aria-hidden="true"></i><span>' + label + '</span>' +
+        '</div>'
+      ).join('') +
+    '</div>' +
+    '<small>Release to open</small>';
+  return overlay;
+}
+
+function positionEdgeHub(startY) {
+  const overlay = edgeHub.overlay;
+  if (!overlay) return;
+  overlay.style.top = '0px';
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden','false');
+  overlay.classList.add('show');
+  const height = overlay.getBoundingClientRect().height || 78;
+  const top = Math.max(58, Math.min(window.innerHeight - height - 18, startY - height / 2));
+  overlay.style.top = top + 'px';
+}
+
+function edgeHubIndexAt(x) {
+  const overlay = edgeHub.overlay;
+  if (!overlay) return -1;
+  const items = [...overlay.querySelectorAll('[data-edge-hub-index]')];
+  for (const item of items) {
+    const rect = item.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right) return Number(item.dataset.edgeHubIndex);
+  }
+  if (!items.length) return -1;
+  let nearest = -1, distance = Infinity;
+  items.forEach((item) => {
+    const rect = item.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    const d = Math.abs(x - center);
+    if (d < distance) { distance = d; nearest = Number(item.dataset.edgeHubIndex); }
+  });
+  return distance <= 28 ? nearest : -1;
+}
+
+function previewEdgeHub(index) {
+  if (index < 0 || index === edgeHub.selectedIndex || !edgeHub.overlay) return;
+  edgeHub.selectedIndex = index;
+  edgeHub.overlay.querySelectorAll('[data-edge-hub-index]').forEach((item) => {
+    item.classList.toggle('is-preview', Number(item.dataset.edgeHubIndex) === index);
+  });
+  edgeSubnavHaptic(16);
+}
+
+function hideEdgeHub() {
+  const overlay = edgeHub.overlay || document.getElementById('twEdgeHub');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+  overlay.hidden = true;
+  overlay.style.top = '';
+}
+
+function resetEdgeHub() {
+  if (edgeHub.timer) clearTimeout(edgeHub.timer);
+  edgeHub.timer = null;
+  edgeHub.tracking = false;
+  edgeHub.selecting = false;
+  edgeHub.touchId = null;
+  edgeHub.startX = 0;
+  edgeHub.startY = 0;
+  edgeHub.lastX = 0;
+  edgeHub.lastY = 0;
+  edgeHub.moved = false;
+  edgeHub.choices = [];
+  edgeHub.selectedIndex = -1;
+  hideEdgeHub();
+}
+
+function installEdgeHubSelector() {
+  if (edgeHubInstalled) return;
+  edgeHubInstalled = true;
+
+  document.addEventListener('contextmenu', (event) => {
+    if (edgeHub.tracking || edgeHub.selecting) event.preventDefault();
+  }, true);
+
+  document.addEventListener('touchstart', (event) => {
+    if (!isMobile() || edgeHub.tracking || event.touches.length !== 1 || hasBlockingSurface()) return;
+    const touch = event.touches[0];
+    if (touch.clientX > 28) return;
+
+    const choices = currentMainAreaChoices();
+    if (choices.length < 2) return;
+
+    resetEdgeHub();
+    edgeHub.tracking = true;
+    edgeHub.touchId = touch.identifier;
+    edgeHub.startX = touch.clientX;
+    edgeHub.startY = touch.clientY;
+    edgeHub.lastX = touch.clientX;
+    edgeHub.lastY = touch.clientY;
+    edgeHub.choices = choices;
+    edgeHub.overlay = renderEdgeHub(choices);
+
+    edgeHub.timer = setTimeout(() => {
+      if (!edgeHub.tracking) return;
+      edgeHub.timer = null;
+      edgeHub.selecting = true;
+      edgeHub.moved = false;
+      positionEdgeHub(edgeHub.startY);
+      document.documentElement.classList.add('tw-edge-hub-active');
+      document.body.classList.add('tw-edge-hub-active');
+      edgeSubnavHaptic([20,16,12]);
+    }, 360);
+  }, { passive:true, capture:true });
+
+  document.addEventListener('touchmove', (event) => {
+    if (!edgeHub.tracking) return;
+    const touch = touchById(event.touches, edgeHub.touchId);
+    if (!touch) return;
+    edgeHub.lastX = touch.clientX;
+    edgeHub.lastY = touch.clientY;
+
+    if (!edgeHub.selecting) {
+      if (Math.hypot(touch.clientX - edgeHub.startX, touch.clientY - edgeHub.startY) > 11) resetEdgeHub();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (touch.clientX - edgeHub.startX >= 6) edgeHub.moved = true;
+    if (edgeHub.moved) previewEdgeHub(edgeHubIndexAt(touch.clientX));
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchend', (event) => {
+    if (!edgeHub.tracking) return;
+    const touch = touchById(event.changedTouches, edgeHub.touchId);
+    if (!touch) return;
+
+    if (!edgeHub.selecting) {
+      resetEdgeHub();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const index = edgeHub.moved ? edgeHubIndexAt(touch.clientX) : -1;
+    const choice = index >= 0 ? edgeHub.choices[index] : null;
+    const target = choice?.[1] || null;
+    edgeSubnavHaptic(target ? 22 : 8);
+
+    document.documentElement.classList.remove('tw-edge-hub-active');
+    document.body.classList.remove('tw-edge-hub-active');
+    resetEdgeHub();
+    if (target && !target.classList.contains('active')) target.click();
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchcancel', () => {
+    if (!edgeHub.tracking) return;
+    document.documentElement.classList.remove('tw-edge-hub-active');
+    document.body.classList.remove('tw-edge-hub-active');
+    resetEdgeHub();
+  }, { passive:true, capture:true });
+}
+
 export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
@@ -962,6 +1167,7 @@ export function initNavigation() {
   ensureNavigation();
   installDropdownRefinement();
   installEdgeSubnavSelector();
+  installEdgeHubSelector();
   installSurfaceNavigation();
   installSurfacePageScrollLock();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
