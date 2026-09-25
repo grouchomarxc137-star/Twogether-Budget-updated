@@ -1496,3 +1496,32 @@ body.dev-v21 #loggedUserBadge {
     transition:transform .14s ease,opacity .14s ease;
   }
 }
+
+
+/* Hold-and-slide main area selector */
+@media(max-width:760px) {
+  .hub-tabs {
+    touch-action:pan-y;
+  }
+
+  .hub-tabs.is-hold-selecting {
+    cursor:grabbing;
+  }
+
+  .hub-tabs.is-hold-selecting .hub-tab {
+    transition:
+      transform .12s ease,
+      background .12s ease,
+      border-color .12s ease,
+      box-shadow .12s ease,
+      color .12s ease;
+  }
+
+  .hub-tabs.is-hold-selecting .hub-tab.is-hold-preview {
+    transform:scale(1.035);
+    background:var(--card)!important;
+    border-color:rgba(193,151,67,.34)!important;
+    color:var(--text)!important;
+    box-shadow:0 7px 18px rgba(54,43,36,.09),0 0 0 2px rgba(193,151,67,.08);
+  }
+}

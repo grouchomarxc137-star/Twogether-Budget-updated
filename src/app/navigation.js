@@ -720,6 +720,156 @@ function installSurfaceNavigation() {
   document.addEventListener('touchcancel', () => resetSurfaceSwipe(true), { passive:true, capture:true });
 }
 
+let hubHoldInstalled = false;
+let hubHold = {
+  timer:null,
+  tracking:false,
+  selecting:false,
+  pointerId:null,
+  startX:0,
+  startY:0,
+  current:null,
+  ignoreClickUntil:0,
+  dispatching:false,
+};
+
+function hubHaptic(strength = 8) {
+  try {
+    if (typeof navigator.vibrate === 'function') navigator.vibrate(strength);
+  } catch {}
+}
+
+function hubChoiceAt(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  const direct = hit?.closest?.('.hub-tab');
+  if (direct && direct.closest('.hub-tabs')) return direct;
+
+  const tabs = [...document.querySelectorAll('.hub-tabs .hub-tab')];
+  return tabs.find((button) => {
+    const rect = button.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top - 10 && y <= rect.bottom + 10;
+  }) || null;
+}
+
+function paintHubHoldChoice(button, vibrate = true) {
+  if (!hubHold.selecting || !button || hubHold.current === button) return;
+  document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.toggle('is-hold-preview', item === button));
+  hubHold.current = button;
+  if (vibrate) hubHaptic(8);
+}
+
+function resetHubHold({ keepIgnore = false } = {}) {
+  if (hubHold.timer) clearTimeout(hubHold.timer);
+  hubHold.timer = null;
+  hubHold.tracking = false;
+  hubHold.selecting = false;
+  hubHold.pointerId = null;
+  hubHold.startX = 0;
+  hubHold.startY = 0;
+  hubHold.current = null;
+  document.querySelector('.hub-tabs')?.classList.remove('is-hold-selecting');
+  document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.remove('is-hold-preview'));
+  if (!keepIgnore) hubHold.ignoreClickUntil = 0;
+}
+
+function chooseHeldHub(button) {
+  if (!button) return;
+  hubHold.dispatching = true;
+  try {
+    button.click();
+  } finally {
+    hubHold.dispatching = false;
+  }
+}
+
+function installHubHoldSelector() {
+  if (hubHoldInstalled) return;
+  const tabs = document.querySelector('.hub-tabs');
+  if (!tabs) return;
+  hubHoldInstalled = true;
+
+  tabs.addEventListener('contextmenu', (event) => {
+    if (hubHold.selecting || hubHold.tracking) event.preventDefault();
+  });
+
+  tabs.addEventListener('click', (event) => {
+    if (hubHold.dispatching) return;
+    if (Date.now() < hubHold.ignoreClickUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
+  tabs.addEventListener('pointerdown', (event) => {
+    if (!isMobile() || event.pointerType === 'mouse' || event.button !== 0) return;
+    const button = event.target.closest?.('.hub-tab');
+    if (!button) return;
+
+    resetHubHold();
+    hubHold.tracking = true;
+    hubHold.pointerId = event.pointerId;
+    hubHold.startX = event.clientX;
+    hubHold.startY = event.clientY;
+    hubHold.current = button;
+
+    hubHold.timer = setTimeout(() => {
+      if (!hubHold.tracking) return;
+      hubHold.timer = null;
+      hubHold.selecting = true;
+      hubHold.ignoreClickUntil = Date.now() + 800;
+      tabs.classList.add('is-hold-selecting');
+      document.querySelectorAll('.hub-tabs .hub-tab').forEach((item) => item.classList.toggle('is-hold-preview', item === hubHold.current));
+      hubHaptic(10);
+      try { tabs.setPointerCapture?.(event.pointerId); } catch {}
+    }, 380);
+  }, { passive:true });
+
+  tabs.addEventListener('pointermove', (event) => {
+    if (!hubHold.tracking || event.pointerId !== hubHold.pointerId) return;
+    const dx = event.clientX - hubHold.startX;
+    const dy = event.clientY - hubHold.startY;
+
+    if (!hubHold.selecting) {
+      if (Math.hypot(dx, dy) > 12) resetHubHold();
+      return;
+    }
+
+    event.preventDefault();
+    const choice = hubChoiceAt(event.clientX, event.clientY);
+    if (choice) paintHubHoldChoice(choice, true);
+  }, { passive:false });
+
+  const finish = (event, cancelled = false) => {
+    if (!hubHold.tracking || (event.pointerId != null && event.pointerId !== hubHold.pointerId)) return;
+    if (hubHold.timer) clearTimeout(hubHold.timer);
+    hubHold.timer = null;
+
+    const wasSelecting = hubHold.selecting;
+    const choice = wasSelecting && !cancelled
+      ? (hubChoiceAt(event.clientX, event.clientY) || hubHold.current)
+      : null;
+
+    if (wasSelecting) {
+      event.preventDefault();
+      event.stopPropagation();
+      hubHold.ignoreClickUntil = Date.now() + 800;
+      if (choice && !choice.classList.contains('active')) {
+        hubHaptic(12);
+        chooseHeldHub(choice);
+      } else if (choice) {
+        hubHaptic(8);
+      }
+    }
+
+    const ignore = hubHold.ignoreClickUntil;
+    resetHubHold({ keepIgnore:true });
+    hubHold.ignoreClickUntil = ignore;
+  };
+
+  tabs.addEventListener('pointerup', (event) => finish(event, false), { passive:false });
+  tabs.addEventListener('pointercancel', (event) => finish(event, true), { passive:false });
+}
+
 export function initNavigation() {
   const tripHub = $('[data-hub="trips"]');
   const financeHub = $('[data-hub="finances"]');
@@ -727,6 +877,7 @@ export function initNavigation() {
 
   ensureNavigation();
   installDropdownRefinement();
+  installHubHoldSelector();
   installSurfaceNavigation();
   installSurfacePageScrollLock();
   document.addEventListener('twogether:v18-rendered', installDropdownRefinement);
