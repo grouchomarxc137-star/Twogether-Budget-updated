@@ -4424,8 +4424,10 @@ dialog.finance-log-host .tv2-backdrop {
 
   [data-fin-view="balances"] .finance-card-actions {
     display:flex!important;
-    flex-wrap:wrap;
-    gap:7px!important;
+    flex-wrap:nowrap;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px!important;
   }
 
   [data-fin-view="balances"] .finance-card-actions .btn,
