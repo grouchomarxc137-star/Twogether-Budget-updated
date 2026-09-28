@@ -1113,6 +1113,7 @@ function openRecurrentChecklistItems(plan) {
       '<div class="tv2-check-row tv2-recurrent-row">'+
         '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
         '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
+        '<button type="button" class="tv2-recurrent-drag" data-recurrent-drag aria-label="Hold and drag to reorder"><i></i><i></i><i></i></button>'+
       '</div>'+
     '</div>';
 
@@ -1272,7 +1273,7 @@ function openRecurrentChecklistItems(plan) {
   };
 
   sheet.addEventListener('touchstart',(e)=>{
-    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1||e.target.closest('[data-recurrent-drag]'))return;
     const row=e.target.closest('[data-recurrent-swipe]');
     if(!row)return;
     closeOtherRecurrentSwipes(row);
@@ -1360,6 +1361,203 @@ function openRecurrentChecklistItems(plan) {
     resetRecurrentSwipeState();
   },{passive:true});
 
+  let recurrentDrag={
+    timer:null,
+    tracking:false,
+    active:false,
+    touchId:null,
+    row:null,
+    list:null,
+    kind:'',
+    itemId:'',
+    startIndex:-1,
+    targetIndex:-1,
+    startY:0,
+    lastY:0,
+    startScrollTop:0,
+    rowHeight:0,
+    centers:[],
+    rows:[],
+  };
+
+  const dragHaptic=()=>{
+    try{if(typeof navigator.vibrate==='function')navigator.vibrate(10);}catch{}
+  };
+
+  const clearRecurrentDragTimer=()=>{
+    if(recurrentDrag.timer)clearTimeout(recurrentDrag.timer);
+    recurrentDrag.timer=null;
+  };
+
+  const resetRecurrentDragVisual=()=>{
+    recurrentDrag.rows.forEach((row)=>{
+      row.classList.remove('is-reordering','is-reorder-shifted');
+      row.style.transform='';
+      row.style.transition='';
+      row.style.zIndex='';
+    });
+    recurrentDrag.row?.classList.remove('is-reordering');
+    sheet.classList.remove('is-reordering-items');
+  };
+
+  const resetRecurrentDrag=()=>{
+    clearRecurrentDragTimer();
+    resetRecurrentDragVisual();
+    recurrentDrag={
+      timer:null,
+      tracking:false,
+      active:false,
+      touchId:null,
+      row:null,
+      list:null,
+      kind:'',
+      itemId:'',
+      startIndex:-1,
+      targetIndex:-1,
+      startY:0,
+      lastY:0,
+      startScrollTop:0,
+      rowHeight:0,
+      centers:[],
+      rows:[],
+    };
+  };
+
+  const touchForRecurrentDrag=(touches,id)=>
+    [...(touches||[])].find((touch)=>touch.identifier===id)||null;
+
+  const paintRecurrentDrag=(touchY)=>{
+    if(!recurrentDrag.active||!recurrentDrag.row)return;
+    const scrollDelta=sheet.scrollTop-recurrentDrag.startScrollTop;
+    const dy=touchY-recurrentDrag.startY+scrollDelta;
+    const startCenter=recurrentDrag.centers[recurrentDrag.startIndex];
+    const currentCenter=startCenter+dy;
+    let target=0;
+
+    recurrentDrag.centers.forEach((center,index)=>{
+      if(currentCenter>=center)target=index;
+    });
+    target=Math.max(0,Math.min(recurrentDrag.rows.length-1,target));
+
+    if(target!==recurrentDrag.targetIndex){
+      recurrentDrag.targetIndex=target;
+      dragHaptic();
+    }
+
+    recurrentDrag.rows.forEach((row,index)=>{
+      if(row===recurrentDrag.row)return;
+      let shift=0;
+      if(target>recurrentDrag.startIndex&&index>recurrentDrag.startIndex&&index<=target)shift=-recurrentDrag.rowHeight;
+      if(target<recurrentDrag.startIndex&&index>=target&&index<recurrentDrag.startIndex)shift=recurrentDrag.rowHeight;
+      row.classList.toggle('is-reorder-shifted',shift!==0);
+      row.style.transform=shift?'translateY('+shift+'px)':'';
+    });
+
+    recurrentDrag.row.style.transform='translateY('+dy+'px) scale(1.015)';
+  };
+
+  const beginRecurrentDrag=()=>{
+    if(!recurrentDrag.tracking||!recurrentDrag.row||!recurrentDrag.list)return;
+    recurrentDrag.timer=null;
+    recurrentDrag.active=true;
+    recurrentDrag.rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')];
+    recurrentDrag.startIndex=recurrentDrag.rows.indexOf(recurrentDrag.row);
+    recurrentDrag.targetIndex=recurrentDrag.startIndex;
+    recurrentDrag.startScrollTop=sheet.scrollTop;
+    recurrentDrag.rowHeight=recurrentDrag.row.getBoundingClientRect().height;
+    recurrentDrag.centers=recurrentDrag.rows.map((row)=>{
+      const rect=row.getBoundingClientRect();
+      return rect.top+sheet.scrollTop+rect.height/2;
+    });
+    sheet.classList.add('is-reordering-items');
+    recurrentDrag.row.classList.add('is-reordering');
+    recurrentDrag.row.style.zIndex='6';
+    recurrentDrag.rows.forEach((row)=>{
+      if(row!==recurrentDrag.row)row.style.transition='transform .16s cubic-bezier(.22,.8,.28,1)';
+    });
+    dragHaptic();
+  };
+
+  sheet.addEventListener('touchstart',(e)=>{
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    const handle=e.target.closest('[data-recurrent-drag]');
+    if(!handle)return;
+    const row=handle.closest('[data-recurrent-swipe]');
+    const list=row?.closest('.tv2-check-list');
+    if(!row||!list)return;
+
+    resetRecurrentDrag();
+    closeOtherRecurrentSwipes();
+    const t=e.touches[0];
+    recurrentDrag.tracking=true;
+    recurrentDrag.touchId=t.identifier;
+    recurrentDrag.row=row;
+    recurrentDrag.list=list;
+    recurrentDrag.kind=row.dataset.checkKind||'';
+    recurrentDrag.itemId=row.dataset.checkId||'';
+    recurrentDrag.startY=t.clientY;
+    recurrentDrag.lastY=t.clientY;
+    recurrentDrag.timer=setTimeout(beginRecurrentDrag,280);
+  },{passive:true});
+
+  sheet.addEventListener('touchmove',(e)=>{
+    if(!recurrentDrag.tracking)return;
+    const t=touchForRecurrentDrag(e.touches,recurrentDrag.touchId);
+    if(!t)return;
+    recurrentDrag.lastY=t.clientY;
+
+    if(!recurrentDrag.active){
+      if(Math.abs(t.clientY-recurrentDrag.startY)>9)resetRecurrentDrag();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sheetRect=sheet.getBoundingClientRect();
+    const edge=72;
+    if(t.clientY<sheetRect.top+edge){
+      sheet.scrollTop-=Math.min(14,(sheetRect.top+edge-t.clientY)*.24);
+    }else if(t.clientY>sheetRect.bottom-edge){
+      sheet.scrollTop+=Math.min(14,(t.clientY-(sheetRect.bottom-edge))*.24);
+    }
+
+    paintRecurrentDrag(t.clientY);
+  },{passive:false});
+
+  sheet.addEventListener('touchend',(e)=>{
+    if(!recurrentDrag.tracking)return;
+    const t=touchForRecurrentDrag(e.changedTouches,recurrentDrag.touchId);
+    if(!t)return;
+
+    if(!recurrentDrag.active){
+      resetRecurrentDrag();
+      return;
+    }
+
+    e.preventDefault();
+    const kind=recurrentDrag.kind;
+    const itemId=recurrentDrag.itemId;
+    const from=recurrentDrag.startIndex;
+    const to=recurrentDrag.targetIndex;
+
+    if(kind&&Array.isArray(prep[kind])&&from>=0&&to>=0&&from!==to){
+      const actualFrom=prep[kind].findIndex((item)=>item.id===itemId);
+      if(actualFrom>=0){
+        const [moved]=prep[kind].splice(actualFrom,1);
+        const safeTo=Math.max(0,Math.min(prep[kind].length,to));
+        prep[kind].splice(safeTo,0,moved);
+      }
+    }
+
+    resetRecurrentDrag();
+    render();
+  },{passive:false});
+
+  sheet.addEventListener('touchcancel',()=>{
+    if(recurrentDrag.tracking)resetRecurrentDrag();
+  },{passive:true});
+
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
@@ -1413,7 +1611,7 @@ function bindChecklistSwipeDown(layer, sheet) {
   };
 
   sheet.addEventListener('touchstart', (e) => {
-    if (!mobile() || e.touches.length !== 1 || sheet.scrollTop > 1) return;
+    if (!mobile() || e.touches.length !== 1 || sheet.scrollTop > 1 || e.target.closest('[data-recurrent-drag]')) return;
     const t = e.touches[0];
     gesture = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastY:t.clientY };
   }, { passive:true });

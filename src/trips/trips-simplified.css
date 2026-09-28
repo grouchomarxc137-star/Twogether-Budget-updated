@@ -1088,3 +1088,54 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   min-width:max-content;
   font:inherit;
 }
+
+
+/* Recurrent Items: hold the right handle and drag to reorder. */
+.tv2-recurrent-swipe-row .tv2-recurrent-row{
+  grid-template-columns:22px minmax(0,1fr) 30px;
+}
+.tv2-recurrent-drag{
+  width:30px;
+  height:40px;
+  display:grid;
+  place-content:center;
+  gap:3px;
+  align-self:center;
+  justify-self:end;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:var(--tv2-faint)!important;
+  cursor:grab;
+  touch-action:none;
+  -webkit-touch-callout:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.tv2-recurrent-drag i{
+  display:block;
+  width:15px;
+  height:1.5px;
+  border-radius:99px;
+  background:currentColor;
+  pointer-events:none;
+}
+.tv2-recurrent-swipe-row.is-reordering{
+  overflow:visible;
+}
+.tv2-recurrent-swipe-row.is-reordering .tv2-recurrent-row{
+  position:relative;
+  z-index:6;
+  box-shadow:0 8px 20px rgba(46,38,31,.10);
+  cursor:grabbing;
+  will-change:transform;
+}
+.tv2-recurrent-swipe-row.is-reordering .tv2-recurrent-drag{
+  cursor:grabbing;
+}
+.tv2-recurrent-swipe-row.is-reorder-shifted{
+  will-change:transform;
+}
+.tv2-recurrent-sheet.is-reordering-items{
+  overscroll-behavior:contain;
+}
