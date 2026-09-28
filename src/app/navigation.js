@@ -404,6 +404,11 @@ function surfaceUsesNativeSwipe(surface) {
   return !!surface?.matches?.('.finance-month-overview,#twCurrentTrips.tv2-trip-view');
 }
 
+function surfaceBlocksGlobalDown(surface) {
+  const card = surfaceCard(surface);
+  return !!(surface?.matches?.('.tv2-layer') && card?.classList?.contains('tv2-recurrent-sheet'));
+}
+
 function surfaceBackdrop(surface) {
   if (!surface) return null;
   if (surface.matches('.finance-mini-modal')) return surface.querySelector('.finance-mini-backdrop');
@@ -634,7 +639,7 @@ function installSurfaceNavigation() {
     const card = surfaceCard(surface);
     const scrollRoot = card || surface;
     const canRight = touch.clientX <= 46;
-    const canDown = (scrollRoot.scrollTop || 0) <= 1;
+    const canDown = !surfaceBlocksGlobalDown(surface) && (scrollRoot.scrollTop || 0) <= 1;
     if (!canRight && !canDown) return;
     surfaceSwipe = {
       tracking:true,
@@ -674,7 +679,7 @@ function installSurfaceNavigation() {
         }
       } else if (ay > ax * 1.15) {
         const scrollRoot = surfaceCard(surfaceSwipe.surface) || surfaceSwipe.surface;
-        if (dy > 10 && (scrollRoot.scrollTop || 0) <= 1) {
+        if (!surfaceBlocksGlobalDown(surfaceSwipe.surface) && dy > 10 && (scrollRoot.scrollTop || 0) <= 1) {
           surfaceSwipe.active = true;
           surfaceSwipe.mode = 'down';
         } else {
