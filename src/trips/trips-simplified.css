@@ -1033,14 +1033,10 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   transition:background .16s ease,border-color .16s ease,box-shadow .16s ease;
 }
 .tv2-check-section[data-check-section="packing"].is-mine-packing.is-principessa{
-  background:rgba(212,170,42,.08);
   border-color:rgba(212,170,42,.42);
-  box-shadow:inset 0 0 0 1px rgba(212,170,42,.05);
 }
 .tv2-check-section[data-check-section="packing"].is-mine-packing.is-principe{
-  background:rgba(215,122,43,.08);
   border-color:rgba(215,122,43,.42);
-  box-shadow:inset 0 0 0 1px rgba(215,122,43,.05);
 }
 
 
