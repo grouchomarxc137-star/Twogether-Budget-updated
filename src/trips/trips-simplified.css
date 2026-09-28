@@ -1120,24 +1120,30 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   background:currentColor;
   pointer-events:none;
 }
-.tv2-recurrent-swipe-row.is-reordering{
-  overflow:visible;
-  border-radius:0;
+.tv2-recurrent-swipe-row.is-reorder-slot .tv2-recurrent-row{
+  opacity:0;
 }
-.tv2-recurrent-swipe-row.is-reordering .tv2-recurrent-row{
+.tv2-recurrent-swipe-row.is-reorder-slot .tv2-recurrent-delete-reveal{
+  opacity:0!important;
+  width:0!important;
+}
+.tv2-recurrent-drag-ghost{
+  position:fixed!important;
+  z-index:1805!important;
+  margin:0!important;
+  overflow:hidden;
+  pointer-events:none!important;
+  will-change:transform;
+  transform-origin:center center;
+}
+.tv2-recurrent-drag-ghost .tv2-recurrent-row{
   background:var(--tv2-card);
-  box-shadow:0 8px 20px rgba(46,38,31,.10);
-  cursor:grabbing;
+  box-shadow:0 8px 22px rgba(46,38,31,.12);
 }
-.tv2-recurrent-swipe-row.is-reordering .tv2-recurrent-drag{
+.tv2-recurrent-drag-ghost .tv2-recurrent-drag{
   cursor:grabbing;
-}
-.tv2-recurrent-drag-placeholder{
-  display:block;
-  width:100%;
-  min-height:1px;
-  pointer-events:none;
 }
 .tv2-recurrent-sheet.is-reordering-items{
-  overscroll-behavior:contain;
+  overscroll-behavior:none;
+  touch-action:none;
 }
