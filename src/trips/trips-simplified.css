@@ -1121,7 +1121,7 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   pointer-events:none;
 }
 .tv2-recurrent-swipe-row.is-reorder-slot .tv2-recurrent-row{
-  opacity:0;
+  visibility:hidden;
 }
 .tv2-recurrent-swipe-row.is-reorder-slot .tv2-recurrent-delete-reveal{
   opacity:0!important;
@@ -1131,14 +1131,16 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   position:fixed!important;
   z-index:1805!important;
   margin:0!important;
-  overflow:hidden;
+  overflow:visible!important;
   pointer-events:none!important;
+  background:var(--tv2-card)!important;
+  box-shadow:0 8px 22px rgba(46,38,31,.22)!important;
+  border-radius:8px;
   will-change:transform;
   transform-origin:center center;
 }
-.tv2-recurrent-drag-ghost .tv2-recurrent-row{
-  background:var(--tv2-card);
-  box-shadow:0 7px 18px rgba(46,38,31,.18);
+.tv2-recurrent-drag-ghost .tv2-check-text-scroll{
+  overflow:hidden;
 }
 .tv2-recurrent-drag-ghost .tv2-recurrent-drag{
   cursor:grabbing;

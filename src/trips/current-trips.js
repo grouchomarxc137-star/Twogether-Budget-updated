@@ -1105,32 +1105,6 @@ function openRecurrentChecklistItems(plan) {
   document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
 
-  let recurrentGestureUnlockTimer=null;
-  const setRecurrentGestureLock=(locked)=>{
-    if(recurrentGestureUnlockTimer){
-      clearTimeout(recurrentGestureUnlockTimer);
-      recurrentGestureUnlockTimer=null;
-    }
-    if(locked){
-      simplifiedLayer.dataset.tv2GestureLock='1';
-      sheet.classList.add('is-reordering-items');
-      sheet.style.transition='none';
-      sheet.style.transform='translateY(0)';
-      sheet.style.opacity='1';
-      const backdrop=simplifiedLayer.querySelector('.tv2-backdrop');
-      if(backdrop){
-        backdrop.style.transition='none';
-        backdrop.style.opacity='1';
-      }
-      return;
-    }
-    recurrentGestureUnlockTimer=setTimeout(()=>{
-      if(simplifiedLayer?.isConnected)delete simplifiedLayer.dataset.tv2GestureLock;
-      sheet.classList.remove('is-reordering-items');
-      recurrentGestureUnlockTimer=null;
-    },40);
-  };
-
   const rowHtml = (kind,item) =>
     '<div class="tv2-recurrent-swipe-row" data-recurrent-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<div class="tv2-recurrent-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
@@ -1415,6 +1389,7 @@ function openRecurrentChecklistItems(plan) {
 
   const animateRecurrentLayout=(beforeRects)=>{
     requestAnimationFrame(()=>{
+      if(!recurrentDrag.list)return;
       const rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')];
       rows.forEach((row)=>{
         if(row===recurrentDrag.row)return;
@@ -1424,16 +1399,16 @@ function openRecurrentChecklistItems(plan) {
         const delta=oldTop-newTop;
         if(Math.abs(delta)<.5)return;
         row.style.transition='none';
-        row.style.transform='translateY('+delta+'px)';
+        row.style.transform='translate3d(0,'+delta+'px,0)';
         void row.offsetHeight;
-        row.style.transition='transform .16s cubic-bezier(.22,.8,.28,1)';
-        row.style.transform='';
+        row.style.transition='transform .17s cubic-bezier(.22,.8,.28,1)';
+        row.style.transform='translate3d(0,0,0)';
         setTimeout(()=>{
           if(row?.isConnected){
             row.style.transition='';
             row.style.transform='';
           }
-        },180);
+        },190);
       });
     });
   };
@@ -1460,6 +1435,7 @@ function openRecurrentChecklistItems(plan) {
     const ghostCenter=ghostTop+ghostHeight/2;
     const rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')].filter((row)=>row!==recurrentDrag.row);
     let before=null;
+
     for(const row of rows){
       const rect=row.getBoundingClientRect();
       if(ghostCenter<rect.top+rect.height/2){
@@ -1473,7 +1449,7 @@ function openRecurrentChecklistItems(plan) {
   const paintRecurrentDrag=(touchY)=>{
     if(!recurrentDrag.active||!recurrentDrag.ghost)return;
     const dy=touchY-recurrentDrag.activationY;
-    recurrentDrag.ghost.style.transform='translate3d(0,'+dy+'px,0)';
+    recurrentDrag.ghost.style.transform='translate3d(0,'+dy+'px,0) scale(1.012)';
     placeRecurrentSlot(touchY);
   };
 
@@ -1485,7 +1461,7 @@ function openRecurrentChecklistItems(plan) {
       recurrentDrag.row.style.transition='';
       recurrentDrag.row.style.transform='';
     }
-    setRecurrentGestureLock(false);
+    sheet.classList.remove('is-reordering-items');
   };
 
   const resetRecurrentDrag=()=>{
@@ -1512,11 +1488,11 @@ function openRecurrentChecklistItems(plan) {
     if(!recurrentDrag.tracking||recurrentDrag.active||!recurrentDrag.row||!recurrentDrag.list)return;
     clearRecurrentDragTimer();
 
-    setRecurrentGestureLock(true);
-    const rect=recurrentDrag.row.getBoundingClientRect();
-    const ghost=recurrentDrag.row.cloneNode(true);
+    const sourceCard=recurrentDrag.row.querySelector('.tv2-recurrent-row');
+    if(!sourceCard)return;
+    const rect=sourceCard.getBoundingClientRect();
+    const ghost=sourceCard.cloneNode(true);
     ghost.classList.add('tv2-recurrent-drag-ghost');
-    ghost.classList.remove('is-reorder-slot');
     ghost.querySelectorAll('input,button').forEach((control)=>{
       control.tabIndex=-1;
       control.setAttribute('aria-hidden','true');
@@ -1526,7 +1502,7 @@ function openRecurrentChecklistItems(plan) {
     ghost.style.left=rect.left+'px';
     ghost.style.width=rect.width+'px';
     ghost.style.height=rect.height+'px';
-    ghost.style.transform='translate3d(0,0,0)';
+    ghost.style.transform='translate3d(0,0,0) scale(1.012)';
     simplifiedLayer.appendChild(ghost);
 
     recurrentDrag.ghost=ghost;
@@ -1535,6 +1511,7 @@ function openRecurrentChecklistItems(plan) {
     recurrentDrag.grabOffsetY=recurrentDrag.lastY-rect.top;
 
     recurrentDrag.row.classList.add('is-reorder-slot');
+    sheet.classList.add('is-reordering-items');
     dragHaptic();
   };
 
@@ -1568,7 +1545,6 @@ function openRecurrentChecklistItems(plan) {
     e.preventDefault();
     e.stopImmediatePropagation();
     resetRecurrentDrag();
-    setRecurrentGestureLock(true);
     closeOtherRecurrentSwipes();
 
     const t=e.touches[0];
@@ -1580,7 +1556,7 @@ function openRecurrentChecklistItems(plan) {
     recurrentDrag.itemId=row.dataset.checkId||'';
     recurrentDrag.startY=t.clientY;
     recurrentDrag.lastY=t.clientY;
-    recurrentDrag.timer=setTimeout(beginRecurrentDrag,220);
+    recurrentDrag.timer=setTimeout(beginRecurrentDrag,180);
   },{passive:false,capture:true});
 
   sheet.addEventListener('touchmove',(e)=>{
@@ -1590,20 +1566,19 @@ function openRecurrentChecklistItems(plan) {
 
     e.preventDefault();
     e.stopImmediatePropagation();
-    setRecurrentGestureLock(true);
     recurrentDrag.lastY=t.clientY;
 
     if(!recurrentDrag.active){
-      if(Math.abs(t.clientY-recurrentDrag.startY)>=6)beginRecurrentDrag();
+      if(Math.abs(t.clientY-recurrentDrag.startY)>=4)beginRecurrentDrag();
       else return;
     }
 
     const sheetRect=sheet.getBoundingClientRect();
-    const edge=68;
+    const edge=64;
     if(t.clientY<sheetRect.top+edge){
-      sheet.scrollTop-=Math.min(12,(sheetRect.top+edge-t.clientY)*.22);
+      sheet.scrollTop-=Math.min(12,(sheetRect.top+edge-t.clientY)*.20);
     }else if(t.clientY>sheetRect.bottom-edge){
-      sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.22);
+      sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.20);
     }
 
     paintRecurrentDrag(t.clientY);
@@ -1655,7 +1630,6 @@ function openRecurrentChecklistItems(plan) {
   });
   simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
   simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
-  bindChecklistSwipeDown(simplifiedLayer, sheet);
   render();
 }
 
