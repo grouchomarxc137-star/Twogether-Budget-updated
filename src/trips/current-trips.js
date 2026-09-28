@@ -1372,6 +1372,7 @@ function openRecurrentChecklistItems(plan) {
 
   let recurrentDragFrame=0;
   let recurrentDragPendingY=0;
+  let recurrentProtectedTouchId=null;
   const setRecurrentGestureLock=(locked)=>{
     if(locked)simplifiedLayer.dataset.tv2GestureLock='1';
     else if(simplifiedLayer?.isConnected)delete simplifiedLayer.dataset.tv2GestureLock;
@@ -1400,6 +1401,24 @@ function openRecurrentChecklistItems(plan) {
 
   const touchForRecurrentDrag=(touches,id)=>
     [...(touches||[])].find((touch)=>touch.identifier===id)||null;
+
+  const isRecurrentProtectedTouch=(touch)=>{
+    if(!touch)return false;
+    const sections=[...sheet.querySelectorAll('.tv2-check-section')];
+    return sections.some((section)=>{
+      const list=section.querySelector('.tv2-check-list');
+      if(!list)return false;
+      const listRect=list.getBoundingClientRect();
+      const sectionRect=section.getBoundingClientRect();
+      return touch.clientY>=listRect.top&&touch.clientY<=listRect.bottom&&
+        touch.clientX>=sectionRect.right-80&&touch.clientX<=sectionRect.right;
+    });
+  };
+
+  const releaseRecurrentProtectedTouch=()=>{
+    recurrentProtectedTouchId=null;
+    if(!recurrentDrag.tracking)setRecurrentGestureLock(false);
+  };
 
   const clearRecurrentDragTimer=()=>{
     if(recurrentDrag.timer)clearTimeout(recurrentDrag.timer);
@@ -1571,19 +1590,34 @@ function openRecurrentChecklistItems(plan) {
 
   sheet.addEventListener('touchstart',(e)=>{
     if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    const t=e.touches[0];
+    const protectedZone=isRecurrentProtectedTouch(t);
     const handle=e.target.closest('[data-recurrent-drag]');
+
+    if(protectedZone){
+      recurrentProtectedTouchId=t.identifier;
+      setRecurrentGestureLock(true);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
     if(!handle)return;
     const row=handle.closest('[data-recurrent-swipe]');
     const list=row?.closest('.tv2-check-list');
     if(!row||!list)return;
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
+    if(!protectedZone){
+      recurrentProtectedTouchId=t.identifier;
+      setRecurrentGestureLock(true);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
     resetRecurrentDrag();
+    recurrentProtectedTouchId=t.identifier;
     setRecurrentGestureLock(true);
     closeOtherRecurrentSwipes();
 
-    const t=e.touches[0];
     recurrentDrag.tracking=true;
     recurrentDrag.touchId=t.identifier;
     recurrentDrag.row=row;
@@ -1597,6 +1631,12 @@ function openRecurrentChecklistItems(plan) {
   },{passive:false,capture:true});
 
   sheet.addEventListener('touchmove',(e)=>{
+    const protectedTouch=touchForRecurrentDrag(e.touches,recurrentProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
     if(!recurrentDrag.tracking)return;
     const t=touchForRecurrentDrag(e.touches,recurrentDrag.touchId);
     if(!t)return;
@@ -1619,7 +1659,16 @@ function openRecurrentChecklistItems(plan) {
   },{passive:false,capture:true});
 
   sheet.addEventListener('touchend',(e)=>{
-    if(!recurrentDrag.tracking)return;
+    const protectedTouch=touchForRecurrentDrag(e.changedTouches,recurrentProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
+    if(!recurrentDrag.tracking){
+      if(protectedTouch)releaseRecurrentProtectedTouch();
+      return;
+    }
     const t=touchForRecurrentDrag(e.changedTouches,recurrentDrag.touchId);
     if(!t)return;
 
@@ -1628,6 +1677,7 @@ function openRecurrentChecklistItems(plan) {
 
     if(!recurrentDrag.active){
       resetRecurrentDrag();
+      recurrentProtectedTouchId=null;
       return;
     }
 
@@ -1636,13 +1686,23 @@ function openRecurrentChecklistItems(plan) {
       recurrentDragFrame=0;
     }
     paintRecurrentDrag(t.clientY);
+    recurrentProtectedTouchId=null;
     finishRecurrentDrag();
   },{passive:false,capture:true});
 
   sheet.addEventListener('touchcancel',(e)=>{
-    if(!recurrentDrag.tracking)return;
+    const protectedTouch=touchForRecurrentDrag(e.changedTouches,recurrentProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+    if(!recurrentDrag.tracking){
+      if(protectedTouch)releaseRecurrentProtectedTouch();
+      return;
+    }
     e.preventDefault();
     e.stopImmediatePropagation();
+    recurrentProtectedTouchId=null;
     cancelRecurrentDrag();
   },{passive:false,capture:true});
 
@@ -1677,13 +1737,6 @@ function bindChecklistSwipeDown(layer, sheet) {
   if (!layer || !sheet || layer.dataset.tv2SwipeDown === '1') return;
   layer.dataset.tv2SwipeDown = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
-  const inRecurrentProtectedZone = (e) => {
-    if (!sheet.classList.contains('tv2-recurrent-sheet') || e.touches.length !== 1) return false;
-    const list = e.target.closest('.tv2-check-list');
-    if (!list) return false;
-    const rect = list.getBoundingClientRect();
-    return e.touches[0].clientX >= rect.right - 64;
-  };
   let gesture = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
 
   const resetVisual = (animate = true) => {
@@ -1706,7 +1759,7 @@ function bindChecklistSwipeDown(layer, sheet) {
   };
 
   sheet.addEventListener('touchstart', (e) => {
-    if (!mobile() || e.touches.length !== 1 || layer.dataset.tv2GestureLock === '1' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items') || inRecurrentProtectedZone(e)) return;
+    if (!mobile() || e.touches.length !== 1 || layer.dataset.tv2GestureLock === '1' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items')) return;
     const t = e.touches[0];
     gesture = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastY:t.clientY };
   }, { passive:true });
