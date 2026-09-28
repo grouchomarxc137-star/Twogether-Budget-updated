@@ -1033,6 +1033,7 @@ function openSimplifiedChecklist(plan) {
     state.error='';
     window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:snapshot},actor()).then((result)=>{
       if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
+      if(remoteState&&result?.tripPrepDefaults)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.tripPrepDefaults));
       publishTripNotifications();
     }).catch((err)=>{
       state.error=err?.message||'Could not update checklist';

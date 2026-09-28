@@ -369,14 +369,38 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
       if (planIdx < 0) throw new Error('Budget plan not found');
+
+      const previousPlan = sanitizePlan_(state.plans[planIdx]);
+      const previousDefaults = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
+      const promoted = promoteNewTripPrepItemsToDefaults_(previousPlan.prep, payload.prep || {}, previousDefaults, actor);
       const plan = sanitizePlan_(state.plans[planIdx]);
-      plan.prep = sanitizeTripPrep_(payload.prep || {});
-      plan.prep.updatedAt = new Date().toISOString(); plan.prep.updatedBy = actor;
-      plan.updatedAt = plan.prep.updatedAt; plan.updatedBy = actor;
+      const now = new Date().toISOString();
+
+      plan.prep = sanitizeTripPrep_(promoted.prep);
+      plan.prep.updatedAt = now; plan.prep.updatedBy = actor;
+      plan.updatedAt = now; plan.updatedBy = actor;
       state.plans[planIdx] = plan;
+
+      let updatedPlans = 0;
+      if (promoted.changed) {
+        const nextDefaults = sanitizeTripPrepDefaults_(promoted.defaults);
+        nextDefaults.updatedAt = now;
+        nextDefaults.updatedBy = actor;
+        updatedPlans = syncRecurrentPrepIntoUpcomingPlans_(state, previousDefaults, nextDefaults, actor, now);
+        state.tripPrepDefaults = nextDefaults;
+        addAudit_(state, actor, 'autoAddTripPrepDefault', plan.id);
+      }
+
       addAudit_(state, actor, 'saveTripPrep', plan.id);
       saveState_(state);
-      return output_({ok:true,prep:plan.prep});
+      const savedPlan = sanitizePlan_(state.plans[planIdx]);
+      return output_({
+        ok:true,
+        prep:savedPlan.prep,
+        tripPrepDefaults:sanitizeTripPrepDefaults_(state.tripPrepDefaults),
+        recurrentUpdated:promoted.changed,
+        updatedPlans:updatedPlans
+      });
     }
 
     if (action === 'saveSharedExpense') {
@@ -1067,6 +1091,60 @@ function tripPrepForNewPlan_(value,actor,now){
 }
 
 function normalizedPrepText_(value){return cleanText_(value,160).trim().toLowerCase();}
+function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor){
+  const previous=sanitizeTripPrep_(previousPrep);
+  const next=sanitizeTripPrep_(nextPrep);
+  const nextDefaults=sanitizeTripPrepDefaults_(defaults);
+  let changed=false;
+
+  ['packing','reminders'].forEach(function(kind){
+    const previousIds={};
+    previous[kind].forEach(function(item){if(item&&item.id)previousIds[item.id]=true;});
+
+    const defaultByText={};
+    nextDefaults[kind].forEach(function(item){
+      const key=normalizedPrepText_(item&&item.text);
+      if(key&&!defaultByText[key])defaultByText[key]=item;
+    });
+
+    const linkedDefaultIds={};
+    next[kind].forEach(function(item){
+      const recurrentId=cleanText_(item&&item.recurrentId,80);
+      if(recurrentId)linkedDefaultIds[recurrentId]=true;
+    });
+
+    next[kind].forEach(function(item){
+      if(!item||previousIds[item.id])return;
+      if(prepAddedBy_(item.addedBy)!==actor)return;
+      if(cleanText_(item.recurrentId,80))return;
+      const key=normalizedPrepText_(item.text);
+      if(!key)return;
+
+      const existingDefault=defaultByText[key];
+      if(existingDefault){
+        if(!linkedDefaultIds[existingDefault.id]){
+          item.recurrentId=existingDefault.id;
+          linkedDefaultIds[existingDefault.id]=true;
+        }
+        return;
+      }
+
+      const recurrent={
+        id:Utilities.getUuid(),
+        text:item.text,
+        done:false,
+        addedBy:actor
+      };
+      nextDefaults[kind].push(recurrent);
+      defaultByText[key]=recurrent;
+      linkedDefaultIds[recurrent.id]=true;
+      item.recurrentId=recurrent.id;
+      changed=true;
+    });
+  });
+
+  return {prep:next,defaults:nextDefaults,changed:changed};
+}
 function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   const existing=Array.isArray(existingItems)?existingItems.map(prepItem_):[];
   const previous=Array.isArray(previousDefaults)?previousDefaults:[];
