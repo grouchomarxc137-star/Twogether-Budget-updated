@@ -991,7 +991,7 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   font-weight:650!important;
   cursor:pointer;
 }
-.tv2-recurrent-row{grid-template-columns:22px minmax(0,1fr) 32px}
+.tv2-recurrent-row{grid-template-columns:22px minmax(0,1fr)}
 .tv2-recurrent-dot{
   width:8px;
   height:8px;
@@ -1086,14 +1086,39 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 }
 
 
-/* Recurrent Items: hold the right handle and drag to reorder. */
+/* Recurrent Items: explicit reorder mode keeps vertical gestures separate. */
+.tv2-recurrent-head-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.tv2-reorder-mode-btn{
+  min-height:32px;
+  padding:6px 10px!important;
+  border:1px solid var(--tv2-line)!important;
+  border-radius:10px!important;
+  background:transparent!important;
+  color:var(--tv2-muted)!important;
+  font:inherit!important;
+  font-size:11px!important;
+  font-weight:700!important;
+  cursor:pointer;
+}
+.tv2-reorder-mode-btn.is-active{
+  border-color:rgba(185,139,54,.48)!important;
+  background:rgba(185,139,54,.08)!important;
+  color:#8a6428!important;
+}
 .tv2-recurrent-swipe-row .tv2-recurrent-row{
+  grid-template-columns:22px minmax(0,1fr);
+}
+.tv2-recurrent-sheet.is-reorder-mode .tv2-recurrent-swipe-row .tv2-recurrent-row{
   grid-template-columns:22px minmax(0,1fr) 30px;
 }
 .tv2-recurrent-drag{
   width:30px;
   height:40px;
-  display:grid;
+  display:none;
   place-content:center;
   gap:3px;
   align-self:center;
@@ -1107,6 +1132,9 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   -webkit-touch-callout:none;
   user-select:none;
   -webkit-user-select:none;
+}
+.tv2-recurrent-sheet.is-reorder-mode .tv2-recurrent-drag{
+  display:grid;
 }
 .tv2-recurrent-drag i{
   display:block;
@@ -1135,11 +1163,21 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   will-change:transform;
   transform-origin:center center;
 }
+.tv2-recurrent-drag-ghost{
+  grid-template-columns:22px minmax(0,1fr) 30px!important;
+}
 .tv2-recurrent-drag-ghost .tv2-check-text-scroll{
   overflow:hidden;
 }
 .tv2-recurrent-drag-ghost .tv2-recurrent-drag{
+  display:grid;
   cursor:grabbing;
+}
+.tv2-recurrent-sheet.is-reorder-mode{
+  overscroll-behavior:contain;
+}
+.tv2-recurrent-sheet.is-reorder-mode .tv2-recurrent-delete-reveal{
+  display:none;
 }
 .tv2-recurrent-sheet.is-reordering-items{
   overscroll-behavior:none;
