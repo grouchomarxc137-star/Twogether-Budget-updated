@@ -1062,6 +1062,158 @@ function openSimplifiedChecklist(plan) {
       autoSaveChecklist();
     }
   });
+  let recurrentSwipe={tracking:false,active:false,pointerId:null,startX:0,startY:0,lastX:0,row:null};
+
+  const resetRecurrentSwipeVisual=(row,animate=true)=>{
+    if(!row)return;
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      card.style.transform='translateX(0)';
+      card.style.opacity='1';
+    }
+    if(reveal){
+      reveal.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      reveal.style.width='0px';
+      reveal.style.opacity='0';
+    }
+    if(animate)setTimeout(()=>{
+      if(card?.isConnected)card.style.transition='';
+      if(reveal?.isConnected)reveal.style.transition='';
+    },220);
+  };
+
+  const resetRecurrentSwipeState=()=>{
+    recurrentSwipe={tracking:false,active:false,pointerId:null,startX:0,startY:0,lastX:0,row:null};
+  };
+
+  const closeOtherRecurrentSwipes=(except=null)=>{
+    sheet.querySelectorAll('[data-recurrent-swipe]').forEach((row)=>{
+      if(row!==except)resetRecurrentSwipeVisual(row,true);
+    });
+  };
+
+  const openRecurrentDeleteConfirm=(kind,id)=>{
+    const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
+    if(!item)return;
+    closeDeleteConfirm();
+    deleteConfirmLayer=document.createElement('div');
+    deleteConfirmLayer.className='tv2-confirm-layer';
+    deleteConfirmLayer.innerHTML=
+      '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
+      '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2RecurrentDeleteTitle">'+
+        '<h2 id="tv2RecurrentDeleteTitle">Delete recurrent item?</h2>'+
+        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
+        '<p class="tv2-confirm-note">It will be removed from Recurrent Items when you save.</p>'+
+        '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
+      '</div>';
+    document.body.appendChild(deleteConfirmLayer);
+    const cancel=()=>{
+      closeDeleteConfirm();
+      closeOtherRecurrentSwipes();
+    };
+    deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+    deleteConfirmLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+    deleteConfirmLayer.querySelector('[data-confirm-delete]')?.addEventListener('click',()=>{
+      prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
+      closeDeleteConfirm();
+      render();
+    });
+  };
+
+  sheet.addEventListener('pointerdown',(e)=>{
+    const row=e.target.closest('[data-recurrent-swipe]');
+    if(!row||deleteConfirmLayer||e.button!==0)return;
+    closeOtherRecurrentSwipes(row);
+    resetRecurrentSwipeVisual(row,false);
+    recurrentSwipe={
+      tracking:true,
+      active:false,
+      pointerId:e.pointerId,
+      startX:e.clientX,
+      startY:e.clientY,
+      lastX:e.clientX,
+      row
+    };
+    try{row.setPointerCapture?.(e.pointerId);}catch{}
+  });
+
+  sheet.addEventListener('pointermove',(e)=>{
+    if(!recurrentSwipe.tracking||recurrentSwipe.pointerId!==e.pointerId||!recurrentSwipe.row)return;
+    const dx=e.clientX-recurrentSwipe.startX;
+    const dy=Math.abs(e.clientY-recurrentSwipe.startY);
+    recurrentSwipe.lastX=e.clientX;
+
+    if(!recurrentSwipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      if(dx<-10&&Math.abs(dx)>dy*1.2){
+        recurrentSwipe.active=true;
+      }else if(dy>=Math.abs(dx)||dx>10){
+        resetRecurrentSwipeVisual(recurrentSwipe.row,true);
+        resetRecurrentSwipeState();
+        return;
+      }
+    }
+    if(!recurrentSwipe.active)return;
+    e.preventDefault();
+
+    const row=recurrentSwipe.row;
+    const width=row.getBoundingClientRect().width||280;
+    const distance=Math.max(-width*.94,Math.min(0,dx));
+    const exposed=Math.abs(distance);
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition='none';
+      card.style.transform='translateX('+distance+'px)';
+    }
+    if(reveal){
+      reveal.style.transition='none';
+      reveal.style.width=exposed+'px';
+      reveal.style.opacity=String(Math.min(1,.35+exposed/120));
+    }
+  },{passive:false});
+
+  sheet.addEventListener('pointerup',(e)=>{
+    if(!recurrentSwipe.tracking||recurrentSwipe.pointerId!==e.pointerId||!recurrentSwipe.row)return;
+    const row=recurrentSwipe.row;
+    const dx=recurrentSwipe.lastX-recurrentSwipe.startX;
+    const width=row.getBoundingClientRect().width||280;
+    const threshold=Math.max(150,width*.58);
+    const fullSwipe=recurrentSwipe.active&&-dx>=threshold;
+    const kind=row.dataset.checkKind,id=row.dataset.checkId;
+
+    if(!fullSwipe){
+      resetRecurrentSwipeVisual(row,true);
+      resetRecurrentSwipeState();
+      return;
+    }
+
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform='translateX(-'+width+'px)';
+      card.style.opacity='.76';
+    }
+    if(reveal){
+      reveal.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      reveal.style.width=width+'px';
+      reveal.style.opacity='1';
+    }
+    resetRecurrentSwipeState();
+    setTimeout(()=>{
+      resetRecurrentSwipeVisual(row,false);
+      openRecurrentDeleteConfirm(kind,id);
+    },180);
+  });
+
+  sheet.addEventListener('pointercancel',()=>{
+    resetRecurrentSwipeVisual(recurrentSwipe.row,true);
+    resetRecurrentSwipeState();
+  });
+
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
     const row=e.target.closest('.tv2-check-row'),item=findItem(row);
@@ -1108,10 +1260,12 @@ function openRecurrentChecklistItems(plan) {
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
   const rowHtml = (kind,item) =>
-    '<div class="tv2-check-row tv2-recurrent-row" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
-      '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
-      '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
-      '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove recurrent item">×</button>'+
+    '<div class="tv2-recurrent-swipe-row" data-recurrent-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+      '<div class="tv2-recurrent-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
+      '<div class="tv2-check-row tv2-recurrent-row">'+
+        '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
+        '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
+      '</div>'+
     '</div>';
 
   const sectionHtml = (kind,title) =>
@@ -1150,7 +1304,8 @@ function openRecurrentChecklistItems(plan) {
   }
 
   function findItem(row) {
-    const kind=row?.dataset.checkKind,id=row?.dataset.checkId;
+    const source=row?.matches?.('[data-check-kind]')?row:row?.closest?.('[data-check-kind]');
+    const kind=source?.dataset.checkKind,id=source?.dataset.checkId;
     return kind&&Array.isArray(prep[kind])?prep[kind].find((item)=>item.id===id):null;
   }
   function addItem(kind) {
@@ -1200,11 +1355,6 @@ function openRecurrentChecklistItems(plan) {
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan);return;}
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
-    if(b.hasAttribute('data-check-remove')){
-      const row=b.closest('.tv2-check-row'),kind=row?.dataset.checkKind,id=row?.dataset.checkId;
-      if(kind&&Array.isArray(prep[kind]))prep[kind]=prep[kind].filter((item)=>item.id!==id);
-      render();return;
-    }
     if(b.hasAttribute('data-check-defaults-save'))saveDefaults();
   });
   simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
