@@ -1050,17 +1050,18 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   display:block;
   overflow:hidden;
 }
-.tv2-recurrent-swipe-row + .tv2-recurrent-swipe-row{
-  border-top:1px solid var(--tv2-line);
-}
 .tv2-recurrent-swipe-row .tv2-recurrent-row{
   position:relative;
   z-index:2;
   grid-template-columns:22px minmax(0,1fr);
-  border-top:0!important;
-  background:var(--tv2-bg);
+  background:transparent;
   transition:transform .2s cubic-bezier(.22,.8,.28,1),opacity .16s ease;
   will-change:transform,opacity;
+}
+.tv2-recurrent-swipe-row:first-child .tv2-recurrent-row{
+  border-top:0;
+}
+.tv2-recurrent-swipe-row .tv2-check-text-scroll{
   touch-action:pan-y;
 }
 .tv2-recurrent-delete-reveal{

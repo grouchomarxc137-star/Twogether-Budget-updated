@@ -1062,158 +1062,6 @@ function openSimplifiedChecklist(plan) {
       autoSaveChecklist();
     }
   });
-  let recurrentSwipe={tracking:false,active:false,pointerId:null,startX:0,startY:0,lastX:0,row:null};
-
-  const resetRecurrentSwipeVisual=(row,animate=true)=>{
-    if(!row)return;
-    const card=row.querySelector('.tv2-recurrent-row');
-    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
-    if(card){
-      card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
-      card.style.transform='translateX(0)';
-      card.style.opacity='1';
-    }
-    if(reveal){
-      reveal.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
-      reveal.style.width='0px';
-      reveal.style.opacity='0';
-    }
-    if(animate)setTimeout(()=>{
-      if(card?.isConnected)card.style.transition='';
-      if(reveal?.isConnected)reveal.style.transition='';
-    },220);
-  };
-
-  const resetRecurrentSwipeState=()=>{
-    recurrentSwipe={tracking:false,active:false,pointerId:null,startX:0,startY:0,lastX:0,row:null};
-  };
-
-  const closeOtherRecurrentSwipes=(except=null)=>{
-    sheet.querySelectorAll('[data-recurrent-swipe]').forEach((row)=>{
-      if(row!==except)resetRecurrentSwipeVisual(row,true);
-    });
-  };
-
-  const openRecurrentDeleteConfirm=(kind,id)=>{
-    const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
-    if(!item)return;
-    closeDeleteConfirm();
-    deleteConfirmLayer=document.createElement('div');
-    deleteConfirmLayer.className='tv2-confirm-layer';
-    deleteConfirmLayer.innerHTML=
-      '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
-      '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2RecurrentDeleteTitle">'+
-        '<h2 id="tv2RecurrentDeleteTitle">Delete recurrent item?</h2>'+
-        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
-        '<p class="tv2-confirm-note">It will be removed from Recurrent Items when you save.</p>'+
-        '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
-      '</div>';
-    document.body.appendChild(deleteConfirmLayer);
-    const cancel=()=>{
-      closeDeleteConfirm();
-      closeOtherRecurrentSwipes();
-    };
-    deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
-    deleteConfirmLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
-    deleteConfirmLayer.querySelector('[data-confirm-delete]')?.addEventListener('click',()=>{
-      prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
-      closeDeleteConfirm();
-      render();
-    });
-  };
-
-  sheet.addEventListener('pointerdown',(e)=>{
-    const row=e.target.closest('[data-recurrent-swipe]');
-    if(!row||deleteConfirmLayer||e.button!==0)return;
-    closeOtherRecurrentSwipes(row);
-    resetRecurrentSwipeVisual(row,false);
-    recurrentSwipe={
-      tracking:true,
-      active:false,
-      pointerId:e.pointerId,
-      startX:e.clientX,
-      startY:e.clientY,
-      lastX:e.clientX,
-      row
-    };
-    try{row.setPointerCapture?.(e.pointerId);}catch{}
-  });
-
-  sheet.addEventListener('pointermove',(e)=>{
-    if(!recurrentSwipe.tracking||recurrentSwipe.pointerId!==e.pointerId||!recurrentSwipe.row)return;
-    const dx=e.clientX-recurrentSwipe.startX;
-    const dy=Math.abs(e.clientY-recurrentSwipe.startY);
-    recurrentSwipe.lastX=e.clientX;
-
-    if(!recurrentSwipe.active){
-      if(Math.abs(dx)<8&&dy<8)return;
-      if(dx<-10&&Math.abs(dx)>dy*1.2){
-        recurrentSwipe.active=true;
-      }else if(dy>=Math.abs(dx)||dx>10){
-        resetRecurrentSwipeVisual(recurrentSwipe.row,true);
-        resetRecurrentSwipeState();
-        return;
-      }
-    }
-    if(!recurrentSwipe.active)return;
-    e.preventDefault();
-
-    const row=recurrentSwipe.row;
-    const width=row.getBoundingClientRect().width||280;
-    const distance=Math.max(-width*.94,Math.min(0,dx));
-    const exposed=Math.abs(distance);
-    const card=row.querySelector('.tv2-recurrent-row');
-    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
-    if(card){
-      card.style.transition='none';
-      card.style.transform='translateX('+distance+'px)';
-    }
-    if(reveal){
-      reveal.style.transition='none';
-      reveal.style.width=exposed+'px';
-      reveal.style.opacity=String(Math.min(1,.35+exposed/120));
-    }
-  },{passive:false});
-
-  sheet.addEventListener('pointerup',(e)=>{
-    if(!recurrentSwipe.tracking||recurrentSwipe.pointerId!==e.pointerId||!recurrentSwipe.row)return;
-    const row=recurrentSwipe.row;
-    const dx=recurrentSwipe.lastX-recurrentSwipe.startX;
-    const width=row.getBoundingClientRect().width||280;
-    const threshold=Math.max(150,width*.58);
-    const fullSwipe=recurrentSwipe.active&&-dx>=threshold;
-    const kind=row.dataset.checkKind,id=row.dataset.checkId;
-
-    if(!fullSwipe){
-      resetRecurrentSwipeVisual(row,true);
-      resetRecurrentSwipeState();
-      return;
-    }
-
-    const card=row.querySelector('.tv2-recurrent-row');
-    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
-    if(card){
-      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-      card.style.transform='translateX(-'+width+'px)';
-      card.style.opacity='.76';
-    }
-    if(reveal){
-      reveal.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
-      reveal.style.width=width+'px';
-      reveal.style.opacity='1';
-    }
-    resetRecurrentSwipeState();
-    setTimeout(()=>{
-      resetRecurrentSwipeVisual(row,false);
-      openRecurrentDeleteConfirm(kind,id);
-    },180);
-  });
-
-  sheet.addEventListener('pointercancel',()=>{
-    resetRecurrentSwipeVisual(recurrentSwipe.row,true);
-    resetRecurrentSwipeState();
-  });
-
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
     const row=e.target.closest('.tv2-check-row'),item=findItem(row);
@@ -1315,13 +1163,16 @@ function openRecurrentChecklistItems(plan) {
     render();
     requestAnimationFrame(()=>sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
+  function recurrentPayload(source=prep) {
+    return {
+      packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
+      reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
+    };
+  }
   async function saveDefaults() {
     if(state.busy)return;
     state.busy=true;state.error='';render();
-    const payload={
-      packing:prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
-      reminders:prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
-    };
+    const payload=recurrentPayload();
     try{
       const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor());
       if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
@@ -1334,6 +1185,180 @@ function openRecurrentChecklistItems(plan) {
       state.busy=false;state.error=err?.message||'Could not save recurrent items';render();
     }
   }
+
+  let recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+
+  const resetRecurrentSwipeVisual=(row,animate=true)=>{
+    if(!row)return;
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      card.style.transform='translateX(0)';
+      card.style.opacity='1';
+    }
+    if(reveal){
+      reveal.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      reveal.style.width='0px';
+      reveal.style.opacity='0';
+    }
+    if(animate)setTimeout(()=>{
+      if(card?.isConnected)card.style.transition='';
+      if(reveal?.isConnected)reveal.style.transition='';
+    },220);
+  };
+
+  const resetRecurrentSwipeState=()=>{
+    recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  };
+
+  const closeOtherRecurrentSwipes=(except=null)=>{
+    sheet.querySelectorAll('[data-recurrent-swipe]').forEach((row)=>{
+      if(row!==except)resetRecurrentSwipeVisual(row,true);
+    });
+  };
+
+  const openRecurrentDeleteConfirm=(kind,id)=>{
+    const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
+    if(!item)return;
+    closeDeleteConfirm();
+    deleteConfirmLayer=document.createElement('div');
+    deleteConfirmLayer.className='tv2-confirm-layer';
+    deleteConfirmLayer.innerHTML=
+      '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
+      '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2RecurrentDeleteTitle">'+
+        '<h2 id="tv2RecurrentDeleteTitle">Delete recurrent item?</h2>'+
+        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
+        '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
+      '</div>';
+    document.body.appendChild(deleteConfirmLayer);
+
+    const cancel=()=>{
+      closeDeleteConfirm();
+      closeOtherRecurrentSwipes();
+    };
+    deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+    deleteConfirmLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+
+    const deleteButton=deleteConfirmLayer.querySelector('[data-confirm-delete]');
+    deleteButton?.addEventListener('click',async()=>{
+      if(state.busy)return;
+      deleteButton.disabled=true;
+      deleteButton.textContent='Deleting…';
+      const error=deleteConfirmLayer.querySelector('.tv2-confirm-error');
+      if(error)error.textContent='';
+      const next={
+        packing:prep.packing.map((entry)=>({...entry})),
+        reminders:prep.reminders.map((entry)=>({...entry})),
+      };
+      next[kind]=next[kind].filter((entry)=>entry.id!==id);
+      try{
+        state.busy=true;
+        const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:recurrentPayload(next)},actor());
+        prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
+        if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
+        state.busy=false;
+        closeDeleteConfirm();
+        render();
+        simplifiedSnack('Recurrent item deleted');
+      }catch(err){
+        state.busy=false;
+        deleteButton.disabled=false;
+        deleteButton.textContent='Delete';
+        if(error)error.textContent=err?.message||'Could not delete recurrent item';
+      }
+    });
+  };
+
+  sheet.addEventListener('touchstart',(e)=>{
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    const row=e.target.closest('[data-recurrent-swipe]');
+    if(!row)return;
+    closeOtherRecurrentSwipes(row);
+    resetRecurrentSwipeVisual(row,false);
+    const t=e.touches[0];
+    recurrentSwipe={tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,row};
+  },{passive:true});
+
+  sheet.addEventListener('touchmove',(e)=>{
+    if(!recurrentSwipe.tracking||!recurrentSwipe.row||e.touches.length!==1)return;
+    const t=e.touches[0];
+    const dx=t.clientX-recurrentSwipe.startX;
+    const dy=Math.abs(t.clientY-recurrentSwipe.startY);
+    recurrentSwipe.lastX=t.clientX;
+
+    if(!recurrentSwipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      if(dx<-10&&Math.abs(dx)>dy*1.2){
+        recurrentSwipe.active=true;
+      }else if(dy>=Math.abs(dx)||dx>10){
+        resetRecurrentSwipeVisual(recurrentSwipe.row,true);
+        resetRecurrentSwipeState();
+        return;
+      }
+    }
+    if(!recurrentSwipe.active)return;
+    e.preventDefault();
+
+    const row=recurrentSwipe.row;
+    const width=row.getBoundingClientRect().width||280;
+    const distance=Math.max(-width*.94,Math.min(0,dx));
+    const exposed=Math.abs(distance);
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition='none';
+      card.style.transform='translateX('+distance+'px)';
+    }
+    if(reveal){
+      reveal.style.transition='none';
+      reveal.style.width=exposed+'px';
+      reveal.style.opacity=String(Math.min(1,.35+exposed/120));
+    }
+  },{passive:false});
+
+  sheet.addEventListener('touchend',()=>{
+    if(!recurrentSwipe.tracking||!recurrentSwipe.row){
+      resetRecurrentSwipeState();
+      return;
+    }
+    const row=recurrentSwipe.row;
+    const dx=recurrentSwipe.lastX-recurrentSwipe.startX;
+    const width=row.getBoundingClientRect().width||280;
+    const threshold=Math.max(180,width*.62);
+    const fullSwipe=recurrentSwipe.active&&-dx>=threshold;
+    const kind=row.dataset.checkKind,id=row.dataset.checkId;
+
+    if(!fullSwipe){
+      resetRecurrentSwipeVisual(row,true);
+      resetRecurrentSwipeState();
+      return;
+    }
+
+    const card=row.querySelector('.tv2-recurrent-row');
+    const reveal=row.querySelector('.tv2-recurrent-delete-reveal');
+    if(card){
+      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform='translateX(-'+width+'px)';
+      card.style.opacity='.76';
+    }
+    if(reveal){
+      reveal.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      reveal.style.width=width+'px';
+      reveal.style.opacity='1';
+    }
+    resetRecurrentSwipeState();
+    setTimeout(()=>{
+      resetRecurrentSwipeVisual(row,false);
+      openRecurrentDeleteConfirm(kind,id);
+    },180);
+  },{passive:true});
+
+  sheet.addEventListener('touchcancel',()=>{
+    resetRecurrentSwipeVisual(recurrentSwipe.row,true);
+    resetRecurrentSwipeState();
+  },{passive:true});
 
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
