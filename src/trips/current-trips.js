@@ -826,11 +826,6 @@ function checklistOwner(value) {
 function checklistSeed(list) {
   return list.map((text) => ({ id: uid(), text, done:false, owner:'' }));
 }
-function checklistOwnerDot(owner) {
-  const safe=checklistOwner(owner);
-  if(!safe)return '<span class="tv2-owner-dot is-both" aria-label="For both"></span>';
-  return '<span class="tv2-owner-dot '+(safe==='Principessa'?'is-principessa':'is-principe')+'" aria-label="For '+safe+'"></span>';
-}
 function checklistOwnerChoices(item) {
   const owner=checklistOwner(item?.owner);
   return '<span class="tv2-owner-choices" role="group" aria-label="Who is this for?">'+
@@ -953,7 +948,7 @@ function openSimplifiedChecklist(plan) {
   if (!plan) return;
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
-  const state = { error:'', view:'overview', ignoreViewClickUntil:0 };
+  const state = { error:'', packingView:'overview', ignorePackingClickUntil:0 };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
@@ -963,27 +958,23 @@ function openSimplifiedChecklist(plan) {
 
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
-  const visibleForView = (item) => state.view !== 'mine' || !checklistOwner(item?.owner) || checklistOwner(item?.owner) === actor();
-  const ownershipClass = (item) => {
-    const owner=checklistOwner(item?.owner);
-    if(!owner)return ' is-shared-owned';
-    return owner===actor() ? ' is-mine-owned' : ' is-other-owned';
-  };
+  const packingVisibleForMine = (item) => !checklistOwner(item?.owner) || checklistOwner(item?.owner) === actor();
   const rowHtml = (kind, item, completed = false) =>
-    '<div class="tv2-check-row '+(completed?'is-completed ':'')+ownershipClass(item)+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+    '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
       '<div class="tv2-check-text-scroll" data-check-scroll>'+
         '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
       '</div>'+
-      checklistOwnerDot(item.owner)+
       '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove item">×</button>'+
       (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
     '</div>';
 
   const activeSection = (kind, title) => {
-    const active = prep[kind].filter((item)=>!item.done && visibleForView(item));
-    const emptyText=state.view==='mine'?'Nothing for you here ♡':'All clear here ♡';
-    return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
+    const mine=kind==='packing'&&state.packingView==='mine';
+    const active = prep[kind].filter((item)=>!item.done && (!mine || packingVisibleForMine(item)));
+    const emptyText=mine?'Nothing for you here ♡':'All clear here ♡';
+    const mineClass=mine?' is-mine-packing '+(actor()==='Principe'?'is-principe':'is-principessa'):'';
+    return '<section class="tv2-check-section'+mineClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
       '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+emptyText+'</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
@@ -991,8 +982,8 @@ function openSimplifiedChecklist(plan) {
 
   const completedSection = () => {
     const done = [
-      ...prep.packing.filter((item)=>item.done && visibleForView(item)).map((item)=>({kind:'packing',item})),
-      ...prep.reminders.filter((item)=>item.done && visibleForView(item)).map((item)=>({kind:'reminders',item})),
+      ...prep.packing.filter((item)=>item.done).map((item)=>({kind:'packing',item})),
+      ...prep.reminders.filter((item)=>item.done).map((item)=>({kind:'reminders',item})),
     ];
     if (!done.length) return '';
     return '<section class="tv2-check-section tv2-check-completed"><div class="tv2-check-section-head"><h3>Completed</h3><span>'+done.length+'</span></div>'+
@@ -1022,13 +1013,8 @@ function openSimplifiedChecklist(plan) {
 
   function render(moveId = '') {
     if (!sheet) return;
-    const mine=state.view==='mine', me=actor();
-    const ownerClass=me==='Principe'?'is-principe':'is-principessa';
-    sheet.classList.toggle('is-mine-view',mine);
-    sheet.classList.toggle('is-principessa-view',mine&&me==='Principessa');
-    sheet.classList.toggle('is-principe-view',mine&&me==='Principe');
     sheet.innerHTML =
-      '<div class="tv2-sheet-head"><button type="button" class="tv2-check-view-toggle '+(mine?ownerClass:'')+'" data-check-view aria-label="'+(mine?'Show full checklist':'Long press to show my checklist')+'"><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+(mine?' · MY VIEW':'')+'</small><h2>'+(mine?'My checklist':'Checklist')+'</h2>'+(mine?'<span>Yours + shared</span>':'')+'</button><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+      '<div class="tv2-sheet-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
       '<button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button>'+
       activeSection('packing','Packing / things to take')+
       activeSection('reminders','Important reminders')+
@@ -1073,51 +1059,51 @@ function openSimplifiedChecklist(plan) {
     requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
 
-  let viewPress={timer:null,pointerId:null,startX:0,startY:0,active:false};
-  const clearViewPress=()=>{
-    if(viewPress.timer)clearTimeout(viewPress.timer);
-    viewPress={timer:null,pointerId:null,startX:0,startY:0,active:false};
+  let packingPress={timer:null,pointerId:null,startX:0,startY:0,active:false};
+  const clearPackingPress=()=>{
+    if(packingPress.timer)clearTimeout(packingPress.timer);
+    packingPress={timer:null,pointerId:null,startX:0,startY:0,active:false};
   };
-  const viewHaptic=()=>{
+  const packingHaptic=()=>{
     try{if(typeof navigator.vibrate==='function')navigator.vibrate(12);}catch{}
   };
   sheet.addEventListener('contextmenu',(e)=>{
-    if(e.target.closest('[data-check-view]'))e.preventDefault();
+    if(e.target.closest('[data-check-section="packing"]'))e.preventDefault();
   });
   sheet.addEventListener('pointerdown',(e)=>{
-    const header=e.target.closest('[data-check-view]');
-    if(!header||e.button!==0)return;
-    clearViewPress();
-    viewPress.pointerId=e.pointerId;
-    viewPress.startX=e.clientX;
-    viewPress.startY=e.clientY;
-    try{sheet.setPointerCapture?.(e.pointerId);}catch{}
-    viewPress.timer=setTimeout(()=>{
-      viewPress.timer=null;
-      viewPress.active=true;
-      state.ignoreViewClickUntil=Date.now()+700;
-      if(state.view!=='mine'){
-        state.view='mine';
-        viewHaptic();
+    const card=e.target.closest('[data-check-section="packing"]');
+    if(!card||e.button!==0||e.target.closest('input,button,label'))return;
+    clearPackingPress();
+    packingPress.pointerId=e.pointerId;
+    packingPress.startX=e.clientX;
+    packingPress.startY=e.clientY;
+    try{card.setPointerCapture?.(e.pointerId);}catch{}
+    packingPress.timer=setTimeout(()=>{
+      packingPress.timer=null;
+      packingPress.active=true;
+      state.ignorePackingClickUntil=Date.now()+700;
+      if(state.packingView!=='mine'){
+        state.packingView='mine';
+        packingHaptic();
         render();
       }
     },480);
   });
   sheet.addEventListener('pointermove',(e)=>{
-    if(viewPress.pointerId!==e.pointerId||!viewPress.timer)return;
-    if(Math.hypot(e.clientX-viewPress.startX,e.clientY-viewPress.startY)>10)clearViewPress();
+    if(packingPress.pointerId!==e.pointerId||!packingPress.timer)return;
+    if(Math.hypot(e.clientX-packingPress.startX,e.clientY-packingPress.startY)>10)clearPackingPress();
   });
   sheet.addEventListener('pointerup',(e)=>{
-    if(viewPress.pointerId!==e.pointerId)return;
-    if(viewPress.timer)clearTimeout(viewPress.timer);
-    const wasActive=viewPress.active;
-    clearViewPress();
+    if(packingPress.pointerId!==e.pointerId)return;
+    if(packingPress.timer)clearTimeout(packingPress.timer);
+    const wasActive=packingPress.active;
+    clearPackingPress();
     if(wasActive){
       e.preventDefault();
-      state.ignoreViewClickUntil=Date.now()+700;
+      state.ignorePackingClickUntil=Date.now()+700;
     }
   });
-  sheet.addEventListener('pointercancel',clearViewPress);
+  sheet.addEventListener('pointercancel',clearPackingPress);
 
   sheet.addEventListener('change',(e)=>{
     const row=e.target.closest('.tv2-check-row'); if(!row)return;
@@ -1143,13 +1129,14 @@ function openSimplifiedChecklist(plan) {
     e.preventDefault(); addItem(input.dataset.checkNew);
   });
   sheet.addEventListener('click',(e)=>{
-    const b=e.target.closest('button'); if(!b)return;
-    if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
-    if(b.hasAttribute('data-check-view')){
-      if(Date.now()<state.ignoreViewClickUntil)return;
-      if(state.view!=='overview'){state.view='overview';viewHaptic();render();}
+    const packingCard=e.target.closest('[data-check-section="packing"]');
+    if(packingCard && !e.target.closest('input,button,label')){
+      if(Date.now()<state.ignorePackingClickUntil)return;
+      if(state.packingView!=='overview'){state.packingView='overview';packingHaptic();render();}
       return;
     }
+    const b=e.target.closest('button'); if(!b)return;
+    if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-recurrent')){openRecurrentChecklistItems(plan);return;}
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
     if(b.hasAttribute('data-check-remove')){
