@@ -1105,6 +1105,8 @@ function openRecurrentChecklistItems(plan) {
   document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
 
+  bindChecklistSwipeDown(simplifiedLayer, sheet);
+
   const rowHtml = (kind,item) =>
     '<div class="tv2-recurrent-swipe-row" data-recurrent-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<div class="tv2-recurrent-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
@@ -1359,6 +1361,13 @@ function openRecurrentChecklistItems(plan) {
     resetRecurrentSwipeState();
   },{passive:true});
 
+  let recurrentDragFrame=0;
+  let recurrentDragPendingY=0;
+  const setRecurrentGestureLock=(locked)=>{
+    if(locked)simplifiedLayer.dataset.tv2GestureLock='1';
+    else if(simplifiedLayer?.isConnected)delete simplifiedLayer.dataset.tv2GestureLock;
+  };
+
   let recurrentDrag={
     timer:null,
     tracking:false,
@@ -1453,6 +1462,15 @@ function openRecurrentChecklistItems(plan) {
     placeRecurrentSlot(touchY);
   };
 
+  const scheduleRecurrentDragPaint=(touchY)=>{
+    recurrentDragPendingY=touchY;
+    if(recurrentDragFrame)return;
+    recurrentDragFrame=requestAnimationFrame(()=>{
+      recurrentDragFrame=0;
+      paintRecurrentDrag(recurrentDragPendingY);
+    });
+  };
+
   const cleanupRecurrentDragVisual=()=>{
     recurrentDrag.ghost?.remove();
     recurrentDrag.ghost=null;
@@ -1466,7 +1484,12 @@ function openRecurrentChecklistItems(plan) {
 
   const resetRecurrentDrag=()=>{
     clearRecurrentDragTimer();
+    if(recurrentDragFrame){
+      cancelAnimationFrame(recurrentDragFrame);
+      recurrentDragFrame=0;
+    }
     cleanupRecurrentDragVisual();
+    setRecurrentGestureLock(false);
     recurrentDrag={
       timer:null,
       tracking:false,
@@ -1545,6 +1568,7 @@ function openRecurrentChecklistItems(plan) {
     e.preventDefault();
     e.stopImmediatePropagation();
     resetRecurrentDrag();
+    setRecurrentGestureLock(true);
     closeOtherRecurrentSwipes();
 
     const t=e.touches[0];
@@ -1581,7 +1605,7 @@ function openRecurrentChecklistItems(plan) {
       sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.20);
     }
 
-    paintRecurrentDrag(t.clientY);
+    scheduleRecurrentDragPaint(t.clientY);
   },{passive:false,capture:true});
 
   sheet.addEventListener('touchend',(e)=>{
@@ -1596,6 +1620,11 @@ function openRecurrentChecklistItems(plan) {
       resetRecurrentDrag();
       return;
     }
+    if(recurrentDragFrame){
+      cancelAnimationFrame(recurrentDragFrame);
+      recurrentDragFrame=0;
+    }
+    paintRecurrentDrag(t.clientY);
     finishRecurrentDrag();
   },{passive:false,capture:true});
 
@@ -1666,14 +1695,9 @@ function bindChecklistSwipeDown(layer, sheet) {
 
   sheet.addEventListener('touchmove', (e) => {
     if (layer.dataset.tv2GestureLock === '1' || sheet.classList.contains('is-reordering-items')) {
-      gesture.tracking = false;
-      gesture.active = false;
-      sheet.style.transition='none';
-      sheet.style.transform='translateY(0)';
-      sheet.style.opacity='1';
-      const lockedBackdrop=layer.querySelector('.tv2-backdrop');
-      if(lockedBackdrop){lockedBackdrop.style.transition='none';lockedBackdrop.style.opacity='1';}
-      e.preventDefault();
+      const hadGesture=gesture.tracking||gesture.active;
+      gesture = { tracking:false, active:false, startX:0, startY:0, lastY:0 };
+      if(hadGesture)resetVisual(false);
       return;
     }
     if (!gesture.tracking || e.touches.length !== 1) return;
