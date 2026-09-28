@@ -1026,3 +1026,14 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     padding:7px 9px 7px 10px;
   }
 }
+
+
+/* Mark the point where the other person's checklist items begin. */
+.tv2-check-list .tv2-check-row.is-other-divider-principessa{
+  border-top-color:#d4aa2a!important;
+  border-top-width:2px;
+}
+.tv2-check-list .tv2-check-row.is-other-divider-principe{
+  border-top-color:#d77a2b!important;
+  border-top-width:2px;
+}

@@ -838,6 +838,21 @@ function orderChecklistItems(items) {
     return rank(a)-rank(b) || a.index-b.index;
   }).map((entry)=>entry.item);
 }
+function checklistOtherStartIndex(items) {
+  const me=actor();
+  const index=items.findIndex((item)=>{
+    const who=checklistAddedBy(item?.addedBy);
+    return who && who!==me;
+  });
+  return index>0 ? index : -1;
+}
+function checklistOtherDividerClass(item, isStart) {
+  if(!isStart)return '';
+  const who=checklistAddedBy(item?.addedBy);
+  if(who==='Principessa')return ' is-other-divider-principessa';
+  if(who==='Principe')return ' is-other-divider-principe';
+  return '';
+}
 function tripPrepSnapshot(plan) {
   const stored = plan?.prep || {};
   const initialized = !!stored.updatedAt || (Array.isArray(stored.packing) && stored.packing.length > 0) || (Array.isArray(stored.reminders) && stored.reminders.length > 0);
@@ -962,8 +977,8 @@ function openSimplifiedChecklist(plan) {
 
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
-  const rowHtml = (kind, item, completed = false) =>
-    '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+  const rowHtml = (kind, item, completed = false, dividerClass = '') =>
+    '<div class="tv2-check-row '+(completed?'is-completed':'')+dividerClass+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
       '<div class="tv2-check-text-scroll" data-check-scroll>'+
         '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
@@ -974,8 +989,9 @@ function openSimplifiedChecklist(plan) {
 
   const activeSection = (kind, title) => {
     const active = orderChecklistItems(prep[kind].filter((item)=>!item.done));
+    const otherStart=checklistOtherStartIndex(active);
     return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
-      '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">All clear here ♡</p>')+'</div>'+
+      '<div class="tv2-check-list">'+(active.length?active.map((item,index)=>rowHtml(kind,item,false,checklistOtherDividerClass(item,index===otherStart))).join(''):'<p class="tv2-check-empty">All clear here ♡</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
@@ -986,8 +1002,9 @@ function openSimplifiedChecklist(plan) {
       ...prep.reminders.filter((item)=>item.done).map((item)=>Object.assign({kind:'reminders'},item)),
     ]);
     if (!done.length) return '';
+    const otherStart=checklistOtherStartIndex(done);
     return '<section class="tv2-check-section tv2-check-completed"><div class="tv2-check-section-head"><h3>Completed</h3><span>'+done.length+'</span></div>'+
-      '<div class="tv2-check-list">'+done.map((item)=>rowHtml(item.kind,item,true)).join('')+'</div></section>';
+      '<div class="tv2-check-list">'+done.map((item,index)=>rowHtml(item.kind,item,true,checklistOtherDividerClass(item,index===otherStart))).join('')+'</div></section>';
   };
 
   const textMeasureCanvas = document.createElement('canvas');
@@ -1110,8 +1127,8 @@ function openRecurrentChecklistItems(plan) {
 
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
-  const rowHtml = (kind,item) =>
-    '<div class="tv2-check-row tv2-recurrent-row" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+  const rowHtml = (kind,item,dividerClass='') =>
+    '<div class="tv2-check-row tv2-recurrent-row'+dividerClass+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
       '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
       '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove recurrent item">×</button>'+
@@ -1119,8 +1136,9 @@ function openRecurrentChecklistItems(plan) {
 
   const sectionHtml = (kind,title) => {
     const ordered=orderChecklistItems(prep[kind]);
+    const otherStart=checklistOtherStartIndex(ordered);
     return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+ordered.length+'</span></div>'+
-      '<div class="tv2-check-list">'+(ordered.length?ordered.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">No standard items here.</p>')+'</div>'+
+      '<div class="tv2-check-list">'+(ordered.length?ordered.map((item,index)=>rowHtml(kind,item,checklistOtherDividerClass(item,index===otherStart))).join(''):'<p class="tv2-check-empty">No standard items here.</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
