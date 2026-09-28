@@ -1387,6 +1387,7 @@ function openRecurrentChecklistItems(plan) {
     ghost:null,
     kind:'',
     itemId:'',
+    startX:0,
     startY:0,
     lastY:0,
     activationY:0,
@@ -1509,6 +1510,7 @@ function openRecurrentChecklistItems(plan) {
       ghost:null,
       kind:'',
       itemId:'',
+      startX:0,
       startY:0,
       lastY:0,
       activationY:0,
@@ -1539,6 +1541,7 @@ function openRecurrentChecklistItems(plan) {
 
     recurrentDrag.ghost=ghost;
     recurrentDrag.active=true;
+    setRecurrentGestureLock(true);
     recurrentDrag.activationY=recurrentDrag.lastY;
     recurrentDrag.grabOffsetY=recurrentDrag.lastY-rect.top;
 
@@ -1574,10 +1577,7 @@ function openRecurrentChecklistItems(plan) {
     const list=row?.closest('.tv2-check-list');
     if(!row||!list)return;
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
     resetRecurrentDrag();
-    setRecurrentGestureLock(true);
     closeOtherRecurrentSwipes();
 
     const t=e.touches[0];
@@ -1587,6 +1587,7 @@ function openRecurrentChecklistItems(plan) {
     recurrentDrag.list=list;
     recurrentDrag.kind=row.dataset.checkKind||'';
     recurrentDrag.itemId=row.dataset.checkId||'';
+    recurrentDrag.startX=t.clientX;
     recurrentDrag.startY=t.clientY;
     recurrentDrag.lastY=t.clientY;
     recurrentDrag.timer=setTimeout(beginRecurrentDrag,180);
@@ -1597,14 +1598,19 @@ function openRecurrentChecklistItems(plan) {
     const t=touchForRecurrentDrag(e.touches,recurrentDrag.touchId);
     if(!t)return;
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
     recurrentDrag.lastY=t.clientY;
 
     if(!recurrentDrag.active){
-      if(Math.abs(t.clientY-recurrentDrag.startY)>=4)beginRecurrentDrag();
-      else return;
+      const dx=t.clientX-recurrentDrag.startX;
+      const dy=t.clientY-recurrentDrag.startY;
+      if(Math.hypot(dx,dy)>=9){
+        resetRecurrentDrag();
+      }
+      return;
     }
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
 
     const sheetRect=sheet.getBoundingClientRect();
     const edge=64;
@@ -1622,13 +1628,14 @@ function openRecurrentChecklistItems(plan) {
     const t=touchForRecurrentDrag(e.changedTouches,recurrentDrag.touchId);
     if(!t)return;
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
     if(!recurrentDrag.active){
       resetRecurrentDrag();
       return;
     }
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
     if(recurrentDragFrame){
       cancelAnimationFrame(recurrentDragFrame);
       recurrentDragFrame=0;
@@ -1639,9 +1646,11 @@ function openRecurrentChecklistItems(plan) {
 
   sheet.addEventListener('touchcancel',(e)=>{
     if(!recurrentDrag.tracking)return;
+    const wasActive=recurrentDrag.active;
+    cancelRecurrentDrag();
+    if(!wasActive)return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    cancelRecurrentDrag();
   },{passive:false,capture:true});
 
   sheet.addEventListener('input',(e)=>{
@@ -1697,7 +1706,7 @@ function bindChecklistSwipeDown(layer, sheet) {
   };
 
   sheet.addEventListener('touchstart', (e) => {
-    if (!mobile() || e.touches.length !== 1 || layer.dataset.tv2GestureLock === '1' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items') || e.target.closest('[data-recurrent-drag]')) return;
+    if (!mobile() || e.touches.length !== 1 || layer.dataset.tv2GestureLock === '1' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items')) return;
     const t = e.touches[0];
     gesture = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastY:t.clientY };
   }, { passive:true });
