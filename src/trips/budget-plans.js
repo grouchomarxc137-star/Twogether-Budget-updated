@@ -35,9 +35,9 @@ export function renderBudgetPlans() {
   root.innerHTML = emptyActive + displayedPlans.map((plan) => {
     const meta = plan.meta || {}; const trip = tripForPlan(plan); const locked = isLocked(trip);
     const pBudget = plan?.budgets?.Principessa ?? ''; const qBudget = plan?.budgets?.Principe ?? '';
-    const pLivePaid = liveTripPaid(plan, 'Principessa'), qLivePaid = liveTripPaid(plan, 'Principe');
-    const pActual = pLivePaid !== '' ? pLivePaid : (trip?.submissions?.Principessa?.paid ?? '');
-    const qActual = qLivePaid !== '' ? qLivePaid : (trip?.submissions?.Principe?.paid ?? '');
+    const pLiveShare = liveTripBudgetShare(plan, 'Principessa'), qLiveShare = liveTripBudgetShare(plan, 'Principe');
+    const pActual = pLiveShare !== '' ? pLiveShare : (trip?.submissions?.Principessa?.paid ?? '');
+    const qActual = qLiveShare !== '' ? qLiveShare : (trip?.submissions?.Principe?.paid ?? '');
     const pPartial = plan?.partials?.Principessa || null; const qPartial = plan?.partials?.Principe || null;
     const pEarly = partialSummary(pPartial), qEarly = partialSummary(qPartial);
     const pv = variance(pBudget, pActual), qv = variance(qBudget, qActual);
@@ -61,20 +61,20 @@ export function renderBudgetPlans() {
   });
 }
 
-function liveTripPaid(plan, person) {
+function liveTripBudgetShare(plan, person) {
   const entries = Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : [];
-  const repayments = Array.isArray(plan?.repayments) ? plan.repayments : [];
-  if (!entries.length && !repayments.length) return '';
+  if (!entries.length) return '';
   let total = 0;
   entries.forEach((entry) => {
-    const remaining = Math.max(0, money2n(entry?.amount) - money2n(entry?.jarContribution));
-    if (entry?.paidBy === 'both') total += remaining / 2;
-    else if (entry?.paidBy === person) total += remaining;
-  });
-  repayments.forEach((repayment) => {
-    const amount = money2n(repayment?.amount);
-    if (repayment?.from === person) total += amount;
-    if (repayment?.to === person) total -= amount;
+    const gross = Math.max(0, money2n(entry?.amount));
+    const jar = Math.min(gross, Math.max(0, money2n(entry?.jarContribution)));
+    const remaining = gross - jar;
+    if (entry?.split === 'personal') {
+      const owner = entry?.forActor === 'Principe' ? 'Principe' : 'Principessa';
+      if (owner === person) total += remaining;
+    } else {
+      total += remaining / 2;
+    }
   });
   return Math.max(0, Math.round(total * 100) / 100);
 }
