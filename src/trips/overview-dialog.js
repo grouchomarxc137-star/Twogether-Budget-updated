@@ -225,12 +225,18 @@ function legacyTotal(plan, trip) {
   const [a, b] = records(plan, trip);
   return legacyKeys.reduce((sum, key) => {
     const shared = sharedFor(plan, trip, key);
-    return sum + (has(shared?.total) ? n(shared.total) : Math.max(n(a?.[key]), n(b?.[key])));
+    const gross = has(shared?.total) ? n(shared.total) : Math.max(n(a?.[key]), n(b?.[key]));
+    const jar = key === 'accom' ? Math.min(gross, Math.max(0, n(shared?.accommodation?.jarContribution))) : 0;
+    return sum + Math.max(0, gross - jar);
   }, 0);
 }
 
 function total(plan, trip) {
-  return legacyTotal(plan, trip) + entries(plan).reduce((sum, entry) => sum + n(entry?.amount), 0);
+  return legacyTotal(plan, trip) + entries(plan).reduce((sum, entry) => {
+    const gross = Math.max(0, n(entry?.amount));
+    const jar = Math.min(gross, Math.max(0, n(entry?.jarContribution)));
+    return sum + (gross - jar);
+  }, 0);
 }
 
 function metrics(plan, trip) {
