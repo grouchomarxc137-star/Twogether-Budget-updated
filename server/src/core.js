@@ -1025,24 +1025,24 @@ function sanitizeAccommodationMeta_(value){
   const upfrontBy=cleanActor_(s.upfrontBy)==='Unknown'?'':cleanActor_(s.upfrontBy),debtor=cleanActor_(r.debtor)==='Unknown'?'':cleanActor_(r.debtor),creditor=cleanActor_(r.creditor)==='Unknown'?'':cleanActor_(r.creditor);
   return {useJar:s.useJar===true,jarContribution:cleanMoney_(s.jarContribution)===''?0:cleanMoney_(s.jarContribution),jarBalanceAfter:cleanMoney_(s.jarBalanceAfter)===''?870:cleanMoney_(s.jarBalanceAfter),remaining:cleanMoney_(s.remaining),paymentType:paymentType==='solo'||paymentType==='shared'?paymentType:'',paidUpfront:s.paidUpfront===true,upfrontBy:upfrontBy,shareEach:cleanMoney_(s.shareEach),repayment:{debtor:debtor,creditor:creditor,amount:cleanMoney_(r.amount),status:status,confirmedAt:cleanText_(r.confirmedAt,40)}};
 }
-function prepOwner_(value){const owner=cleanActor_(value);return ACTORS.includes(owner)?owner:'';}
-function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),owner:prepOwner_(x&&x.owner)};}
+function prepAddedBy_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
+function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
     packing:[
-      {id:'default-packing-1',text:'Toothbrushes',done:false,owner:''},
-      {id:'default-packing-2',text:'Slippers',done:false,owner:''},
-      {id:'default-packing-3',text:'Hair brush',done:false,owner:''},
-      {id:'default-packing-4',text:'Shampoo',done:false,owner:''},
-      {id:'default-packing-5',text:'Conditioner',done:false,owner:''},
-      {id:'default-packing-6',text:'Shower gel',done:false,owner:''},
-      {id:'default-packing-7',text:'Dishwasher detergent',done:false,owner:''}
+      {id:'default-packing-1',text:'Toothbrushes',done:false},
+      {id:'default-packing-2',text:'Slippers',done:false},
+      {id:'default-packing-3',text:'Hair brush',done:false},
+      {id:'default-packing-4',text:'Shampoo',done:false},
+      {id:'default-packing-5',text:'Conditioner',done:false},
+      {id:'default-packing-6',text:'Shower gel',done:false},
+      {id:'default-packing-7',text:'Dishwasher detergent',done:false}
     ],
     reminders:[
-      {id:'default-reminder-1',text:"Don't forget to put fuel",done:false,owner:''},
-      {id:'default-reminder-2',text:"Don't forget to ask mom to make work sandwich",done:false,owner:''},
-      {id:'default-reminder-3',text:"Don't forget to take pictures of the Airbnb when you arrive",done:false,owner:''}
+      {id:'default-reminder-1',text:"Don't forget to put fuel",done:false},
+      {id:'default-reminder-2',text:"Don't forget to ask mom to make work sandwich",done:false},
+      {id:'default-reminder-3',text:"Don't forget to take pictures of the Airbnb when you arrive",done:false}
     ],
     updatedAt:'',
     updatedBy:'Unknown'
@@ -1052,15 +1052,15 @@ function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
-  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,owner:item.owner};});
-  out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,owner:item.owner};});
+  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy};});
+  out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy};});
   return out;
 }
 function tripPrepForNewPlan_(value,actor,now){
   const source=sanitizeTripPrepDefaults_(value);
   return {
-    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,owner:item.owner};}),
-    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,owner:item.owner};}),
+    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};}),
+    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};}),
     updatedAt:now||new Date().toISOString(),
     updatedBy:actor
   };
@@ -1100,8 +1100,8 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   const recurrent=next.map(function(item){
     const prior=matchedByDefaultId[item.id];
     return prior
-      ? {id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,owner:item.owner}
-      : {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,owner:item.owner};
+      ? {id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy}
+      : {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};
   });
   return recurrent.concat(custom);
 }
