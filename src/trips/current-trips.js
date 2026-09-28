@@ -107,12 +107,21 @@ function expenseTotal(plan, trip) {
   const b = trip?.submissions?.Principe || plan?.partials?.Principe || {};
   const legacy = MONEY_KEYS.reduce((sum, key) => {
     const shared = plan?.sharedExpenses?.[key] || trip?.sharedExpenses?.[key];
-    if (has(shared?.total)) return sum + n(shared.total);
-    const av = has(a?.[key]) ? n(a[key]) : null, bv = has(b?.[key]) ? n(b[key]) : null;
-    if (av != null && bv != null) return sum + Math.max(av, bv);
-    return sum + (av ?? bv ?? 0);
+    const total = has(shared?.total)
+      ? n(shared.total)
+      : (() => {
+          const av = has(a?.[key]) ? n(a[key]) : null, bv = has(b?.[key]) ? n(b[key]) : null;
+          if (av != null && bv != null) return Math.max(av, bv);
+          return av ?? bv ?? 0;
+        })();
+    const jar = key === 'accom' ? Math.min(total, Math.max(0, n(shared?.accommodation?.jarContribution))) : 0;
+    return sum + Math.max(0, total - jar);
   }, 0);
-  return legacy + tripEntries(plan).reduce((sum, entry) => sum + n(entry?.amount), 0);
+  return legacy + tripEntries(plan).reduce((sum, entry) => {
+    const amount = Math.max(0, n(entry?.amount));
+    const jar = Math.min(amount, Math.max(0, n(entry?.jarContribution)));
+    return sum + (amount - jar);
+  }, 0);
 }
 
 function tripEntries(plan) {
@@ -473,7 +482,7 @@ function simplifiedTrip(plan, trip) {
         : '<section class="tv2-trip-confirm"><div><strong>Trip finished</strong><span>'+(otherConfirmed?esc(other)+' already confirmed. Confirm yours to move it to Trip stories.':'Confirm when the logged expenses look final. It moves to Trip stories after both of you confirm.')+'</span></div><button type="button" data-act="confirm-trip">Confirm trip</button></section>';
   const combinedAvailable = tripBudget(plan, trip), combinedSpent = expenseTotal(plan, trip);
   const ownBudget = has(plan?.budgets?.[me]) ? n(plan.budgets[me]) : null;
-  const ownSpent = n(settlement.paid?.[me]);
+  const ownSpent = n(settlement.share?.[me]);
   const available = personal ? ownBudget : combinedAvailable;
   const spent = personal ? ownSpent : combinedSpent;
   const left = available == null ? null : available - spent;
