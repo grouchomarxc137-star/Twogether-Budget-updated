@@ -136,7 +136,7 @@ function financeOverviewIcon(kind) {
     wealth:'<svg viewBox="0 0 32 32"><ellipse cx="16" cy="8" rx="8" ry="4"/><path d="M8 8v6c0 2.2 3.6 4 8 4s8-1.8 8-4V8"/><path d="M8 14v6c0 2.2 3.6 4 8 4s8-1.8 8-4v-6"/></svg>',
     investment:'<svg viewBox="0 0 32 32"><path d="m5 23 7-7 5 4 10-12"/><path d="M21 8h6v6"/></svg>',
   };
-  return '<span class="finance-overview-kpi-icon is-'+kind+'" aria-hidden="true">'+(icons[kind]||icons.investment)+'</span>';
+  return '<i class="finance-overview-kpi-icon is-'+kind+'" aria-hidden="true">'+(icons[kind]||icons.investment)+'</i>';
 }
 function financeYearBounds() {
   const years=ownMonths().map((item)=>Number(String(item.month||'').slice(0,4))).filter(Number.isFinite);
@@ -1096,11 +1096,11 @@ function renderPage() {
       </div>
       <div class="finance-kpi finance-overview-kpi wealth">
         ${financeOverviewIcon('wealth')}
-        <div class="finance-overview-kpi-copy"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong><small>Available savings + your investments</small></div>
+        <div class="finance-overview-kpi-copy"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong></div>
       </div>
       <div class="finance-kpi finance-overview-kpi finance-overview-investment ${overviewGl?.value < 0 ? 'bad' : overviewGl?.value > 0 ? 'good' : ''}">
         ${financeOverviewIcon('investment')}
-        <div class="finance-overview-kpi-copy"><span>Investment G/L p/m</span><strong>${overviewGl ? signedMoney(overviewGl.value) : '—'}</strong><small>${overviewGl ? `vs ${monthLabel(overviewGl.previousMonth)}` : 'Log 2 months to compare'}</small></div>
+        <div class="finance-overview-kpi-copy"><span>Investment G/L p/m</span><strong>${overviewGl ? signedMoney(overviewGl.value) : '—'}</strong></div>
       </div>
       <article class="finance-house-goal" aria-label="House savings goal">
         <div class="finance-house-goal-head">
@@ -1122,16 +1122,33 @@ function renderPage() {
         </div>
       </article>`;
 
-    $('[data-fin-overview-prev]',summaryRoot)?.addEventListener('click',()=>{
-      if(!canOverviewPrev)return;
-      financeOverviewMonth=shiftFinanceMonthKey(financeOverviewMonth,-1);
+    const moveOverviewMonth=(delta)=>{
+      if(delta<0&&!canOverviewPrev)return;
+      if(delta>0&&!canOverviewNext)return;
+      financeOverviewMonth=shiftFinanceMonthKey(financeOverviewMonth,delta);
       renderPage();
-    });
-    $('[data-fin-overview-next]',summaryRoot)?.addEventListener('click',()=>{
-      if(!canOverviewNext)return;
-      financeOverviewMonth=shiftFinanceMonthKey(financeOverviewMonth,1);
-      renderPage();
-    });
+    };
+    $('[data-fin-overview-prev]',summaryRoot)?.addEventListener('click',()=>moveOverviewMonth(-1));
+    $('[data-fin-overview-next]',summaryRoot)?.addEventListener('click',()=>moveOverviewMonth(1));
+    const overviewSwitcher=$('.finance-overview-month-switcher',summaryRoot);
+    if(overviewSwitcher){
+      let swipeStartX=0, swipeStartY=0;
+      overviewSwitcher.addEventListener('touchstart',(event)=>{
+        const touch=event.touches?.[0];
+        if(!touch)return;
+        swipeStartX=touch.clientX;
+        swipeStartY=touch.clientY;
+      },{passive:true});
+      overviewSwitcher.addEventListener('touchend',(event)=>{
+        const touch=event.changedTouches?.[0];
+        if(!touch)return;
+        const dx=touch.clientX-swipeStartX;
+        const dy=touch.clientY-swipeStartY;
+        swipeStartX=0; swipeStartY=0;
+        if(Math.abs(dx)<44||Math.abs(dx)<=Math.abs(dy))return;
+        moveOverviewMonth(dx<0?1:-1);
+      },{passive:true});
+    }
   }
   renderCurrentPanel();
   renderScenarioPanel();
