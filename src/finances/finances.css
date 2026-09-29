@@ -3364,7 +3364,8 @@ button.finance-owed-history-row:hover {
   overflow:hidden;
 }
 
-.finance-log-layer #financeLogDate {
+.finance-log-layer #financeLogDate,
+.finance-log-layer #financeLogExtraDate {
   display:block!important;
   box-sizing:border-box!important;
   width:100%!important;
@@ -3377,7 +3378,8 @@ button.finance-owed-history-row:hover {
   margin:0!important;
 }
 
-.finance-log-layer #financeLogDate::-webkit-date-and-time-value {
+.finance-log-layer #financeLogDate::-webkit-date-and-time-value,
+.finance-log-layer #financeLogExtraDate::-webkit-date-and-time-value {
   width:100%;
   min-width:0;
   text-align:center;
@@ -5696,8 +5698,13 @@ dialog.finance-log-host .tv2-backdrop {
 
 .finance-extra-used-panel .tv2-field {
   display:grid;
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
   gap:6px;
   margin-top:5px;
+  overflow:hidden;
   color:#785e58;
   font-size:12px;
 }
