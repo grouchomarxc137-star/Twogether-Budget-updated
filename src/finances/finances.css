@@ -5631,22 +5631,22 @@ dialog.finance-log-host .tv2-backdrop {
 }
 
 [data-fin-view="overview"] .finance-overview-networth.is-combined {
-  background:linear-gradient(120deg,#fff7cf 0%,#f9e1ad 48%,#f6c795 100%);
-  border-color:#e7bd6d;
-  box-shadow:0 9px 24px rgba(175,118,44,.12);
+  background:linear-gradient(120deg,#fffdf5 0%,#f8edc9 52%,#edd99d 100%);
+  border-color:#d8b85f;
+  box-shadow:0 9px 24px rgba(139,108,35,.11);
 }
 
 [data-fin-view="overview"] .finance-overview-networth.is-combined .finance-overview-kpi-icon {
-  background:rgba(255,244,201,.8);
-  color:#a85d1b;
+  background:#f7e8b7;
+  color:#9b761c;
 }
 
 [data-fin-view="overview"] .finance-overview-networth.is-combined .finance-overview-kpi-copy>span {
-  color:#986125;
+  color:#876b24;
 }
 
 [data-fin-view="overview"] .finance-overview-networth.is-combined .finance-overview-kpi-copy>strong {
-  color:#a9541d!important;
+  color:#9a7318!important;
 }
 
 @media(hover:hover) and (pointer:fine) {
