@@ -829,23 +829,21 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
       if (existing && existing.finalized) throw new Error('This month is final and locked');
       const now = new Date().toISOString();
-      if (actor === 'Principe') {
-        state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
-        const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
-        const savingsUsed = function(record) {
-          return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
-        };
-        const previousSavingsUsed = savingsUsed(existing);
-        const nextSavingsUsed = savingsUsed(monthData);
-        const savingsDelta = money2_(nextSavingsUsed - previousSavingsUsed);
-        if (Math.abs(savingsDelta) > .005) {
-          const currentSavings = financeProfile.savingsTotal === '' ? 0 : Number(financeProfile.savingsTotal || 0);
-          if (savingsDelta > currentSavings + .005) throw new Error('Saved up only has ' + formatMoney_(currentSavings) + ' available');
-          financeProfile.savingsTotal = money2_(Math.max(0, currentSavings - savingsDelta));
-          financeProfile.updatedAt = now;
-          financeProfile.updatedBy = actor;
-          state.financeProfiles[actor] = financeProfile;
-        }
+      state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
+      const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
+      const savingsUsed = function(record) {
+        return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
+      };
+      const previousSavingsUsed = savingsUsed(existing);
+      const nextSavingsUsed = savingsUsed(monthData);
+      const savingsDelta = money2_(nextSavingsUsed - previousSavingsUsed);
+      if (Math.abs(savingsDelta) > .005) {
+        const currentSavings = financeProfile.savingsTotal === '' ? 0 : Number(financeProfile.savingsTotal || 0);
+        if (savingsDelta > currentSavings + .005) throw new Error('Saved up only has ' + formatMoney_(currentSavings) + ' available');
+        financeProfile.savingsTotal = money2_(Math.max(0, currentSavings - savingsDelta));
+        financeProfile.updatedAt = now;
+        financeProfile.updatedBy = actor;
+        state.financeProfiles[actor] = financeProfile;
       }
       monthData.updatedAt = now;
       monthData.updatedBy = actor;
@@ -860,7 +858,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         const pstate=state.game[actor],settleKey='month:'+actor+':'+monthData.month;
         if (pstate.awards.financeSettlements.indexOf(settleKey) < 0) {
           const income=(monthData.incomes||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
-          const outflow=(monthData.expenses||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0)+(monthData.extraSpends||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+          const outflow=(monthData.expenses||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0)+(monthData.extraSpends||[]).filter(financeExtraSpendCountsAsOutflow_).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
           twosDelta=Math.round((income-outflow)*100)/100;
           pstate.twos+=twosDelta;
           pstate.awards.financeSettlements.push(settleKey);
@@ -1409,11 +1407,20 @@ function sanitizeFinanceReserved_(item) {
 function sanitizeFinanceExtraSpend_(item) {
   const sourceRaw = String(item && item.source || '');
   const source = sourceRaw === 'creditcard' || sourceRaw === 'savings' || sourceRaw === 'main' ? sourceRaw : '';
+  const rawStatus = String(item && item.status || '');
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
     source: source,
-    amount: cleanMoney_(item && item.amount)
+    amount: cleanMoney_(item && item.amount),
+    date: cleanFinanceDate_(item && item.date),
+    status: source === 'creditcard' ? (rawStatus === 'pending' ? 'pending' : 'confirmed') : 'confirmed',
+    pendingCounts: source === 'creditcard' && item && item.pendingCounts === true
   };
+}
+function financeExtraSpendCountsAsOutflow_(item) {
+  if (!item || item.source !== 'creditcard') return true;
+  if (item.status !== 'pending') return true;
+  return item.pendingCounts === true;
 }
 
 
@@ -1453,13 +1460,16 @@ function sanitizeFinanceMonth_(record, actor) {
   if (usesExtraBudget && !partialOnly && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget, date:''});
   if (partialOnly) expenses = expenses.filter(function(x){ return !(x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'); });
 
-  const allowedExtraSources = actor === 'Principe' ? ['savings'] : ['creditcard','savings','main'];
+  const allowedExtraSources = actor === 'Principe' ? ['savings','main'] : ['creditcard','savings','main'];
   let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
+  if (/^\d{4}-\d{2}$/.test(month)) {
+    extraSpends.forEach(function(x){ if (x.date && x.date.slice(0,7) !== month) x.date = ''; });
+  }
   if (!extraSpends.length) {
     const legacySourceRaw = String(record && record.extraOverspendSource || '');
     const legacySource = allowedExtraSources.indexOf(legacySourceRaw) >= 0 ? legacySourceRaw : '';
     const legacyAmount = cleanMoney_(record && record.extraOverspendAmount);
-    if (legacySource && legacyAmount !== '' && Number(legacyAmount) > 0) extraSpends.push({id:Utilities.getUuid(),source:legacySource,amount:legacyAmount});
+    if (legacySource && legacyAmount !== '' && Number(legacyAmount) > 0) extraSpends.push({id:Utilities.getUuid(),source:legacySource,amount:legacyAmount,date:'',status:'confirmed',pendingCounts:false});
   }
   const legacyTotal = extraSpends.reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
   return {

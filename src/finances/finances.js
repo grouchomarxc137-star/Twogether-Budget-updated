@@ -895,16 +895,25 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     copy.extraBudget = '';
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
   }
-  const allowedExtraSources = rules.extraTracking ? ['creditcard', 'savings', 'main'] : (rules.savedUpExtraTracking ? ['savings'] : []);
+  const allowedExtraSources = owner === 'Principe' ? ['savings', 'main'] : ['creditcard', 'savings', 'main'];
   copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => {
     const sourceRaw = String(x.source || '');
-    return { id: x.id || uid(), source: allowedExtraSources.includes(sourceRaw) ? sourceRaw : '', amount: n(x.amount) };
+    const source = allowedExtraSources.includes(sourceRaw) ? sourceRaw : '';
+    const rawStatus = String(x.status || '');
+    return {
+      id: x.id || uid(),
+      source,
+      amount: n(x.amount),
+      date: normalizeFinanceDate(x.date, copy.month),
+      status: source === 'creditcard' ? (rawStatus === 'pending' ? 'pending' : 'confirmed') : 'confirmed',
+      pendingCounts: source === 'creditcard' && x.pendingCounts === true,
+    };
   }).filter((x) => x.source && x.amount > 0) : [];
   if (!copy.extraSpends.length && allowedExtraSources.length) {
     const legacySourceRaw = String(copy.extraOverspendSource || '');
     const legacySource = allowedExtraSources.includes(legacySourceRaw) ? legacySourceRaw : '';
     const legacyAmount = hasValue(copy.extraOverspendAmount) ? Math.max(0, n(copy.extraOverspendAmount)) : 0;
-    if (legacySource && legacyAmount > 0) copy.extraSpends.push({ id: uid(), source: legacySource, amount: legacyAmount });
+    if (legacySource && legacyAmount > 0) copy.extraSpends.push({ id: uid(), source: legacySource, amount: legacyAmount, date:'', status:'confirmed', pendingCounts:false });
   }
   const legacyFirst = copy.extraSpends[0] || null;
   copy.extraOverspendSource = legacyFirst?.source || '';
@@ -917,6 +926,37 @@ function extraSourceLabel(source) {
   if (source === 'main') return 'From Main account leftover';
   return 'Credit Card';
 }
+function extraSourceShortLabel(source) {
+  if (source === 'savings') return 'Saved up';
+  if (source === 'main') return 'Leftover';
+  return 'Credit card';
+}
+function extraSourceOptions(owner = actor()) {
+  const sources = owner === 'Principe' ? ['savings', 'main'] : ['savings', 'creditcard', 'main'];
+  return sources.map((source) => ({
+    id: source,
+    source,
+    name: extraSourceShortLabel(source),
+    amount: '',
+    day: '',
+    group: '',
+    tone: 'extra-used',
+  }));
+}
+function financeSalaryDate(month) {
+  const salaryPattern = /neways|salary|loon|wage|salar/i;
+  const logged = (recordFor(month)?.incomes || []).find((item) => salaryPattern.test(String(item?.name || '')) && normalizeFinanceDate(item?.date, month));
+  if (logged) return normalizeFinanceDate(logged.date, month);
+  const recurring = (recurringConfig().incomes || []).find((item) => salaryPattern.test(String(item?.name || '')));
+  const recurringDay = normalizeRecurringDay(recurring?.day);
+  if (recurringDay !== '') return financeDateForDay(month, recurringDay);
+  return financeDateForDay(month, 25);
+}
+function extraSpendCountsInOutflow(item) {
+  if (!item || item.source !== 'creditcard') return true;
+  if (item.status !== 'pending') return true;
+  return item.pendingCounts === true;
+}
 
 function previousMonthKey(month) {
   const match = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
@@ -927,12 +967,13 @@ function previousMonthKey(month) {
 }
 
 function extraSpendsTotal(rec) { return (rec?.extraSpends || []).reduce((sum, x) => sum + n(x.amount), 0); }
+function extraSpendsOutflowTotal(rec) { return (rec?.extraSpends || []).filter(extraSpendCountsInOutflow).reduce((sum, x) => sum + n(x.amount), 0); }
 
 function extraCarryInfo(month) {
   const rules = financeRules();
   if (!rules.extraTracking) return { prevMonth: previousMonthKey(month), over: 0, budget: 0, debt: 0 };
   const prevMonth = previousMonthKey(month), prev = prevMonth ? recordFor(prevMonth) : null;
-  const over = prev ? extraSpendsTotal(prev) : 0;
+  const over = prev ? extraSpendsOutflowTotal(prev) : 0;
   return {
     prevMonth,
     over,
@@ -956,7 +997,7 @@ function calc(rec) {
   const expenses = Array.isArray(rec?.expenses) ? rec.expenses : [];
   const income = incomes.reduce((sum, x) => sum + n(x.amount), 0);
   const normalOutflow = expenses.reduce((sum, x) => sum + n(x.amount), 0);
-  const extraOverspendAmount = extraSpendsTotal(rec);
+  const extraOverspendAmount = extraSpendsOutflowTotal(rec);
   const outflow = normalOutflow + extraOverspendAmount;
   const savings = expenses.filter((x) => normalizeGroup(x.group) === 'savings').reduce((sum, x) => sum + n(x.amount), 0);
   const investmentContribution = expenses.filter((x) => normalizeGroup(x.group) === 'investments').reduce((sum, x) => sum + n(x.amount), 0);
@@ -1830,9 +1871,11 @@ function financeLogCategories(rec) {
       tone,
       icon:financeMonthToneIcon(tone),
     })),
+    { key:'extra-used', label:'Money used extra', tone:'extra-used', icon:financeMonthToneIcon('extra-used') },
   ];
 }
 function financeRecurringItemsForCategory(category) {
+  if (category === 'extra-used') return extraSourceOptions();
   const config = recurringConfig();
   if (category === 'income') {
     return (config.incomes || []).map((item)=>({
@@ -1969,8 +2012,12 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const selectedItems=()=>financeRecurringItemsForCategory(state.category);
   const isOther=()=>state.category==='other';
   const isCustomCategory=()=>isCustomGroupKey(state.category);
+  const isExtraUsed=()=>state.category==='extra-used';
+  const selectedExtraSource=()=>isExtraUsed()?String(state.selectedItemId||''):'';
+  const isCreditCardExtra=()=>selectedExtraSource()==='creditcard';
   const hasChosenItem=()=>!!state.selectedItemId || isOther() || isCustomCategory();
-  const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim();
+  const validExtraDate=()=>!isCreditCardExtra() || (!!normalizeFinanceDate(state.date) && state.date.slice(0,7) >= rec.month);
+  const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim()&&validExtraDate();
 
   const layer=document.createElement('dialog');
   layer.className='tv2-layer finance-log-layer finance-log-host';
@@ -2070,6 +2117,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
     if (!state.category) return 'Pick a category';
     if (!hasChosenItem()) return 'Pick an item';
     if (!state.name.trim()) return 'Add a name';
+    if (isCreditCardExtra() && !normalizeFinanceDate(state.date)) return 'Choose when the credit card amount will leave your account';
+    if (isCreditCardExtra() && state.date.slice(0,7) < rec.month) return 'Choose this month or a future charge date';
     return '';
   }
 
@@ -2079,6 +2128,19 @@ function openFinanceTransactionSheet(rec, edit = null) {
     const drillDown=!!category;
     const bounds=financeDateBounds(rec.month);
     const tone=category?.tone||'';
+    const extraSource=selectedExtraSource();
+    const extraCopy=extraSource==='savings'
+      ? 'This comes out of Saved up and reduces your available savings and net worth.'
+      : extraSource==='main'
+        ? 'This reduces the leftover money that should remain in your main account.'
+        : extraSource==='creditcard'
+          ? 'This stays Pending until you confirm the card charge.'
+          : 'Use this only when money had to come from outside the normal monthly plan.';
+    const extraDetail=isExtraUsed()
+      ? '<div class="finance-extra-used-panel"><strong>'+esc(extraSource?extraSourceShortLabel(extraSource):'Money used extra')+'</strong><span>'+esc(extraCopy)+'</span>'+
+        (isCreditCardExtra()?'<label class="tv2-field"><span>Date it leaves your account</span><input id="financeLogExtraDate" type="date" min="'+rec.month+'-01" value="'+esc(state.date)+'"></label>':'')+
+        '</div>'
+      : '';
     sheet.className='tv2-sheet finance-log-sheet'+(tone?' finance-log-sheet-tone-'+tone:'');
     const tiles=!drillDown
       ? categories.map((item)=>categoryTile(item,false)).join('')
@@ -2092,13 +2154,15 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:isOther()
-        ? '<label class="tv2-field finance-log-name"><span>New category <small>Optional</small></span><input id="financeLogCategoryName" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts" value="'+esc(state.newCategoryName)+'"></label><label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Vet, haircut, birthday gift" value="'+esc(state.name)+'"></label>'
-        : isCustomCategory()
-          ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
-          : '',
-      defaultsHtml:'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
-      moreHtml:'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
+      afterCategoriesHtml:isExtraUsed()
+        ? extraDetail
+        : isOther()
+          ? '<label class="tv2-field finance-log-name"><span>New category <small>Optional</small></span><input id="financeLogCategoryName" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts" value="'+esc(state.newCategoryName)+'"></label><label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Vet, haircut, birthday gift" value="'+esc(state.name)+'"></label>'
+          : isCustomCategory()
+            ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
+            : '',
+      defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
+      moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
       hintClass:state.error?'is-error':'',
       saveAttr:'data-fin-log-save',
@@ -2129,6 +2193,11 @@ function openFinanceTransactionSheet(rec, edit = null) {
     });
     sheet.querySelector('#financeLogDate')?.addEventListener('change',(event)=>{
       state.date=normalizeFinanceDate(event.target.value,rec.month);
+      refreshLive();
+    });
+    sheet.querySelector('#financeLogExtraDate')?.addEventListener('change',(event)=>{
+      state.date=normalizeFinanceDate(event.target.value);
+      state.error='';
       refreshLive();
     });
 
@@ -2189,8 +2258,8 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.selectedItemId=String(item.id);
       state.name=item.name;
       state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
-      state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
-      state.date=financeDateForDay(rec.month,item.day);
+      if(!isExtraUsed()||hasValue(item.amount)) state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
+      state.date=isExtraUsed()?'':financeDateForDay(rec.month,item.day);
       state.more=false;
       state.error='';
       render();
@@ -2213,6 +2282,65 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.busy=true;
       state.error='';
       refreshLive();
+
+      if(isExtraUsed()){
+        const source=selectedExtraSource();
+        const chargeDate=isCreditCardExtra()?normalizeFinanceDate(state.date):'';
+        const targetMonth=isCreditCardExtra()?chargeDate.slice(0,7):rec.month;
+        if(!source){
+          state.busy=false;
+          state.error='Choose where the extra money came from.';
+          refreshLive();
+          return;
+        }
+        if(isCreditCardExtra()&&(!chargeDate||targetMonth<rec.month)){
+          state.busy=false;
+          state.error='Choose when the credit card amount will leave your account.';
+          refreshLive();
+          return;
+        }
+        const target=targetMonth===rec.month?cloneRecord(rec):directMonthRecord(targetMonth);
+        if(target.finalized===true){
+          state.busy=false;
+          state.error=monthLabel(targetMonth)+' is already final and locked.';
+          refreshLive();
+          return;
+        }
+        target.extraSpends=[...(target.extraSpends||[])];
+        const salaryDate=isCreditCardExtra()?financeSalaryDate(targetMonth):'';
+        const pendingCounts=isCreditCardExtra()
+          ? (targetMonth>rec.month || (!!salaryDate && chargeDate>=salaryDate))
+          : true;
+        target.extraSpends.push({
+          id:uid(),
+          source,
+          amount:amount(),
+          date:chargeDate,
+          status:isCreditCardExtra()?'pending':'confirmed',
+          pendingCounts,
+        });
+        if(!recordFor(targetMonth))target.partialOnly=true;
+        try{
+          closeFinanceTransactionSheet();
+          await saveDirectMonthRecord(
+            target,
+            isCreditCardExtra()?'Credit card expense added as pending':'Money used extra logged'
+          );
+        }catch(error){
+          state.busy=false;
+          state.error=error?.message||'Could not save this item.';
+          if(!layer.isConnected)document.body.appendChild(layer);
+          if(!layer.open)layer.showModal();
+          document.documentElement.classList.add('finance-log-locked');
+          document.body.classList.add('finance-log-locked');
+          document.body.classList.add('tv2-locked');
+          document.body.classList.add('trip-expense-open');
+          financeMonthDialog?.classList.add('finance-log-background-locked');
+          if(financeLogBackgroundLock?.shell?.isConnected)financeLogBackgroundLock.shell.scrollTop=financeLogBackgroundLock.scrollTop;
+          render();
+        }
+        return;
+      }
 
       let categoryForSave=state.category;
       if(categoryForSave==='other'&&state.newCategoryName.trim()){
@@ -2287,6 +2415,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
 function financeMonthToneIcon(tone, kind = 'expense') {
   if (kind === 'income') return '💶';
   if (tone === 'budgets' && actor() === 'Principe') return '🛒';
+  if (tone === 'extra-used') return '⚠';
   return { fixed:'🏠', medical:'🩺', subscriptions:'🔁', budgets:'💰', wealth:'🏦', other:'🏷️' }[tone] || '🏷️';
 }
 
@@ -2305,14 +2434,13 @@ function financeMonthTimeline(rec) {
   })).concat((rec.expenses||[]).map((item,index)=>({
     kind:'expense',date:item.date||'',item,index,tone:groupTone(item.group),
   })));
-  extraSpendSummary({extraSpends:rec.extraSpends||[]}).forEach((item,index)=>{
-    const savedUpOnly=actor()==='Principe'&&item.source==='savings';
+  (rec.extraSpends||[]).forEach((item,index)=>{
     rows.push({
-      kind:'summary',
-      date:'',
-      item:{name:extraSourceLabel(item.source),amount:item.amount,group:savedUpOnly?'savings':'extra'},
-      index:1000+index,
-      tone:savedUpOnly?'wealth':'budgets',
+      kind:'extra',
+      date:item.date||'',
+      item,
+      index,
+      tone:'extra-used',
     });
   });
   rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || a.kind.localeCompare(b.kind));
@@ -2326,20 +2454,26 @@ function financeMonthTimeline(rec) {
     rowHtml:(row)=>{
       const item=row.item;
       const income=row.kind==='income';
+      const extra=row.kind==='extra';
       const tone=income?'income':row.tone;
-      const meta=income?'Income':categoryLabel(tone);
-      const editable=row.kind!=='summary'&&!locked;
+      const meta=income
+        ? 'Income'
+        : extra
+          ? 'Money used extra · '+extraSourceShortLabel(item.source)+(item.source==='creditcard'&&item.status==='pending'?' · Pending':'')
+          : categoryLabel(tone);
+      const editable=(row.kind==='income'||row.kind==='expense')&&!locked;
+      const deletable=(row.kind==='income'||row.kind==='expense'||row.kind==='extra')&&!locked;
       const rowHtml=tripExpenseRowHtml({
         attr:editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable,
         icon:financeMonthToneIcon(tone,income?'income':'expense'),
         iconClass:'finance-tv2-tone-'+tone,
-        title:item.name||(income?'Income':groupLabel(item.group)),
+        title:extra?extraSourceShortLabel(item.source):(item.name||(income?'Income':groupLabel(item.group))),
         meta,
         amount:money(item.amount),
-        amountClass:income?'finance-tv2-income-amt':'',
+        amountClass:income?'finance-tv2-income-amt':extra?'finance-extra-used-amt':'',
       });
-      if(!editable) return rowHtml;
+      if(!deletable) return rowHtml;
       return '<div class="finance-month-swipe-row" data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'">'+
         '<div class="finance-month-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
         rowHtml+
@@ -2379,7 +2513,7 @@ function closeFinanceMonthDeleteConfirm() {
 function openFinanceMonthDeleteConfirm(rec, kind, index) {
   if (!rec || rec.finalized === true) return;
   closeFinanceMonthDeleteConfirm();
-  const list=kind==='income'?(rec.incomes||[]):(rec.expenses||[]);
+  const list=kind==='income'?(rec.incomes||[]):kind==='extra'?(rec.extraSpends||[]):(rec.expenses||[]);
   const item=list[index];
   if(!item)return;
 
@@ -2391,7 +2525,7 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
       '<div class="tv2-confirm-backdrop" data-fin-month-confirm-cancel></div>'+
       '<div class="tv2-confirm-card" role="document" aria-labelledby="finMonthDeleteTitle">'+
         '<h2 id="finMonthDeleteTitle">Delete finance?</h2>'+
-        '<p>Are you sure you want to delete <strong>'+esc(item.name||(kind==='income'?'Income':groupLabel(item.group)))+'</strong> · '+money(item.amount)+'?</p>'+
+        '<p>Are you sure you want to delete <strong>'+esc(kind==='extra'?extraSourceShortLabel(item.source):(item.name||(kind==='income'?'Income':groupLabel(item.group))))+'</strong> · '+money(item.amount)+'?</p>'+
         '<p class="tv2-confirm-note">This removes it from '+esc(monthLabel(rec.month))+'.</p>'+
         '<p class="tv2-confirm-error" aria-live="polite"></p>'+
         '<div class="tv2-confirm-actions"><button type="button" data-fin-month-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-month-confirm-delete>Delete</button></div>'+
@@ -2415,7 +2549,8 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
       const next=cloneRecord(rec);
       next.incomes=[...(next.incomes||[])];
       next.expenses=[...(next.expenses||[])];
-      const target=kind==='income'?next.incomes:next.expenses;
+      next.extraSpends=[...(next.extraSpends||[])];
+      const target=kind==='income'?next.incomes:kind==='extra'?next.extraSpends:next.expenses;
       if(!target[index]) throw new Error('This finance item no longer exists');
       const deletingInvestment=kind==='expense'&&normalizeGroup(target[index]?.group)==='investments';
       target.splice(index,1);
@@ -2698,6 +2833,7 @@ function renderDetail(rec) {
   financeMonthDialog.querySelectorAll('[data-fin-entry-kind]').forEach((button)=>{
     button.addEventListener('click',(event)=>{
       if(Date.now()<financeMonthSwipeIgnoreUntil){event.preventDefault();return;}
+      if(button.dataset.finEntryKind==='extra')return;
       openFinanceTransactionSheet(rec,{
         kind:button.dataset.finEntryKind,
         index:Number(button.dataset.finEntryIndex),

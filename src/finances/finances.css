@@ -5655,3 +5655,72 @@ dialog.finance-log-host .tv2-backdrop {
   }
 }
 
+/* Money used extra: intentionally warning-red because it sits outside the normal plan. */
+.finance-log-layer .finance-tv2-tone-extra-used,
+.finance-log-layer .tv2-cat.finance-tv2-tone-extra-used {
+  color:#9f433b!important;
+  background:#f8e8e5!important;
+  border-color:#e8bbb5!important;
+}
+
+.finance-log-layer .finance-tv2-tone-extra-used.active,
+.finance-log-layer .tv2-cat.finance-tv2-tone-extra-used.on {
+  border-color:#b95d54!important;
+  box-shadow:inset 0 0 0 1px #b95d54;
+}
+
+.finance-log-layer .finance-log-sheet-tone-extra-used {
+  background:#fbefed!important;
+}
+
+.finance-extra-used-panel {
+  display:grid;
+  gap:5px;
+  padding:12px 13px;
+  border:1px solid #e7b8b2;
+  border-radius:14px;
+  background:rgba(255,250,248,.8);
+  color:#6d514c;
+}
+
+.finance-extra-used-panel>strong {
+  color:#98473f;
+  font-size:14px;
+  font-weight:750;
+}
+
+.finance-extra-used-panel>span {
+  font-size:12.5px;
+  line-height:1.35;
+}
+
+.finance-extra-used-panel .tv2-field {
+  display:grid;
+  gap:6px;
+  margin-top:5px;
+  color:#785e58;
+  font-size:12px;
+}
+
+.finance-extra-used-panel input[type="date"] {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  padding:0 10px;
+  border:1px solid #dfc4bf;
+  border-radius:11px;
+  background:#fff;
+  color:#2b2520;
+  font:inherit;
+}
+
+.finance-month-overview .finance-tv2-tone-extra-used {
+  color:#a34b43!important;
+  background:#f6dfdc!important;
+}
+
+.finance-month-overview .finance-extra-used-amt {
+  color:#a9443c!important;
+}
+
