@@ -1136,7 +1136,8 @@ function renderPage() {
       const netWorthLabel=$('[data-fin-networth-label]',netWorthCard);
       const netWorthValue=$('[data-fin-networth-value]',netWorthCard);
       let netWorthHoldTimer=0;
-      let netWorthHoldActive=false;
+      let netWorthCombined=false;
+      let netWorthSuppressClick=false;
       let netWorthPointerId=null;
       let netWorthStartX=0;
       let netWorthStartY=0;
@@ -1147,39 +1148,49 @@ function renderPage() {
         }
       };
       const showCombinedNetWorth=()=>{
-        netWorthHoldActive=true;
+        netWorthCombined=true;
+        netWorthSuppressClick=true;
         netWorthCard.classList.add('is-combined');
         if(netWorthLabel)netWorthLabel.textContent='Combined net worth';
         if(netWorthValue)netWorthValue.textContent=money(house.combinedNetWorth);
       };
       const showPersonalNetWorth=()=>{
         clearNetWorthTimer();
-        netWorthHoldActive=false;
+        netWorthCombined=false;
         netWorthCard.classList.remove('is-combined');
         if(netWorthLabel)netWorthLabel.textContent='Current net worth';
         if(netWorthValue)netWorthValue.textContent=money(ps.netWorth);
       };
       netWorthCard.addEventListener('pointerdown',(event)=>{
         if(event.pointerType==='mouse'&&event.button!==0)return;
-        showPersonalNetWorth();
+        clearNetWorthTimer();
         netWorthPointerId=event.pointerId;
         netWorthStartX=event.clientX;
         netWorthStartY=event.clientY;
+        if(netWorthCombined)return;
         netWorthHoldTimer=window.setTimeout(()=>{
           netWorthHoldTimer=0;
           showCombinedNetWorth();
         },500);
       });
       netWorthCard.addEventListener('pointermove',(event)=>{
-        if(event.pointerId!==netWorthPointerId||netWorthHoldActive)return;
+        if(event.pointerId!==netWorthPointerId||netWorthCombined)return;
         if(Math.hypot(event.clientX-netWorthStartX,event.clientY-netWorthStartY)>12)clearNetWorthTimer();
       });
       ['pointerup','pointercancel','pointerleave'].forEach((type)=>{
         netWorthCard.addEventListener(type,(event)=>{
           if(netWorthPointerId!=null&&event.pointerId!==netWorthPointerId)return;
           netWorthPointerId=null;
-          showPersonalNetWorth();
+          clearNetWorthTimer();
         });
+      });
+      netWorthCard.addEventListener('click',(event)=>{
+        if(netWorthSuppressClick){
+          netWorthSuppressClick=false;
+          event.preventDefault();
+          return;
+        }
+        if(netWorthCombined)showPersonalNetWorth();
       });
       netWorthCard.addEventListener('contextmenu',(event)=>event.preventDefault());
     }
