@@ -540,8 +540,10 @@ function renderCurrentTrips() {
   const section = ensureCurrentTrips(), root = $('#twCurrentTrips'); if (!section || !root || !remoteState) return;
   if (simplifiedView.name === 'trip') {
     const plan = (remoteState.plans || []).find((p)=>p.id===simplifiedView.planId);
-    if (!plan) simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
-    else {
+    if (!plan) {
+      dismissCardView('current-trip:'+simplifiedView.planId);
+      simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
+    } else {
       const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
       const snapshot={planId:plan.id,budgetMode:simplifiedView.budgetMode||'combined',budgetEditor:!!simplifiedView.budgetEditor};
       rememberCardView('current-trip:'+plan.id,()=>{

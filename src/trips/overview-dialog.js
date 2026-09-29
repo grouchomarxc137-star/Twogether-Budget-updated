@@ -461,6 +461,7 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
     dialog._twogetherBack=()=>draw(plan);
     dialog._twogetherHome=dismissOverview;
     dialog.querySelector('[data-overview-close]').onclick = dismissOverview;
+    dialog.querySelector('[data-overview-back]').onclick = () => backFromOverview(plan);
     dialog.querySelector('[data-category-back]').onclick = () => draw(plan);
 
     const amount = dialog.querySelector('#overviewExpenseAmount');

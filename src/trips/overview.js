@@ -67,13 +67,14 @@ export function openTripModal(id) {
 }
 
 export function closeTripModal(preserveHistory = false) {
+  const preserve=preserveHistory===true;
   const key=openTripId?'trip-story:'+openTripId:'';
-  if(!preserveHistory&&key)dismissCardView(key);
+  if(!preserve&&key)dismissCardView(key);
   openTripId = '';
   const modal=$('#tripModal');
   modal?.classList.remove('show');
   modal?.setAttribute('aria-hidden', 'true');
-  if(modal&&!preserveHistory){
+  if(modal&&!preserve){
     modal._twogetherBack=null;
     modal._twogetherHome=null;
   }
