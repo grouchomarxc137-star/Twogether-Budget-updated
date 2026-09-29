@@ -870,6 +870,30 @@ function handleAction_(actionValue, payloadValue, actorValue) {
     }
 
 
+    if (action === 'confirmFinanceCreditCard') {
+      const month = cleanText_(payload.month, 10);
+      const extraSpendId = cleanText_(payload.extraSpendId, 80);
+      if (!/^\d{4}-\d{2}$/.test(month) || !extraSpendId) throw new Error('Choose a valid credit card charge');
+      state.finances = sanitizeFinances_(state.finances);
+      const list = state.finances[actor] || [];
+      const idx = list.findIndex(function(x){ return x.month === month; });
+      if (idx < 0) throw new Error('Finance month not found');
+      const record = sanitizeFinanceMonth_(list[idx], actor);
+      if (record.finalized) throw new Error('This month is final and locked');
+      const spend = (record.extraSpends || []).find(function(x){ return x.id === extraSpendId; });
+      if (!spend || spend.source !== 'creditcard') throw new Error('Credit card charge not found');
+      if (spend.status !== 'pending') return output_({ok:true,monthData:record});
+      spend.status = 'confirmed';
+      spend.pendingCounts = true;
+      record.updatedAt = new Date().toISOString();
+      record.updatedBy = actor;
+      list[idx] = sanitizeFinanceMonth_(record, actor);
+      state.finances[actor] = list;
+      addAudit_(state, actor, 'confirmFinanceCreditCard', month + ':' + extraSpendId);
+      saveState_(state);
+      return output_({ok:true,monthData:list[idx]});
+    }
+
     if (action === 'saveFinancePlanning') {
       const month = cleanText_(payload.month, 10);
       if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Choose a valid month');
@@ -2105,7 +2129,7 @@ function reconciliationWarnings_(trip, plan) {
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
-  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'saveFinancePlanning',
+  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',

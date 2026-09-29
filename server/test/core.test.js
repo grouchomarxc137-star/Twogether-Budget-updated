@@ -397,6 +397,38 @@ test('pending credit card only counts in finalized outflow when marked to count 
   }
 });
 
+test('confirms a pending credit card charge without changing its amount', () => {
+  const context = setup();
+  try {
+    const saved = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-10',
+        incomes: [{ name: 'Neways', amount: 1000 }],
+        expenses: [],
+        extraSpends: [{ id:'cc-1', source:'creditcard', amount:125.5, date:'2026-10-18', status:'pending', pendingCounts:false }],
+        partialOnly:true,
+        finalized:false,
+      },
+    }, 'Principessa');
+    assert.equal(saved.ok, true);
+
+    const confirmed = action(context.database, 'confirmFinanceCreditCard', {
+      month:'2026-10',
+      extraSpendId:'cc-1',
+    }, 'Principessa');
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmed.monthData.extraSpends[0].amount, 125.5);
+    assert.equal(confirmed.monthData.extraSpends[0].status, 'confirmed');
+    assert.equal(confirmed.monthData.extraSpends[0].pendingCounts, true);
+
+    const stored = getState().finances.Principessa[0].extraSpends[0];
+    assert.equal(stored.amount, 125.5);
+    assert.equal(stored.status, 'confirmed');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('keeps optional finance dates and recurring usual days', () => {
   const context = setup();
   try {

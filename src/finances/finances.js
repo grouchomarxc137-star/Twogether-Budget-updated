@@ -644,9 +644,62 @@ function financeReminderQuestion(reminder) {
     ? 'Has '+reminder.name+' arrived?'
     : 'Has '+reminder.name+' been charged?';
 }
+function creditCardReminderId(month,item) {
+  return ['finance-creditcard',actor(),month,String(item?.id||'')].join(':');
+}
+function dueCreditCardReminderSnapshots() {
+  if(actor()!=='Principessa')return [];
+  const {date}=localFinanceToday();
+  const rows=[];
+  ownMonths().forEach((rec)=>{
+    if(rec?.finalized===true)return;
+    (rec?.extraSpends||[]).forEach((item)=>{
+      if(item?.source!=='creditcard'||item?.status!=='pending')return;
+      const dueDate=normalizeFinanceDate(item.date,rec.month);
+      if(!dueDate||dueDate>date)return;
+      rows.push({
+        id:creditCardReminderId(rec.month,item),
+        month:rec.month,
+        extraSpendId:String(item.id||''),
+        amount:item.amount,
+        date:dueDate,
+      });
+    });
+  });
+  return rows;
+}
+function pendingCreditCardByNotificationId(id) {
+  const target=String(id||'');
+  for(const rec of ownMonths()){
+    const item=(rec?.extraSpends||[]).find((entry)=>entry?.source==='creditcard'&&entry?.status==='pending'&&creditCardReminderId(rec.month,entry)===target);
+    if(item)return {rec,item};
+  }
+  return null;
+}
+async function confirmPendingCreditCard(id) {
+  const found=pendingCreditCardByNotificationId(id);
+  if(!found){publishFinanceNotifications();return;}
+  if(found.rec?.finalized===true)return toast('This month is final and locked','warn');
+  try{
+    const result=await post('confirmFinanceCreditCard',{month:found.rec.month,extraSpendId:found.item.id});
+    const saved=normalizeFinanceRecord(result?.monthData||found.rec,actor());
+    const list=financeState.finances[actor()]||[];
+    const index=list.findIndex((item)=>item.month===saved.month);
+    if(index>=0)list[index]=saved;else list.push(saved);
+    list.sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+    renderPage();
+    if(financeMonthDialog?.isConnected)renderDetail(saved);
+    publishFinanceNotifications();
+    toast('Credit card charge confirmed');
+    setTimeout(loadState,700);
+  }catch(error){
+    toast(error?.message||'Could not confirm the credit card charge','warn');
+    publishFinanceNotifications();
+  }
+}
 function publishFinanceNotifications() {
   const p=profile();
-  const items=(p.financeReminders||[]).filter((item)=>!financeReminderResolved(item)).map((item)=>({
+  const recurringItems=(p.financeReminders||[]).filter((item)=>!financeReminderResolved(item)).map((item)=>({
     id:item.id,
     actor:actor(),
     kind:'finance-recurring',
@@ -655,7 +708,17 @@ function publishFinanceNotifications() {
     actionable:true,
     actionLabel:item.kind==='investment-snapshot'?'Log':'Yes',
   }));
-  window.TwogetherNotifications?.setPending(items,'finances');
+  const creditCardItems=dueCreditCardReminderSnapshots().map((item)=>({
+    id:item.id,
+    actor:actor(),
+    kind:'finance-credit-card',
+    title:'Did this credit card charge leave your account?',
+    detail:money(item.amount)+' · '+financeDateLabel(item.date)+' · Pending',
+    actionable:true,
+    actionLabel:'Confirm',
+    priority:'important',
+  }));
+  window.TwogetherNotifications?.setPending([...creditCardItems,...recurringItems],'finances');
 }
 async function syncFinanceReminders() {
   const a=actor();
@@ -3740,7 +3803,13 @@ function init() {
     renderCurrentPanel();
   });
   document.addEventListener('twogether:notification-action',(event)=>{
-    if(event.detail?.kind!=='finance-recurring')return;
+    const kind=String(event.detail?.kind||'');
+    if(kind==='finance-credit-card'){
+      if(event.detail?.choice==='not-yet'){publishFinanceNotifications();return;}
+      if(event.detail?.choice==='yes')confirmPendingCreditCard(String(event.detail?.id||''));
+      return;
+    }
+    if(kind!=='finance-recurring')return;
     if(event.detail?.choice==='not-yet'){publishFinanceNotifications();return;}
     if(event.detail?.choice!=='yes')return;
     const reminder=financeReminderById(String(event.detail?.id||''));

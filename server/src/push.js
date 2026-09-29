@@ -170,7 +170,7 @@ function buildFinancePushItems(state, actor, today) {
     }
   }
 
-  return [...byId.values()].map((reminder) => ({
+  const items = [...byId.values()].map((reminder) => ({
     eventKey: reminder.id,
     tag: reminder.id,
     source: 'finances',
@@ -180,6 +180,30 @@ function buildFinancePushItems(state, actor, today) {
       : `${euro(reminder.amount)} · ${shortDate(reminder.date)}`,
     url: './?notifications=finances',
   }));
+
+  if (actor === 'Principessa') {
+    for (const financeMonth of Array.isArray(state?.finances?.[actor]) ? state.finances[actor] : []) {
+      if (financeMonth?.finalized === true) continue;
+      const monthKey = cleanText(financeMonth?.month, 7);
+      for (const extra of Array.isArray(financeMonth?.extraSpends) ? financeMonth.extraSpends : []) {
+        if (extra?.source !== 'creditcard' || extra?.status !== 'pending') continue;
+        const dueDate = cleanText(extra?.date, 10);
+        const spendId = cleanText(extra?.id, 80);
+        if (!monthKey || !spendId || !dueDate || dueDate > today) continue;
+        const eventKey = `finance-creditcard:${actor}:${monthKey}:${spendId}`;
+        items.push({
+          eventKey,
+          tag:eventKey,
+          source:'finances',
+          title:'Did this credit card charge leave your account?',
+          body:`${euro(extra?.amount)} · ${shortDate(dueDate)} · Pending`,
+          url:'./?notifications=finances',
+        });
+      }
+    }
+  }
+
+  return items;
 }
 
 function settlementState(plan) {
