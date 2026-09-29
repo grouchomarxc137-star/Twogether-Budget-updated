@@ -13,6 +13,69 @@ const FIN_VIEW_KEY = 'twogether_fin_subview_v1';
 
 const isMobile = () => window.matchMedia?.('(max-width: 760px)')?.matches || false;
 
+let cardViewCurrent = null;
+let cardViewTrail = [];
+let cardViewRestoringKey = '';
+
+export function rememberCardView(key, reopen) {
+  const normalizedKey = String(key || '');
+  if (!normalizedKey || typeof reopen !== 'function') return;
+  const entry = { key: normalizedKey, reopen };
+  if (cardViewRestoringKey === normalizedKey) {
+    cardViewRestoringKey = '';
+    cardViewCurrent = entry;
+    return;
+  }
+  if (cardViewCurrent?.key === normalizedKey) {
+    cardViewCurrent = entry;
+    return;
+  }
+  if (cardViewCurrent) {
+    cardViewTrail = cardViewTrail.filter((item) => item.key !== cardViewCurrent.key);
+    cardViewTrail.push(cardViewCurrent);
+    if (cardViewTrail.length > 24) cardViewTrail.shift();
+  }
+  cardViewCurrent = entry;
+}
+
+export function dismissCardView(key = '') {
+  const normalizedKey = String(key || '');
+  if (normalizedKey && cardViewCurrent?.key !== normalizedKey) return;
+  cardViewCurrent = null;
+  cardViewTrail = [];
+  cardViewRestoringKey = '';
+}
+
+export function backFromCardView(key, fallback) {
+  const normalizedKey = String(key || '');
+  if (!cardViewCurrent || (normalizedKey && cardViewCurrent.key !== normalizedKey)) {
+    if (typeof fallback === 'function') fallback();
+    return false;
+  }
+  const remaining = [...cardViewTrail];
+  const previous = remaining.pop() || null;
+  cardViewCurrent = null;
+  cardViewTrail = remaining;
+  if (typeof fallback === 'function') fallback();
+  if (!previous) return false;
+  cardViewRestoringKey = previous.key;
+  setTimeout(() => {
+    try { previous.reopen(); }
+    finally {
+      if (cardViewRestoringKey === previous.key) cardViewRestoringKey = '';
+    }
+  }, 0);
+  return true;
+}
+
+export function returnToLastCard(fallback) {
+  const previous = cardViewCurrent;
+  if (typeof fallback === 'function') fallback();
+  if (!previous) return false;
+  setTimeout(() => previous.reopen(), 0);
+  return true;
+}
+
 function setHub(name) {
   document.querySelectorAll('[data-hub]').forEach((btn) => btn.classList.toggle('active', btn.dataset.hub === name));
   $('#wishlistHub')?.classList.remove('active');
@@ -44,6 +107,14 @@ function activateFinanceView(view) {
   $$('[data-fin-view]').forEach((el) => el.classList.toggle('active', el.dataset.finView === chosen));
   try { localStorage.setItem(FIN_VIEW_KEY, chosen); } catch {}
   document.dispatchEvent(new CustomEvent('twogether:finance-view', { detail: { view: chosen } }));
+}
+
+export function openTripSubview(view = 'log') {
+  activateTrip(view);
+}
+
+export function openFinanceSubview(view = 'overview') {
+  activateFinanceView(view);
 }
 
 function lastTripView() {
@@ -530,7 +601,7 @@ function finishSurfaceVisual(visual, mode, done) {
 function surfaceBackControl(surface) {
   if (!surface) return null;
   const exact = surface.querySelector(
-    '[data-site-nav-back],[data-fin-mini-back],[data-fin-recurring-back],[data-category-back],[data-wizard-back],[data-other-back],[data-act="cancel-budget-editor"]'
+    '[data-site-nav-back],[data-fin-mini-back],[data-fin-recurring-back],[data-category-back],[data-overview-back],[data-wizard-back],[data-other-back],[data-act="cancel-budget-editor"]'
   );
   if (exact) return exact;
   return [...surface.querySelectorAll('button')].find((button) => {

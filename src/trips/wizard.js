@@ -11,7 +11,7 @@ import { actor, otherActor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { MONEY_FIELDS, MONEY_LABELS, tripMeta, locationLabel, isLocked, differences, fmtDate } from './data.js';
 import { getState, postAction } from './state.js';
-import { openSheet } from '../app/navigation.js';
+import { openSheet, returnToLastCard } from '../app/navigation.js';
 import { closeTripModal } from './overview.js';
 
 let wizard = freshWizard();
@@ -73,7 +73,7 @@ export function beginEdit(id) {
     mode: 'edit', tripId: id, index: 0, otherFlow: null,
     draft: { ...freshDraft(), ...meta, ...own, budget: t.budget ?? '', uncertain: { ...(own.uncertain || {}) } },
   };
-  closeTripModal();
+  closeTripModal(true);
   openSheet('log');
   renderWizard();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -343,7 +343,9 @@ function bindWizard(s) {
   });
   $('[data-wizard-back]')?.addEventListener('click', () => {
     if (wizard.index > 0) { wizard.index--; renderWizard(); }
-    else { wizard = freshWizard(); renderWizard(); }
+    else if (wizard.mode === 'edit' || wizard.mode === 'join') {
+      returnToLastCard(() => { wizard = freshWizard(); renderWizard(); });
+    } else { wizard = freshWizard(); renderWizard(); }
   });
   $('[data-wizard-next]')?.addEventListener('click', () => {
     const value = String(wizard.draft[s.key] ?? '').trim();

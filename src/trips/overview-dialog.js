@@ -4,6 +4,7 @@
 // collection on each budget plan.
 import { fmtDate, money as formatMoney } from '../lib/format.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
+import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 
 const names = ['Principessa', 'Principe'];
 const legacyKeys = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -298,15 +299,33 @@ function matchCell(status) {
   return '<span class="overview-match ' + status.cls + '"><i>' + status.symbol + '</i>' + status.text + '</span>';
 }
 
+function overviewCardKey(id = opened) { return id ? 'trip-overview:'+id : ''; }
 function close() { dialog?.remove(); dialog = null; opened = null; }
-export function open(plan) { if (!plan) return; opened = plan.id; draw(plan); }
+function dismissOverview() {
+  const key=overviewCardKey();
+  if(key)dismissCardView(key);
+  close();
+}
+function backFromOverview(plan) {
+  backFromCardView(overviewCardKey(plan?.id),close);
+}
+export function open(plan) {
+  if (!plan) return;
+  opened = plan.id;
+  rememberCardView(overviewCardKey(plan.id),()=>{
+    openSheet('log');
+    const latestPlan=(latest?.plans||[]).find((item)=>item.id===plan.id)||plan;
+    open(latestPlan);
+  });
+  draw(plan);
+}
 
 function hero(plan, trip) {
   const meta=plan?.meta||{},spent=total(plan,trip);
   const splitBudget=names.reduce((sum,name)=>sum+(has(plan?.budgets?.[name])?n(plan.budgets[name]):0),0);
   const available=splitBudget||(has(trip?.budget)?n(trip.budget):0),left=available-spent,pct=available>0?Math.max(0,Math.min(100,(spent/available)*100)):0;
   const mine=plan?.budgets?.[actorName()];
-  return '<header class="overview-trip-head"><div class="overview-trip-nav"><button type="button" data-overview-close>‹ Trips</button><button type="button" data-overview-edit>Edit</button></div><h2>'+esc(meta.city||'Current trip')+'</h2><p>'+esc(shortRange(meta.start,meta.end))+(timing(meta)?' · '+esc(timing(meta)):'')+'</p></header>'+
+  return '<header class="overview-trip-head"><div class="overview-trip-nav"><button type="button" data-overview-back>‹ Trips</button><button type="button" data-overview-edit>Edit</button></div><h2>'+esc(meta.city||'Current trip')+'</h2><p>'+esc(shortRange(meta.start,meta.end))+(timing(meta)?' · '+esc(timing(meta)):'')+'</p></header>'+
     '<section class="overview-trip-money"><div class="overview-trip-figures"><button type="button" data-overview-budget><span>Available ›</span><strong>'+(available>0?displayMoney(available):'Not set')+'</strong>'+(!has(mine)?'<small>+ add yours</small>':'')+'</button><div><span>Spent</span><strong>'+displayMoney(spent)+'</strong></div></div>'+(available>0?'<span class="overview-trip-progress"><i style="width:'+pct.toFixed(1)+'%"></i></span><div class="overview-trip-left '+(left<0?'over':'')+'"><strong>'+displayMoney(Math.abs(left))+'</strong><span>'+(left<0?'over budget':'left')+'</span></div>':'')+'</section>';
 }
 
@@ -324,7 +343,7 @@ function draw(plan) {
   const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?' is-even':balanceLine.startsWith('You owe ')?' is-debtor':'';
 
   dialog.innerHTML=tripDetailShellHtml({
-    back:{attr:'data-overview-close',label:'‹ Trips'},
+    back:{attr:'data-overview-back',label:'‹ Trips'},
     right:{attr:'data-overview-edit',label:'Edit'},
     title:meta.city||'Current trip',
     subtitle:shortRange(meta.start,meta.end)+(timing(meta)?' · '+timing(meta):''),
@@ -339,8 +358,10 @@ function draw(plan) {
     dock:{attr:'data-overview-add',label:'＋ Add expense'},
   });
   document.body.appendChild(dialog);dialog.showModal();
-  dialog.addEventListener('cancel',close);
-  dialog.querySelector('[data-overview-close]').onclick=close;
+  dialog._twogetherBack=()=>backFromOverview(plan);
+  dialog._twogetherHome=dismissOverview;
+  dialog.addEventListener('cancel',(event)=>{event.preventDefault();backFromOverview(plan);});
+  dialog.querySelector('[data-overview-back]').onclick=()=>backFromOverview(plan);
   dialog.querySelector('[data-overview-edit]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
   dialog.querySelector('[data-overview-budget]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
   dialog.querySelector('[data-overview-add]').onclick=()=>openExpenseSheet(plan);
@@ -437,7 +458,9 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
       '<div class="overview-category-layout"><section class="overview-quick-log"><div class="overview-quick-log-head"><span>' + (draft.id ? 'EDIT EXPENSE' : 'QUICK LOG') + '</span><strong>' + (draft.id ? esc(entryTitle(row, currentEntry || draft)) : 'Add to ' + esc(row.label)) + '</strong></div>' + categoryFormHtml(plan, row, draft, currentEntry) + '</section>' +
       historyHtml(plan, row, expanded) + '</div></div></div>';
 
-    dialog.querySelector('[data-overview-close]').onclick = close;
+    dialog._twogetherBack=()=>draw(plan);
+    dialog._twogetherHome=dismissOverview;
+    dialog.querySelector('[data-overview-close]').onclick = dismissOverview;
     dialog.querySelector('[data-category-back]').onclick = () => draw(plan);
 
     const amount = dialog.querySelector('#overviewExpenseAmount');

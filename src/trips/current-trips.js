@@ -21,6 +21,7 @@ import { $, $$ } from '../lib/dom.js';
 import { esc, n, money, fmtDate, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
+import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -542,6 +543,12 @@ function renderCurrentTrips() {
     if (!plan) simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
     else {
       const trip = (remoteState.trips || []).find((t)=>t.id===plan.linkedTripId);
+      const snapshot={planId:plan.id,budgetMode:simplifiedView.budgetMode||'combined',budgetEditor:!!simplifiedView.budgetEditor};
+      rememberCardView('current-trip:'+plan.id,()=>{
+        openSheet('log');
+        simplifiedView={name:'trip',planId:snapshot.planId,budgetMode:snapshot.budgetMode,budgetEditor:snapshot.budgetEditor};
+        renderCurrentTrips();
+      });
       root.classList.add('tv2-trip-view');
       section.classList.add('tv2-focus-open');
       setTripFocusLock(true);
@@ -581,6 +588,19 @@ function mapUiCategory(key) {
 function closeSimplifiedSheet() {
   simplifiedLayer?.remove(); simplifiedLayer = null; document.body.classList.remove('tv2-locked');
 }
+function currentTripCardKey() { return simplifiedView.name==='trip'&&simplifiedView.planId ? 'current-trip:'+simplifiedView.planId : ''; }
+function closeCurrentTripToHome({dismiss=false}={}) {
+  const key=currentTripCardKey();
+  if(dismiss&&key)dismissCardView(key);
+  simplifiedView={name:'home',planId:'',budgetMode:'combined'};
+  renderCurrentTrips();
+}
+function backFromCurrentTrip() {
+  const key=currentTripCardKey();
+  if(!key){closeCurrentTripToHome();return;}
+  backFromCardView(key,()=>closeCurrentTripToHome());
+}
+
 function simplifiedSnack(message) {
   let el = document.querySelector('.tv2-snack');
   if (!el) { el = document.createElement('div'); el.className = 'tv2-snack'; el.setAttribute('role','status'); document.body.appendChild(el); }
@@ -2420,8 +2440,7 @@ function bindSimplifiedSwipe(section) {
     resetState();
     setTimeout(() => {
       if (simplifiedView.name !== 'trip') return;
-      simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
-      renderCurrentTrips();
+      backFromCurrentTrip();
     }, 185);
   };
 
@@ -2515,8 +2534,7 @@ async function handleSimplifiedClick(e) {
     if (tripCard && !tripCard.contains(e.target)) {
       e.preventDefault();
       e.stopPropagation();
-      simplifiedView = { name:'home', planId:'', budgetMode:'combined' };
-      renderCurrentTrips();
+      closeCurrentTripToHome({dismiss:true});
       return;
     }
   }
@@ -2524,7 +2542,7 @@ async function handleSimplifiedClick(e) {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'open-trip' && Date.now() < cardSwipe.ignoreClickUntil) { e.preventDefault(); return; }
   if (b.dataset.act === 'new-trip') { document.dispatchEvent(new CustomEvent('twogether:budget-new-plan')); return; }
-  if (b.dataset.act === 'home') { simplifiedView={name:'home',planId:'',budgetMode:'combined'}; renderCurrentTrips(); return; }
+  if (b.dataset.act === 'home') { backFromCurrentTrip(); return; }
   if (b.dataset.act === 'open-trip') {
     if (b.dataset.kind === 'plan') { simplifiedView={name:'trip',planId:b.dataset.id,budgetMode:'combined'}; renderCurrentTrips(); }
     else window.TwogetherApp?.open(b.dataset.id);
@@ -2594,7 +2612,10 @@ async function handleSimplifiedClick(e) {
     b.textContent = 'Confirming…';
     try {
       const result = await window.TwogetherAPI.post('confirmPlanTrip',{planId:plan.id},actor());
-      if (result?.locked) simplifiedView={name:'home',planId:'',budgetMode:'combined'};
+      if (result?.locked) {
+        dismissCardView(currentTripCardKey());
+        simplifiedView={name:'home',planId:'',budgetMode:'combined'};
+      }
       await refreshState(true);
       simplifiedSnack(result?.locked ? 'Trip confirmed · moved to Trip stories' : 'Your confirmation was saved · waiting for '+other);
     } catch (err) {

@@ -18,6 +18,7 @@ import {
 } from './budget-state.js';
 import { renderBudgetPlans } from './budget-plans.js';
 import { renderShared } from './shared-expenses.js';
+import { returnToLastCard } from '../app/navigation.js';
 
 // ---- Full "actual expenses" wizard ----
 
@@ -114,7 +115,7 @@ function renderActualOtherExpenses(plan, steps, qCount, qNum) {
     if (of_.stage === 'name') { of_.stage = 'amount'; renderActualFlow(); return; }
     if (of_.stage === 'more') { of_.stage = 'name'; const last = of_.items.pop(); if (last) { of_.amount = String(last.amount); of_.name = last.name; of_.uncertain = !!last.uncertain; syncActualOtherDraft(); } renderActualFlow(); return; }
     if (of_.items.length) { of_.stage = 'more'; renderActualFlow(); return; }
-    if (f.index === 0) closeOverlay(); else { f.index--; renderActualFlow(); }
+    if (f.index === 0) returnToLastCard(closeOverlay); else { f.index--; renderActualFlow(); }
   });
   $('[data-v5-other-next]')?.addEventListener('click', () => {
     if (of_.stage === 'amount') {
@@ -160,7 +161,7 @@ function renderActualFlow() {
   const input = $('#v5FlowInput'); input?.addEventListener('input', () => { f.draft[step.key] = input.value; if (step.key === 'accom') { const strong = $('#v5FullJointPot strong'); if (strong) strong.textContent = money(n(input.value) * 0.20); } }); setTimeout(() => input?.focus(), 0);
   $$('[data-v5-cert]').forEach((btn) => btn.addEventListener('click', () => { f.draft.uncertain = { ...(f.draft.uncertain || {}) }; f.draft.uncertain[step.key] = btn.dataset.v5Cert === 'estimate'; renderActualFlow(); }));
   $('[data-v5-none]')?.addEventListener('click', () => { f.draft.other = '0'; f.draft.uncertain.other = false; f.index++; renderActualFlow(); });
-  $('[data-v5-back]')?.addEventListener('click', () => { if (f.index === 0) closeOverlay(); else { f.index--; renderActualFlow(); } });
+  $('[data-v5-back]')?.addEventListener('click', () => { if (f.index === 0) returnToLastCard(closeOverlay); else { f.index--; renderActualFlow(); } });
   $('[data-v5-next]')?.addEventListener('click', () => {
     const value = String(f.draft[step.key] ?? '').trim();
     if (step.type === 'money' && (!value || !Number.isFinite(Number(value.replace(',', '.'))))) { toast('Enter a valid amount first', 'warn'); return; }
@@ -241,7 +242,7 @@ function renderPartialActual() {
     showOverlay('PARTIAL EXPENSES', 24, 'What do you want to log?', intro, content);
     $$('[data-v5-partial-key]').forEach((btn) => btn.addEventListener('click', () => beginPartialAmount(f, btn.dataset.v5PartialKey, 'new')));
     $$('[data-v5-partial-saved]').forEach((btn) => btn.addEventListener('click', () => { f.key = btn.dataset.v5PartialSaved; f.stage = 'savedAction'; renderPartialActual(); }));
-    $('[data-v5-partial-cancel]')?.addEventListener('click', closeOverlay);
+    $('[data-v5-partial-cancel]')?.addEventListener('click', () => returnToLastCard(closeOverlay));
     $('[data-v5-partial-save]')?.addEventListener('click', savePartialActual);
     return;
   }
@@ -378,7 +379,7 @@ function renderMatchFlow() {
     else f.draft[step.key] = String(f.other?.[step.key] || '');
     renderMatchFlow();
   });
-  $('[data-v5-match-back]')?.addEventListener('click', () => { if (f.index === 0) closeOverlay(); else { f.index--; renderMatchFlow(); } });
+  $('[data-v5-match-back]')?.addEventListener('click', () => { if (f.index === 0) returnToLastCard(closeOverlay); else { f.index--; renderMatchFlow(); } });
   $('[data-v5-match-next]')?.addEventListener('click', () => {
     if (step.type === 'money') {
       const value = String(f.draft?.[step.key] ?? '').trim();

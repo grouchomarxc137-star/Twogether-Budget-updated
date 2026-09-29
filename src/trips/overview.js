@@ -18,7 +18,7 @@ import {
 } from './data.js';
 import { getState, isBackendV3, postAction, syncNow } from './state.js';
 import { beginEdit, beginJoin } from './wizard.js';
-import { openSheet } from '../app/navigation.js';
+import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 
 let openTripId = '';
 let selectedMonthlyKey = '';
@@ -54,15 +54,29 @@ export function renderTripGallery() {
 
 export function openTripModal(id) {
   openTripId = id;
+  const key='trip-story:'+id;
+  rememberCardView(key,()=>{openSheet('log');openTripModal(id);});
   renderTripModal(id);
-  $('#tripModal')?.classList.add('show');
-  $('#tripModal')?.setAttribute('aria-hidden', 'false');
+  const modal=$('#tripModal');
+  modal?.classList.add('show');
+  modal?.setAttribute('aria-hidden', 'false');
+  if(modal){
+    modal._twogetherBack=()=>backFromCardView(key,()=>closeTripModal(true));
+    modal._twogetherHome=()=>closeTripModal(false);
+  }
 }
 
-export function closeTripModal() {
+export function closeTripModal(preserveHistory = false) {
+  const key=openTripId?'trip-story:'+openTripId:'';
+  if(!preserveHistory&&key)dismissCardView(key);
   openTripId = '';
-  $('#tripModal')?.classList.remove('show');
-  $('#tripModal')?.setAttribute('aria-hidden', 'true');
+  const modal=$('#tripModal');
+  modal?.classList.remove('show');
+  modal?.setAttribute('aria-hidden', 'true');
+  if(modal&&!preserveHistory){
+    modal._twogetherBack=null;
+    modal._twogetherHome=null;
+  }
 }
 
 export function refreshModalIfOpen() {
@@ -108,7 +122,7 @@ function renderTripModal(id) {
     </div>`;
 
   $('[data-edit-own]', root)?.addEventListener('click', () => beginEdit(id));
-  $('[data-add-own]', root)?.addEventListener('click', () => { closeTripModal(); openSheet('log'); beginJoin(id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  $('[data-add-own]', root)?.addEventListener('click', () => { closeTripModal(true); openSheet('log'); beginJoin(id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('[data-confirm-own]', root)?.addEventListener('click', async () => {
     try { await postAction('confirmTrip', { id }, actor()); toast('Your confirmation was saved'); await syncNow(true); }
     catch (err) { toast(err.message || 'Could not confirm', 'warn'); }

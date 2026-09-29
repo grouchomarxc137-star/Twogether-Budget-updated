@@ -9,6 +9,7 @@ import { esc, n, money, formatNumber, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
+import { openFinanceSubview, rememberCardView, backFromCardView } from '../app/navigation.js';
 
 const MONTHS = [
   ['2026-01', 'Jan 2026'], ['2026-02', 'Feb 2026'], ['2026-03', 'Mar 2026'], ['2026-04', 'Apr 2026'],
@@ -2677,7 +2678,7 @@ function bindFinanceMonthSwipe(rec) {
     root.style.opacity='.7';
     resetPageState();
     resetRowState();
-    setTimeout(()=>closeFinanceMonthDialog(),185);
+    setTimeout(()=>backFromFinanceMonth(rec),185);
   };
 
   const paintDelete=(row,distance)=>{
@@ -2832,6 +2833,11 @@ function bindFinanceMonthSwipe(rec) {
 }
 
 
+function financeMonthCardKey(month) { return 'finance-month:'+String(month||''); }
+function backFromFinanceMonth(rec) {
+  backFromCardView(financeMonthCardKey(rec?.month), closeFinanceMonthDialog);
+}
+
 function closeFinanceMonthDialog() {
   financeMonthSwipeAbort?.abort();
   financeMonthSwipeAbort=null;
@@ -2888,8 +2894,15 @@ function renderDetail(rec) {
   document.body.appendChild(financeMonthDialog);
   setFinanceMonthPageLock(true);
   financeMonthDialog.showModal();
-  financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();closeFinanceMonthDialog();});
-  financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',closeFinanceMonthDialog);
+  const monthKey=financeMonthCardKey(rec.month);
+  rememberCardView(monthKey,()=>{
+    openFinanceSubview('monthly');
+    const latest=recordFor(rec.month)||directMonthRecord(rec.month);
+    renderDetail(latest);
+  });
+  financeMonthDialog._twogetherBack=()=>backFromFinanceMonth(rec);
+  financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();backFromFinanceMonth(rec);});
+  financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',()=>backFromFinanceMonth(rec));
   financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
   financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
   bindFinanceMonthSwipe(rec);
