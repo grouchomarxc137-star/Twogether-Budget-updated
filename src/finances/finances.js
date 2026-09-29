@@ -92,6 +92,7 @@ let financeState = {
 };
 let flow = null;
 let selectedMonth = '2026-09';
+let financeOverviewMonth = '';
 let financeViewYear = Number(selectedMonth.slice(0,4));
 let loading = false;
 let recurringSwipeAbort = null;
@@ -115,6 +116,28 @@ const monthLabel = (m) => {
   const index=Number(match[2])-1;
   return `${FINANCE_MONTH_NAMES[index]?.slice(0,3)||match[2]} ${match[1]}`;
 };
+const fullMonthLabel = (m) => {
+  const match=/^(\d{4})-(\d{2})$/.exec(String(m||''));
+  if (!match) return String(m||'');
+  const index=Number(match[2])-1;
+  return `${FINANCE_MONTH_NAMES[index]||match[2]} ${match[1]}`;
+};
+function shiftFinanceMonthKey(month, delta) {
+  const match=/^(\d{4})-(\d{2})$/.exec(String(month||''));
+  if (!match) return month;
+  const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-1+delta,1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}`;
+}
+function financeOverviewIcon(kind) {
+  const icons={
+    income:'<svg viewBox="0 0 32 32"><path d="M16 5v20"/><path d="m8.5 17.5 7.5 7.5 7.5-7.5"/></svg>',
+    outflow:'<svg viewBox="0 0 32 32"><path d="M16 27V7"/><path d="m8.5 14.5 7.5-7.5 7.5 7.5"/></svg>',
+    alert:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11"/><path d="M16 10v8"/><path d="M16 23h.01"/></svg>',
+    wealth:'<svg viewBox="0 0 32 32"><ellipse cx="16" cy="8" rx="8" ry="4"/><path d="M8 8v6c0 2.2 3.6 4 8 4s8-1.8 8-4V8"/><path d="M8 14v6c0 2.2 3.6 4 8 4s8-1.8 8-4v-6"/></svg>',
+    investment:'<svg viewBox="0 0 32 32"><path d="m5 23 7-7 5 4 10-12"/><path d="M21 8h6v6"/></svg>',
+  };
+  return '<span class="finance-overview-kpi-icon is-'+kind+'" aria-hidden="true">'+(icons[kind]||icons.investment)+'</span>';
+}
 function financeYearBounds() {
   const years=ownMonths().map((item)=>Number(String(item.month||'').slice(0,4))).filter(Number.isFinite);
   const currentYear=new Date().getFullYear();
@@ -1029,42 +1052,86 @@ function renderPage() {
   syncCustomCategoryStyles();
   const months = [...ownMonths()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
   const latest = months[months.length - 1] || null;
-  const summary = calc(latest || {});
+  const now=new Date();
+  const currentKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const overviewBounds=financeYearBounds();
+  const minOverviewMonth=`${overviewBounds.min}-01`;
+  const maxOverviewMonth=`${overviewBounds.max}-12`;
+  if (!/^\d{4}-\d{2}$/.test(financeOverviewMonth) || financeOverviewMonth < minOverviewMonth || financeOverviewMonth > maxOverviewMonth) {
+    financeOverviewMonth=latest?.month || currentKey;
+  }
+  const overviewRecord=recordFor(financeOverviewMonth);
+  const summary = calc(overviewRecord || {});
   const ps = profileStats();
-  const latestGl = latest ? investmentGL(latest) : null;
+  const overviewGl = overviewRecord ? investmentGL(overviewRecord) : null;
   const house = sharedHouseProgressStats();
   const housePercent = HOUSE_GOAL_TARGET > 0 ? Math.max(0, (house.availableForHouse / HOUSE_GOAL_TARGET) * 100) : 0;
   const houseProgress = Math.min(100, housePercent);
   const houseMarker = Math.min(98, Math.max(2, houseProgress));
   const housePercentLabel = housePercent.toFixed(1).replace(/\.0$/, '');
   const houseRemaining = Math.max(0, HOUSE_GOAL_TARGET - house.availableForHouse);
+  const canOverviewPrev=financeOverviewMonth>minOverviewMonth;
+  const canOverviewNext=financeOverviewMonth<maxOverviewMonth;
   const summaryRoot = $('#financeSummary');
   if (summaryRoot) {
-    const statusClass = latest ? (latest.finalized ? 'status-final' : 'status-draft') : 'status-empty';
+    const balanceBad=summary.leftover<0;
+    const balanceGood=!balanceBad&&summary.income>0;
     summaryRoot.innerHTML = `
-      <div class="finance-kpi month-status ${statusClass}"><strong>${latest ? monthLabel(latest.month) : 'No month logged'}</strong></div>
-      <div class="finance-kpi"><span>Total income</span><strong>${money(summary.income)}</strong></div>
-      <div class="finance-kpi"><span>Total outflow</span><strong>${money(summary.outflow)}</strong></div>
-      <div class="finance-kpi ${summary.leftover < 0 ? 'bad' : summary.income ? 'good' : ''}"><span>${summary.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(summary.leftover))}</strong></div>
-      <div class="finance-kpi wealth"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong><small>Available savings + your investments</small></div>
-      <div class="finance-kpi ${latestGl?.value < 0 ? 'bad' : latestGl?.value > 0 ? 'good' : ''}"><span>Investment G/L p/m</span><strong>${latestGl ? signedMoney(latestGl.value) : '—'}</strong><small>${latestGl ? `vs ${monthLabel(latestGl.previousMonth)}` : 'Log 2 months to compare'}</small></div>
+      <div class="finance-overview-month-switcher" aria-label="Selected finance month">
+        <button type="button" data-fin-overview-prev aria-label="Previous month" ${canOverviewPrev?'':'disabled'}>‹</button>
+        <strong>${esc(fullMonthLabel(financeOverviewMonth))}</strong>
+        <button type="button" data-fin-overview-next aria-label="Next month" ${canOverviewNext?'':'disabled'}>›</button>
+      </div>
+      <div class="finance-kpi finance-overview-kpi is-income">
+        ${financeOverviewIcon('income')}
+        <div class="finance-overview-kpi-copy"><span>Total income</span><strong>${money(summary.income)}</strong></div>
+      </div>
+      <div class="finance-kpi finance-overview-kpi is-outflow">
+        ${financeOverviewIcon('outflow')}
+        <div class="finance-overview-kpi-copy"><span>Total outflow</span><strong>${money(summary.outflow)}</strong></div>
+      </div>
+      <div class="finance-kpi finance-overview-kpi ${balanceBad?'bad':balanceGood?'good':''}">
+        ${financeOverviewIcon(balanceBad?'alert':'wealth')}
+        <div class="finance-overview-kpi-copy"><span>${balanceBad?'Overspent':'Leftover'}</span><strong>${money(Math.abs(summary.leftover))}</strong></div>
+      </div>
+      <div class="finance-kpi finance-overview-kpi wealth">
+        ${financeOverviewIcon('wealth')}
+        <div class="finance-overview-kpi-copy"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong><small>Available savings + your investments</small></div>
+      </div>
+      <div class="finance-kpi finance-overview-kpi finance-overview-investment ${overviewGl?.value < 0 ? 'bad' : overviewGl?.value > 0 ? 'good' : ''}">
+        ${financeOverviewIcon('investment')}
+        <div class="finance-overview-kpi-copy"><span>Investment G/L p/m</span><strong>${overviewGl ? signedMoney(overviewGl.value) : '—'}</strong><small>${overviewGl ? `vs ${monthLabel(overviewGl.previousMonth)}` : 'Log 2 months to compare'}</small></div>
+      </div>
       <article class="finance-house-goal" aria-label="House savings goal">
-        <div class="finance-house-goal-icon" aria-hidden="true"><span>🏡</span><small>♡</small></div>
-        <div class="finance-house-goal-body">
-          <div class="finance-house-goal-head">
-            <div><span class="panel-kicker">OUR DREAM HOME</span><h2>Closer to our own front door</h2></div>
+        <div class="finance-house-goal-head">
+          <div><span class="panel-kicker">OUR DREAM HOME</span><h2>Closer to our own front door</h2></div>
+        </div>
+        <div class="finance-house-goal-content">
+          <div class="finance-house-goal-icon" aria-hidden="true"><span>🏡</span><small>♡</small></div>
+          <div class="finance-house-goal-body">
             <div class="finance-house-goal-percent"><strong>${housePercentLabel}%</strong><span>of the way there</span></div>
-          </div>
-          <div class="finance-house-goal-money"><strong>${money(house.availableForHouse)}</strong><span>of ${money(HOUSE_GOAL_TARGET)}</span></div>
-          <div class="finance-house-goal-track" role="progressbar" aria-label="House goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${houseProgress.toFixed(1)}">
-            <span style="width:${houseProgress}%"></span><i style="left:${houseMarker}%" aria-hidden="true">♡</i>
-          </div>
-          <div class="finance-house-goal-foot">
-            <span>${houseRemaining > 0 ? `${money(houseRemaining)} to go` : 'Dream-home goal reached ♡'}</span>
-            <small>Both net worths combined, with ${money(HOUSE_EMERGENCY_RESERVE)} kept for emergencies.</small>
+            <div class="finance-house-goal-money"><strong>${money(house.availableForHouse)}</strong><span>of ${money(HOUSE_GOAL_TARGET)}</span></div>
+            <div class="finance-house-goal-track" role="progressbar" aria-label="House goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${houseProgress.toFixed(1)}">
+              <span style="width:${houseProgress}%"></span><i style="left:${houseMarker}%" aria-hidden="true">♡</i>
+            </div>
+            <div class="finance-house-goal-foot">
+              <span>${houseRemaining > 0 ? `${money(houseRemaining)} to go` : 'Dream-home goal reached ♡'}</span>
+              <small>Both net worths combined, with ${money(HOUSE_EMERGENCY_RESERVE)} kept for emergencies.</small>
+            </div>
           </div>
         </div>
       </article>`;
+
+    $('[data-fin-overview-prev]',summaryRoot)?.addEventListener('click',()=>{
+      if(!canOverviewPrev)return;
+      financeOverviewMonth=shiftFinanceMonthKey(financeOverviewMonth,-1);
+      renderPage();
+    });
+    $('[data-fin-overview-next]',summaryRoot)?.addEventListener('click',()=>{
+      if(!canOverviewNext)return;
+      financeOverviewMonth=shiftFinanceMonthKey(financeOverviewMonth,1);
+      renderPage();
+    });
   }
   renderCurrentPanel();
   renderScenarioPanel();
@@ -1072,8 +1139,6 @@ function renderPage() {
   const root = $('#financeMonths'); if (!root) return;
   const yearBounds=financeYearBounds();
   financeViewYear=Math.min(yearBounds.max,Math.max(yearBounds.min,financeViewYear));
-  const now=new Date();
-  const currentKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const yearControls=`<div class="finance-year-switcher" aria-label="Finance year">
     <button type="button" data-fin-year-prev aria-label="Previous year" ${financeViewYear<=yearBounds.min?'disabled':''}>‹</button>
     <strong>${financeViewYear}</strong>
