@@ -39,6 +39,30 @@ function dayDiff(left, right) {
   return Math.round((b - a) / 86400000);
 }
 
+function localWallClock(timeZone, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: validTimeZone(timeZone),
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(values.year), month: Number(values.month), day: Number(values.day),
+    hour: Number(values.hour), minute: Number(values.minute), second: Number(values.second),
+  };
+}
+
+function hoursUntilTripStart(value, timeZone, now = new Date()) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match) return null;
+  const current = localWallClock(timeZone, now);
+  const start = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0);
+  const localNow = Date.UTC(current.year, current.month - 1, current.day, current.hour, current.minute, current.second);
+  if (!Number.isFinite(start) || !Number.isFinite(localNow)) return null;
+  return (start - localNow) / 3600000;
+}
+
 function normalizeGroup(value) {
   const group = String(value || 'other');
   if (group === 'health') return 'medical';
@@ -177,17 +201,22 @@ function planName(meta) {
   return cleanText(meta?.city || (meta?.location === 'Other' ? meta?.otherLocation : meta?.location) || 'Trip', 100) || 'Trip';
 }
 
-function buildTripPushItems(state, actor, today) {
+function buildTripPushItems(state, actor, today, timeZone, now) {
   const items = [];
   const plans = Array.isArray(state?.plans) ? state.plans : [];
   const trips = Array.isArray(state?.trips) ? state.trips : [];
   for (const plan of plans) {
     const meta = plan?.meta || {};
     const start = cleanText(meta.start, 10);
-    const days = dayDiff(today, start);
+    const hoursUntilStart = hoursUntilTripStart(start, timeZone, now);
+    const reminderStage = hoursUntilStart != null && hoursUntilStart > 0 && hoursUntilStart <= 12
+      ? 'important'
+      : hoursUntilStart != null && hoursUntilStart > 12 && hoursUntilStart <= 48
+        ? 'two-days'
+        : '';
     const linked = plan?.linkedTripId ? trips.find((trip) => trip?.id === plan.linkedTripId) : null;
     const locked = !!(linked?.confirmed?.Principessa && linked?.confirmed?.Principe);
-    if (!locked && days != null && days >= 0 && days <= 3) {
+    if (!locked && reminderStage) {
       const stored = plan?.prep || {};
       const initialized = !!stored.updatedAt || (Array.isArray(stored.packing) && stored.packing.length) || (Array.isArray(stored.reminders) && stored.reminders.length);
       const fallback = state?.tripPrepDefaults || {};
@@ -199,12 +228,14 @@ function buildTripPushItems(state, actor, today) {
       const packing = (Array.isArray(prep.packing) ? prep.packing : []).filter((item) => !item?.done && cleanText(item?.text, 160));
       if (reminders.length || packing.length) {
         const name = planName(meta);
-        const title = days === 0 ? `${name} starts today ♡` : days === 1 ? `${name} is tomorrow — final checks` : `${name} is in ${days} days ♡`;
+        const title = reminderStage === 'important'
+          ? `${name} starts soon — final checks`
+          : `${name} is coming up ♡`;
         const parts = [];
         if (reminders.length) parts.push(`${reminders.length} important reminder${reminders.length === 1 ? '' : 's'}`);
         if (packing.length) parts.push(`${packing.length} packing item${packing.length === 1 ? '' : 's'}`);
         items.push({
-          eventKey: `trip-prep:${plan.id}:${today}`,
+          eventKey: `trip-prep:${plan.id}:${reminderStage}`,
           tag: `trip-prep:${plan.id}`,
           source: 'trips', title, body: parts.join(' · '), url: './?notifications=trips',
         });
@@ -233,9 +264,9 @@ function buildTripPushItems(state, actor, today) {
   return items;
 }
 
-function buildPushItems(state, actor, timeZone, now = new Date()) {
+export function buildPushItems(state, actor, timeZone, now = new Date()) {
   const today = localIsoDate(timeZone, now);
-  return [...buildTripPushItems(state, actor, today), ...buildFinancePushItems(state, actor, today)];
+  return [...buildTripPushItems(state, actor, today, timeZone, now), ...buildFinancePushItems(state, actor, today)];
 }
 
 function ensureVapidKeys(db) {
