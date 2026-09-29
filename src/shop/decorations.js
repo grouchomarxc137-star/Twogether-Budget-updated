@@ -18,7 +18,7 @@
 // every-time version would flicker/lose DOM references under v32's
 // stabilizing observer). v29.js's calmShopCopy() was byte-identical to
 // v32.js's -- kept once, not twice.
-import { $, $ } from '../lib/dom.js';
+import { $, $$ } from '../lib/dom.js';
 import { formatNumber } from '../lib/format.js';
 
 let repairingShop = false;
