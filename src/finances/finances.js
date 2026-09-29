@@ -1094,9 +1094,9 @@ function renderPage() {
         ${financeOverviewIcon(balanceBad?'alert':'wealth')}
         <div class="finance-overview-kpi-copy"><span>${balanceBad?'Overspent':'Leftover'}</span><strong>${money(Math.abs(summary.leftover))}</strong></div>
       </div>
-      <div class="finance-kpi finance-overview-kpi wealth">
+      <div class="finance-kpi finance-overview-kpi wealth finance-overview-networth" data-fin-overview-networth>
         ${financeOverviewIcon('wealth')}
-        <div class="finance-overview-kpi-copy"><span>Current net worth</span><strong>${money(ps.netWorth)}</strong></div>
+        <div class="finance-overview-kpi-copy"><span data-fin-networth-label>Current net worth</span><strong data-fin-networth-value>${money(ps.netWorth)}</strong></div>
       </div>
       <div class="finance-kpi finance-overview-kpi finance-overview-investment ${overviewGl?.value < 0 ? 'bad' : overviewGl?.value > 0 ? 'good' : ''}">
         ${financeOverviewIcon('investment')}
@@ -1130,6 +1130,60 @@ function renderPage() {
     };
     $('[data-fin-overview-prev]',summaryRoot)?.addEventListener('click',()=>moveOverviewMonth(-1));
     $('[data-fin-overview-next]',summaryRoot)?.addEventListener('click',()=>moveOverviewMonth(1));
+
+    const netWorthCard=$('[data-fin-overview-networth]',summaryRoot);
+    if(netWorthCard){
+      const netWorthLabel=$('[data-fin-networth-label]',netWorthCard);
+      const netWorthValue=$('[data-fin-networth-value]',netWorthCard);
+      let netWorthHoldTimer=0;
+      let netWorthHoldActive=false;
+      let netWorthPointerId=null;
+      let netWorthStartX=0;
+      let netWorthStartY=0;
+      const clearNetWorthTimer=()=>{
+        if(netWorthHoldTimer){
+          clearTimeout(netWorthHoldTimer);
+          netWorthHoldTimer=0;
+        }
+      };
+      const showCombinedNetWorth=()=>{
+        netWorthHoldActive=true;
+        netWorthCard.classList.add('is-combined');
+        if(netWorthLabel)netWorthLabel.textContent='Combined net worth';
+        if(netWorthValue)netWorthValue.textContent=money(house.combinedNetWorth);
+      };
+      const showPersonalNetWorth=()=>{
+        clearNetWorthTimer();
+        netWorthHoldActive=false;
+        netWorthCard.classList.remove('is-combined');
+        if(netWorthLabel)netWorthLabel.textContent='Current net worth';
+        if(netWorthValue)netWorthValue.textContent=money(ps.netWorth);
+      };
+      netWorthCard.addEventListener('pointerdown',(event)=>{
+        if(event.pointerType==='mouse'&&event.button!==0)return;
+        showPersonalNetWorth();
+        netWorthPointerId=event.pointerId;
+        netWorthStartX=event.clientX;
+        netWorthStartY=event.clientY;
+        netWorthHoldTimer=window.setTimeout(()=>{
+          netWorthHoldTimer=0;
+          showCombinedNetWorth();
+        },500);
+      });
+      netWorthCard.addEventListener('pointermove',(event)=>{
+        if(event.pointerId!==netWorthPointerId||netWorthHoldActive)return;
+        if(Math.hypot(event.clientX-netWorthStartX,event.clientY-netWorthStartY)>12)clearNetWorthTimer();
+      });
+      ['pointerup','pointercancel','pointerleave'].forEach((type)=>{
+        netWorthCard.addEventListener(type,(event)=>{
+          if(netWorthPointerId!=null&&event.pointerId!==netWorthPointerId)return;
+          netWorthPointerId=null;
+          showPersonalNetWorth();
+        });
+      });
+      netWorthCard.addEventListener('contextmenu',(event)=>event.preventDefault());
+    }
+
     const overviewSwitcher=$('.finance-overview-month-switcher',summaryRoot);
     if(overviewSwitcher){
       let swipeStartX=0, swipeStartY=0;
