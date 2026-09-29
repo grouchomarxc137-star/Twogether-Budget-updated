@@ -3231,3 +3231,32 @@ html body #financeWishlist .v28-view-tabs span, html body #financeWishlist .v27-
 }
 
 /* Wishlist redesign deployment marker. */
+
+
+/* Keep the Wishlist price input inside its currency shell on iOS. */
+.v27-wish-fields .v27-wish-price-field {
+  min-width:0;
+  overflow:hidden;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+
+.v27-wish-fields .v27-wish-price-field:focus-within {
+  border-color:#9d8177;
+  box-shadow:0 0 0 3px rgba(141,110,99,.12);
+}
+
+.v27-wish-fields .v27-wish-price-field>span {
+  flex:0 0 auto;
+}
+
+.v27-wish-fields .v27-wish-price-field>input {
+  flex:1 1 auto;
+  width:auto;
+  min-width:0;
+  max-width:100%;
+  padding-left:8px;
+  outline:none!important;
+  box-shadow:none!important;
+  -webkit-appearance:none;
+  appearance:none;
+}

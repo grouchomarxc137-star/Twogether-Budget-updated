@@ -336,7 +336,7 @@ function openWishEditor(id = '') {
   let saving = false;
   const editorActor = actor();
   const current = wishes().find((x) => x.id === id), m = ensureModal(), body = $('#v27ModalBody', m);
-  body.innerHTML = `<span class="eyebrow">WISHLIST</span><h2>${current ? 'Edit wish' : 'Add a wish'}</h2><div class="v27-wish-fields"><label>What do you want?<input id="v27WishName" value="${esc(current?.name || '')}" placeholder="e.g. New headphones"></label><label>Price<div><span>€</span><input id="v27WishPrice" inputmode="decimal" value="${esc(String(current?.price ?? ''))}" placeholder="0"></div></label><label>Priority<select id="v27WishPriority">${[1, 2, 3, 4, 5].map((p) => `<option value="${p}" ${p === (current?.priority || 3) ? 'selected' : ''}>P${p}</option>`).join('')}</select></label><label class="wide">Note or link<textarea id="v27WishNote" placeholder="Why you want it, model, link…">${esc(current?.note || '')}</textarea></label></div><div class="v27-modal-actions">${current ? '<button data-wish-delete>Delete</button>' : '<span></span>'}<button class="btn primary" data-wish-save>Save wish</button></div>`;
+  body.innerHTML = `<span class="eyebrow">WISHLIST</span><h2>${current ? 'Edit wish' : 'Add a wish'}</h2><div class="v27-wish-fields"><label>What do you want?<input id="v27WishName" value="${esc(current?.name || '')}" placeholder="e.g. New headphones"></label><label>Price<div class="v27-wish-price-field"><span aria-hidden="true">€</span><input id="v27WishPrice" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="${esc(String(current?.price ?? ''))}" placeholder="0,00"></div></label><label>Priority<select id="v27WishPriority">${[1, 2, 3, 4, 5].map((p) => `<option value="${p}" ${p === (current?.priority || 3) ? 'selected' : ''}>P${p}</option>`).join('')}</select></label><label class="wide">Note or link<textarea id="v27WishNote" placeholder="Why you want it, model, link…">${esc(current?.note || '')}</textarea></label></div><div class="v27-modal-actions">${current ? '<button data-wish-delete>Delete</button>' : '<span></span>'}<button class="btn primary" data-wish-save>Save wish</button></div>`;
   const save = async () => {
     if (saving || actor() !== editorActor) return;
     const name = $('#v27WishName').value.trim(), raw = $('#v27WishPrice').value.trim(), note = $('#v27WishNote').value.trim(), priority = Number($('#v27WishPriority').value);
@@ -355,6 +355,18 @@ function openWishEditor(id = '') {
       saving = false; button.disabled = false; button.textContent = 'Save wish';
     }
   };
+  const priceInput = $('#v27WishPrice');
+  priceInput?.addEventListener('input', () => {
+    const original = priceInput.value;
+    let cleaned = original.replace(/[^0-9.,]/g, '');
+    const separator = cleaned.search(/[.,]/);
+    if (separator >= 0) {
+      const whole = cleaned.slice(0, separator) || '0';
+      const decimals = cleaned.slice(separator + 1).replace(/[.,]/g, '').slice(0, 2);
+      cleaned = whole + cleaned[separator] + decimals;
+    }
+    if (cleaned !== original) priceInput.value = cleaned;
+  });
   $('[data-wish-save]').onclick = save;
   $('[data-wish-delete]')?.addEventListener('click', async () => {
     const list = wishes().filter((x) => x.id !== current.id);
