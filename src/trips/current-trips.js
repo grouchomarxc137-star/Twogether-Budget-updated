@@ -2442,7 +2442,8 @@ function bindSimplifiedSwipe(section) {
     resetState();
     setTimeout(() => {
       if (simplifiedView.name !== 'trip') return;
-      backFromCurrentTrip();
+      if(mode==='right')backFromCurrentTrip();
+      else closeCurrentTripToHome({dismiss:true});
     }, 185);
   };
 
