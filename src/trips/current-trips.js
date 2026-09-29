@@ -776,7 +776,11 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         mount();
         return;
       }
-      if (b.hasAttribute('data-pay-full')) { state.amountText=maxCategoryRepayment().toFixed(2); mount(); return; }
+      if (b.hasAttribute('data-pay-full')) {
+        const fullAmount=maxCategoryRepayment(), whole=Math.abs(fullAmount-Math.round(fullAmount))<.005;
+        state.amountText=fullAmount.toLocaleString('nl-NL',{useGrouping:false,minimumFractionDigits:whole?0:2,maximumFractionDigits:2});
+        mount(); return;
+      }
       if (b.dataset.jar) { state.useJar=b.dataset.jar==='on'; refreshLive(); return; }
       if (b.hasAttribute('data-more')) { state.more=!state.more; mount(); return; }
       if (b.dataset.payer) { state.paidBy=b.dataset.payer; if(state.paidBy==='both')state.split='shared'; else if(state.split==='personal')state.forActor=state.paidBy; mount(); return; }
