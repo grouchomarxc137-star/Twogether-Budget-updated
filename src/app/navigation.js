@@ -475,6 +475,10 @@ function surfaceUsesNativeSwipe(surface) {
   return !!surface?.matches?.('.finance-month-overview,#twCurrentTrips.tv2-trip-view');
 }
 
+function surfaceDownReturnsToPrevious(surface) {
+  return !!surface?.matches?.('dialog.finance-log-host,.tv2-expense-layer');
+}
+
 function surfaceBlocksGlobalDown(surface) {
   const card = surfaceCard(surface);
   return !!(surface?.matches?.('.tv2-layer') && card?.classList?.contains('tv2-recurrent-sheet'));
@@ -788,7 +792,7 @@ function installSurfaceNavigation() {
     event.preventDefault();
     event.stopImmediatePropagation();
     finishSurfaceVisual(visual,mode,() => {
-      if (mode === 'right') goSurfaceBack(surface);
+      if (mode === 'right' || surfaceDownReturnsToPrevious(surface)) goSurfaceBack(surface);
       else goSurfaceHome();
     });
   }, { passive:false, capture:true });
