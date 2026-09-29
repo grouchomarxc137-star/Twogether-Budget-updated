@@ -45,7 +45,7 @@ function noteParts(note) {
   return { link: m[0], text: (String(note || '').slice(0, m.index) + String(note || '').slice((m.index || 0) + m[0].length)).trim() };
 }
 
-let wishPriority = 'all', wishView = 'wishes', wishActor = '', wishRenderKey = '';
+let wishPriority = 'all', wishView = 'wishes', wishStatus = 'all', wishActor = '', wishRenderKey = '';
 
 function effectiveTwos() {
   const t = testState();
@@ -65,47 +65,238 @@ function wishlistAdvice(gap) {
   return `Finish future trips or months ${money(gap)} better than budget to cover this basket. Small wins count too.`;
 }
 
+const WISH_PRIORITY_LABELS = ['', 'Most wanted', 'High priority', 'Someday soon', 'Nice to have', 'Just dreaming'];
+
+function wishVisual(w) {
+  const text = (String(w?.name || '') + ' ' + String(w?.note || '')).toLowerCase();
+  const rules = [
+    [/(travel|trip|flight|hotel|holiday|weekend|garda|suitcase|luggage)/, '✈'],
+    [/(headphone|earbud|speaker|music|sony)/, '♫'],
+    [/(camera|instax|photo)/, '◉'],
+    [/(coffee|espresso|smeg)/, '☕'],
+    [/(home|house|lamp|decor|kitchen|pan|pot|creuset)/, '⌂'],
+    [/(phone|iphone|ipad|mac|laptop|computer|tech)/, '⌘'],
+    [/(shoe|bag|dress|clothes|fashion)/, '✦'],
+  ];
+  return rules.find(([pattern]) => pattern.test(text))?.[1] || '♡';
+}
+
+function wishlistGoal(waiting, selected, twos) {
+  if (selected.length) {
+    const total = selected.reduce((sum, item) => sum + num(item.price), 0);
+    return {
+      target: total,
+      label: 'Basket goal',
+      detail: selected.length + ' ' + (selected.length === 1 ? 'wish' : 'wishes') + ' · ' + money(total),
+    };
+  }
+  const priced = waiting.filter(hasWishPrice).sort((a, b) => num(a.price) - num(b.price));
+  if (!priced.length) return { target: 0, label: 'Next goal', detail: 'Add a price to a wish' };
+  const next = priced.find((item) => num(item.price) > Math.max(0, twos)) || priced[0];
+  return {
+    target: num(next.price),
+    label: twos >= num(next.price) ? 'Ready now' : 'Next wish',
+    detail: next.name,
+  };
+}
+
 export function renderWishlist() {
   const root = $('#financeWishlist');
   if (!root || !actor()) return;
-  if (wishActor !== actor()) { wishPriority = 'all'; wishView = 'wishes'; wishActor = actor(); }
+  if (wishActor !== actor()) {
+    wishPriority = 'all';
+    wishView = 'wishes';
+    wishStatus = 'all';
+    wishActor = actor();
+  }
+
   const list = wishes(), ids = cart(), twos = effectiveTwos(), t = testState();
   const selected = list.filter((x) => ids.includes(x.id) && !wishEarned(x) && hasWishPrice(x));
-  const total = selected.reduce((sum, x) => sum + num(x.price), 0), gap = Math.max(0, total - twos);
-  const earned = list.filter(wishEarned), waiting = list.filter((x) => !wishEarned(x));
-  const key = JSON.stringify([actor(), list, ids, twos, t.active, t.wishlistBought, wishPriority, wishView, checkoutBusy]);
-  if (wishRenderKey === key && root.querySelector('.v28-boutique')) return;
+  const total = selected.reduce((sum, x) => sum + num(x.price), 0);
+  const gap = Math.max(0, total - twos);
+  const earned = list.filter(wishEarned);
+  const waiting = list.filter((x) => !wishEarned(x));
+  const readyCount = waiting.filter((x) => hasWishPrice(x) && twos >= num(x.price)).length;
+  const goal = wishlistGoal(waiting, selected, twos);
+  const goalProgress = goal.target > 0 ? Math.min(100, Math.max(0, twos) / goal.target * 100) : 0;
+
+  const key = JSON.stringify([actor(), list, ids, twos, t.active, t.wishlistBought, wishPriority, wishView, wishStatus, checkoutBusy]);
+  if (wishRenderKey === key && root.querySelector('.tw-wishlist')) return;
   wishRenderKey = key;
+
   const active = document.activeElement;
   const focus = active && root.contains(active)
-    ? ['wish-edit', 'cart-toggle', 'cart-remove', 'priority', 'wish-view', 'wish-add', 'checkout'].map((a) => [a, active.getAttribute('data-' + a)]).find((x) => x[1] !== null)
+    ? ['wish-edit', 'cart-toggle', 'cart-remove', 'priority', 'wish-view', 'wish-status', 'wish-add', 'checkout']
+      .map((a) => [a, active.getAttribute('data-' + a)])
+      .find((x) => x[1] !== null)
     : null;
-  root.innerHTML = `<div class="v27-wish-shell v28-boutique">
- <header class="v27-wish-hero"><div><span class="eyebrow">THE LITTLE WISHLIST SHOP</span><h1>Good things, worth saving for.</h1><p>${esc(actor())}’s collection of little wants and bigger dreams.</p></div><div class="v27-twos-wallet"><span>${t.active ? 'Test balance' : 'Available Twos'}</span><strong>${fmt(twos)} <i>Twos</i></strong><small>${twos < 0 ? 'Your next budget wins rebuild this balance.' : '€1 better than budget = 1 Two'}</small></div></header>
- ${t.active ? '<div class="v28-test-banner" role="status">Test Lab · Try your basket with test Twos. Real wishes and balances stay untouched.</div>' : ''}
- <div class="v28-shop-layout"><section class="v28-collection" aria-label="Wishlist collection">
- <div class="v27-wish-actions"><div class="v28-view-tabs" aria-label="Collection"><button data-wish-view="wishes" aria-pressed="${wishView === 'wishes'}">On my wishlist <span>${waiting.length}</span></button><button data-wish-view="earned" aria-pressed="${wishView === 'earned'}">Earned <span>${earned.length}</span></button></div><button class="btn primary" data-wish-add ${t.active ? 'disabled' : ''}>+ Add a wish</button></div>
- <div class="v28-filter-row"><span>Priority</span><div class="v27-priority-filter" aria-label="Filter by priority"><button data-priority="all" aria-pressed="${wishPriority === 'all'}" class="${wishPriority === 'all' ? 'active' : ''}">All</button>${[1, 2, 3, 4, 5].map((p) => `<button data-priority="${p}" aria-pressed="${wishPriority === String(p)}" class="${wishPriority === String(p) ? 'active' : ''}" title="${['', 'Most wanted', 'High priority', 'Someday soon', 'Nice to have', 'Just dreaming'][p]}">P${p}</button>`).join('')}</div><small>P1 = most wanted</small></div>
- <a class="v28-mobile-basket" href="#v28Basket">View basket · ${selected.length} ${selected.length === 1 ? 'wish' : 'wishes'} <strong>${money(total)} ↓</strong></a><div class="v27-wish-grid">${list.map((w) => wishCard(w, ids)).join('')}</div><div class="v27-wish-empty" data-wish-empty hidden><span aria-hidden="true">♡</span><h3>${wishView === 'earned' ? 'Your little victories belong here.' : list.length ? 'A little room for another wish.' : 'What are you dreaming of?'}</h3><p>${wishView === 'earned' ? 'Unlock a wish with Twos and keep it here as a little reminder of what you earned.' : list.length ? 'No wishes match this priority. Try All, or add something new.' : 'Add your first wish, give it a price, and turn your budget wins into something you love.'}</p></div>
- </section><aside id="v28Basket" class="v27-cart" aria-label="Shopping basket" tabindex="-1"><div class="v27-cart-head"><div><span class="eyebrow">SET ASIDE FOR YOU</span><h2>Your little basket</h2></div><span class="v28-bag-count">${selected.length}</span></div>
- ${selected.length ? `<div class="v27-cart-items">${selected.map((x) => `<div><span>${esc(x.name)}</span><b>${money(x.price)}</b><button data-cart-remove="${esc(x.id)}" aria-label="Remove ${esc(x.name)} from basket">×</button></div>`).join('')}</div><dl class="v28-basket-totals"><div><dt>Basket total</dt><dd>${money(total)}</dd></div><div><dt>${t.active ? 'Test Twos' : 'Available Twos'}</dt><dd>${fmt(twos)}</dd></div></dl><div class="v27-cart-plan ${gap ? 'not-ready' : 'ready'}" aria-live="polite"><strong>${gap ? `${fmt(gap)} Twos to go` : 'Ready to unlock ♡'}</strong><progress max="100" value="${total > 0 ? Math.min(100, Math.max(0, twos) / total * 100) : gap ? 0 : 100}" aria-label="Basket covered by Twos"></progress><p>${wishlistAdvice(gap)}</p>${gap ? `<small>Two smaller wins of ${money(Math.ceil(gap / 2))} + ${money(gap - Math.ceil(gap / 2))} would get you there.</small>` : `<small>${fmt(twos - total)} Twos left after unlocking.</small>`}</div><button class="btn primary v27-checkout" data-checkout ${gap || checkoutBusy ? 'disabled' : ''}>${checkoutBusy ? 'Unlocking…' : t.active ? 'Preview checkout' : 'Unlock my wishes'} <span aria-hidden="true">→</span></button>` : '<div class="v28-basket-empty"><span aria-hidden="true">♡</span><h3>A little something for you?</h3><p>Add a wish to see how close you are. We’ll do the maths.</p></div>'}
- <p class="v28-basket-footnote">A playful reward for real saving.<br>No payment. No order placed.</p></aside></div></div>`;
+
+  const statusFilters = wishView === 'wishes'
+    ? `<div class="tw-wish-status" aria-label="Wishlist status">
+        <button data-wish-status="all" aria-pressed="${wishStatus === 'all'}">All wishes <span>${waiting.length}</span></button>
+        <button data-wish-status="ready" aria-pressed="${wishStatus === 'ready'}">Ready now <span>${readyCount}</span></button>
+        <button data-wish-status="basket" aria-pressed="${wishStatus === 'basket'}">In basket <span>${selected.length}</span></button>
+      </div>`
+    : '';
+
+  const emptyTitle = wishView === 'earned'
+    ? 'Your earned wishes will live here.'
+    : wishStatus === 'ready'
+      ? 'Nothing is within reach just yet.'
+      : wishStatus === 'basket'
+        ? 'Your basket is empty.'
+        : list.length
+          ? 'No wishes match these filters.'
+          : 'What are you dreaming of?';
+  const emptyText = wishView === 'earned'
+    ? 'When your Twos unlock a wish, it stays here as a little record of the win.'
+    : wishStatus === 'ready'
+      ? 'Keep collecting Twos, or choose All wishes to see everything.'
+      : wishStatus === 'basket'
+        ? 'Add any priced wish to your basket and it will appear here.'
+        : list.length
+          ? 'Try another priority or reset the filters.'
+          : 'Add your first wish and let your budget wins slowly bring it closer.';
+
+  root.innerHTML = `<div class="tw-wishlist">
+    <div class="tw-wish-topline">
+      <div class="tw-wish-owner">
+        <span class="tw-wish-owner-heart" aria-hidden="true">♡</span>
+        <div><small>${esc(actor())}'s wishlist</small><strong>${waiting.length} ${waiting.length === 1 ? 'wish' : 'wishes'} waiting</strong></div>
+      </div>
+      <button class="tw-wish-add" data-wish-add ${t.active ? 'disabled' : ''}>＋ Add wish</button>
+    </div>
+
+    ${t.active ? '<div class="tw-wish-test" role="status">Test Lab · Your real wishlist and Twos stay untouched.</div>' : ''}
+
+    <section class="tw-wish-points" aria-label="Twogether points">
+      <div class="tw-wish-points-head">
+        <div class="tw-wish-points-value">
+          <span class="tw-wish-points-icon" aria-hidden="true">✦</span>
+          <div>
+            <small>${t.active ? 'Test Twogether points' : 'Twogether points'}</small>
+            <strong>${fmt(twos)} <em>Twos</em></strong>
+          </div>
+        </div>
+        <a href="#v28Basket">View basket <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="tw-wish-points-track" aria-hidden="true"><i style="width:${goalProgress.toFixed(1)}%"></i></div>
+      <div class="tw-wish-points-foot">
+        <span>${esc(goal.label)}</span>
+        <strong>${esc(goal.detail)}</strong>
+        <small>€1 better than budget = 1 Two</small>
+      </div>
+    </section>
+
+    <div class="tw-wish-controls">
+      <div class="tw-wish-view-tabs" aria-label="Wishlist collection">
+        <button data-wish-view="wishes" aria-pressed="${wishView === 'wishes'}">Wishlist <span>${waiting.length}</span></button>
+        <button data-wish-view="earned" aria-pressed="${wishView === 'earned'}">Earned <span>${earned.length}</span></button>
+      </div>
+      ${statusFilters}
+      <div class="tw-wish-priority" aria-label="Filter by priority">
+        <button data-priority="all" aria-pressed="${wishPriority === 'all'}">All priorities</button>
+        ${[1, 2, 3, 4, 5].map((p) => `<button data-priority="${p}" aria-pressed="${wishPriority === String(p)}" title="${WISH_PRIORITY_LABELS[p]}">P${p}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="tw-wish-layout">
+      <section class="tw-wish-collection" aria-label="Wishlist collection">
+        <a class="tw-wish-mobile-basket" href="#v28Basket">
+          <span><b>Basket</b><small>${selected.length} ${selected.length === 1 ? 'wish' : 'wishes'}</small></span>
+          <strong>${money(total)} <i aria-hidden="true">→</i></strong>
+        </a>
+
+        <div class="tw-wish-grid">${list.map((w) => wishCard(w, ids)).join('')}</div>
+        <div class="tw-wish-empty" data-wish-empty hidden>
+          <span aria-hidden="true">♡</span>
+          <h3>${emptyTitle}</h3>
+          <p>${emptyText}</p>
+        </div>
+      </section>
+
+      <aside id="v28Basket" class="tw-wish-basket" aria-label="Wishlist basket" tabindex="-1">
+        <div class="tw-wish-basket-head">
+          <div><small>SET ASIDE FOR YOU</small><h2>Your basket</h2></div>
+          <span>${selected.length}</span>
+        </div>
+        ${selected.length ? `
+          <div class="tw-wish-basket-items">${selected.map((x) => `<div>
+            <span>${esc(x.name)}</span>
+            <b>${money(x.price)}</b>
+            <button data-cart-remove="${esc(x.id)}" aria-label="Remove ${esc(x.name)} from basket">×</button>
+          </div>`).join('')}</div>
+          <div class="tw-wish-basket-total"><span>Basket total</span><strong>${money(total)}</strong></div>
+          <div class="tw-wish-basket-total is-points"><span>${t.active ? 'Test Twos' : 'Available Twos'}</span><strong>${fmt(twos)}</strong></div>
+          <div class="tw-wish-basket-plan ${gap ? 'is-waiting' : 'is-ready'}" aria-live="polite">
+            <div><strong>${gap ? fmt(gap) + ' Twos to go' : 'Ready to unlock ♡'}</strong><span>${total > 0 ? Math.min(100, Math.max(0, twos) / total * 100).toFixed(0) : 100}%</span></div>
+            <progress max="100" value="${total > 0 ? Math.min(100, Math.max(0, twos) / total * 100) : 100}" aria-label="Basket covered by Twos"></progress>
+            <p>${wishlistAdvice(gap)}</p>
+          </div>
+          <button class="tw-wish-checkout" data-checkout ${gap || checkoutBusy ? 'disabled' : ''}>${checkoutBusy ? 'Unlocking…' : t.active ? 'Preview checkout' : 'Unlock my wishes'} <span aria-hidden="true">→</span></button>
+        ` : `
+          <div class="tw-wish-basket-empty"><span aria-hidden="true">♡</span><h3>Nothing in the basket yet</h3><p>Add a priced wish when you want to see how close your Twos are to covering it.</p></div>
+        `}
+        <p class="tw-wish-basket-note">Twos are a playful reward for saving. No payment or real order is placed here.</p>
+      </aside>
+    </div>
+  </div>`;
+
   bindWishlist(root);
   applyWishFilter(root);
-  if (focus) $$('[data-' + focus[0] + ']', root).find((x) => x.getAttribute('data-' + focus[0]) === focus[1])?.focus({ preventScroll: true });
+  if (focus) {
+    $$('[data-' + focus[0] + ']', root)
+      .find((x) => x.getAttribute('data-' + focus[0]) === focus[1])
+      ?.focus({ preventScroll: true });
+  }
 }
 
 function wishCard(w, ids) {
   const parts = noteParts(w.note), inCart = ids.includes(w.id), priced = hasWishPrice(w), twos = effectiveTwos();
   const earned = wishEarned(w), ready = priced && twos >= num(w.price), gap = Math.max(0, num(w.price) - twos);
-  return `<article class="v27-wish-card ${earned ? 'earned' : ''} ${inCart ? 'v28-selected' : ''}" data-priority="${w.priority}" data-earned="${earned}"><div class="v27-wish-top"><span>P${w.priority} · ${['', 'Most wanted', 'High priority', 'Someday soon', 'Nice to have', 'Just dreaming'][w.priority] || 'Someday soon'}</span><b>${earned ? 'Earned ♡' : inCart ? 'In your basket' : ready ? 'Within reach' : 'Saving for'}</b></div><div class="v28-wish-title"><h3>${esc(w.name)}</h3><strong class="v27-wish-price">${priced ? money(w.price) : 'Price to come'}</strong></div><p class="v28-wish-note">${esc(parts.text || 'A little wish with your name on it.')}</p>${parts.link ? `<a href="${esc(parts.link)}" target="_blank" rel="noopener noreferrer">Take a closer look ↗</a>` : ''}<div class="v28-wish-readiness">${earned ? 'Your saving made this possible.' : !priced ? 'Add a price to start saving towards it.' : ready ? 'Your Twos can cover this wish.' : `${fmt(gap)} more Twos to cover this wish.`}</div><div class="v27-wish-card-actions"><button data-wish-edit="${esc(w.id)}" aria-label="Edit ${esc(w.name)}" ${testState().active ? 'disabled' : ''}>Edit wish</button>${priced && !earned ? `<button data-cart-toggle="${esc(w.id)}" aria-pressed="${inCart}" class="${inCart ? 'in-cart' : ''}">${inCart ? 'Added ✓' : 'Add to basket +'}</button>` : ''}</div></article>`;
+  const progress = earned ? 100 : priced && num(w.price) > 0 ? Math.min(100, Math.max(0, twos) / num(w.price) * 100) : 0;
+  const status = earned ? 'Earned' : inCart ? 'In basket' : ready ? 'Ready now' : priced ? 'Saving' : 'No price';
+  const readiness = earned
+    ? 'You earned this one.'
+    : !priced
+      ? 'Add a price to track progress.'
+      : ready
+        ? 'Your Twos can cover it.'
+        : fmt(gap) + ' Twos to go.';
+
+  return `<article class="tw-wish-card ${earned ? 'is-earned' : ''} ${inCart ? 'is-selected' : ''}" data-priority="${w.priority}" data-earned="${earned}" data-ready="${ready}" data-in-cart="${inCart}">
+    <div class="tw-wish-card-visual tone-${Math.min(5, Math.max(1, Number(w.priority) || 3))}">
+      <span aria-hidden="true">${wishVisual(w)}</span>
+      <i>P${w.priority}</i>
+      <b>${status}</b>
+    </div>
+    <div class="tw-wish-card-body">
+      <div class="tw-wish-card-title">
+        <h3>${esc(w.name)}</h3>
+        <strong>${priced ? money(w.price) : 'Price later'}</strong>
+      </div>
+      <p class="tw-wish-card-note">${esc(parts.text || WISH_PRIORITY_LABELS[w.priority] || 'A little wish for later.')}</p>
+      ${parts.link ? `<a class="tw-wish-link" href="${esc(parts.link)}" target="_blank" rel="noopener noreferrer">Open link ↗</a>` : ''}
+      <div class="tw-wish-card-progress" aria-hidden="true"><i><em style="width:${progress.toFixed(1)}%"></em></i></div>
+      <small class="tw-wish-card-readiness">${readiness}</small>
+      <div class="tw-wish-card-actions">
+        <button class="tw-wish-edit" data-wish-edit="${esc(w.id)}" aria-label="Edit ${esc(w.name)}" ${testState().active ? 'disabled' : ''}>Edit</button>
+        ${priced && !earned ? `<button class="tw-wish-cart-toggle ${inCart ? 'is-in-cart' : ''}" data-cart-toggle="${esc(w.id)}" aria-pressed="${inCart}">${inCart ? 'Added ✓' : 'Add to basket'}</button>` : ''}
+      </div>
+    </div>
+  </article>`;
 }
 
 function applyWishFilter(root) {
   let visible = 0;
-  $$('.v27-wish-card', root).forEach((c) => {
-    c.hidden = (wishPriority !== 'all' && c.dataset.priority !== wishPriority) || (c.dataset.earned === 'true') !== (wishView === 'earned');
-    if (!c.hidden) visible++;
+  $$('.tw-wish-card', root).forEach((card) => {
+    const priorityMatch = wishPriority === 'all' || card.dataset.priority === wishPriority;
+    const viewMatch = (card.dataset.earned === 'true') === (wishView === 'earned');
+    const statusMatch = wishView !== 'wishes' || wishStatus === 'all'
+      || (wishStatus === 'ready' && card.dataset.ready === 'true')
+      || (wishStatus === 'basket' && card.dataset.inCart === 'true');
+    card.hidden = !(priorityMatch && viewMatch && statusMatch);
+    if (!card.hidden) visible++;
   });
   const empty = $('[data-wish-empty]', root);
   if (empty) empty.hidden = visible > 0;
@@ -114,12 +305,31 @@ function applyWishFilter(root) {
 function bindWishlist(root) {
   $('[data-wish-add]', root)?.addEventListener('click', () => openWishEditor());
   $$('[data-wish-edit]', root).forEach((b) => b.onclick = () => openWishEditor(b.dataset.wishEdit));
-  $$('[data-cart-toggle]', root).forEach((b) => b.onclick = () => { const ids = cart(), id = b.dataset.cartToggle; saveCart(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]); renderWishlist(); });
-  $$('[data-cart-remove]', root).forEach((b) => b.onclick = () => { saveCart(cart().filter((id) => id !== b.dataset.cartRemove)); renderWishlist(); });
-  $$('button[data-priority]', root).forEach((b) => b.onclick = () => { wishPriority = b.dataset.priority; renderWishlist(); });
-  $$('[data-wish-view]', root).forEach((b) => b.onclick = () => { wishView = b.dataset.wishView; renderWishlist(); });
+  $$('[data-cart-toggle]', root).forEach((b) => b.onclick = () => {
+    const ids = cart(), id = b.dataset.cartToggle;
+    saveCart(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+    renderWishlist();
+  });
+  $$('[data-cart-remove]', root).forEach((b) => b.onclick = () => {
+    saveCart(cart().filter((id) => id !== b.dataset.cartRemove));
+    renderWishlist();
+  });
+  $$('button[data-priority]', root).forEach((b) => b.onclick = () => {
+    wishPriority = b.dataset.priority;
+    renderWishlist();
+  });
+  $$('[data-wish-view]', root).forEach((b) => b.onclick = () => {
+    wishView = b.dataset.wishView;
+    wishStatus = 'all';
+    renderWishlist();
+  });
+  $$('[data-wish-status]', root).forEach((b) => b.onclick = () => {
+    wishStatus = b.dataset.wishStatus;
+    renderWishlist();
+  });
   $('[data-checkout]', root)?.addEventListener('click', checkoutWishlist);
 }
+
 
 function openWishEditor(id = '') {
   if (testState().active) return;
