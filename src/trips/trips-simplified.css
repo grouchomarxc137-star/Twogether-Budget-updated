@@ -1145,3 +1145,52 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   overscroll-behavior:none;
   touch-action:none;
 }
+
+/* Current trip checklist: swipe left to delete, matching Recurrent Items. */
+.tv2-check-swipe-row{
+  position:relative;
+  display:block;
+  overflow:hidden;
+}
+.tv2-check-swipe-row .tv2-check-row{
+  position:relative;
+  z-index:2;
+  grid-template-columns:30px minmax(0,1fr);
+  background:transparent;
+  transition:transform .2s cubic-bezier(.22,.8,.28,1),opacity .16s ease,background .16s ease;
+  will-change:transform,opacity;
+}
+.tv2-check-swipe-row:first-child .tv2-check-row{
+  border-top:0;
+}
+.tv2-check-swipe-row .tv2-check-row.is-completed{
+  grid-template-columns:30px minmax(0,1fr);
+}
+.tv2-check-swipe-row .tv2-check-text-scroll{
+  touch-action:pan-y;
+}
+.tv2-check-delete-reveal{
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:0;
+  overflow:hidden;
+  opacity:0;
+  pointer-events:none;
+  white-space:nowrap;
+  background:var(--tv2-over);
+  color:#fff;
+  font-size:14px;
+  font-weight:700;
+  will-change:width,opacity;
+}
+.tv2-check-delete-reveal b{
+  min-width:max-content;
+  font:inherit;
+}
+

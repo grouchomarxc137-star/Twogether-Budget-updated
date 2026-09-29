@@ -949,7 +949,7 @@ function openSimplifiedChecklist(plan) {
   if (!plan) return;
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
-  const state = { error:'', packingMine:false };
+  const state = { error:'', packingMine:false, busy:false };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
@@ -960,13 +960,15 @@ function openSimplifiedChecklist(plan) {
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
   const rowHtml = (kind, item, completed = false) =>
-    '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
-      '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
-      '<div class="tv2-check-text-scroll" data-check-scroll>'+
-        '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
+    '<div class="tv2-check-swipe-row" data-check-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+      '<div class="tv2-check-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
+      '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+        '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
+        '<div class="tv2-check-text-scroll" data-check-scroll>'+
+          '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
+        '</div>'+
+        (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
       '</div>'+
-      '<button type="button" class="tv2-check-remove" data-check-remove aria-label="Remove item">×</button>'+
-      (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
     '</div>';
 
   const activeSection = (kind, title) => {
@@ -1021,7 +1023,7 @@ function openSimplifiedChecklist(plan) {
     requestAnimationFrame(() => {
       syncAllChecklistTextWidths();
       if (moveId) {
-        const row = sheet.querySelector('[data-check-id="'+CSS.escape(moveId)+'"]');
+        const row = sheet.querySelector('.tv2-check-row[data-check-id="'+CSS.escape(moveId)+'"]');
         row?.classList.add('just-arrived');
       }
     });
@@ -1031,10 +1033,10 @@ function openSimplifiedChecklist(plan) {
     const kind = row?.dataset.checkKind, id = row?.dataset.checkId;
     return kind && Array.isArray(prep[kind]) ? prep[kind].find((item)=>item.id===id) : null;
   }
-  function cleanPrep() {
+  function cleanPrep(source=prep) {
     return {
-      packing: prep.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
-      reminders: prep.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
+      packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
+      reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
     };
   }
   function autoSaveChecklist() {
@@ -1057,6 +1059,184 @@ function openSimplifiedChecklist(plan) {
     autoSaveChecklist();
     requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
+
+  let checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  let checklistSwipeIgnoreUntil=0;
+
+  const resetChecklistSwipeVisual=(row,animate=true)=>{
+    if(!row)return;
+    const card=row.querySelector('.tv2-check-row');
+    const reveal=row.querySelector('.tv2-check-delete-reveal');
+    if(card){
+      card.style.transition=animate?'transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      card.style.transform='translateX(0)';
+      card.style.opacity='1';
+    }
+    if(reveal){
+      reveal.style.transition=animate?'width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease':'none';
+      reveal.style.width='0px';
+      reveal.style.opacity='0';
+    }
+    if(animate)setTimeout(()=>{
+      if(card?.isConnected)card.style.transition='';
+      if(reveal?.isConnected)reveal.style.transition='';
+    },220);
+  };
+
+  const resetChecklistSwipeState=()=>{
+    checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  };
+
+  const closeOtherChecklistSwipes=(except=null)=>{
+    sheet.querySelectorAll('[data-check-swipe]').forEach((row)=>{
+      if(row!==except)resetChecklistSwipeVisual(row,true);
+    });
+  };
+
+  const openChecklistDeleteConfirm=(kind,id)=>{
+    const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
+    if(!item)return;
+    closeDeleteConfirm();
+    deleteConfirmLayer=document.createElement('div');
+    deleteConfirmLayer.className='tv2-confirm-layer';
+    deleteConfirmLayer.innerHTML=
+      '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
+      '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2ChecklistDeleteTitle">'+
+        '<h2 id="tv2ChecklistDeleteTitle">Delete checklist item?</h2>'+
+        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
+        '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
+      '</div>';
+    document.body.appendChild(deleteConfirmLayer);
+
+    const cancel=()=>{
+      closeDeleteConfirm();
+      closeOtherChecklistSwipes();
+    };
+    deleteConfirmLayer.querySelectorAll('[data-confirm-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+    deleteConfirmLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+
+    const deleteButton=deleteConfirmLayer.querySelector('[data-confirm-delete]');
+    deleteButton?.addEventListener('click',async()=>{
+      if(state.busy)return;
+      deleteButton.disabled=true;
+      deleteButton.textContent='Deleting…';
+      const error=deleteConfirmLayer.querySelector('.tv2-confirm-error');
+      if(error)error.textContent='';
+      const next={
+        packing:prep.packing.map((entry)=>({...entry})),
+        reminders:prep.reminders.map((entry)=>({...entry})),
+      };
+      next[kind]=next[kind].filter((entry)=>entry.id!==id);
+      try{
+        state.busy=true;
+        const result=await window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:cleanPrep(next)},actor());
+        prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
+        if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
+        if(remoteState&&result?.tripPrepDefaults)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.tripPrepDefaults));
+        state.busy=false;
+        closeDeleteConfirm();
+        render();
+        publishTripNotifications();
+        simplifiedSnack('Checklist item deleted');
+      }catch(err){
+        state.busy=false;
+        deleteButton.disabled=false;
+        deleteButton.textContent='Delete';
+        if(error)error.textContent=err?.message||'Could not delete checklist item';
+      }
+    });
+  };
+
+  sheet.addEventListener('touchstart',(e)=>{
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    const row=e.target.closest('[data-check-swipe]');
+    if(!row)return;
+    closeOtherChecklistSwipes(row);
+    resetChecklistSwipeVisual(row,false);
+    const t=e.touches[0];
+    checklistSwipe={tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,row};
+  },{passive:true});
+
+  sheet.addEventListener('touchmove',(e)=>{
+    if(!checklistSwipe.tracking||!checklistSwipe.row||e.touches.length!==1)return;
+    const t=e.touches[0];
+    const dx=t.clientX-checklistSwipe.startX;
+    const dy=Math.abs(t.clientY-checklistSwipe.startY);
+    checklistSwipe.lastX=t.clientX;
+
+    if(!checklistSwipe.active){
+      if(Math.abs(dx)<8&&dy<8)return;
+      if(dx<-10&&Math.abs(dx)>dy*1.2){
+        checklistSwipe.active=true;
+      }else if(dy>=Math.abs(dx)||dx>10){
+        resetChecklistSwipeVisual(checklistSwipe.row,true);
+        resetChecklistSwipeState();
+        return;
+      }
+    }
+    if(!checklistSwipe.active)return;
+    e.preventDefault();
+
+    const row=checklistSwipe.row;
+    const width=row.getBoundingClientRect().width||280;
+    const distance=Math.max(-width*.94,Math.min(0,dx));
+    const exposed=Math.abs(distance);
+    const card=row.querySelector('.tv2-check-row');
+    const reveal=row.querySelector('.tv2-check-delete-reveal');
+    if(card){
+      card.style.transition='none';
+      card.style.transform='translateX('+distance+'px)';
+    }
+    if(reveal){
+      reveal.style.transition='none';
+      reveal.style.width=exposed+'px';
+      reveal.style.opacity=String(Math.min(1,.35+exposed/120));
+    }
+  },{passive:false});
+
+  sheet.addEventListener('touchend',()=>{
+    if(!checklistSwipe.tracking||!checklistSwipe.row){
+      resetChecklistSwipeState();
+      return;
+    }
+    const row=checklistSwipe.row;
+    const dx=checklistSwipe.lastX-checklistSwipe.startX;
+    const width=row.getBoundingClientRect().width||280;
+    const threshold=Math.max(180,width*.62);
+    const fullSwipe=checklistSwipe.active&&-dx>=threshold;
+    const kind=row.dataset.checkKind,id=row.dataset.checkId;
+
+    if(!fullSwipe){
+      resetChecklistSwipeVisual(row,true);
+      resetChecklistSwipeState();
+      return;
+    }
+
+    checklistSwipeIgnoreUntil=Date.now()+450;
+    const card=row.querySelector('.tv2-check-row');
+    const reveal=row.querySelector('.tv2-check-delete-reveal');
+    if(card){
+      card.style.transition='transform .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      card.style.transform='translateX(-'+width+'px)';
+      card.style.opacity='.76';
+    }
+    if(reveal){
+      reveal.style.transition='width .2s cubic-bezier(.22,.8,.28,1), opacity .16s ease';
+      reveal.style.width=width+'px';
+      reveal.style.opacity='1';
+    }
+    resetChecklistSwipeState();
+    setTimeout(()=>{
+      resetChecklistSwipeVisual(row,false);
+      openChecklistDeleteConfirm(kind,id);
+    },180);
+  },{passive:true});
+
+  sheet.addEventListener('touchcancel',()=>{
+    resetChecklistSwipeVisual(checklistSwipe.row,true);
+    resetChecklistSwipeState();
+  },{passive:true});
 
   sheet.addEventListener('change',(e)=>{
     const row=e.target.closest('.tv2-check-row'); if(!row)return;
@@ -1082,6 +1262,10 @@ function openSimplifiedChecklist(plan) {
     e.preventDefault(); addItem(input.dataset.checkNew);
   });
   sheet.addEventListener('click',(e)=>{
+    if(Date.now()<checklistSwipeIgnoreUntil&&e.target.closest('[data-check-swipe]')){
+      e.preventDefault();
+      return;
+    }
     const packingCard=e.target.closest('[data-check-section="packing"]');
     if(packingCard && !e.target.closest('input,button,label')){
       state.packingMine=!state.packingMine;
@@ -1092,11 +1276,6 @@ function openSimplifiedChecklist(plan) {
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-recurrent')){openRecurrentChecklistItems(plan);return;}
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
-    if(b.hasAttribute('data-check-remove')){
-      const row=b.closest('.tv2-check-row'),kind=row?.dataset.checkKind,id=row?.dataset.checkId;
-      if(kind&&Array.isArray(prep[kind]))prep[kind]=prep[kind].filter((item)=>item.id!==id);
-      render(); autoSaveChecklist(); return;
-    }
   });
   simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
   simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
