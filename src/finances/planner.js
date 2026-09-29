@@ -16,7 +16,7 @@ function baseRow(name, planner = '', actual = '', group = 'other', notes = '', k
 }
 function principeDefaults() {
   return [
-    baseRow('Salary', '', '', 'other', 'Usually €1,350–€1,600', 'income', 'monthly'),
+    baseRow('Salary', '', '', 'other', 'Usually €1.350–€1.600', 'income', 'monthly'),
     baseRow('Mandatory savings', '', '', 'savings', 'Move planned savings aside when possible', 'expense', 'monthly'),
     baseRow('Rent', 575, '', 'rent', '', 'expense', 'monthly'), baseRow('Ryanair part 3', 47.58, '', 'other', '', 'expense', 'monthly'),
     baseRow('Iliad', 9.99, '', 'subscriptions', 'Around the 2nd', 'expense', 'monthly'), baseRow('Spotify', 16.99, '', 'subscriptions', 'Around the 22nd', 'expense', 'monthly'),

@@ -37,7 +37,7 @@ export function renderCompareLab() {
 
 function scenarioHtml(lab, side) {
   const rows = lab['rows' + side] || [];
-  return `<article class="v27-scenario" data-side="${side}"><input class="v27-scenario-title" value="${esc(lab['title' + side] || `Scenario ${side}`)}" aria-label="Scenario ${side} title"><div class="v27-scenario-rows">${rows.map((r, i) => `<div class="v27-scenario-row" data-row="${i}"><input data-row-name value="${esc(r.name || '')}" placeholder="Cost name"><div><span>€</span><input data-row-amount inputmode="decimal" value="${esc(String(r.amount ?? ''))}" placeholder="0.00"></div><button data-row-remove aria-label="Remove row">×</button></div>`).join('')}</div><div class="v27-scenario-foot"><button data-add-row>+ Add row</button><div><span>Total</span><strong data-scenario-total>${money(scenarioTotal(rows))}</strong></div><button data-save-scenario>Save scenario</button></div></article>`;
+  return `<article class="v27-scenario" data-side="${side}"><input class="v27-scenario-title" value="${esc(lab['title' + side] || `Scenario ${side}`)}" aria-label="Scenario ${side} title"><div class="v27-scenario-rows">${rows.map((r, i) => `<div class="v27-scenario-row" data-row="${i}"><input data-row-name value="${esc(r.name || '')}" placeholder="Cost name"><div><span>€</span><input data-row-amount inputmode="decimal" value="${esc(String(r.amount ?? ''))}" placeholder="0"></div><button data-row-remove aria-label="Remove row">×</button></div>`).join('')}</div><div class="v27-scenario-foot"><button data-add-row>+ Add row</button><div><span>Total</span><strong data-scenario-total>${money(scenarioTotal(rows))}</strong></div><button data-save-scenario>Save scenario</button></div></article>`;
 }
 
 function readLab(sec, base) {
@@ -78,7 +78,7 @@ function bindCompare(sec, base) {
   $$('[data-add-row]', sec).forEach((b) => b.onclick = () => {
     const card = b.closest('.v27-scenario'), rows = $('.v27-scenario-rows', card), div = document.createElement('div');
     div.className = 'v27-scenario-row';
-    div.innerHTML = '<input data-row-name placeholder="Cost name"><div><span>€</span><input data-row-amount inputmode="decimal" placeholder="0.00"></div><button data-row-remove aria-label="Remove row">×</button>';
+    div.innerHTML = '<input data-row-name placeholder="Cost name"><div><span>€</span><input data-row-amount inputmode="decimal" placeholder="0"></div><button data-row-remove aria-label="Remove row">×</button>';
     rows.appendChild(div);
     $('[data-row-remove]', div).onclick = () => { div.remove(); updateCompareVerdict(sec); };
     $('[data-row-name]', div).focus();

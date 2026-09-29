@@ -170,7 +170,7 @@ function otherExpensesControl() {
   if (f.stage === 'more') {
     return `${list}<div class="choice-grid"><button class="choice" type="button" data-other-more="yes">Yes, add another</button><button class="choice" type="button" data-other-more="no">No, continue</button></div>`;
   }
-  return `${list}<div class="${f.uncertain ? 'uncertain-mode' : ''}"><div class="money-input-wrap"><span>€</span><input id="wizardOtherAmount" class="big-input money-field" inputmode="decimal" value="${esc(f.amount || '')}" placeholder="0.00"></div><div class="certainty-row"><button class="certainty ${!f.uncertain ? 'active' : ''}" type="button" data-other-certainty="exact">Exact</button><button class="certainty ${f.uncertain ? 'active' : ''}" type="button" data-other-certainty="estimate">Not sure · estimate</button></div>${f.items.length ? '' : '<button class="btn ghost full" type="button" data-other-none>No other expenses</button>'}</div><div class="wizard-actions"><button class="btn ghost" type="button" data-other-back>Back</button><button class="btn primary big" type="button" data-other-next>Next</button></div>`;
+  return `${list}<div class="${f.uncertain ? 'uncertain-mode' : ''}"><div class="money-input-wrap"><span>€</span><input id="wizardOtherAmount" class="big-input money-field" inputmode="decimal" value="${esc(f.amount || '')}" placeholder="0"></div><div class="certainty-row"><button class="certainty ${!f.uncertain ? 'active' : ''}" type="button" data-other-certainty="exact">Exact</button><button class="certainty ${f.uncertain ? 'active' : ''}" type="button" data-other-certainty="estimate">Not sure · estimate</button></div>${f.items.length ? '' : '<button class="btn ghost full" type="button" data-other-none>No other expenses</button>'}</div><div class="wizard-actions"><button class="btn ghost" type="button" data-other-back>Back</button><button class="btn primary big" type="button" data-other-next>Next</button></div>`;
 }
 
 export function renderWizard() {
@@ -216,7 +216,7 @@ export function renderWizard() {
     const value = wizard.draft[s.key] ?? '';
     const isUncertain = !!wizard.draft.uncertain?.[s.key];
     control = `<div class="${isUncertain ? 'uncertain-mode' : ''}">
-      <div class="money-input-wrap"><span>€</span><input id="wizardInput" class="big-input money-field" inputmode="decimal" value="${esc(value)}" placeholder="0.00"></div>
+      <div class="money-input-wrap"><span>€</span><input id="wizardInput" class="big-input money-field" inputmode="decimal" value="${esc(value)}" placeholder="0"></div>
       ${(!s.noUncertain && MONEY_FIELDS.includes(s.key)) ? `<div class="certainty-row"><button class="certainty ${!isUncertain ? 'active' : ''}" type="button" data-certainty="exact">Exact</button><button class="certainty ${isUncertain ? 'active' : ''}" type="button" data-certainty="estimate">Not sure · estimate</button></div>` : ''}
       ${isUncertain ? '<div class="estimate-note">This amount will count in totals but stay marked as an estimate.</div>' : ''}
       ${s.type === 'moneyOrNone' ? '<button class="btn ghost full" type="button" data-none> No other expenses </button>' : ''}

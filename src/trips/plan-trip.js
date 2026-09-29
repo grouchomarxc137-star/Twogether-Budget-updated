@@ -139,7 +139,7 @@ function showModal() {
       '<div class="plan-trip-field hidden" id="v5PlanOtherWrap"><label>Country / place</label><input id="v5PlanOther" placeholder="e.g. Tunisia"></div>' +
       '<div class="plan-trip-field full"><label>City / area</label><input id="v5PlanCity" placeholder="e.g. Lonato del Garda" autocomplete="address-level2"></div>' +
       '<div class="plan-trip-field full"><label>Dates</label><button id="v5PlanDateToggle" class="plan-date-toggle" type="button"><span><small>Trip dates</small><strong id="v5PlanDateSummary">Choose your dates</strong></span><b id="v5PlanDateCount">Select start + end</b><i aria-hidden="true">⌄</i></button><div id="v5PlanCalendar" class="plan-calendar hidden"></div></div>' +
-      '<div class="plan-trip-field full"><label>Budget <span>optional</span></label><div class="plan-budget-input"><span>€</span><input id="v5PlanBudget" inputmode="decimal" placeholder="0.00"></div><small>You can add or change your budget later.</small></div>' +
+      '<div class="plan-trip-field full"><label>Budget <span>optional</span></label><div class="plan-budget-input"><span>€</span><input id="v5PlanBudget" inputmode="decimal" placeholder="0"></div><small>You can add or change your budget later.</small></div>' +
     '</div>' +
     '<div class="plan-trip-actions"><button class="btn ghost" type="button" data-plan-cancel>Cancel</button><button class="btn primary" type="button" data-plan-save>Save trip</button></div>';
 
