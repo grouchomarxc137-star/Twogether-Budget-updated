@@ -60,8 +60,7 @@ function shortRange(start, end) {
   return am === bm ? `${a.getDate()}–${b.getDate()} ${bm}` : `${a.getDate()} ${am}–${b.getDate()} ${bm}`;
 }
 function cardMoney(value) {
-  const amount = n(value); const whole = Math.abs(amount - Math.round(amount)) < .005;
-  return '€' + amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});
+  return money(value);
 }
 
 function simplifyStaticCopy() {
@@ -412,9 +411,8 @@ function settlementLine(plan) {
   if (me === settlement.debtor) return `You owe ${settlement.creditor} ${displayMoney(settlement.amount,true)}`;
   return `${settlement.debtor} owes ${settlement.creditor} ${displayMoney(settlement.amount,true)}`;
 }
-function displayMoney(value, forceCents = false) {
-  const amount = n(value), whole = Math.abs(amount - Math.round(amount)) < .005 && !forceCents;
-  return '€' + amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});
+function displayMoney(value, _forceCents = false) {
+  return money(value);
 }
 
 function planItem(plan, trip) {
@@ -643,18 +641,18 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       if (selectedMax > .005) {
         owedPanel = '<div class="tv2-owed-panel tv2-owed-repay">'+
           '<div class="tv2-owed-head"><span>You owe '+esc(settlement.creditor)+' for '+esc(selectedLabel)+'</span><strong>'+displayMoney(selectedAmount,true)+'</strong></div>'+
-          '<label class="tv2-owed-field"><span>Amount you paid back</span><div><b>€</b><input id="tv2Amount" inputmode="decimal" autocomplete="off" placeholder="0.00" value="'+esc(state.amountText)+'"></div></label>'+
+          '<label class="tv2-owed-field"><span>Amount you paid back</span><div><b>€</b><input id="tv2Amount" inputmode="decimal" autocomplete="off" placeholder="0" value="'+esc(state.amountText)+'"></div></label>'+
           '<button type="button" class="tv2-btn tv2-pay-full" data-pay-full>Pay full '+displayMoney(selectedMax,true)+'</button>'+
           '<button type="button" class="tv2-defaults tv2-owed-note-toggle" data-owed-note-toggle aria-expanded="'+(state.owedNoteOpen?'true':'false')+'"><span class="tv2-summary">'+(state.owedNoteOpen?'Hide note':'＋ Add note')+'</span><span class="tv2-chev" aria-hidden="true">'+(state.owedNoteOpen?'⌃':'⌄')+'</span></button>'+
           '<div class="tv2-more tv2-owed-note-box" '+(state.owedNoteOpen?'':'hidden')+'><label class="tv2-field"><span>Optional note</span><input id="tv2RepaymentNote" maxlength="180" placeholder="e.g. my half of the Airbnb" value="'+esc(state.repaymentNote)+'"></label></div>'+
         '</div>';
       } else {
-        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(selectedLabel)+'</span><strong>€0.00</strong></div><p>Nothing to pay back in this category right now.</p></div>';
+        owedPanel = '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(selectedLabel)+'</span><strong>€0</strong></div><p>Nothing to pay back in this category right now.</p></div>';
       }
     } else if (owedMode && mine <= .005) {
       owedPanel = settlement.creditor === me && settlement.debtor
         ? '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>'+esc(settlement.debtor)+' owes you</span><strong>'+displayMoney(settlement.amount,true)+'</strong></div><p>They can log their repayment from their own profile.</p></div>'
-        : '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0.00</strong></div><p>You’re even on this trip right now.</p></div>';
+        : '<div class="tv2-owed-panel is-empty"><div class="tv2-owed-head"><span>Nothing owed</span><strong>€0</strong></div><p>You’re even on this trip right now.</p></div>';
     }
 
     const forOptions = state.paidBy === other

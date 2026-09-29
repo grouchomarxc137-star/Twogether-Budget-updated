@@ -13,7 +13,7 @@
 // event instead, which shop.js and wishlist.js each listen for. This
 // mirrors the 'twogether:saved' / 'twogether:v18-rendered' event pattern
 // already used elsewhere in the app.
-import { n } from '../lib/format.js';
+import { n, formatNumber } from '../lib/format.js';
 import { actor, otherActor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 
@@ -25,7 +25,7 @@ let gameState = null;
 let lastFetch = 0;
 let refreshPending = null;
 
-export const fmt = (v) => n(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+export const fmt = (v) => formatNumber(n(v), { maximumFractionDigits: 2 });
 
 export function profile(name = actor()) {
   const g = gameState || sharedState?.game || {};

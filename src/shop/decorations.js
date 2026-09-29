@@ -18,7 +18,8 @@
 // every-time version would flicker/lose DOM references under v32's
 // stabilizing observer). v29.js's calmShopCopy() was byte-identical to
 // v32.js's -- kept once, not twice.
-import { $, $$ } from '../lib/dom.js';
+import { $, $ } from '../lib/dom.js';
+import { formatNumber } from '../lib/format.js';
 
 let repairingShop = false;
 let shopObserver = null;
@@ -26,8 +27,24 @@ let financeObserver = null;
 let balanceTimer = null;
 
 function numberFrom(text) {
-  const match = String(text || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
-  return match ? Number(match[0]) : 0;
+  const match = String(text || '').match(/-?[\d.,]+/);
+  if (!match) return 0;
+  let value = match[0];
+  const comma = value.lastIndexOf(',');
+  const dot = value.lastIndexOf('.');
+  if (comma >= 0 && dot >= 0) {
+    const decimal = comma > dot ? ',' : '.';
+    const thousands = decimal === ',' ? '.' : ',';
+    value = value.split(thousands).join('').replace(decimal, '.');
+  } else if (comma >= 0) {
+    const tail = value.length - comma - 1;
+    value = tail > 0 && tail <= 2 ? value.replace(',', '.') : value.replace(/,/g, '');
+  } else if (dot >= 0) {
+    const tail = value.length - dot - 1;
+    if (value.indexOf('.') !== dot || tail === 3) value = value.replace(/\./g, '');
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 function setText(el, text) { if (el && el.textContent !== text) el.textContent = text; }
 
@@ -66,12 +83,12 @@ function repairJourney(root) {
   let path = $('.v31-journey-path', score);
   if (!path) {
     path = document.createElement('div'); path.className = 'v31-journey-path';
-    path.innerHTML = `<div class="v31-journey-person"><div class="v31-journey-avatar">♕</div><strong>Principessa</strong><small>${values.Principessa.toLocaleString()} Lovis</small></div><div class="v31-journey-route" aria-label="Shared Lovis milestones"><div class="v31-milestone"><i>✓</i><span>First moments</span></div><div class="v31-milestone"><i>♡</i><span>Little rewards</span></div><div class="v31-milestone"><i>✦</i><span>More adventures</span></div></div><div class="v31-journey-person"><div class="v31-journey-avatar">♔</div><strong>Principe</strong><small>${values.Principe.toLocaleString()} Lovis</small></div>`;
+    path.innerHTML = `<div class="v31-journey-person"><div class="v31-journey-avatar">♕</div><strong>Principessa</strong><small>${formatNumber(values.Principessa)} Lovis</small></div><div class="v31-journey-route" aria-label="Shared Lovis milestones"><div class="v31-milestone"><i>✓</i><span>First moments</span></div><div class="v31-milestone"><i>♡</i><span>Little rewards</span></div><div class="v31-milestone"><i>✦</i><span>More adventures</span></div></div><div class="v31-journey-person"><div class="v31-journey-avatar">♔</div><strong>Principe</strong><small>${formatNumber(values.Principe)} Lovis</small></div>`;
     $('.v27-section-title', score)?.insertAdjacentElement('afterend', path);
   } else {
     const people = $$('.v31-journey-person', path);
-    setText($('small', people[0]), `${values.Principessa.toLocaleString()} Lovis`);
-    setText($('small', people[1]), `${values.Principe.toLocaleString()} Lovis`);
+    setText($('small', people[0]), `${formatNumber(values.Principessa)} Lovis`);
+    setText($('small', people[1]), `${formatNumber(values.Principe)} Lovis`);
   }
 }
 
@@ -84,10 +101,10 @@ function updateRewardSide(layout, root) {
   const lovis = currentLovis(root), infos = $$('.v27-shop-item', layout).map(rewardInfo).sort((a, b) => a.cost - b.cost), max = Math.max(120, ...infos.map((x) => x.cost));
   const unowned = infos.filter((x) => !x.owned), next = unowned.find((x) => x.cost > lovis) || unowned[0] || null, affordable = unowned.filter((x) => x.cost <= lovis), pct = Math.max(0, Math.min(100, Math.round(lovis / max * 100)));
   $('.v31-lovis-ring', side)?.style.setProperty('--p', String(pct));
-  setText($('.v31-lovis-ring strong', side), lovis.toLocaleString());
+  setText($('.v31-lovis-ring strong', side), formatNumber(lovis));
   setText($('.v31-lovis-ring small', side), `/ ${max} Lovis`);
   const msg = $('.v31-next-reward', side);
-  if (msg) { if (affordable.length) setText(msg, `You can unlock ${affordable[0].title} now.`); else if (next) setText(msg, `${Math.max(0, next.cost - lovis).toLocaleString()} Lovis until ${next.title}.`); else setText(msg, 'Your reward shelf is completely unlocked. ♡'); }
+  if (msg) { if (affordable.length) setText(msg, `You can unlock ${affordable[0].title} now.`); else if (next) setText(msg, `${formatNumber(Math.max(0, next.cost - lovis))} Lovis until ${next.title}.`); else setText(msg, 'Your reward shelf is completely unlocked. ♡'); }
 }
 function repairRewards(root) {
   const grid = $('.v27-shop-grid', root); if (!grid) return;
@@ -141,7 +158,7 @@ function repairShop() {
   try { root.classList.add('v32-shop-stable'); calmShopCopy(root); repairJourney(root); repairRewards(root); } finally { repairingShop = false; }
 }
 
-function numberFromText(text) { const cleaned = String(text || '').replace(/,/g, '').replace(/[^0-9.\-]/g, ''); const n = Number(cleaned); return Number.isFinite(n) ? n : 0; }
+function numberFromText(text) { return numberFrom(text); }
 function wishIcon(name) {
   const s = String(name || '').toLowerCase();
   if (/laptop|macbook|computer|pc/.test(s)) return '⌘';
@@ -176,7 +193,7 @@ function decorateWishlist() {
       if (price > 0) {
         const pct = earned ? 100 : Math.max(0, Math.min(100, Math.round((Math.max(0, twos) / price) * 100)));
         const p = document.createElement('div'); p.className = 'v29-wish-progress';
-        p.innerHTML = `<div><span>${earned ? 'Goal unlocked' : `${Math.min(Math.max(0, twos), price).toLocaleString(undefined, { maximumFractionDigits: 0 })} / ${price.toLocaleString(undefined, { maximumFractionDigits: 0 })} Twos`}</span><b>${pct}%</b></div><i><em style="width:${pct}%"></em></i>`;
+        p.innerHTML = `<div><span>${earned ? 'Goal unlocked' : `${formatNumber(Math.min(Math.max(0, twos), price), { maximumFractionDigits: 0 })} / ${formatNumber(price, { maximumFractionDigits: 0 })} Twos`}</span><b>${pct}%</b></div><i><em style="width:${pct}%"></em></i>`;
         const ready = $('.v28-wish-readiness', card); if (ready) card.insertBefore(p, ready); else card.appendChild(p);
       }
     }

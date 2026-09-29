@@ -2,7 +2,7 @@
 // editing for individual trip expenses. Existing/legacy trip totals stay
 // visible while new log-as-you-go expenses use the shared expenseEntries
 // collection on each budget plan.
-import { fmtDate } from '../lib/format.js';
+import { fmtDate, money as formatMoney } from '../lib/format.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 
 const names = ['Principessa', 'Principe'];
@@ -18,7 +18,7 @@ const rows = [
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = (v) => v !== '' && v != null;
 const n = (v) => Number(String(v ?? 0).replace(',', '.')) || 0;
-const money = (v) => '€' + n(v).toFixed(2);
+const money = formatMoney;
 const today = () => { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 10); };
 const actorName = () => document.body.dataset.actor || 'Principessa';
 function asDate(value) { if (!value) return null; const d = new Date(value + 'T12:00:00'); return Number.isNaN(d.getTime()) ? null : d; }
@@ -30,7 +30,7 @@ function timing(meta){
   return 'Past trip';
 }
 function shortRange(start,end){const a=asDate(start),b=asDate(end);if(!a||!b)return'';const am=a.toLocaleDateString('en-GB',{month:'short'}),bm=b.toLocaleDateString('en-GB',{month:'short'});return am===bm?`${a.getDate()}–${b.getDate()} ${bm}`:`${a.getDate()} ${am}–${b.getDate()} ${bm}`;}
-function displayMoney(value,forceCents=false){const amount=n(value),whole=Math.abs(amount-Math.round(amount))<.005&&!forceCents;return '€'+amount.toLocaleString('nl-NL',{minimumFractionDigits:whole?0:2,maximumFractionDigits:2});}
+function displayMoney(value,_forceCents=false){return money(value);}
 function categoryInfo(entry){
   if(entry?.category==='accommodation')return['Stay','🛏'];
   if(entry?.category==='transport')return[entry?.transportType==='fuel'?'Fuel':entry?.transportType==='tolls'?'Tolls':'Transport',entry?.transportType==='fuel'?'⛽':'✈️'];
@@ -405,7 +405,7 @@ function categoryFormHtml(plan, row, draft, entry) {
   return '<div class="overview-expense-form">' +
     formSubtype(row, draft) +
     '<label data-form-name-wrap class="' + (needsName ? '' : 'hidden') + '">Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' +
-    '<label>Amount<div class="overview-money-input"><span>€</span><input id="overviewExpenseAmount" inputmode="decimal" value="' + esc(draft.amount || '') + '" placeholder="0.00"></div></label>' +
+    '<label>Amount<div class="overview-money-input"><span>€</span><input id="overviewExpenseAmount" inputmode="decimal" value="' + esc(draft.amount || '') + '" placeholder="0"></div></label>' +
     '<fieldset><legend>Who paid?</legend><div class="overview-form-chips">' + names.concat('both').map((value) => '<button type="button" class="' + (draft.paidBy === value ? 'active' : '') + '" data-form-payer="' + value + '">' + (value === 'both' ? 'Both' : value) + '</button>').join('') + '</div></fieldset>' +
     '<fieldset><legend>How should we count it?</legend><div class="overview-form-chips"><button type="button" class="' + (draft.split === 'shared' ? 'active' : '') + '" data-form-split="shared">Shared 50/50</button><button type="button" class="' + (draft.split === 'personal' ? 'active' : '') + '" data-form-split="personal">Personal</button></div></fieldset>' +
     '<fieldset data-form-owner-wrap class="' + (draft.split === 'personal' ? '' : 'hidden') + '"><legend>Personal expense for</legend><div class="overview-form-chips">' + names.map((value) => '<button type="button" class="' + (draft.forActor === value ? 'active' : '') + '" data-form-owner="' + value + '">' + value + '</button>').join('') + '</div></fieldset>' +

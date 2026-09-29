@@ -12,9 +12,19 @@ export const n = (v) => {
   return Number.isFinite(x) ? x : 0;
 };
 
-export const money = (v) => '€' + n(v).toLocaleString(undefined, {
-  minimumFractionDigits: 2, maximumFractionDigits: 2
+export const formatNumber = (v, options = {}) => n(v).toLocaleString('nl-NL', {
+  minimumFractionDigits: options.minimumFractionDigits ?? 0,
+  maximumFractionDigits: options.maximumFractionDigits ?? 2
 });
+
+export const money = (v) => {
+  const value = n(v);
+  const whole = Math.abs(value - Math.round(value)) < .005;
+  return '€' + formatNumber(value, {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+};
 
 export const fmtDate = (v) => {
   if (!v) return '—';

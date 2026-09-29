@@ -5,7 +5,7 @@
 // state read, not the caching/queueing the shared client provides).
 // Extracted from finances.js.
 import { $, $$ } from '../lib/dom.js';
-import { esc, n, money, uid } from '../lib/format.js';
+import { esc, n, money, formatNumber, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
@@ -712,10 +712,10 @@ function openInvestmentSnapshotEditor(month) {
   const currentSis=isPrincipessa&&hasValue(rec.sisterInvestments)?String(n(rec.sisterInvestments)):'';
   const fields=isPrincipessa
     ? '<div class="finance-mini-fields">'+
-        '<label class="full">Total investment account value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label>'+
-        '<label class="full">Sis’s value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditSisValue" inputmode="decimal" value="'+esc(currentSis)+'" placeholder="0.00"></div></label>'+
+        '<label class="full">Total investment account value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0"></div></label>'+
+        '<label class="full">Sis’s value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditSisValue" inputmode="decimal" value="'+esc(currentSis)+'" placeholder="0"></div></label>'+
       '</div>'
-    : '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label></div>';
+    : '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentEditValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0"></div></label></div>';
   showMini(
     '<span class="panel-kicker">INVESTMENTS</span>'+
     '<h2>Edit '+esc(monthLabel(month))+' investment value</h2>'+
@@ -754,10 +754,10 @@ function openFinanceReminderConfirm(reminder) {
     const currentSis=isPrincipessa&&rec&&hasValue(rec.sisterInvestments)?String(n(rec.sisterInvestments)):'';
     const investmentFields=isPrincipessa
       ? '<div class="finance-mini-fields">'+
-          '<label class="full">Total investment account value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label>'+
-          '<label class="full">Sis’s value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotSisValue" inputmode="decimal" value="'+esc(currentSis)+'" placeholder="0.00"></div></label>'+
+          '<label class="full">Total investment account value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0"></div></label>'+
+          '<label class="full">Sis’s value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotSisValue" inputmode="decimal" value="'+esc(currentSis)+'" placeholder="0"></div></label>'+
         '</div>'
-      : '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0.00"></div></label></div>';
+      : '<div class="finance-mini-fields"><label class="full">Current value<div class="finance-money mini"><span>€</span><input id="finInvestmentSnapshotValue" inputmode="decimal" value="'+esc(current)+'" placeholder="0"></div></label></div>';
     showMini(
       '<span class="panel-kicker">INVESTMENTS</span>'+
       '<h2>What’s your investment worth now?</h2>'+
@@ -1068,7 +1068,7 @@ function renderPage() {
   const housePercent = HOUSE_GOAL_TARGET > 0 ? Math.max(0, (house.availableForHouse / HOUSE_GOAL_TARGET) * 100) : 0;
   const houseProgress = Math.min(100, housePercent);
   const houseMarker = Math.min(98, Math.max(2, houseProgress));
-  const housePercentLabel = housePercent.toFixed(1).replace(/\.0$/, '');
+  const housePercentLabel = formatNumber(housePercent, { maximumFractionDigits: 1 });
   const houseRemaining = Math.max(0, HOUSE_GOAL_TARGET - house.availableForHouse);
   const canOverviewPrev=financeOverviewMonth>minOverviewMonth;
   const canOverviewNext=financeOverviewMonth<maxOverviewMonth;
@@ -1399,7 +1399,7 @@ function renderCurrentPanel() {
   const activeManualOwed = p.receivables.map((x, i) => ({ item:x, index:i, remaining:loanRemaining(x) })).filter((x) => x.remaining > .005);
   const activeTripRows = tripOwedItems.map((x) => `<div class="finance-current-row finance-trip-owed"><span>${esc(x.person)}<small>${esc(x.reason)} · ${esc(x.categories)}</small></span><strong>${money(x.amount)}</strong></div>`).join('');
   const activeManualRows = activeManualOwed.map(({ item, index, remaining }) => `<button class="finance-current-row finance-manual-owed" type="button" data-fin-repay-owed="${index}"><span>${esc(item.person)}<small>${esc(item.reason || 'Reason not added')} · Manual loan</small></span><strong>${money(remaining)}</strong></button>`).join('');
-  const owedPreview = activeTripRows + activeManualRows || '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.</span><strong>€0.00</strong></button>';
+  const owedPreview = activeTripRows + activeManualRows || '<button class="finance-current-row finance-owed-preview is-empty" type="button" data-fin-open-owed-history><span>Nobody currently owes you money.</span><strong>€0</strong></button>';
   root.innerHTML = `
     <div class="finance-current-head"><div><span class="panel-kicker">CURRENT POSITION</span><h2>${esc(actor())}’s balances</h2></div></div>
     <div class="finance-wallet-stage">
@@ -1754,7 +1754,7 @@ function openRecurringEditor(kind,index) {
         '<section class="tv2-budget-editor-card finance-recurring-editor-card">'+
           '<label class="tv2-field"><span>Name</span><input id="finRecurringName" value="'+esc(item?.name||'')+'" placeholder="'+(isExpense?'e.g. Spotify':'e.g. Salary')+'"></label>'+
           groupField+
-          '<label class="tv2-field"><span>Usual amount</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0.00"></div></label>'+
+          '<label class="tv2-field"><span>Usual amount</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0"></div></label>'+
           '<label class="tv2-field tv2-date-field"><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
         '</section>'+
         '<div class="finance-recurring-editor-actions">'+
@@ -1806,7 +1806,7 @@ function openRecurringEditor(kind,index) {
 
 function openScenarioModal(index) {
   const p = profile(), item = index >= 0 ? p.scenarios[index] : null;
-  showMini(`<span class="panel-kicker">TEST SCENARIO</span><h2>${item ? 'Edit purchase test' : 'Test a purchase'}</h2><p>Purchase price is tested against your accumulated Main account leftover. If that is not enough, Twogether uses your actually available savings. A monthly cost only reduces your usual monthly leftover.</p><div class="finance-mini-fields"><label>What are you considering?<input id="finMiniScenarioName" value="${esc(item?.name || '')}" placeholder="e.g. New laptop"></label><label>Purchase price<div class="finance-money mini"><span>€</span><input id="finMiniScenarioUpfront" inputmode="decimal" value="${esc(String(item?.upfront ?? ''))}" placeholder="0.00"></div></label><label>Monthly cost, if any<div class="finance-money mini"><span>€</span><input id="finMiniScenarioMonthly" inputmode="decimal" value="${esc(String(item?.monthly ?? 0))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save scenario</button></div>`);
+  showMini(`<span class="panel-kicker">TEST SCENARIO</span><h2>${item ? 'Edit purchase test' : 'Test a purchase'}</h2><p>Purchase price is tested against your accumulated Main account leftover. If that is not enough, Twogether uses your actually available savings. A monthly cost only reduces your usual monthly leftover.</p><div class="finance-mini-fields"><label>What are you considering?<input id="finMiniScenarioName" value="${esc(item?.name || '')}" placeholder="e.g. New laptop"></label><label>Purchase price<div class="finance-money mini"><span>€</span><input id="finMiniScenarioUpfront" inputmode="decimal" value="${esc(String(item?.upfront ?? ''))}" placeholder="0"></div></label><label>Monthly cost, if any<div class="finance-money mini"><span>€</span><input id="finMiniScenarioMonthly" inputmode="decimal" value="${esc(String(item?.monthly ?? 0))}" placeholder="0"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save scenario</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', () => {
     const name = String($('#finMiniScenarioName')?.value || '').trim(), upfront = $('#finMiniScenarioUpfront')?.value || '', monthly = $('#finMiniScenarioMonthly')?.value || '0';
     if (!name) return toast('Add what you want to test', 'warn');
@@ -2767,7 +2767,7 @@ function openSharedJarHistory(detail = {}) {
 }
 
 function openSharedJarModal(balance, backAction = closeMini) {
-  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`, '', { back: backAction });
+  showMini(`<span class="panel-kicker">SHARED JAR</span><h2>Edit Shared Jar</h2><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(n(balance)))}" placeholder="0"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`, '', { back: backAction });
   $('[data-fin-mini-save]')?.addEventListener('click', async () => {
     const amount = $('#finMiniAmount')?.value || '';
     if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.'))) || Number(amount.replace(',', '.')) < 0) return toast('Enter a valid balance', 'warn');
@@ -2785,7 +2785,7 @@ function openSharedJarModal(balance, backAction = closeMini) {
 
 function openBankModal(index) {
   const p = profile(), item = index >= 0 ? p.bankAccounts[index] : null;
-  showMini(`<span class="panel-kicker">BANK BALANCE</span><h2>${item ? 'Edit bank' : 'Add bank'}</h2><div class="finance-mini-fields"><label>Bank / account<input id="finMiniName" value="${esc(item?.name || '')}" placeholder="e.g. ING"></label><label>Current balance<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item?.balance ?? ''))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
+  showMini(`<span class="panel-kicker">BANK BALANCE</span><h2>${item ? 'Edit bank' : 'Add bank'}</h2><div class="finance-mini-fields"><label>Bank / account<input id="finMiniName" value="${esc(item?.name || '')}" placeholder="e.g. ING"></label><label>Current balance<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item?.balance ?? ''))}" placeholder="0"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', () => {
     const name = String($('#finMiniName')?.value || '').trim(), amount = $('#finMiniAmount')?.value || '';
     if (!name) return toast('Add the bank name first', 'warn'); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid balance', 'warn');
@@ -2796,13 +2796,13 @@ function openBankModal(index) {
 
 function openSavingsModal() {
   const p = profile();
-  showMini(`<span class="panel-kicker">SAVED UP</span><h2>Update total savings</h2><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(p.savingsTotal ?? ''))}" placeholder="0.00"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
+  showMini(`<span class="panel-kicker">SAVED UP</span><h2>Update total savings</h2><div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(p.savingsTotal ?? ''))}" placeholder="0"></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', () => { const amount = $('#finMiniAmount')?.value || ''; if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid savings total', 'warn'); const next = profile(); next.savingsTotal = n(amount); saveProfile(next, 'Savings total updated'); });
 }
 
 function openHoldModal(index) {
   const p = profile(), item = index >= 0 ? p.savingsReserved[index] : null;
-  showMini(`<span class="panel-kicker">SAVINGS ON HOLD</span><h2>${item ? 'Edit earmarked money' : 'Add savings on hold'}</h2><div class="finance-mini-fields"><label>What is it reserved for?<input id="finMiniName" value="${esc(item?.name || '')}" placeholder="e.g. Driving licence"></label><label>Amount<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0.00"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
+  showMini(`<span class="panel-kicker">SAVINGS ON HOLD</span><h2>${item ? 'Edit earmarked money' : 'Add savings on hold'}</h2><div class="finance-mini-fields"><label>What is it reserved for?<input id="finMiniName" value="${esc(item?.name || '')}" placeholder="e.g. Driving licence"></label><label>Amount<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" value="${esc(String(item?.amount ?? ''))}" placeholder="0"></div></label></div><div class="finance-mini-actions">${item ? '<button class="btn ghost" type="button" data-fin-mini-delete>Delete</button>' : '<span></span>'}<button class="btn primary" type="button" data-fin-mini-save>Save</button></div>`);
   $('[data-fin-mini-save]')?.addEventListener('click', () => { const name = String($('#finMiniName')?.value || '').trim(), amount = $('#finMiniAmount')?.value || ''; if (!name) return toast('Add what this money is for', 'warn'); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); const next = profile(); const row = { id: item?.id || uid(), name, amount: n(amount) }; if (index >= 0) next.savingsReserved[index] = row; else next.savingsReserved.push(row); saveProfile(next, 'Savings hold saved'); });
   $('[data-fin-mini-delete]')?.addEventListener('click', () => { const next = profile(); next.savingsReserved.splice(index, 1); saveProfile(next, 'Savings hold removed'); });
 }
@@ -2976,7 +2976,7 @@ function openOwedHistory() {
 function openOwedModal(index, backAction = closeMini) {
   const p = profile(), item = index >= 0 ? p.receivables[index] : null;
   if (!item) {
-    showMini(`<span class="panel-kicker">NEW LOAN</span><h2>Add money someone owes you</h2><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" placeholder="e.g. Sis"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" placeholder="0.00"></div></label><label class="full">Why did you lend it?<input id="finMiniReason" placeholder="e.g. IP17"></label></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save loan</button></div>`, '', { back: backAction });
+    showMini(`<span class="panel-kicker">NEW LOAN</span><h2>Add money someone owes you</h2><div class="finance-mini-fields"><label>Who owes you?<input id="finMiniPerson" placeholder="e.g. Sis"></label><label>Original amount lent<div class="finance-money mini"><span>€</span><input id="finMiniAmount" inputmode="decimal" placeholder="0"></div></label><label class="full">Why did you lend it?<input id="finMiniReason" placeholder="e.g. IP17"></label></div><div class="finance-mini-actions"><span></span><button class="btn primary" type="button" data-fin-mini-save>Save loan</button></div>`, '', { back: backAction });
     $('[data-fin-mini-save]')?.addEventListener('click', () => { const person = String($('#finMiniPerson')?.value || '').trim(), reason = String($('#finMiniReason')?.value || '').trim(), amount = $('#finMiniAmount')?.value || ''; if (!person) return toast('Add who owes you first', 'warn'); if (!reason) return toast('Add why you lent it', 'warn'); if (amount === '' || !Number.isFinite(Number(amount.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); const next = profile(); next.receivables.push({ id: uid(), person, reason, principal: n(amount), repayments: [] }); saveProfile(next, 'Loan added'); });
     return;
   }
@@ -3000,7 +3000,7 @@ function openLoanRepayment(index, backAction = closeMini) {
   const p = profile(), item = p.receivables[index]; if (!item) return; const remaining = loanRemaining(item);
   const today = new Date().toISOString().slice(0, 10);
   const defaultDate = today.startsWith(selectedMonth+'-') ? today : '';
-  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Date repaid<input id="finMiniRepayDate" type="date" value="${defaultDate}" min="${selectedMonth}-01" max="${selectedMonth}-${String(daysInFinanceMonth(selectedMonth)).padStart(2,'0')}"></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0.00"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`, '', { back: backAction });
+  showMini(`<span class="panel-kicker">REPAYMENT</span><h2>Add repayment from ${esc(item.person)}</h2><div class="finance-mini-fields"><label>Month<select id="finMiniRepayMonth">${MONTHS.map(([k, l]) => `<option value="${k}" ${k === selectedMonth ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Date repaid<input id="finMiniRepayDate" type="date" value="${defaultDate}" min="${selectedMonth}-01" max="${selectedMonth}-${String(daysInFinanceMonth(selectedMonth)).padStart(2,'0')}"></label><label>Amount repaid<div class="finance-money mini"><span>€</span><input id="finMiniRepayAmount" inputmode="decimal" placeholder="0"></div></label></div><div class="finance-mini-actions"><button class="btn ghost" type="button" data-fin-mini-back>Back</button><button class="btn primary" type="button" data-fin-mini-save>Save repayment</button></div>`, '', { back: backAction });
   $('[data-fin-mini-back]')?.addEventListener('click', backAction);
   $('#finMiniRepayMonth')?.addEventListener('change', (event) => {
     const month = event.target.value || selectedMonth;
@@ -3207,7 +3207,7 @@ function renderWizard() {
     const loggedIndex = partialExpenseIndex(d, candidate), logged = loggedIndex >= 0 ? d.expenses[loggedIndex] : null;
     const bounds = financeDateBounds(d.month), suggestedDate = normalizeFinanceDate(logged?.date || candidate.date, d.month);
     setProgress('PARTIAL EXPENSE', 36);
-    body.innerHTML = wizardHtml(`Log ${candidate.name}`, 'Confirm the amount and date for this expense. The date can be left blank.', `<div class="finance-reference finance-tone-${groupTone(candidate.group)}"><span>${esc(groupLabel(candidate.group))}</span><strong>${esc(candidate.name)}</strong><small>${logged ? 'Already in this draft — saving will update it.' : 'Only this expense will be added.'}</small></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(logged?.amount ?? candidate.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(suggestedDate)}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>${logged ? 'Update expense' : 'Add expense'}</button></div>`);
+    body.innerHTML = wizardHtml(`Log ${candidate.name}`, 'Confirm the amount and date for this expense. The date can be left blank.', `<div class="finance-reference finance-tone-${groupTone(candidate.group)}"><span>${esc(groupLabel(candidate.group))}</span><strong>${esc(candidate.name)}</strong><small>${logged ? 'Already in this draft — saving will update it.' : 'Only this expense will be added.'}</small></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(logged?.amount ?? candidate.amount ?? ''))}" placeholder="0"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(suggestedDate)}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>${logged ? 'Update expense' : 'Add expense'}</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = flow.partialGroup ? 'partialCategory' : 'partialChoose'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => {
       const amount = $('#finMoney')?.value || '', rawDate = String($('#finItemDate')?.value || '').trim(), safeDate = normalizeFinanceDate(rawDate, d.month);
@@ -3273,7 +3273,7 @@ function renderWizard() {
     if (!item || !source) { flow.stage = 'recurringCheck'; renderWizard(); return; }
     const bounds = financeDateBounds(d.month);
     setProgress(`EDITING ${idx + 1} OF ${(flow.recurringQueue || []).length}`, 20 + Math.round(((idx + 1) / Math.max(1, (flow.recurringQueue || []).length)) * 40));
-    body.innerHTML = wizardHtml(`Update ${source.name}`, 'Change this month’s amount or actual date. The recurring default stays unchanged.', `<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Actual date <small>Optional</small></span><input class="finance-input" id="finRecurringDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(source.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
+    body.innerHTML = wizardHtml(`Update ${source.name}`, 'Change this month’s amount or actual date. The recurring default stays unchanged.', `<div class="finance-reference"><span>Current suggestion</span><strong>${money(source.amount)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(source.amount ?? ''))}" placeholder="0"></div><label class="finance-date-field"><span>Actual date <small>Optional</small></span><input class="finance-input" id="finRecurringDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(source.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save & continue</button></div>`);
     bindBack(() => { flow.stage = 'recurringCheck'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => {
       const v = $('#finMoney')?.value || '';
@@ -3309,7 +3309,7 @@ function renderWizard() {
   if (flow.stage === 'savedUpSpentAmount') {
     setProgress('SAVED UP', 70);
     const entry = (d.extraSpends || []).find((x) => x.source === 'savings') || null;
-    body.innerHTML = wizardHtml('How much did you use from Saved up?', 'Enter the amount Principe used from his saved-up money.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${entry ? esc(String(entry.amount)) : ''}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save</button></div>`);
+    body.innerHTML = wizardHtml('How much did you use from Saved up?', 'Enter the amount Principe used from his saved-up money.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${entry ? esc(String(entry.amount)) : ''}" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save</button></div>`);
     bindBack(() => { flow.stage = 'savedUpSpentAsk'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => {
       const v = $('#finMoney')?.value || '';
@@ -3345,7 +3345,7 @@ function renderWizard() {
 
   if (flow.stage === 'extraAmount') {
     const source = t.extraSource || 'creditcard'; setProgress('EXTRA', 70);
-    body.innerHTML = wizardHtml(`How much from ${extraSourceLabel(source)}?`, 'Enter the amount used so far. You can add another extra source afterwards.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save</button></div>`);
+    body.innerHTML = wizardHtml(`How much from ${extraSourceLabel(source)}?`, 'Enter the amount used so far. You can add another extra source afterwards.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save</button></div>`);
     bindBack(() => { flow.stage = 'extraSourceAsk'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.'))) || n(v) <= 0) return toast('Enter a valid amount', 'warn'); d.extraSpends.push({ id: uid(), source, amount: n(v) }); flow.temp = {}; flow.stage = 'extraMoreAsk'; renderWizard(); });
     return;
@@ -3364,7 +3364,7 @@ function renderWizard() {
     const idx = Number(t.extraEditIndex), item = d.extraSpends?.[idx];
     if (!item) { flow.temp = {}; flow.stage = 'extraSpentAsk'; renderWizard(); return; }
     setProgress('EDIT EXTRA', 70);
-    body.innerHTML = wizardHtml(`Edit ${extraSourceLabel(item.source)}`, 'Update this extra amount. It remains editable until the month is confirmed.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    body.innerHTML = wizardHtml(`Edit ${extraSourceLabel(item.source)}`, 'Update this extra amount. It remains editable until the month is confirmed.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = 'extraSpentAsk'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.'))) || n(v) <= 0) return toast('Enter a valid amount', 'warn'); item.amount = n(v); flow.temp = {}; flow.stage = 'extraSpentAsk'; renderWizard(); });
     return;
@@ -3379,7 +3379,7 @@ function renderWizard() {
 
   if (flow.stage === 'incomeAmount') {
     setProgress('INCOME', 27);
-    body.innerHTML = wizardHtml(`How much came from ${t.name}?`, 'Enter the amount you actually received.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+    body.innerHTML = wizardHtml(`How much came from ${t.name}?`, 'Enter the amount you actually received.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { flow.stage = 'incomeSource'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); t.amount = n(v); flow.stage = 'incomeDate'; renderWizard(); }); return;
   }
@@ -3405,7 +3405,7 @@ function renderWizard() {
     if (!item) { flow.temp = {}; flow.stage = 'review'; renderWizard(); return; }
     const bounds = financeDateBounds(d.month);
     setProgress('EDIT INCOME', 34);
-    body.innerHTML = wizardHtml(`Edit ${item.name}`, 'Update the amount or date for this saved draft income.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    body.innerHTML = wizardHtml(`Edit ${item.name}`, 'Update the amount or date for this saved draft income.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = 'review'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => {
       const v = $('#finMoney')?.value || '';
@@ -3427,7 +3427,7 @@ function renderWizard() {
     if (!item) { flow.temp = {}; flow.stage = 'review'; renderWizard(); return; }
     const bounds = financeDateBounds(d.month);
     setProgress('EDIT EXPENSE', 58);
-    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. Amount and date stay editable until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(categoryLabel(groupTone(item.group)))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0.00"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
+    body.innerHTML = wizardHtml(`Edit ${item.name || groupLabel(item.group)}`, 'Update this saved draft expense. Amount and date stay editable until the month is confirmed.', `<div class="finance-reference finance-tone-${groupTone(item.group)}"><span>${esc(categoryLabel(groupTone(item.group)))}</span><strong>${esc(item.name || groupLabel(item.group))}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(item.amount ?? ''))}" placeholder="0"></div><label class="finance-date-field"><span>Date <small>Optional</small></span><input class="finance-input" id="finItemDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(item.date, d.month))}"></label><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Save change</button></div>`);
     bindBack(() => { flow.temp = {}; flow.stage = 'review'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => {
       const v = $('#finMoney')?.value || '';
@@ -3477,7 +3477,7 @@ function renderWizard() {
 
   if (flow.stage === 'expenseAmount') {
     const meta = groupMeta(t.group); setProgress('EXPENSES', 56);
-    body.innerHTML = wizardHtml(`How much was ${t.name}?`, meta.key === 'extra' ? `This counts toward your ${money(hasValue(d.extraBudget) ? d.extraBudget : 250)} monthly Extra budget.` : 'Enter the amount for this month.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+    body.innerHTML = wizardHtml(`How much was ${t.name}?`, meta.key === 'extra' ? `This counts toward your ${money(hasValue(d.extraBudget) ? d.extraBudget : 250)} monthly Extra budget.` : 'Enter the amount for this month.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { if (meta.optionalName) flow.stage = 'expenseOptionalName'; else if (meta.defaultName) flow.stage = flow.partialMode && flow.partialGroup ? 'partialCategory' : 'expenseGroup'; else flow.stage = 'expenseName'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); t.amount = n(v); flow.stage = 'expenseDate'; renderWizard(); }); return;
   }
@@ -3501,14 +3501,14 @@ function renderWizard() {
 
   if (flow.stage === 'extraBudget') {
     setProgress('EXTRA BUDGET', 70);
-    body.innerHTML = wizardHtml('What is your Extra spending limit this month?', 'Default is €250. You can change it for a specific month. This is a limit, not an expense. Twogether will warn you when your actual Extra purchases go above it.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(hasValue(d.extraBudget) ? d.extraBudget : 250))}" placeholder="250.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+    body.innerHTML = wizardHtml('What is your Extra spending limit this month?', 'Default is €250. You can change it for a specific month. This is a limit, not an expense. Twogether will warn you when your actual Extra purchases go above it.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(hasValue(d.extraBudget) ? d.extraBudget : 250))}" placeholder="250"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { flow.stage = 'expenseGroup'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid Extra budget', 'warn'); d.extraBudget = 250; flow.stage = 'extraSpentAsk'; renderWizard(); }); return;
   }
 
   if (flow.stage === 'investmentTotal') {
     setProgress('INVESTMENTS', 80);
-    body.innerHTML = wizardHtml('What is the investment account worth now?', 'Enter the full current investment value for this month. This is separate from how much you contributed this month.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(d.investmentTotal ?? ''))}" placeholder="0.00"></div><button class="btn ghost full" type="button" data-fin-skip style="margin-top:10px">Skip investment snapshot this month</button><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
+    body.innerHTML = wizardHtml('What is the investment account worth now?', 'Enter the full current investment value for this month. This is separate from how much you contributed this month.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(d.investmentTotal ?? ''))}" placeholder="0"></div><button class="btn ghost full" type="button" data-fin-skip style="margin-top:10px">Skip investment snapshot this month</button><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { flow.stage = 'extraSpentAsk'; renderWizard(); });
     $('[data-fin-skip]')?.addEventListener('click', () => { d.investmentTotal = ''; d.sisterInvestments = ''; flow.stage = 'review'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid investment total', 'warn'); d.investmentTotal = n(v); if(actor()==='Principessa')flow.stage = 'sisterInvestments'; else { d.sisterInvestments=''; flow.stage='review'; } renderWizard(); }); return;
@@ -3516,7 +3516,7 @@ function renderWizard() {
 
   if (flow.stage === 'sisterInvestments') {
     setProgress('INVESTMENTS', 88);
-    body.innerHTML = wizardHtml('How much of that belongs to Sis?', 'Twogether subtracts Sis’s amount from the total to calculate your own investment value.', `<div class="finance-reference"><span>Total investment account</span><strong>${money(d.investmentTotal)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(d.sisterInvestments ?? 0))}" placeholder="0.00"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Review</button></div>`);
+    body.innerHTML = wizardHtml('How much of that belongs to Sis?', 'Twogether subtracts Sis’s amount from the total to calculate your own investment value.', `<div class="finance-reference"><span>Total investment account</span><strong>${money(d.investmentTotal)}</strong></div><div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(d.sisterInvestments ?? 0))}" placeholder="0"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Review</button></div>`);
     bindBack(() => { flow.stage = 'investmentTotal'; renderWizard(); });
     $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || '0'; if (!Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid amount', 'warn'); d.sisterInvestments = n(v); if (n(d.sisterInvestments) > n(d.investmentTotal)) return toast('Sis’s amount cannot be higher than the investment total', 'warn'); flow.stage = 'review'; renderWizard(); }); return;
   }
