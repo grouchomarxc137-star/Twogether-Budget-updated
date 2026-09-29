@@ -708,7 +708,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       '<button type="button" class="tv2-primary tv2-save" data-save>'+(owedMode?'Log repayment':existing?'Save changes':'Save')+'</button>'+
       (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
   };
-  simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer';
+  simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer tv2-expense-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet" role="dialog" aria-modal="true"></div>';
   document.body.appendChild(simplifiedLayer); document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-sheet');
