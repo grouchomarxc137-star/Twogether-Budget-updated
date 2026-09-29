@@ -264,7 +264,7 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
   return items;
 }
 
-export function buildPushItems(state, actor, timeZone, now = new Date()) {
+function buildPushItems(state, actor, timeZone, now = new Date()) {
   const today = localIsoDate(timeZone, now);
   return [...buildTripPushItems(state, actor, today, timeZone, now), ...buildFinancePushItems(state, actor, today)];
 }
