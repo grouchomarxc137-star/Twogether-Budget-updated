@@ -865,15 +865,17 @@ function recurrentPrepSnapshot() {
 
 function tripPrepNotificationItems() {
   if (!remoteState || !actor()) return [];
-  const today = localToday();
+  const now = new Date();
   return (remoteState.plans || []).map((plan) => {
     const trip = plan?.linkedTripId ? (remoteState.trips || []).find((item) => item.id === plan.linkedTripId) : null;
     if (trip && isLocked(trip)) return null;
     const meta = plan?.meta || {};
     const start = localDate(meta.start);
     if (!start) return null;
-    const days = dayDiff(today, start);
-    if (days < 0 || days > 3) return null;
+    const tripStart = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+    const hoursUntilStart = (tripStart - now) / 3600000;
+    if (hoursUntilStart <= 0 || hoursUntilStart > 48) return null;
+    const urgent = hoursUntilStart <= 12;
 
     const prep = tripPrepSnapshot(plan);
     const reminders = (prep.reminders || []).filter((item) => !item.done && String(item.text || '').trim());
@@ -881,11 +883,9 @@ function tripPrepNotificationItems() {
     if (!reminders.length && !packing.length) return null;
 
     const name = String(meta.city || locationLabel(meta) || 'Your trip').trim();
-    const title = days === 0
-      ? name + ' starts today ♡'
-      : days === 1
-        ? name + ' is tomorrow — final checks'
-        : name + ' is in ' + days + ' days ♡';
+    const title = urgent
+      ? name + ' starts soon — final checks'
+      : name + ' is coming up ♡';
     const parts = [];
     if (reminders.length) parts.push(reminders.length + ' important reminder' + (reminders.length === 1 ? '' : 's'));
     if (packing.length) parts.push(packing.length + ' packing item' + (packing.length === 1 ? '' : 's'));
@@ -897,8 +897,8 @@ function tripPrepNotificationItems() {
       title,
       detail: parts.join(' · '),
       openLabel: 'Open checklist',
-      urgent: days <= 1,
-      priority: days <= 1 ? 'critical' : '',
+      urgent,
+      priority: urgent ? 'critical' : '',
       reminders: reminders.map((item) => item.text),
       packing: packing.map((item) => item.text),
     };
