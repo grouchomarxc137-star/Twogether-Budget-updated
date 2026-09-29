@@ -113,7 +113,12 @@ function financeQuestion(reminder) {
 }
 
 function euro(value) {
-  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount(value));
+  const numeric = amount(value);
+  const whole = Math.abs(numeric - Math.round(numeric)) < .005;
+  return '€' + numeric.toLocaleString('nl-NL', {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function shortDate(value) {
