@@ -270,7 +270,7 @@ test('partial finance drafts keep only the expenses explicitly logged', () => {
   }
 });
 
-test('Principe Saved up spending is savings-only and adjusts the saved total by the edit delta', () => {
+test('Principe Money used extra allows Saved up and Leftover but not credit card', () => {
   const context = setup();
   try {
     assert.equal(action(context.database, 'saveFinanceProfile', { profile: { savingsTotal: 1000 } }, 'Principe').ok, true);
@@ -282,6 +282,7 @@ test('Principe Saved up spending is savings-only and adjusts the saved total by 
         expenses: [{ group: 'rent', name: 'Rent', amount: 575 }],
         extraSpends: [
           { source: 'savings', amount: 120 },
+          { source: 'main', amount: 35 },
           { source: 'creditcard', amount: 50 },
         ],
         finalized: false,
@@ -289,7 +290,7 @@ test('Principe Saved up spending is savings-only and adjusts the saved total by 
     }, 'Principe');
     assert.equal(first.ok, true);
     assert.equal(first.financeProfile.savingsTotal, 880);
-    assert.deepEqual(getState().finances.Principe[0].extraSpends.map((x) => x.source), ['savings']);
+    assert.deepEqual(getState().finances.Principe[0].extraSpends.map((x) => x.source), ['savings', 'main']);
 
     const edited = action(context.database, 'saveFinanceMonth', {
       monthData: {
@@ -321,6 +322,76 @@ test('Principe Saved up spending is savings-only and adjusts the saved total by 
     assert.equal(tooMuch.ok, false);
     assert.match(tooMuch.error, /Saved up only has/);
     assert.equal(getState().financeProfiles.Principe.savingsTotal, 1000);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test('Principessa Saved up extra spending reduces and restores Saved up', () => {
+  const context = setup();
+  try {
+    assert.equal(action(context.database, 'saveFinanceProfile', { profile: { savingsTotal: 1000 } }, 'Principessa').ok, true);
+
+    const first = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [],
+        expenses: [],
+        extraSpends: [{ source: 'savings', amount: 150 }],
+        partialOnly: true,
+        finalized: false,
+      },
+    }, 'Principessa');
+    assert.equal(first.ok, true);
+    assert.equal(first.financeProfile.savingsTotal, 850);
+
+    const removed = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-09',
+        incomes: [],
+        expenses: [],
+        extraSpends: [],
+        partialOnly: true,
+        finalized: false,
+      },
+    }, 'Principessa');
+    assert.equal(removed.ok, true);
+    assert.equal(removed.financeProfile.savingsTotal, 1000);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test('pending credit card only counts in finalized outflow when marked to count while pending', () => {
+  const context = setup();
+  try {
+    const beforeSalary = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-10',
+        incomes: [{ name: 'Neways', amount: 1000 }],
+        expenses: [{ group: 'other', name: 'Normal', amount: 100 }],
+        extraSpends: [{ source: 'creditcard', amount: 200, date: '2026-10-10', status: 'pending', pendingCounts: false }],
+        partialOnly: true,
+        finalized: true,
+      },
+    }, 'Principessa');
+    assert.equal(beforeSalary.ok, true);
+    assert.equal(beforeSalary.twosDelta, 900);
+    assert.equal(getState().finances.Principessa[0].extraSpends[0].status, 'pending');
+    assert.equal(getState().finances.Principessa[0].extraSpends[0].pendingCounts, false);
+
+    const futureCycle = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-11',
+        incomes: [{ name: 'Neways', amount: 1000 }],
+        expenses: [{ group: 'other', name: 'Normal', amount: 100 }],
+        extraSpends: [{ source: 'creditcard', amount: 200, date: '2026-11-10', status: 'pending', pendingCounts: true }],
+        partialOnly: true,
+        finalized: true,
+      },
+    }, 'Principessa');
+    assert.equal(futureCycle.ok, true);
+    assert.equal(futureCycle.twosDelta, 700);
   } finally {
     context.cleanup();
   }

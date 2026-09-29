@@ -2309,7 +2309,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
         target.extraSpends=[...(target.extraSpends||[])];
         const salaryDate=isCreditCardExtra()?financeSalaryDate(targetMonth):'';
         const pendingCounts=isCreditCardExtra()
-          ? (targetMonth>rec.month || (!!salaryDate && chargeDate>=salaryDate))
+          ? (targetMonth>rec.month || targetMonth>localFinanceToday().month || (!!salaryDate && chargeDate>=salaryDate))
           : true;
         target.extraSpends.push({
           id:uid(),
