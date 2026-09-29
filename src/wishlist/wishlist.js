@@ -202,10 +202,10 @@ export function renderWishlist() {
 
     <div class="tw-wish-layout">
       <section class="tw-wish-collection" aria-label="Wishlist collection">
-        <a class="tw-wish-mobile-basket" href="#v28Basket">
+        <button type="button" class="tw-wish-mobile-basket" data-basket-jump>
           <span><b>Basket</b><small>${selected.length} ${selected.length === 1 ? 'wish' : 'wishes'}</small></span>
           <strong>${money(total)} <i aria-hidden="true">→</i></strong>
-        </a>
+        </button>
 
         <div class="tw-wish-grid">${list.map((w) => wishCard(w, ids)).join('')}</div>
         <div class="tw-wish-empty" data-wish-empty hidden>
@@ -326,6 +326,11 @@ function bindWishlist(root) {
   $$('[data-wish-status]', root).forEach((b) => b.onclick = () => {
     wishStatus = b.dataset.wishStatus;
     renderWishlist();
+  });
+  $('[data-basket-jump]', root)?.addEventListener('click', () => {
+    const basket = $('#v28Basket', root);
+    basket?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    basket?.focus({ preventScroll: true });
   });
   $('[data-checkout]', root)?.addEventListener('click', checkoutWishlist);
 }

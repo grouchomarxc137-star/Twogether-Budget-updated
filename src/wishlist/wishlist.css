@@ -3260,3 +3260,14 @@ html body #financeWishlist .v28-view-tabs span, html body #financeWishlist .v27-
   -webkit-appearance:none;
   appearance:none;
 }
+
+
+/* The sticky Wishlist basket is a UI control, not a link. This prevents
+   iOS long-press from offering to open/preview the current page URL. */
+#financeWishlist .tw-wish-mobile-basket {
+  width:100%;
+  text-align:left;
+  font-family:inherit;
+  cursor:pointer;
+  -webkit-touch-callout:none;
+}
