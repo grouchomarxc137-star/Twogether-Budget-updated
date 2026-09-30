@@ -5826,3 +5826,33 @@ dialog.finance-log-host .tv2-backdrop {
   font-size:11px;
   line-height:1.35;
 }
+
+
+/* Prevent touch hover/focus states from sticking on Wallet rows after opening them. */
+@media (max-width:760px) and (hover:none) {
+  [data-fin-view="balances"] .finance-current-row,
+  [data-fin-view="balances"] .finance-current-title,
+  [data-fin-view="balances"] .finance-add,
+  [data-fin-view="balances"] .finance-card-actions .btn,
+  [data-fin-view="balances"] .finance-investment-edit {
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  [data-fin-view="balances"] .finance-current-row:hover,
+  [data-fin-view="balances"] .finance-current-row:focus:not(:focus-visible) {
+    background:transparent!important;
+    outline:none!important;
+  }
+
+  [data-fin-view="balances"] .v33-shared-jar-bank:hover,
+  [data-fin-view="balances"] .v33-shared-jar-bank:focus:not(:focus-visible) {
+    background:linear-gradient(90deg,rgba(255,245,218,.48),rgba(255,253,249,.18))!important;
+  }
+
+  [data-fin-view="balances"] .finance-manual-owed:hover,
+  [data-fin-view="balances"] .finance-manual-owed:focus:not(:focus-visible),
+  [data-fin-view="balances"] .finance-owed-preview:hover,
+  [data-fin-view="balances"] .finance-owed-preview:focus:not(:focus-visible) {
+    background:linear-gradient(90deg,rgba(237,246,232,.72),rgba(255,253,249,.18))!important;
+  }
+}
