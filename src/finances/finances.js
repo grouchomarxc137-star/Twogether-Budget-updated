@@ -1225,7 +1225,7 @@ function renderPage() {
       </div>
       <article class="finance-house-goal" aria-label="House savings goal">
         <div class="finance-house-goal-head">
-          <div><span class="panel-kicker">OUR DREAM HOME</span><h2>Closer to our own front door</h2></div>
+          <div><span class="panel-kicker">OUR DREAM HOME</span></div>
         </div>
         <div class="finance-house-goal-content">
           <div class="finance-house-goal-icon" aria-hidden="true"><span>🏡</span><small>♡</small></div>
