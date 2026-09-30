@@ -1493,11 +1493,12 @@ function sanitizeFinanceMonth_(record, actor) {
   if (partialOnly) expenses = expenses.filter(function(x){ return !(x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'); });
 
   const allowedExtraSources = actor === 'Principe' ? ['savings','main'] : ['creditcard','savings','main'];
-  let extraSpends = Array.isArray(record && record.extraSpends) ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
+  const hasExplicitExtraSpends = Array.isArray(record && record.extraSpends);
+  let extraSpends = hasExplicitExtraSpends ? record.extraSpends.slice(0,60).map(sanitizeFinanceExtraSpend_).filter(function(x){ return allowedExtraSources.indexOf(x.source) >= 0 && x.amount !== '' && Number(x.amount) > 0; }) : [];
   if (/^\d{4}-\d{2}$/.test(month)) {
     extraSpends.forEach(function(x){ if (x.date && x.date.slice(0,7) !== month) x.date = ''; });
   }
-  if (!extraSpends.length) {
+  if (!hasExplicitExtraSpends && !extraSpends.length) {
     const legacySourceRaw = String(record && record.extraOverspendSource || '');
     const legacySource = allowedExtraSources.indexOf(legacySourceRaw) >= 0 ? legacySourceRaw : '';
     const legacyAmount = cleanMoney_(record && record.extraOverspendAmount);

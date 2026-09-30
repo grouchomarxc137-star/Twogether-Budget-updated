@@ -960,7 +960,8 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
   }
   const allowedExtraSources = owner === 'Principe' ? ['savings', 'main'] : ['creditcard', 'savings', 'main'];
-  copy.extraSpends = Array.isArray(copy.extraSpends) ? copy.extraSpends.map((x) => {
+  const hasExplicitExtraSpends = Array.isArray(copy.extraSpends);
+  copy.extraSpends = hasExplicitExtraSpends ? copy.extraSpends.map((x) => {
     const sourceRaw = String(x.source || '');
     const source = allowedExtraSources.includes(sourceRaw) ? sourceRaw : '';
     const rawStatus = String(x.status || '');
@@ -973,7 +974,7 @@ function normalizeFinanceRecord(rec, owner = actor()) {
       pendingCounts: source === 'creditcard' && x.pendingCounts === true,
     };
   }).filter((x) => x.source && x.amount > 0) : [];
-  if (!copy.extraSpends.length && allowedExtraSources.length) {
+  if (!hasExplicitExtraSpends && !copy.extraSpends.length && allowedExtraSources.length) {
     const legacySourceRaw = String(copy.extraOverspendSource || '');
     const legacySource = allowedExtraSources.includes(legacySourceRaw) ? legacySourceRaw : '';
     const legacyAmount = hasValue(copy.extraOverspendAmount) ? Math.max(0, n(copy.extraOverspendAmount)) : 0;

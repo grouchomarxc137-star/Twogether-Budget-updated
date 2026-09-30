@@ -490,6 +490,38 @@ test('confirms a pending credit card charge without changing its amount', () => 
   }
 });
 
+test('deleting the final credit card log does not revive it from legacy extra fields', () => {
+  const context = setup();
+  try {
+    assert.equal(action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month: '2026-10',
+        incomes: [],
+        expenses: [],
+        extraSpends: [{ id:'cc-delete', source:'creditcard', amount:80, date:'2026-10-20', status:'pending', pendingCounts:false }],
+        partialOnly:true,
+        finalized:false,
+      },
+    }, 'Principessa').ok, true);
+
+    const stored = getState().finances.Principessa[0];
+    assert.equal(stored.extraOverspendSource, 'creditcard');
+    assert.equal(stored.extraOverspendAmount, 80);
+
+    const deleting = JSON.parse(JSON.stringify(stored));
+    deleting.extraSpends = [];
+    // These compatibility fields intentionally stay stale, matching the UI delete path.
+    assert.equal(action(context.database, 'saveFinanceMonth', { monthData: deleting }, 'Principessa').ok, true);
+
+    const after = getState().finances.Principessa[0];
+    assert.deepEqual(after.extraSpends, []);
+    assert.equal(after.extraOverspendSource, '');
+    assert.equal(after.extraOverspendAmount, 0);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('keeps optional finance dates and recurring usual days', () => {
   const context = setup();
   try {
