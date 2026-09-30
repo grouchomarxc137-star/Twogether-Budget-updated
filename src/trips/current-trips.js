@@ -442,7 +442,7 @@ function simplifiedCard(item) {
   const over = item.left != null && item.left < 0;
   const name = item.meta?.city || locationLabel(item.meta);
   const country = locationLabel(item.meta);
-  const image = tripImage(name, country);
+  const image = tripImage(name, country, item.id);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
@@ -3364,7 +3364,7 @@ function decorateTripStories() {
   const root = $('#tripGallery'); if (!root) return;
   $$('.trip-story-card', root).forEach((card) => {
     const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
-    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    const image = tripImage(city, country, card.dataset.openTrip || `${city}|${country}`);
     card.style.setProperty('--v28-story-bg', `url("${image}")`);
     card.dataset.v28Background = '1';
   });
@@ -3491,10 +3491,10 @@ function enhanceCardPhotos() {
     $('.tw-trip-monogram', art)?.remove();
     const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
     card.dataset.v21City = city; card.dataset.v21Country = country.toLowerCase();
-    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    const image = tripImage(city, country, card.dataset.openTrip || card.dataset.tripId || card.dataset.id || `${city}|${country}`);
     const bg = `linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.20)),url("${image}")`;
     art.style.backgroundImage = bg; card.style.setProperty('--v27-trip-bg', bg); card.dataset.v27Background = '1';
-    if (city === 'ariana' || country === 'Tunisia') art.title = 'Ariana, Tunisia — Wikimedia Commons';
+    art.removeAttribute('title');
     const flag = $('.tw-trip-emoji', art);
     if (flag && FLAGS[country] && !flag.querySelector('img')) flag.innerHTML = `<img alt="${country} flag" loading="lazy" decoding="async" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${FLAGS[country]}.svg">`;
   });

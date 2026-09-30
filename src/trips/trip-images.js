@@ -1,3 +1,12 @@
+import portugalImage from './country-images/portugal.webp';
+import italyImage1 from './country-images/italy-1.webp';
+import italyImage2 from './country-images/italy-2.webp';
+import austriaImage1 from './country-images/austria-1.webp';
+import austriaImage2 from './country-images/austria-2.webp';
+import netherlandsImage1 from './country-images/netherlands-1.webp';
+import netherlandsImage2 from './country-images/netherlands-2.webp';
+import tunisiaImage from './country-images/tunisia.webp';
+
 const CITY_IMAGES = {
   ariana: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg',
   amsterdam: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82',
@@ -31,6 +40,39 @@ function key(value) {
   return String(value || '').trim().toLocaleLowerCase('en').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-export function tripImage(city, country) {
-  return CITY_IMAGES[key(city)] || COUNTRY_IMAGES[String(country || '').trim()] || FALLBACK_IMAGE;
+function countryKey(value) {
+  const normalized = key(value).replace(/^the\s+/, '');
+  if (normalized === 'holland' || normalized === 'nederland') return 'netherlands';
+  if (normalized === 'italia') return 'italy';
+  return normalized;
+}
+
+const CUSTOM_COUNTRY_IMAGES = {
+  portugal: [portugalImage],
+  italy: [italyImage1, italyImage2],
+  austria: [austriaImage1, austriaImage2],
+  netherlands: [netherlandsImage1, netherlandsImage2],
+  tunisia: [tunisiaImage],
+};
+
+function stableImageIndex(seed, length) {
+  let hash = 2166136261;
+  for (const char of String(seed || '')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % length;
+}
+
+export function tripImage(city, country, seed = '') {
+  const countryName = String(country || '').trim();
+  const normalizedCountry = countryKey(countryName);
+  const custom = CUSTOM_COUNTRY_IMAGES[normalizedCountry];
+
+  if (custom?.length) {
+    const choiceSeed = seed || `${key(city)}|${normalizedCountry}`;
+    return custom[stableImageIndex(choiceSeed, custom.length)];
+  }
+
+  return CITY_IMAGES[key(city)] || COUNTRY_IMAGES[countryName] || FALLBACK_IMAGE;
 }

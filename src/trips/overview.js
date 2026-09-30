@@ -43,7 +43,7 @@ export function renderTripGallery() {
     else if (t.submissions.Principessa && t.submissions.Principe && d.length) { status = 'Needs discussion'; statusClass = 'status-warn'; }
     else if (t.submissions.Principessa && t.submissions.Principe) { status = 'Awaiting confirmation'; statusClass = 'status-wait'; }
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
-    const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country);
+    const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country, t.id);
     return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
       <span class="trip-story-photo" aria-hidden="true"><img src="${esc(image)}" alt="" loading="lazy" decoding="async"></span>
       <div class="trip-card-top"><span class="trip-country">${esc(country)}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
