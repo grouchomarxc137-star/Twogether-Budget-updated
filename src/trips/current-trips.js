@@ -998,7 +998,7 @@ function openSimplifiedChecklist(plan) {
     '</div>';
 
   const activeSection = (kind, title) => {
-    const mine=kind==='packing'&&state.packingMine;
+    const mine=state.packingMine;
     const active = prep[kind].filter((item)=>!item.done && (!mine || checklistAddedBy(item.addedBy)===actor()));
     const ownerClass=mine?(actor()==='Principe'?' is-principe':' is-principessa'):'';
     return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
@@ -1690,8 +1690,8 @@ function openSimplifiedChecklist(plan) {
       e.preventDefault();
       return;
     }
-    const packingCard=e.target.closest('[data-check-section="packing"]');
-    if(packingCard && !e.target.closest('input,button,label')){
+    const personalCard=e.target.closest('[data-check-section="packing"],[data-check-section="reminders"]');
+    if(personalCard && !e.target.closest('input,button,label')){
       state.packingMine=!state.packingMine;
       render();
       return;
