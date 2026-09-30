@@ -1804,6 +1804,7 @@ function openRecurrentChecklistItems(plan) {
     state.busy=true;state.error='';render();
     const payload=recurrentPayload();
     try{
+      await recurrentSaveQueue.catch(()=>{});
       const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor());
       if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
       closeSimplifiedSheet();
