@@ -22,7 +22,7 @@ import { esc, n, money, fmtDate, uid } from '../lib/format.js';
 import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
-import { countryFlag } from './country-flags.js';
+import { tripImage } from './trip-images.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -435,19 +435,21 @@ function allSimplifiedItems() {
 }
 function cardCountryEmoji(meta) {
   const country = String(meta?.location === 'Other' ? (meta?.otherLocation || '') : (meta?.location || '')).trim();
-  return countryFlag(country);
+  return COUNTRY_EMOJI[country] || COUNTRY_EMOJI[String(meta?.location || '').trim()] || '🌍';
 }
 function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
   const over = item.left != null && item.left < 0;
   const name = item.meta?.city || locationLabel(item.meta);
-  const flag = cardCountryEmoji(item.meta);
+  const country = locationLabel(item.meta);
+  const image = tripImage(name, country);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
+      '<span class="tv2-card-photo" aria-hidden="true"><img src="'+esc(image)+'" alt="" loading="lazy" decoding="async"></span>'+
       '<span class="tv2-card-content">'+
-        '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+esc(flag)+'</span><span class="tv2-card-name">'+esc(name)+'</span></strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+        '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
         '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
         '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span class="'+(over?'is-over':'')+'">'+displayMoney(item.left)+' left</span>':'')+'</span>'+
         (item.available && item.available > 0?'<span class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
@@ -3355,18 +3357,16 @@ function filterTripStories() {
   if (!shown) { const e = document.createElement('div'); e.className = 'empty-state gallery-empty tw-story-empty'; e.innerHTML = '<strong>No confirmed trips yet</strong><span>Completed trips move here after both of you confirm them.</span>'; root.appendChild(e); }
 }
 
-// Confirmed Trip Story cards use the native country flag emoji too.
+// Background images for confirmed Trip Story cards in #tripGallery -- a
+// separate gallery from the Current Trips cards enhanceCardPhotos() already
+// decorates above. Ported from v28.js's decorateTripStories().
 function decorateTripStories() {
   const root = $('#tripGallery'); if (!root) return;
   $$('.trip-story-card', root).forEach((card) => {
-    const country = ($('.trip-country', card)?.textContent || '').trim();
-    const art = $('.trip-story-photo', card);
-    if (!art) return;
-    art.classList.add('trip-story-flag');
-    art.textContent = countryFlag(country);
-    art.setAttribute('aria-label', country ? country+' flag' : 'Country flag');
-    card.style.removeProperty('--v28-story-bg');
-    delete card.dataset.v28Background;
+    const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
+    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    card.style.setProperty('--v28-story-bg', `url("${image}")`);
+    card.dataset.v28Background = '1';
   });
 }
 
@@ -3467,7 +3467,7 @@ function enhanceTripModal() {
 // dev-tooling panel (gated behind window.TwogetherDevV18, confirmed never
 // defined by any loaded file -- same dead reference as the Dev toggle in
 // app/session-switch.js).
-
+const COUNTRY_EMOJI = { Italy: '🇮🇹', Netherlands: '🇳🇱', Tunisia: '🇹🇳', Portugal: '🇵🇹', Spain: '🇪🇸', France: '🇫🇷', Germany: '🇩🇪', Belgium: '🇧🇪', 'United Kingdom': '🇬🇧', Other: '✦' };
 function enhanceCardArt(card) {
   if (card.dataset.v19Aesthetic === '1') return;
   const main = $('.tw-current-main', card); if (!main) return;
@@ -3481,20 +3481,22 @@ function enhanceCardArt(card) {
 }
 function ensureCardArt() { $$('#twCurrentTrips .tw-current-card').forEach(enhanceCardArt); }
 
+const FLAGS = { Italy: '1f1ee-1f1f9', Netherlands: '1f1f3-1f1f1', Tunisia: '1f1f9-1f1f3', Portugal: '1f1f5-1f1f9', Spain: '1f1ea-1f1f8', France: '1f1eb-1f1f7', Germany: '1f1e9-1f1ea', Belgium: '1f1e7-1f1ea', 'United Kingdom': '1f1ec-1f1e7' };
+const CITY_IMAGES = { ariana: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', amsterdam: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', lonato: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', lisbon: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', lisboa: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', porto: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82' };
+const COUNTRY_IMAGES = { Italy: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', Netherlands: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', Portugal: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', Tunisia: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', Spain: 'https://images.unsplash.com/photo-1509840841025-9088ba78a826?auto=format&fit=crop&w=900&q=82', France: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=82', Germany: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=82', Belgium: 'https://images.unsplash.com/photo-1491557345352-5929e343eb89?auto=format&fit=crop&w=900&q=82' };
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=82';
 function enhanceCardPhotos() {
   $$('#twCurrentTrips .tw-current-card').forEach((card) => {
     const art = $('.tw-trip-art', card); if (!art) return;
     $('.tw-trip-monogram', art)?.remove();
-    const country = ($('.trip-country', card)?.textContent || '').trim();
-    card.dataset.v21Country = country.toLowerCase();
-    art.style.backgroundImage = 'none';
-    card.style.removeProperty('--v27-trip-bg');
-    delete card.dataset.v27Background;
+    const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
+    card.dataset.v21City = city; card.dataset.v21Country = country.toLowerCase();
+    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    const bg = `linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.20)),url("${image}")`;
+    art.style.backgroundImage = bg; card.style.setProperty('--v27-trip-bg', bg); card.dataset.v27Background = '1';
+    if (city === 'ariana' || country === 'Tunisia') art.title = 'Ariana, Tunisia — Wikimedia Commons';
     const flag = $('.tw-trip-emoji', art);
-    if (flag) {
-      flag.textContent = countryFlag(country);
-      flag.setAttribute('aria-label', country ? country+' flag' : 'Country flag');
-    }
+    if (flag && FLAGS[country] && !flag.querySelector('img')) flag.innerHTML = `<img alt="${country} flag" loading="lazy" decoding="async" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${FLAGS[country]}.svg">`;
   });
 }
 function enhanceCardMedia() { ensureCardArt(); enhanceCardPhotos(); }

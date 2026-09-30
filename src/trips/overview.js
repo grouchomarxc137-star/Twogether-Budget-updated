@@ -19,23 +19,12 @@ import {
 import { getState, isBackendV3, postAction, syncNow } from './state.js';
 import { beginEdit, beginJoin } from './wizard.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
-import { countryFlag } from './country-flags.js';
+import { tripImage } from './trip-images.js';
 
 let openTripId = '';
 let selectedMonthlyKey = '';
 let monthlyViewMode = 'combined';
 let monthlyIgnoreClickUntil = 0;
-
-function shortStoryRange(start, end) {
-  if (!start || !end) return '';
-  const a = new Date(start + 'T12:00:00');
-  const b = new Date(end + 'T12:00:00');
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return '';
-  const am = a.toLocaleDateString('en-GB',{month:'short'});
-  const bm = b.toLocaleDateString('en-GB',{month:'short'});
-  return am === bm ? `${a.getDate()}–${b.getDate()} ${bm}` : `${a.getDate()} ${am}–${b.getDate()} ${bm}`;
-}
-
 
 export function renderTripGallery() {
   const root = $('#tripGallery');
@@ -54,15 +43,12 @@ export function renderTripGallery() {
     else if (t.submissions.Principessa && t.submissions.Principe && d.length) { status = 'Needs discussion'; statusClass = 'status-warn'; }
     else if (t.submissions.Principessa && t.submissions.Principe) { status = 'Awaiting confirmation'; statusClass = 'status-wait'; }
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
-    const city = m.city || locationLabel(m), country = locationLabel(m), flag = countryFlag(country);
-    const left = e.budget > 0 ? e.budget - e.total : null;
-    const over = left != null && left < 0;
-    const pct = e.budget > 0 ? Math.min(100, Math.max(0, (e.total / e.budget) * 100)) : 0;
+    const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country);
     return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
-      <span class="trip-story-title-row"><strong><span class="trip-story-flag" aria-hidden="true">${esc(flag)}</span><span class="trip-story-name">${esc(city)}</span></strong><small>${esc(shortStoryRange(m.start,m.end))}</small></span>
-      <span class="trip-story-sub">Confirmed trip</span>
-      <span class="trip-story-money"><span>${e.estimated ? '~ ' : ''}${money(e.total)} spent</span><span class="${over ? 'is-over' : ''}">${left == null ? 'No budget set' : money(Math.abs(left)) + (over ? ' over' : ' left')}</span></span>
-      ${e.budget > 0 ? '<span class="trip-story-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>' : ''}
+      <span class="trip-story-photo" aria-hidden="true"><img src="${esc(image)}" alt="" loading="lazy" decoding="async"></span>
+      <div class="trip-card-top"><span class="trip-country">${esc(country)}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
+      <h3>${esc(city)}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
+      <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
   }).join('');
