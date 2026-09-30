@@ -1467,11 +1467,11 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   width:100%;
   max-width:900px;
   margin:0 auto;
-  padding:26px 8px 10px;
+  padding:14px 8px 10px;
   gap:24px;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-home-head{
-  padding:8px 4px 12px;
+  padding:4px 4px 12px;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-home-head h1{
   font-size:32px;
@@ -1746,11 +1746,11 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 
 @media(max-width:620px){
   #twCurrentTrips.tv2-root:not(.tv2-trip-view)>.tv2-page{
-    padding:18px 2px 8px;
+    padding:8px 2px 8px;
     gap:20px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-home-head{
-    padding:5px 3px 8px;
+    padding:2px 3px 8px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-home-head h1{
     font-size:32px;
