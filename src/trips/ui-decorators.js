@@ -103,11 +103,6 @@ function installStyles() {
     .confirmed-spend-card{position:relative;background:#fffdfa;border:1px solid #e7ded5;border-radius:20px;padding:16px;box-shadow:0 7px 22px rgba(62,45,31,.04);touch-action:pan-y}
     .confirmed-spend-card.is-principessa{border-color:#e4d8b8;background:#fffdf8}
     .confirmed-spend-card.is-principe{border-color:#ead7ca;background:#fffaf7}
-    .confirmed-spend-switch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 15px;padding:4px;border-radius:14px;background:#f3f0eb}
-    .confirmed-spend-switch button{min-width:0;min-height:34px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:#81766d;font:inherit;font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .confirmed-spend-switch button.is-active{background:#fffdfa;color:#332d28;box-shadow:0 1px 5px rgba(70,54,42,.09)}
-    .confirmed-spend-switch button[data-confirmed-mode="principessa"].is-active{color:#8a6814}
-    .confirmed-spend-switch button[data-confirmed-mode="principe"].is-active{color:#a65220}
     .confirmed-spend-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 10px}
     .confirmed-spend-title h3{margin:0;font-size:17px;line-height:1.2;font-weight:600}
     .confirmed-spend-title small{color:#91877e;font-size:10px;white-space:nowrap}
@@ -124,10 +119,6 @@ function installStyles() {
     .confirmed-donut-center strong{font-size:22px;line-height:1.04;font-variant-numeric:tabular-nums}
     .confirmed-donut-center small{color:#91877e;font-size:10px;line-height:1.2}
     .confirmed-spend-side{min-width:0;display:grid;gap:11px;align-content:center}
-    .confirmed-spend-summary{display:grid;gap:2px;padding:0 2px}
-    .confirmed-spend-summary span{color:#91877e;font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:750}
-    .confirmed-spend-summary strong{font-size:18px;line-height:1.15;font-weight:600}
-    .confirmed-spend-summary small{color:#857a70;font-size:11px;line-height:1.35}
     .confirmed-legend{display:flex;flex-wrap:wrap;gap:7px}
     .confirmed-legend-chip{display:inline-flex;align-items:center;gap:6px;min-height:30px;max-width:100%;padding:0 9px;border:1px solid #e6ddd4;border-radius:999px;background:#fffdfa;color:#6f655c;font:inherit;font-size:10.5px;line-height:1;white-space:nowrap}
     .confirmed-legend-chip i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--confirmed-color)}
@@ -145,11 +136,9 @@ function installStyles() {
       #tripModalBody.confirmed-trip-redesign .budget-check>div{border-bottom:0!important}
       #tripModalBody.confirmed-trip-redesign .budget-check>div:first-child{border-right:1px solid rgba(110,89,70,.08)!important}
       .confirmed-spend-card{padding:14px;border-radius:18px}
-      .confirmed-spend-switch{margin-bottom:13px}
       .confirmed-spend-visual{grid-template-columns:1fr;gap:13px}
       .confirmed-donut-shell{width:min(205px,62vw)}
       .confirmed-spend-side{gap:9px;text-align:center}
-      .confirmed-spend-summary{justify-items:center}
       .confirmed-legend{justify-content:center}
     }
   `;
@@ -315,6 +304,7 @@ function decorateConfirmedSpend() {
   const tripId = root.dataset.tripId || '';
   const plan = (state.plans || []).find((item) => item.linkedTripId === tripId) || null;
   const me = actor();
+  const other = me === 'Principessa' ? 'Principe' : 'Principessa';
   const totalCategories = categoryData(cards[0]);
   const total = parseMoney(root.querySelector('.trip-modal-total strong')?.textContent) || 0;
   const personal = {
@@ -335,8 +325,12 @@ function decorateConfirmedSpend() {
   analysis.className = 'confirmed-spend-overview';
   let mode = 'total';
   let selectedIndex = -1;
+  let longPressed = false;
+  let longTimer = null;
+  let startX = 0;
+  let startY = 0;
 
-  const personForMode = () => mode === 'principessa' ? 'Principessa' : mode === 'principe' ? 'Principe' : '';
+  const personForMode = () => mode === 'mine' ? me : mode === 'other' ? other : '';
 
   const render = () => {
     const viewed = personForMode();
@@ -373,16 +367,8 @@ function decorateConfirmedSpend() {
 
     const modeLabel = viewed || 'Together';
     const cls = viewed ? ' is-' + viewed.toLowerCase() : '';
-    const detail = viewed
-      ? (hasDetailed ? money(viewedTotal)+' paid by '+esc(viewed) : money(viewedTotal)+' paid · category detail unavailable')
-      : money(total)+' across the confirmed trip';
 
-    analysis.innerHTML = '<section class="confirmed-spend-card'+cls+'" aria-label="Confirmed trip spending view: '+esc(modeLabel)+'">'+
-      '<div class="confirmed-spend-switch" role="tablist" aria-label="Choose whose expenses to view">'+
-        '<button type="button" role="tab" data-confirmed-mode="total" class="'+(mode==='total'?'is-active':'')+'" aria-selected="'+(mode==='total')+'">Together</button>'+
-        '<button type="button" role="tab" data-confirmed-mode="principessa" class="'+(mode==='principessa'?'is-active':'')+'" aria-selected="'+(mode==='principessa')+'">Principessa</button>'+
-        '<button type="button" role="tab" data-confirmed-mode="principe" class="'+(mode==='principe'?'is-active':'')+'" aria-selected="'+(mode==='principe')+'">Principe</button>'+
-      '</div>'+
+    analysis.innerHTML = '<section class="confirmed-spend-card'+cls+'" role="button" tabindex="0" aria-label="Confirmed trip spending view: '+esc(modeLabel)+'">'+
       '<div class="confirmed-spend-title"><h3>Spending breakdown</h3><small>Tap a color</small></div>'+
       '<div class="confirmed-spend-visual">'+
         '<div class="confirmed-donut-shell">'+
@@ -391,38 +377,74 @@ function decorateConfirmedSpend() {
           '</svg>'+
           '<div class="confirmed-donut-center">'+centerHtml+'</div>'+
         '</div>'+
-        '<div class="confirmed-spend-side">'+
-          '<div class="confirmed-spend-summary"><span>'+esc(modeLabel)+'</span><strong>'+money(viewedTotal)+'</strong><small>'+detail+'</small></div>'+
-          '<div class="confirmed-legend">'+legend+'</div>'+
-        '</div>'+
+        '<div class="confirmed-spend-side"><div class="confirmed-legend">'+legend+'</div></div>'+
       '</div>'+
     '</section>';
   };
 
-  analysis.addEventListener('click', (event) => {
-    const modeButton = event.target.closest?.('[data-confirmed-mode]');
-    if (modeButton) {
-      mode = modeButton.dataset.confirmedMode || 'total';
+  const clearLongPress = () => {
+    if (longTimer) clearTimeout(longTimer);
+    longTimer = null;
+  };
+
+  analysis.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !event.target.closest?.('.confirmed-spend-card') || event.target.closest?.('[data-confirmed-category]')) return;
+    longPressed = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    clearLongPress();
+    longTimer = setTimeout(() => {
+      longPressed = true;
       selectedIndex = -1;
+      mode = 'other';
+      try { if (typeof navigator.vibrate === 'function') navigator.vibrate(10); } catch {}
+      render();
+    }, 550);
+  });
+  analysis.addEventListener('pointermove', (event) => {
+    if (Math.abs(event.clientX - startX) > 12 || Math.abs(event.clientY - startY) > 12) clearLongPress();
+  });
+  analysis.addEventListener('pointerup', clearLongPress);
+  analysis.addEventListener('pointercancel', clearLongPress);
+  analysis.addEventListener('contextmenu', (event) => {
+    if (event.target.closest?.('.confirmed-spend-card')) event.preventDefault();
+  });
+
+  analysis.addEventListener('click', (event) => {
+    const categoryTarget = event.target.closest?.('[data-confirmed-category]');
+    if (categoryTarget) {
+      const index = Number(categoryTarget.dataset.confirmedCategory);
+      if (!Number.isInteger(index)) return;
+      selectedIndex = selectedIndex === index ? -1 : index;
       render();
       return;
     }
-    const categoryTarget = event.target.closest?.('[data-confirmed-category]');
-    if (!categoryTarget) return;
-    const index = Number(categoryTarget.dataset.confirmedCategory);
-    if (!Number.isInteger(index)) return;
-    selectedIndex = selectedIndex === index ? -1 : index;
+    if (!event.target.closest?.('.confirmed-spend-card')) return;
+    if (longPressed) {
+      longPressed = false;
+      return;
+    }
+    selectedIndex = -1;
+    mode = mode === 'total' ? 'mine' : 'total';
     render();
   });
 
   analysis.addEventListener('keydown', (event) => {
-    const categoryTarget = event.target.closest?.('.confirmed-donut-segment[data-confirmed-category]');
-    if (!categoryTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-    event.preventDefault();
-    const index = Number(categoryTarget.dataset.confirmedCategory);
-    if (!Number.isInteger(index)) return;
-    selectedIndex = selectedIndex === index ? -1 : index;
-    render();
+    const categoryTarget = event.target.closest?.('.confirmed-donut-segment[data-confirmed-category], .confirmed-legend-chip[data-confirmed-category]');
+    if (categoryTarget && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      const index = Number(categoryTarget.dataset.confirmedCategory);
+      if (!Number.isInteger(index)) return;
+      selectedIndex = selectedIndex === index ? -1 : index;
+      render();
+      return;
+    }
+    if (event.target.closest?.('.confirmed-spend-card') && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      selectedIndex = -1;
+      mode = mode === 'total' ? 'mine' : 'total';
+      render();
+    }
   });
 
   render();
