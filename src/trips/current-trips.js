@@ -2376,14 +2376,12 @@ function bindChecklistSwipeDown(layer, sheet) {
   if (!layer || !sheet || layer.dataset.tv2SwipeDown === '1') return;
   layer.dataset.tv2SwipeDown = '1';
   const mobile = () => window.matchMedia?.('(max-width:760px)')?.matches ?? window.innerWidth <= 760;
-  const startsInRecurrentHeader = (e) => {
-    if(!sheet.classList.contains('tv2-recurrent-sheet'))return true;
+  const startsInChecklistHeader = (e) => {
     const target=e.target;
     return !!target?.closest?.('.tv2-sheet-head') && !target.closest?.('button,input,textarea,select,a');
   };
-  const startsInRecurrentNoCloseStrip = (e) => {
-    if(!sheet.classList.contains('tv2-recurrent-sheet'))return false;
-    const row=e.target.closest?.('[data-recurrent-swipe]');
+  const startsInChecklistNoCloseStrip = (e) => {
+    const row=e.target.closest?.('[data-recurrent-swipe],[data-check-swipe]');
     const touch=e.touches?.[0];
     if(!row||!touch)return false;
     const rect=row.getBoundingClientRect();
@@ -2417,7 +2415,7 @@ function bindChecklistSwipeDown(layer, sheet) {
   sheet.__tv2CancelSwipeDown=cancelSwipeDownForReorder;
 
   sheet.addEventListener('touchstart', (e) => {
-    if (!mobile() || e.touches.length !== 1 || !startsInRecurrentHeader(e) || layer.dataset.tv2GestureLock === '1' || layer.dataset.tv2GestureOwner === 'reorder' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items') || e.target.closest?.('[data-recurrent-drag]') || startsInRecurrentNoCloseStrip(e)) return;
+    if (!mobile() || e.touches.length !== 1 || !startsInChecklistHeader(e) || layer.dataset.tv2GestureLock === '1' || layer.dataset.tv2GestureOwner === 'reorder' || sheet.scrollTop > 1 || sheet.classList.contains('is-reordering-items') || e.target.closest?.('[data-recurrent-drag],[data-check-drag]') || startsInChecklistNoCloseStrip(e)) return;
     const t = e.touches[0];
     gesture = { tracking:true, active:false, startX:t.clientX, startY:t.clientY, lastY:t.clientY };
   }, { passive:true });
