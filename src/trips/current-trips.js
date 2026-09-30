@@ -446,7 +446,7 @@ function simplifiedCard(item) {
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
-      '<span class="tv2-card-photo tv2-card-flag" aria-hidden="true">'+esc(flag)+'</span>'+
+      '<span class="tv2-card-corner-flag" aria-hidden="true">'+esc(flag)+'</span>'+
       '<span class="tv2-card-content">'+
         '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
         '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
