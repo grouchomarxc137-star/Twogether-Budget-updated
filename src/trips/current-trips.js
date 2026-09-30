@@ -440,17 +440,15 @@ function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
   const over = item.left != null && item.left < 0;
   const name = item.meta?.city || locationLabel(item.meta);
+  const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
-      tripPhotoMarkup(item.meta,'tv2-card-photo')+
-      '<span class="tv2-card-body">'+
-        '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(statusLine(item.meta))+'</small></span>'+
-        '<span class="tv2-card-date">'+esc(shortRange(item.meta?.start,item.meta?.end))+'</span>'+
-        '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span class="'+(over?'is-over':'')+'">'+displayMoney(item.left)+' left</span>':'')+'</span>'+
-        (item.available && item.available > 0?'<span class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
-      '</span>'+
+      '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+flag+'</span> '+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+      '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
+      '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span class="'+(over?'is-over':'')+'">'+displayMoney(item.left)+' left</span>':'')+'</span>'+
+      (item.available && item.available > 0?'<span class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
     '</button>'+
   '</div>';
 }
@@ -568,7 +566,6 @@ function renderCurrentTrips() {
   root.style.opacity = '';
   setTripFocusLock(false);
   root.innerHTML = simplifiedHome(allSimplifiedItems());
-  hydrateTripPhotos(root);
 }
 
 const EXPENSE_CATS = [
@@ -3272,29 +3269,12 @@ function filterTripStories() {
 // decorates above. Ported from v28.js's decorateTripStories().
 function decorateTripStories() {
   const root = $('#tripGallery'); if (!root) return;
-  $('.trip-story-card', root).forEach((card) => {
-    const country = ($('.trip-country', card)?.textContent || '').trim();
-    const city = ($('h3', card)?.textContent || '').trim();
-    let photo = $('.trip-story-photo', card);
-    if (!photo) {
-      photo = document.createElement('span');
-      photo.className = 'trip-story-photo';
-      photo.setAttribute('aria-hidden','true');
-      photo.innerHTML = '<img data-trip-photo alt="" loading="lazy" decoding="async">';
-      card.insertBefore(photo,card.firstChild);
-    }
-    const img = $('img[data-trip-photo]', photo);
-    if (img) {
-      img.dataset.city = city;
-      img.dataset.country = country;
-      img.src = immediateTripPhoto(city,country);
-      img.dataset.photoReady = '0';
-    }
-    card.style.removeProperty('--v28-story-bg');
-    card.removeAttribute('data-v28-background');
-    card.dataset.tripPhoto = '1';
+  $$('.trip-story-card', root).forEach((card) => {
+    const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
+    const image = CITY_IMAGES[city] || COUNTRY_IMAGES[country] || FALLBACK_IMAGE;
+    card.style.setProperty('--v28-story-bg', `url("${image}")`);
+    card.dataset.v28Background = '1';
   });
-  hydrateTripPhotos(root);
 }
 
 export async function refreshState(force = false) {
@@ -3412,80 +3392,6 @@ const FLAGS = { Italy: '1f1ee-1f1f9', Netherlands: '1f1f3-1f1f1', Tunisia: '1f1f
 const CITY_IMAGES = { ariana: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', amsterdam: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', lonato: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', lisbon: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', lisboa: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', porto: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82' };
 const COUNTRY_IMAGES = { Italy: 'https://images.unsplash.com/photo-1520175480921-4edfa2983e0f?auto=format&fit=crop&w=900&q=82', Netherlands: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=82', Portugal: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=900&q=82', Tunisia: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Ariana_2_-_Tunisia.jpg', Spain: 'https://images.unsplash.com/photo-1509840841025-9088ba78a826?auto=format&fit=crop&w=900&q=82', France: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=82', Germany: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=82', Belgium: 'https://images.unsplash.com/photo-1491557345352-5929e343eb89?auto=format&fit=crop&w=900&q=82' };
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=82';
-const cityPhotoCache = new Map();
-const cityPhotoPending = new Map();
-
-function normalizedPhotoKey(value) {
-  return String(value || '').trim().toLocaleLowerCase('en').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-function immediateTripPhoto(city, country) {
-  return CITY_IMAGES[normalizedPhotoKey(city)] || COUNTRY_IMAGES[String(country || '').trim()] || FALLBACK_IMAGE;
-}
-function tripPhotoMarkup(meta, className = 'tv2-card-photo') {
-  const city = String(meta?.city || locationLabel(meta) || '').trim();
-  const country = String(meta?.location === 'Other' ? (meta?.otherLocation || '') : (meta?.location || '')).trim();
-  return '<span class="'+className+'" aria-hidden="true"><img data-trip-photo data-city="'+esc(city)+'" data-country="'+esc(country)+'" src="'+esc(immediateTripPhoto(city,country))+'" alt="" loading="lazy" decoding="async"></span>';
-}
-async function resolveTripPhoto(city, country) {
-  const cleanCity = String(city || '').trim(), cleanCountry = String(country || '').trim();
-  const fallback = immediateTripPhoto(cleanCity, cleanCountry);
-  if (!cleanCity) return fallback;
-  if (CITY_IMAGES[normalizedPhotoKey(cleanCity)]) return fallback;
-  const key = normalizedPhotoKey(cleanCity)+'|'+normalizedPhotoKey(cleanCountry);
-  if (cityPhotoCache.has(key)) return cityPhotoCache.get(key);
-  if (cityPhotoPending.has(key)) return cityPhotoPending.get(key);
-
-  const request = (async () => {
-    try {
-      const params = new URLSearchParams({
-        action:'query',
-        generator:'search',
-        gsrsearch:[cleanCity,cleanCountry,'city'].filter(Boolean).join(' '),
-        gsrnamespace:'0',
-        gsrlimit:'6',
-        prop:'pageimages',
-        piprop:'thumbnail',
-        pithumbsize:'1000',
-        format:'json',
-        formatversion:'2',
-        origin:'*',
-      });
-      const response = await fetch('https://en.wikipedia.org/w/api.php?'+params.toString(), { mode:'cors', credentials:'omit' });
-      if (!response.ok) throw new Error('Photo lookup failed');
-      const data = await response.json();
-      const pages = Array.isArray(data?.query?.pages) ? data.query.pages : Object.values(data?.query?.pages || {});
-      const cityKey = normalizedPhotoKey(cleanCity);
-      const withPhoto = pages.filter((page) => page?.thumbnail?.source);
-      const best = withPhoto.find((page) => normalizedPhotoKey(page?.title).includes(cityKey)) || withPhoto[0];
-      const image = best?.thumbnail?.source || fallback;
-      cityPhotoCache.set(key,image);
-      return image;
-    } catch {
-      cityPhotoCache.set(key,fallback);
-      return fallback;
-    } finally {
-      cityPhotoPending.delete(key);
-    }
-  })();
-  cityPhotoPending.set(key,request);
-  return request;
-}
-function hydrateTripPhotos(root = document) {
-  $('img[data-trip-photo]', root).forEach((img) => {
-    const city = String(img.dataset.city || '').trim(), country = String(img.dataset.country || '').trim();
-    const key = normalizedPhotoKey(city)+'|'+normalizedPhotoKey(country);
-    const fallback = immediateTripPhoto(city,country);
-    if (!img.getAttribute('src')) img.src = fallback;
-    if (img.dataset.photoKey === key && img.dataset.photoReady === '1') return;
-    img.dataset.photoKey = key;
-    img.addEventListener('error', () => { if (img.src !== fallback) img.src = fallback; }, { once:true });
-    resolveTripPhoto(city,country).then((image) => {
-      if (!img.isConnected || img.dataset.photoKey !== key) return;
-      img.src = image;
-      img.dataset.photoReady = '1';
-    });
-  });
-}
 function enhanceCardPhotos() {
   $$('#twCurrentTrips .tw-current-card').forEach((card) => {
     const art = $('.tw-trip-art', card); if (!art) return;
