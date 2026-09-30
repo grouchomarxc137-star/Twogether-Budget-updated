@@ -991,7 +991,9 @@ function openSimplifiedChecklist(plan) {
         '<div class="tv2-check-text-scroll" data-check-scroll>'+
           '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
         '</div>'+
-        (completed?'<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>':'')+
+        (completed
+          ? '<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>'
+          : '<button type="button" class="tv2-check-drag" data-check-drag aria-label="Hold and drag to reorder"><i></i><i></i><i></i></button>')+
       '</div>'+
     '</div>';
 
@@ -1173,7 +1175,7 @@ function openSimplifiedChecklist(plan) {
   };
 
   sheet.addEventListener('touchstart',(e)=>{
-    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1||e.target.closest('[data-check-drag]'))return;
     const row=e.target.closest('[data-check-swipe]');
     if(!row)return;
     closeOtherChecklistSwipes(row);
@@ -1261,6 +1263,397 @@ function openSimplifiedChecklist(plan) {
     resetChecklistSwipeVisual(checklistSwipe.row,true);
     resetChecklistSwipeState();
   },{passive:true});
+
+  let checklistDragFrame=0;
+  let checklistDragPendingY=0;
+  let checklistProtectedTouchId=null;
+
+  const setChecklistGestureLock=(locked)=>{
+    if(locked){
+      simplifiedLayer.dataset.tv2GestureLock='1';
+      simplifiedLayer.dataset.tv2GestureOwner='reorder';
+      sheet.style.transition='none';
+      sheet.style.transform='translateY(0)';
+      sheet.style.opacity='1';
+      const backdrop=simplifiedLayer.querySelector('.tv2-backdrop');
+      if(backdrop){
+        backdrop.style.transition='none';
+        backdrop.style.opacity='1';
+      }
+      return;
+    }
+    if(simplifiedLayer?.isConnected){
+      delete simplifiedLayer.dataset.tv2GestureLock;
+      delete simplifiedLayer.dataset.tv2GestureOwner;
+    }
+  };
+
+  let checklistDrag={
+    timer:null,
+    tracking:false,
+    active:false,
+    touchId:null,
+    row:null,
+    list:null,
+    kind:'',
+    itemId:'',
+    ghost:null,
+    startX:0,
+    startY:0,
+    lastY:0,
+    activationY:0,
+    grabOffsetY:0,
+  };
+
+  const checklistDragHaptic=()=>{
+    try{if(typeof navigator.vibrate==='function')navigator.vibrate(10);}catch{}
+  };
+
+  const touchForChecklistDrag=(touches,id)=>
+    [...(touches||[])].find((touch)=>touch.identifier===id)||null;
+
+  const isChecklistProtectedTouch=(touch)=>{
+    if(!touch)return false;
+    const rows=[...sheet.querySelectorAll('[data-check-swipe]')].filter((row)=>row.querySelector('[data-check-drag]'));
+    return rows.some((row)=>{
+      const rect=row.getBoundingClientRect();
+      return touch.clientY>=rect.top&&touch.clientY<=rect.bottom&&
+        touch.clientX>=rect.right-52&&touch.clientX<=rect.right;
+    });
+  };
+
+  const checklistHandleForTouch=(target,touch)=>{
+    const direct=target?.closest?.('[data-check-drag]');
+    if(direct)return direct;
+    const row=target?.closest?.('[data-check-swipe]');
+    if(!row||!row.querySelector('[data-check-drag]')||!touch)return null;
+    const rect=row.getBoundingClientRect();
+    if(touch.clientY<rect.top||touch.clientY>rect.bottom||
+      touch.clientX<rect.right-52||touch.clientX>rect.right)return null;
+    return row.querySelector('[data-check-drag]');
+  };
+
+  const clearChecklistDragTimer=()=>{
+    if(checklistDrag.timer)clearTimeout(checklistDrag.timer);
+    checklistDrag.timer=null;
+  };
+
+  const cleanupChecklistDragVisual=()=>{
+    checklistDrag.ghost?.remove();
+    checklistDrag.ghost=null;
+    if(checklistDrag.row){
+      checklistDrag.row.classList.remove('is-reorder-slot');
+      checklistDrag.row.style.transition='';
+      checklistDrag.row.style.transform='';
+    }
+    sheet.classList.remove('is-reordering-items');
+  };
+
+  const resetChecklistDrag=()=>{
+    clearChecklistDragTimer();
+    if(checklistDragFrame){
+      cancelAnimationFrame(checklistDragFrame);
+      checklistDragFrame=0;
+    }
+    cleanupChecklistDragVisual();
+    setChecklistGestureLock(false);
+    checklistDrag={
+      timer:null,
+      tracking:false,
+      active:false,
+      touchId:null,
+      row:null,
+      list:null,
+      kind:'',
+      itemId:'',
+      ghost:null,
+      startX:0,
+      startY:0,
+      lastY:0,
+      activationY:0,
+      grabOffsetY:0,
+    };
+  };
+
+  const animateChecklistLayout=(beforeRects)=>{
+    requestAnimationFrame(()=>{
+      if(!checklistDrag.list)return;
+      const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')];
+      rows.forEach((row)=>{
+        if(row===checklistDrag.row)return;
+        const oldTop=beforeRects.get(row);
+        if(oldTop==null)return;
+        const newTop=row.getBoundingClientRect().top;
+        const delta=oldTop-newTop;
+        if(Math.abs(delta)<.5)return;
+        row.style.transition='none';
+        row.style.transform='translate3d(0,'+delta+'px,0)';
+        void row.offsetHeight;
+        row.style.transition='transform .17s cubic-bezier(.22,.8,.28,1)';
+        row.style.transform='translate3d(0,0,0)';
+        setTimeout(()=>{
+          if(row?.isConnected){
+            row.style.transition='';
+            row.style.transform='';
+          }
+        },190);
+      });
+    });
+  };
+
+  const moveChecklistSlot=(beforeRow)=>{
+    if(!checklistDrag.active||!checklistDrag.list||!checklistDrag.row)return;
+    const currentNext=checklistDrag.row.nextElementSibling;
+    if((beforeRow&&currentNext===beforeRow)||(!beforeRow&&!currentNext))return;
+
+    const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')];
+    const beforeRects=new Map(rows.filter((row)=>row!==checklistDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
+
+    if(beforeRow)checklistDrag.list.insertBefore(checklistDrag.row,beforeRow);
+    else checklistDrag.list.appendChild(checklistDrag.row);
+
+    animateChecklistLayout(beforeRects);
+    checklistDragHaptic();
+  };
+
+  const placeChecklistSlot=(touchY)=>{
+    if(!checklistDrag.active||!checklistDrag.list||!checklistDrag.row||!checklistDrag.ghost)return;
+    const ghostTop=touchY-checklistDrag.grabOffsetY;
+    const ghostHeight=checklistDrag.ghost.getBoundingClientRect().height||checklistDrag.row.getBoundingClientRect().height;
+    const ghostCenter=ghostTop+ghostHeight/2;
+    const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')].filter((row)=>row!==checklistDrag.row);
+    let before=null;
+
+    if(rows.length){
+      const firstRect=rows[0].getBoundingClientRect();
+      if(ghostTop<=firstRect.top+1){
+        moveChecklistSlot(rows[0]);
+        return;
+      }
+    }
+
+    for(const row of rows){
+      const rect=row.getBoundingClientRect();
+      if(ghostCenter<=rect.top+rect.height/2+.5){
+        before=row;
+        break;
+      }
+    }
+    moveChecklistSlot(before);
+  };
+
+  const clampChecklistDragY=(touchY)=>{
+    if(!checklistDrag.list||!checklistDrag.ghost)return touchY;
+    const listRect=checklistDrag.list.getBoundingClientRect();
+    const ghostHeight=checklistDrag.ghost.getBoundingClientRect().height||checklistDrag.row?.getBoundingClientRect().height||0;
+    const minY=listRect.top+checklistDrag.grabOffsetY;
+    const maxY=listRect.bottom-Math.max(0,ghostHeight-checklistDrag.grabOffsetY);
+    if(maxY<minY)return (minY+maxY)/2;
+    return Math.max(minY,Math.min(maxY,touchY));
+  };
+
+  const paintChecklistDrag=(touchY)=>{
+    if(!checklistDrag.active||!checklistDrag.ghost)return;
+    const clampedY=clampChecklistDragY(touchY);
+    const dy=clampedY-checklistDrag.activationY;
+    checklistDrag.ghost.style.transform='translate3d(0,'+dy+'px,0) scale(1.012)';
+    placeChecklistSlot(clampedY);
+  };
+
+  const scheduleChecklistDragPaint=(touchY)=>{
+    checklistDragPendingY=touchY;
+    if(checklistDragFrame)return;
+    checklistDragFrame=requestAnimationFrame(()=>{
+      checklistDragFrame=0;
+      paintChecklistDrag(checklistDragPendingY);
+    });
+  };
+
+  const beginChecklistDrag=()=>{
+    if(!checklistDrag.tracking||checklistDrag.active||!checklistDrag.row||!checklistDrag.list)return;
+    clearChecklistDragTimer();
+
+    const sourceCard=checklistDrag.row.querySelector('.tv2-check-row');
+    if(!sourceCard)return;
+    const rect=sourceCard.getBoundingClientRect();
+    const ghost=sourceCard.cloneNode(true);
+    ghost.classList.add('tv2-check-drag-ghost');
+    ghost.querySelectorAll('input,button').forEach((control)=>{
+      control.tabIndex=-1;
+      control.setAttribute('aria-hidden','true');
+    });
+
+    ghost.style.top=rect.top+'px';
+    ghost.style.left=rect.left+'px';
+    ghost.style.width=rect.width+'px';
+    ghost.style.height=rect.height+'px';
+    ghost.style.transform='translate3d(0,0,0) scale(1.012)';
+    simplifiedLayer.appendChild(ghost);
+
+    checklistDrag.ghost=ghost;
+    checklistDrag.active=true;
+    setChecklistGestureLock(true);
+    checklistDrag.activationY=checklistDrag.lastY;
+    checklistDrag.grabOffsetY=checklistDrag.lastY-rect.top;
+
+    checklistDrag.row.classList.add('is-reorder-slot');
+    sheet.classList.add('is-reordering-items');
+    checklistDragHaptic();
+  };
+
+  const applyChecklistOrder=()=>{
+    const kind=checklistDrag.kind;
+    const list=checklistDrag.list;
+    if(!kind||!Array.isArray(prep[kind])||!list)return;
+    const ids=[...list.querySelectorAll('[data-check-swipe]')].map((row)=>row.dataset.checkId);
+    const visibleSet=new Set(ids);
+    const byId=new Map(prep[kind].map((item)=>[item.id,item]));
+    let index=0;
+    prep[kind]=prep[kind].map((item)=>{
+      if(!visibleSet.has(item.id))return item;
+      return byId.get(ids[index++])||item;
+    });
+  };
+
+  const finishChecklistDrag=()=>{
+    applyChecklistOrder();
+    checklistSwipeIgnoreUntil=Date.now()+350;
+    resetChecklistDrag();
+    render();
+    autoSaveChecklist();
+  };
+
+  const cancelChecklistDrag=()=>{
+    const wasActive=checklistDrag.active;
+    resetChecklistDrag();
+    if(wasActive)render();
+  };
+
+  sheet.addEventListener('touchstart',(e)=>{
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
+    const t=e.touches[0];
+    const handle=checklistHandleForTouch(e.target,t);
+    const protectedZone=!!handle||isChecklistProtectedTouch(t);
+
+    if(handle){
+      sheet.__tv2CancelSwipeDown?.();
+      resetChecklistDrag();
+    }
+
+    if(protectedZone){
+      checklistProtectedTouchId=t.identifier;
+      setChecklistGestureLock(true);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
+    if(!handle)return;
+    const row=handle.closest('[data-check-swipe]');
+    const list=row?.closest('.tv2-check-list');
+    if(!row||!list)return;
+
+    closeOtherChecklistSwipes();
+
+    checklistDrag.tracking=true;
+    checklistDrag.touchId=t.identifier;
+    checklistDrag.row=row;
+    checklistDrag.list=list;
+    checklistDrag.kind=row.dataset.checkKind||'';
+    checklistDrag.itemId=row.dataset.checkId||'';
+    checklistDrag.startX=t.clientX;
+    checklistDrag.startY=t.clientY;
+    checklistDrag.lastY=t.clientY;
+    checklistDrag.timer=setTimeout(beginChecklistDrag,180);
+  },{passive:false,capture:true});
+
+  sheet.addEventListener('touchmove',(e)=>{
+    const protectedTouch=touchForChecklistDrag(e.touches,checklistProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
+    if(!checklistDrag.tracking)return;
+    const t=touchForChecklistDrag(e.touches,checklistDrag.touchId);
+    if(!t)return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    checklistDrag.lastY=t.clientY;
+
+    if(!checklistDrag.active){
+      const dx=t.clientX-checklistDrag.startX;
+      const dy=t.clientY-checklistDrag.startY;
+      if(Math.hypot(dx,dy)>=3)beginChecklistDrag();
+      else return;
+    }
+    if(!checklistDrag.active)return;
+
+    const sheetRect=sheet.getBoundingClientRect();
+    const edge=64;
+    if(t.clientY<sheetRect.top+edge){
+      sheet.scrollTop-=Math.min(12,(sheetRect.top+edge-t.clientY)*.20);
+    }else if(t.clientY>sheetRect.bottom-edge){
+      sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.20);
+    }
+
+    scheduleChecklistDragPaint(t.clientY);
+  },{passive:false,capture:true});
+
+  sheet.addEventListener('touchend',(e)=>{
+    const protectedTouch=touchForChecklistDrag(e.changedTouches,checklistProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+
+    if(!checklistDrag.tracking){
+      if(protectedTouch){
+        checklistProtectedTouchId=null;
+        setChecklistGestureLock(false);
+      }
+      return;
+    }
+
+    const t=touchForChecklistDrag(e.changedTouches,checklistDrag.touchId);
+    if(!t)return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if(!checklistDrag.active){
+      resetChecklistDrag();
+      checklistProtectedTouchId=null;
+      return;
+    }
+
+    if(checklistDragFrame){
+      cancelAnimationFrame(checklistDragFrame);
+      checklistDragFrame=0;
+    }
+    paintChecklistDrag(t.clientY);
+    checklistProtectedTouchId=null;
+    finishChecklistDrag();
+  },{passive:false,capture:true});
+
+  sheet.addEventListener('touchcancel',(e)=>{
+    const protectedTouch=touchForChecklistDrag(e.changedTouches,checklistProtectedTouchId);
+    if(protectedTouch){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+    if(!checklistDrag.tracking){
+      if(protectedTouch){
+        checklistProtectedTouchId=null;
+        setChecklistGestureLock(false);
+      }
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    checklistProtectedTouchId=null;
+    cancelChecklistDrag();
+  },{passive:false,capture:true});
 
   sheet.addEventListener('change',(e)=>{
     const row=e.target.closest('.tv2-check-row'); if(!row)return;

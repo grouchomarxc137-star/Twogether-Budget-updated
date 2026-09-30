@@ -1194,3 +1194,64 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   font:inherit;
 }
 
+
+
+/* Current checklist: hold the right handle and drag to reorder. */
+.tv2-check-swipe-row .tv2-check-row:not(.is-completed){
+  grid-template-columns:30px minmax(0,1fr) 30px;
+}
+.tv2-check-drag{
+  width:30px;
+  height:40px;
+  display:grid;
+  place-content:center;
+  gap:3px;
+  align-self:center;
+  justify-self:end;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:var(--tv2-faint)!important;
+  cursor:grab;
+  touch-action:none;
+  -webkit-touch-callout:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.tv2-check-drag i{
+  display:block;
+  width:15px;
+  height:1.5px;
+  border-radius:99px;
+  background:currentColor;
+  pointer-events:none;
+}
+.tv2-check-swipe-row.is-reorder-slot .tv2-check-row{
+  visibility:hidden;
+}
+.tv2-check-swipe-row.is-reorder-slot .tv2-check-delete-reveal{
+  opacity:0!important;
+  width:0!important;
+}
+.tv2-check-drag-ghost{
+  position:fixed!important;
+  z-index:1805!important;
+  margin:0!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+  background:var(--tv2-card)!important;
+  box-shadow:0 8px 22px rgba(46,38,31,.22)!important;
+  border-radius:8px;
+  will-change:transform;
+  transform-origin:center center;
+}
+.tv2-check-drag-ghost .tv2-check-text-scroll{
+  overflow:hidden;
+}
+.tv2-check-drag-ghost .tv2-check-drag{
+  cursor:grabbing;
+}
+.tv2-checklist-sheet.is-reordering-items{
+  overscroll-behavior:none;
+  touch-action:none;
+}
