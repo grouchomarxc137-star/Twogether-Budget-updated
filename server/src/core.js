@@ -928,6 +928,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       });
       record.updatedAt = new Date().toISOString(); record.updatedBy = actor;
       record = sanitizeFinanceMonth_(record, actor);
+      syncFinanceSharedJarTransactions_(state,actor,record,record.updatedAt);
       if (idx >= 0) list[idx] = record; else list.push(record);
       list.sort(function(a,b){ return String(a.month).localeCompare(String(b.month)); });
       state.finances[actor] = list;
