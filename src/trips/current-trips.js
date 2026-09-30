@@ -1065,17 +1065,24 @@ function openSimplifiedChecklist(plan) {
       reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
     };
   }
+  let checklistSaveQueue=Promise.resolve();
   function autoSaveChecklist() {
     const snapshot = cleanPrep();
     state.error='';
-    window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:snapshot},actor()).then((result)=>{
+    checklistSaveQueue=checklistSaveQueue.catch(()=>{}).then(()=>
+      window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:snapshot},actor())
+    ).then((result)=>{
       if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
       if(remoteState&&result?.tripPrepDefaults)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.tripPrepDefaults));
       publishTripNotifications();
+      return result;
     }).catch((err)=>{
       state.error=err?.message||'Could not update checklist';
-      render();
+      if(sheet?.isConnected)render();
+      throw err;
     });
+    checklistSaveQueue.catch(()=>{});
+    return checklistSaveQueue;
   }
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
@@ -1775,6 +1782,23 @@ function openRecurrentChecklistItems(plan) {
       reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
     };
   }
+  let recurrentSaveQueue=Promise.resolve();
+  function autoSaveRecurrentOrder() {
+    const payload=recurrentPayload();
+    state.error='';
+    recurrentSaveQueue=recurrentSaveQueue.catch(()=>{}).then(()=>
+      window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor())
+    ).then((result)=>{
+      if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
+      return result;
+    }).catch((err)=>{
+      state.error=err?.message||'Could not save recurrent item order';
+      if(sheet?.isConnected)render();
+      throw err;
+    });
+    recurrentSaveQueue.catch(()=>{});
+    return recurrentSaveQueue;
+  }
   async function saveDefaults() {
     if(state.busy)return;
     state.busy=true;state.error='';render();
@@ -2218,6 +2242,7 @@ function openRecurrentChecklistItems(plan) {
     }
     resetRecurrentDrag();
     render();
+    autoSaveRecurrentOrder();
   };
 
   const cancelRecurrentDrag=()=>{
