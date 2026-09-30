@@ -446,9 +446,8 @@ function simplifiedCard(item) {
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
-      '<span class="tv2-card-corner-flag" aria-hidden="true">'+esc(flag)+'</span>'+
       '<span class="tv2-card-content">'+
-        '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
+        '<span class="tv2-card-top"><strong><span class="tv2-card-flag" aria-hidden="true">'+esc(flag)+'</span><span class="tv2-card-name">'+esc(name)+'</span></strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
         '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
         '<span class="tv2-card-money"><span>'+displayMoney(item.spent)+' spent</span>'+(item.left != null?'<span class="'+(over?'is-over':'')+'">'+displayMoney(item.left)+' left</span>':'')+'</span>'+
         (item.available && item.available > 0?'<span class="tv2-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>':'')+
