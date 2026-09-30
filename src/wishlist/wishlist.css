@@ -3271,3 +3271,39 @@ html body #financeWishlist .v28-view-tabs span, html body #financeWishlist .v27-
   cursor:pointer;
   -webkit-touch-callout:none;
 }
+
+
+/* Wishlist editor destructive action */
+.v27-modal-actions [data-wish-delete] {
+  min-height:44px;
+  padding:10px 16px;
+  border:1px solid #e4c9c4;
+  border-radius:10px;
+  background:#fff7f5;
+  color:#a84f45;
+  font:600 14px inherit;
+  cursor:pointer;
+  box-shadow:none;
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .1s ease;
+}
+
+.v27-modal-actions [data-wish-delete]:hover {
+  background:#faece8;
+  border-color:#d9aaa2;
+  color:#943f36;
+}
+
+.v27-modal-actions [data-wish-delete]:active {
+  transform:translateY(1px);
+}
+
+.v27-modal-actions [data-wish-delete]:focus-visible {
+  outline:2px solid #c47c70;
+  outline-offset:3px;
+}
+
+@media(max-width:520px) {
+  .v27-modal-actions [data-wish-delete] {
+    min-width:86px;
+  }
+}
