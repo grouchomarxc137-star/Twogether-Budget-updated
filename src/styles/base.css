@@ -48,6 +48,39 @@ button,input {
   color:inherit;
 }
 
+/* Low-specificity native-control safety net.
+   Feature styles override this; it only prevents browser-default controls
+   when a local style was accidentally missed. */
+:where(.app) :where(button:not([class])) {
+  -webkit-appearance:none;
+  appearance:none;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--card);
+  padding:8px 12px;
+  font:inherit;
+  color:inherit;
+  cursor:pointer;
+}
+
+:where(.app) :where(
+  input:not([class]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  select:not([class]),
+  textarea:not([class])
+) {
+  max-width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--card);
+  color:inherit;
+  font:inherit;
+}
+
+:where(.app) :where(button:not([class]):disabled) {
+  cursor:default;
+  opacity:.55;
+}
+
 /* Keep browser tap/text-selection highlights from sticking to app UI.
    Editable fields remain selectable so typing and cursor controls still work. */
 html,
