@@ -1133,7 +1133,13 @@ function sanitizeAccommodationMeta_(value){
   return {useJar:s.useJar===true,jarContribution:cleanMoney_(s.jarContribution)===''?0:cleanMoney_(s.jarContribution),jarBalanceAfter:cleanMoney_(s.jarBalanceAfter)===''?870:cleanMoney_(s.jarBalanceAfter),remaining:cleanMoney_(s.remaining),paymentType:paymentType==='solo'||paymentType==='shared'?paymentType:'',paidUpfront:s.paidUpfront===true,upfrontBy:upfrontBy,shareEach:cleanMoney_(s.shareEach),repayment:{debtor:debtor,creditor:creditor,amount:cleanMoney_(r.amount),status:status,confirmedAt:cleanText_(r.confirmedAt,40)}};
 }
 function prepAddedBy_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
-function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy)};}
+function prepNotifyAt_(value){
+  const raw=cleanText_(value,40);
+  if(!raw)return '';
+  const stamp=Date.parse(raw);
+  return Number.isFinite(stamp)?new Date(stamp).toISOString():'';
+}
+function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy),notifyAt:prepNotifyAt_(x&&x.notifyAt)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
@@ -1264,7 +1270,7 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   next.forEach(function(item){
     const prior=matchedByDefaultId[item.id];
     if(prior){
-      recurrent.push({id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy});
+      recurrent.push({id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy,notifyAt:prior.notifyAt||''});
       return;
     }
     // A default that already existed but is absent from this trip was deleted

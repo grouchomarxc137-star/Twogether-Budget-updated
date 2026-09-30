@@ -38,6 +38,7 @@ let tripSwipe = { tracking:false, active:false, mode:'', startX:0, startY:0, las
 let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, direction:'', ignoreClickUntil:0 };
 let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
+let tripNotificationTimer = null;
 let tripFocusScrollY = 0;
 
 function has(v) { return v !== '' && v != null; }
@@ -844,8 +845,8 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       closeSimplifiedSheet(); await refreshState(true); simplifiedSnack('Expense deleted');
     } catch (err) { state.busy=false;state.error=err?.message||'Could not delete';refreshLive(); }
   }
-  simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
-  simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeSimplifiedSheet();});
+  simplifiedLayer.querySelector('.tv2-backdrop').onclick=()=>{closeReminderNotificationEditor();closeSimplifiedSheet();};
+  simplifiedLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&!notifyEditorLayer)closeSimplifiedSheet();});
   mount();
 }
 
@@ -929,6 +930,57 @@ function tripPrepNotificationItems() {
   }).filter(Boolean);
 }
 
+function scheduledTripReminderNotificationItems() {
+  if (!remoteState || !actor()) return [];
+  const now=Date.now();
+  const items=[];
+  (remoteState.plans||[]).forEach((plan)=>{
+    const trip=plan?.linkedTripId?(remoteState.trips||[]).find((item)=>item.id===plan.linkedTripId):null;
+    if(trip&&isLocked(trip))return;
+    const prep=tripPrepSnapshot(plan);
+    const tripName=String(plan?.meta?.city||locationLabel(plan?.meta)||'Trip').trim();
+    (prep.reminders||[]).forEach((item)=>{
+      const notifyAt=Date.parse(String(item?.notifyAt||''));
+      if(item?.done||!String(item?.text||'').trim()||!Number.isFinite(notifyAt)||notifyAt>now)return;
+      items.push({
+        id:'trip-reminder:'+plan.id+':'+item.id,
+        actor:actor(),
+        kind:'trip-reminder',
+        title:String(item.text||'Important reminder').trim(),
+        detail:tripName+' · Scheduled reminder',
+        openLabel:'Open checklist',
+        priority:'important',
+      });
+    });
+  });
+  return items;
+}
+
+function scheduleNextTripReminderRefresh() {
+  if(tripNotificationTimer){
+    clearTimeout(tripNotificationTimer);
+    tripNotificationTimer=null;
+  }
+  if(!remoteState)return;
+  const now=Date.now();
+  let next=Infinity;
+  (remoteState.plans||[]).forEach((plan)=>{
+    const trip=plan?.linkedTripId?(remoteState.trips||[]).find((item)=>item.id===plan.linkedTripId):null;
+    if(trip&&isLocked(trip))return;
+    (tripPrepSnapshot(plan).reminders||[]).forEach((item)=>{
+      if(item?.done)return;
+      const stamp=Date.parse(String(item?.notifyAt||''));
+      if(Number.isFinite(stamp)&&stamp>now&&stamp<next)next=stamp;
+    });
+  });
+  if(!Number.isFinite(next))return;
+  const delay=Math.min(2147480000,Math.max(250,next-now+150));
+  tripNotificationTimer=setTimeout(()=>{
+    tripNotificationTimer=null;
+    publishTripNotifications();
+  },delay);
+}
+
 function tripRepaymentNotificationItems() {
   if (!remoteState || !actor()) return [];
   const me = actor();
@@ -964,16 +1016,18 @@ function tripRepaymentNotificationItems() {
 
 function publishTripNotifications() {
   window.TwogetherNotifications?.setPending([
+    ...scheduledTripReminderNotificationItems(),
     ...tripPrepNotificationItems(),
     ...tripRepaymentNotificationItems(),
   ], 'trips');
+  scheduleNextTripReminderRefresh();
 }
 
 function openSimplifiedChecklist(plan) {
   if (!plan) return;
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
-  const state = { error:'', packingMine:false, busy:false };
+  const state = { error:'', packingMine:false, busy:false, reminderDraftText:'', reminderDraftNotifyAt:'' };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
@@ -983,27 +1037,52 @@ function openSimplifiedChecklist(plan) {
 
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
-  const rowHtml = (kind, item, completed = false) =>
-    '<div class="tv2-check-swipe-row" data-check-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+  const reminderBellIcon=()=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>';
+  const notifyParts=(value)=>{
+    const d=new Date(String(value||''));
+    if(Number.isNaN(d.getTime()))return {date:'',time:''};
+    const pad=(n)=>String(n).padStart(2,'0');
+    return {date:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),time:pad(d.getHours())+':'+pad(d.getMinutes())};
+  };
+  const notifyLabel=(value)=>{
+    const d=new Date(String(value||''));
+    if(Number.isNaN(d.getTime()))return '';
+    return d.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  };
+  const notifyAtFromFields=(date,time)=>{
+    if(!date||!time)return '';
+    const d=new Date(date+'T'+time+':00');
+    return Number.isNaN(d.getTime())?'':d.toISOString();
+  };
+
+  const rowHtml = (kind, item, completed = false) => {
+    const canNotify=kind==='reminders'&&!completed;
+    const label=notifyLabel(item.notifyAt);
+    return '<div class="tv2-check-swipe-row" data-check-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<div class="tv2-check-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
-      '<div class="tv2-check-row '+(completed?'is-completed':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+      '<div class="tv2-check-row '+(completed?'is-completed':'')+(canNotify?' has-reminder-notify':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
         '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
         '<div class="tv2-check-text-scroll" data-check-scroll>'+
           '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
         '</div>'+
+        (canNotify?'<button type="button" class="tv2-check-notify '+(label?'is-set':'')+'" data-check-notify aria-label="'+esc(label?'Edit notification · '+label:'Add notification date and time')+'" title="'+esc(label||'Add notification')+'">'+reminderBellIcon()+'</button>':'')+
         (completed
           ? '<small>'+(kind==='packing'?'Packing':'Reminder')+'</small>'
           : '<button type="button" class="tv2-check-drag" data-check-drag aria-label="Hold and drag to reorder"><i></i><i></i><i></i></button>')+
       '</div>'+
     '</div>';
+  };
 
   const activeSection = (kind, title) => {
     const mine=state.packingMine;
     const active = prep[kind].filter((item)=>!item.done && (!mine || checklistAddedBy(item.addedBy)===actor()));
     const ownerClass=mine?(actor()==='Principe'?' is-principe':' is-principessa'):'';
+    const isReminder=kind==='reminders';
+    const draftNotifyLabel=isReminder?notifyLabel(state.reminderDraftNotifyAt):'';
+    const notifyButton=isReminder?'<button type="button" class="tv2-check-add-notify '+(draftNotifyLabel?'is-set':'')+'" data-check-new-notify aria-label="'+esc(draftNotifyLabel?'Edit notification · '+draftNotifyLabel:'Add notification date and time')+'" title="'+esc(draftNotifyLabel||'Add notification')+'">'+reminderBellIcon()+'</button>':'';
     return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
       '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
-      '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
+      '<div class="tv2-check-add '+(isReminder?'is-reminder-add':'')+'"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item" value="'+esc(isReminder?state.reminderDraftText:'')+'">'+notifyButton+'<button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
 
@@ -1068,7 +1147,7 @@ function openSimplifiedChecklist(plan) {
   function cleanPrep(source=prep) {
     return {
       packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
-      reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
+      reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),notifyAt:String(item.notifyAt||'')})),
     };
   }
   let checklistSaveQueue=Promise.resolve();
@@ -1093,10 +1172,86 @@ function openSimplifiedChecklist(plan) {
       return null;
     });
   }
+  let notifyEditorLayer=null;
+  function closeReminderNotificationEditor(){
+    notifyEditorLayer?.remove();
+    notifyEditorLayer=null;
+  }
+  function openReminderNotificationEditor(item=null){
+    closeReminderNotificationEditor();
+    const current=String(item?.notifyAt||state.reminderDraftNotifyAt||'');
+    const parts=notifyParts(current);
+    const todayParts=notifyParts(new Date().toISOString());
+    notifyEditorLayer=document.createElement('div');
+    notifyEditorLayer.className='tv2-confirm-layer tv2-check-notify-layer';
+    notifyEditorLayer.innerHTML=
+      '<div class="tv2-confirm-backdrop" data-notify-cancel></div>'+
+      '<div class="tv2-confirm-card tv2-check-notify-card" role="dialog" aria-modal="true" aria-labelledby="tv2NotifyTitle">'+
+        '<h2 id="tv2NotifyTitle">'+(current?'Edit notification':'Add notification')+'</h2>'+
+        '<p>Choose when Twogether should remind you about this important item.</p>'+
+        '<div class="tv2-check-notify-fields">'+
+          '<label><span>Date</span><input type="date" data-notify-date min="'+esc(todayParts.date)+'" value="'+esc(parts.date)+'"></label>'+
+          '<label><span>Time</span><input type="time" data-notify-time value="'+esc(parts.time)+'"></label>'+
+        '</div>'+
+        '<p class="tv2-confirm-error" data-notify-error aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions tv2-check-notify-actions '+(current?'has-remove':'')+'">'+
+          '<button type="button" data-notify-cancel>Cancel</button>'+
+          (current?'<button type="button" class="is-remove" data-notify-remove>Remove</button>':'')+
+          '<button type="button" class="is-save" data-notify-save>Save</button>'+
+        '</div>'+
+      '</div>';
+    simplifiedLayer.appendChild(notifyEditorLayer);
+
+    const finishDraft=()=>{
+      closeReminderNotificationEditor();
+      render();
+      requestAnimationFrame(()=>sheet.querySelector('[data-check-new="reminders"]')?.focus());
+    };
+    const cancel=()=>closeReminderNotificationEditor();
+    notifyEditorLayer.querySelectorAll('[data-notify-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+    notifyEditorLayer.querySelector('[data-notify-remove]')?.addEventListener('click',()=>{
+      if(item){
+        item.notifyAt='';
+        autoSaveChecklist();
+        closeReminderNotificationEditor();
+        render(item.id);
+      }else{
+        state.reminderDraftNotifyAt='';
+        finishDraft();
+      }
+    });
+    notifyEditorLayer.querySelector('[data-notify-save]')?.addEventListener('click',()=>{
+      const date=String(notifyEditorLayer?.querySelector('[data-notify-date]')?.value||'');
+      const time=String(notifyEditorLayer?.querySelector('[data-notify-time]')?.value||'');
+      const notifyAt=notifyAtFromFields(date,time);
+      const error=notifyEditorLayer?.querySelector('[data-notify-error]');
+      if(!date||!time||!notifyAt){
+        if(error)error.textContent='Choose both a date and a time.';
+        return;
+      }
+      if(item){
+        item.notifyAt=notifyAt;
+        autoSaveChecklist();
+        closeReminderNotificationEditor();
+        render(item.id);
+      }else{
+        state.reminderDraftNotifyAt=notifyAt;
+        finishDraft();
+      }
+    });
+    notifyEditorLayer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+  }
+
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
     const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
-    prep[kind].push({ id:uid(), text, done:false, addedBy:actor() });
+    const next={ id:uid(), text, done:false, addedBy:actor() };
+    if(kind==='reminders'&&state.reminderDraftNotifyAt)next.notifyAt=state.reminderDraftNotifyAt;
+    prep[kind].push(next);
+    if(kind==='reminders'){
+      state.reminderDraftText='';
+      state.reminderDraftNotifyAt='';
+    }
     render();
     autoSaveChecklist();
     requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
@@ -1190,7 +1345,7 @@ function openSimplifiedChecklist(plan) {
   };
 
   sheet.addEventListener('touchstart',(e)=>{
-    if(state.busy||deleteConfirmLayer||e.touches.length!==1||e.target.closest('[data-check-drag]'))return;
+    if(state.busy||deleteConfirmLayer||e.touches.length!==1||e.target.closest('[data-check-drag],[data-check-notify]'))return;
     const row=e.target.closest('[data-check-swipe]');
     if(!row)return;
     closeOtherChecklistSwipes(row);
@@ -1338,6 +1493,7 @@ function openSimplifiedChecklist(plan) {
   };
 
   const checklistHandleForTouch=(target,touch)=>{
+    if(target?.closest?.('[data-check-notify]'))return null;
     const direct=target?.closest?.('[data-check-drag]');
     if(direct)return direct;
     const row=target?.closest?.('[data-check-swipe]');
@@ -1689,6 +1845,10 @@ function openSimplifiedChecklist(plan) {
     }
   });
   sheet.addEventListener('input',(e)=>{
+    if(e.target.matches('[data-check-new="reminders"]')){
+      state.reminderDraftText=e.target.value;
+      return;
+    }
     if(!e.target.matches('[data-check-text]'))return;
     const row=e.target.closest('.tv2-check-row'),item=findItem(row);
     if(item)item.text=e.target.value;
@@ -1716,8 +1876,19 @@ function openSimplifiedChecklist(plan) {
       return;
     }
     const b=e.target.closest('button'); if(!b)return;
-    if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
-    if(b.hasAttribute('data-check-recurrent')){openRecurrentChecklistItems(plan);return;}
+    if(b.hasAttribute('data-close')){closeReminderNotificationEditor();closeSimplifiedSheet();return;}
+    if(b.hasAttribute('data-check-recurrent')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan);return;}
+    if(b.hasAttribute('data-check-new-notify')){
+      const input=sheet.querySelector('[data-check-new="reminders"]');
+      state.reminderDraftText=String(input?.value||'');
+      openReminderNotificationEditor();
+      return;
+    }
+    if(b.hasAttribute('data-check-notify')){
+      const item=findItem(b.closest('.tv2-check-row'));
+      if(item)openReminderNotificationEditor(item);
+      return;
+    }
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
   });
   simplifiedLayer.querySelector('.tv2-backdrop').onclick=closeSimplifiedSheet;
@@ -3251,8 +3422,13 @@ export function initCurrentTrips() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshState(false); });
   document.addEventListener('twogether:saved', () => setTimeout(() => refreshState(false), 120));
   document.addEventListener('twogether:notification-action', (event) => {
-    if (event.detail?.kind !== 'trip-prep' || event.detail?.choice !== 'open') return;
-    const id = String(event.detail?.id || '').replace(/^trip-prep:/, '');
+    if (event.detail?.choice !== 'open') return;
+    const kind=String(event.detail?.kind||'');
+    if(kind!=='trip-prep'&&kind!=='trip-reminder')return;
+    const rawId=String(event.detail?.id||'');
+    const id=kind==='trip-reminder'
+      ? rawId.replace(/^trip-reminder:/,'').split(':')[0]
+      : rawId.replace(/^trip-prep:/,'');
     const plan = (remoteState?.plans || []).find((item) => item.id === id);
     if (plan) openSimplifiedChecklist(plan);
     else refreshState(false);

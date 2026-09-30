@@ -1300,3 +1300,117 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   overscroll-behavior:none;
   touch-action:none;
 }
+
+
+/* Optional date/time notifications for Important reminders. */
+.tv2-check-row.has-reminder-notify{
+  grid-template-columns:30px minmax(0,1fr) 32px 32px;
+}
+.tv2-check-notify,
+.tv2-check-add-notify{
+  position:relative;
+  display:grid!important;
+  place-items:center;
+  width:32px;
+  min-width:32px!important;
+  height:32px;
+  min-height:32px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:10px!important;
+  background:transparent!important;
+  color:var(--tv2-faint)!important;
+}
+.tv2-check-notify svg,
+.tv2-check-add-notify svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.tv2-check-notify.is-set,
+.tv2-check-add-notify.is-set{
+  color:#9a7428!important;
+  background:#fff7e5!important;
+  box-shadow:inset 0 0 0 1px #ead9b5;
+}
+.tv2-check-notify.is-set::after,
+.tv2-check-add-notify.is-set::after{
+  content:'';
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#c58f2c;
+}
+.tv2-check-add.is-reminder-add{
+  grid-template-columns:minmax(0,1fr) 42px auto;
+}
+.tv2-check-add.is-reminder-add .tv2-check-add-notify{
+  width:42px;
+  min-width:42px!important;
+  height:42px;
+  min-height:42px!important;
+  border:1px solid var(--tv2-line)!important;
+  background:var(--tv2-bg)!important;
+}
+.tv2-check-add.is-reminder-add .tv2-check-add-notify.is-set{
+  background:#fff7e5!important;
+  border-color:#ead9b5!important;
+}
+.tv2-check-notify-card{
+  width:min(100%,360px);
+}
+.tv2-check-notify-fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:2px;
+}
+.tv2-check-notify-fields label{
+  display:grid;
+  gap:6px;
+  min-width:0;
+  color:var(--tv2-muted);
+  font-size:12.5px;
+  font-weight:650;
+}
+.tv2-check-notify-fields input{
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  border:1px solid var(--tv2-line);
+  border-radius:11px;
+  background:var(--tv2-bg);
+  padding:0 10px;
+  color:var(--tv2-ink);
+  font:inherit;
+  font-size:15px!important;
+}
+.tv2-check-notify-actions.has-remove{
+  grid-template-columns:1fr 1fr 1fr;
+}
+.tv2-check-notify-actions .is-remove{
+  color:var(--tv2-over);
+}
+.tv2-check-notify-actions .is-save{
+  border-color:transparent;
+  background:var(--tv2-primary);
+  color:var(--tv2-on-primary);
+}
+@media(max-width:390px){
+  .tv2-check-row.has-reminder-notify{
+    grid-template-columns:28px minmax(0,1fr) 30px 30px;
+    gap:6px;
+  }
+  .tv2-check-add.is-reminder-add{
+    grid-template-columns:minmax(0,1fr) 40px auto;
+    gap:6px;
+  }
+}

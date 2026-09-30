@@ -245,14 +245,34 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
         : '';
     const linked = plan?.linkedTripId ? trips.find((trip) => trip?.id === plan.linkedTripId) : null;
     const locked = !!(linked?.confirmed?.Principessa && linked?.confirmed?.Principe);
+    const stored = plan?.prep || {};
+    const initialized = !!stored.updatedAt || (Array.isArray(stored.packing) && stored.packing.length) || (Array.isArray(stored.reminders) && stored.reminders.length);
+    const fallback = state?.tripPrepDefaults || {};
+    const prep = initialized ? stored : {
+      packing: Array.isArray(fallback.packing) ? fallback.packing : CHECKLIST_DEFAULTS.packing.map((text) => ({ text, done: false })),
+      reminders: Array.isArray(fallback.reminders) ? fallback.reminders : CHECKLIST_DEFAULTS.reminders.map((text) => ({ text, done: false })),
+    };
+
+    if(!locked){
+      for(const reminder of Array.isArray(prep.reminders)?prep.reminders:[]){
+        if(reminder?.done)continue;
+        const text=cleanText(reminder?.text,160);
+        const reminderId=cleanText(reminder?.id,80);
+        const notifyAt=cleanText(reminder?.notifyAt,40);
+        const notifyMs=Date.parse(notifyAt);
+        if(!text||!reminderId||!Number.isFinite(notifyMs)||notifyMs>now.getTime())continue;
+        items.push({
+          eventKey:`trip-reminder:${plan.id}:${reminderId}:${notifyAt}`,
+          tag:`trip-reminder:${plan.id}:${reminderId}`,
+          source:'trips',
+          title:text,
+          body:`${planName(meta)} · Important reminder`,
+          url:'./?notifications=trips',
+        });
+      }
+    }
+
     if (!locked && reminderStage) {
-      const stored = plan?.prep || {};
-      const initialized = !!stored.updatedAt || (Array.isArray(stored.packing) && stored.packing.length) || (Array.isArray(stored.reminders) && stored.reminders.length);
-      const fallback = state?.tripPrepDefaults || {};
-      const prep = initialized ? stored : {
-        packing: Array.isArray(fallback.packing) ? fallback.packing : CHECKLIST_DEFAULTS.packing.map((text) => ({ text, done: false })),
-        reminders: Array.isArray(fallback.reminders) ? fallback.reminders : CHECKLIST_DEFAULTS.reminders.map((text) => ({ text, done: false })),
-      };
       const reminders = (Array.isArray(prep.reminders) ? prep.reminders : []).filter((item) => !item?.done && cleanText(item?.text, 160));
       const packing = (Array.isArray(prep.packing) ? prep.packing : []).filter((item) => !item?.done && cleanText(item?.text, 160));
       if (reminders.length || packing.length) {
@@ -293,9 +313,24 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
   return items;
 }
 
-function buildPushItems(state, actor, timeZone, now = new Date()) {
+export function buildPushItems(state, actor, timeZone, now = new Date()) {
   const today = localIsoDate(timeZone, now);
   return [...buildTripPushItems(state, actor, today, timeZone, now), ...buildFinancePushItems(state, actor, today)];
+}
+
+function nextScheduledTripReminderAt(state, nowMs = Date.now()) {
+  const trips=Array.isArray(state?.trips)?state.trips:[];
+  let next=Infinity;
+  for(const plan of Array.isArray(state?.plans)?state.plans:[]){
+    const linked=plan?.linkedTripId?trips.find((trip)=>trip?.id===plan.linkedTripId):null;
+    if(linked?.confirmed?.Principessa&&linked?.confirmed?.Principe)continue;
+    for(const reminder of Array.isArray(plan?.prep?.reminders)?plan.prep.reminders:[]){
+      if(reminder?.done)continue;
+      const stamp=Date.parse(String(reminder?.notifyAt||''));
+      if(Number.isFinite(stamp)&&stamp>nowMs&&stamp<next)next=stamp;
+    }
+  }
+  return Number.isFinite(next)?next:null;
 }
 
 function ensureVapidKeys(db) {
@@ -361,6 +396,7 @@ export function createPushService({ db, readState }) {
   let evaluating = false;
   let queued = false;
   let soonTimer = null;
+  let reminderTimer = null;
   const testTimers = new Set();
 
   async function sendWake(subscription) {
@@ -400,6 +436,16 @@ export function createPushService({ db, readState }) {
         pruneMessages.run();
         const state = readState();
         const now = new Date();
+        if(reminderTimer){clearTimeout(reminderTimer);reminderTimer=null;}
+        const nextReminderAt=nextScheduledTripReminderAt(state,now.getTime());
+        if(nextReminderAt!=null){
+          const delay=Math.min(2147480000,Math.max(250,nextReminderAt-now.getTime()+150));
+          reminderTimer=setTimeout(()=>{
+            reminderTimer=null;
+            evaluate().catch((error)=>console.warn('Scheduled reminder push evaluation failed:',error?.message||error));
+          },delay);
+          reminderTimer.unref?.();
+        }
         for (const subscription of allSubscriptions.all()) {
           if (!ACTORS.has(subscription.actor)) continue;
           const items = buildPushItems(state, subscription.actor, subscription.timezone, now);
@@ -509,6 +555,7 @@ export function createPushService({ db, readState }) {
       clearInterval(interval);
       clearTimeout(initial);
       if (soonTimer) clearTimeout(soonTimer);
+      if (reminderTimer) clearTimeout(reminderTimer);
       for (const timer of testTimers) clearTimeout(timer);
       testTimers.clear();
     },

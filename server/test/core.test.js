@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { configureStateStore, getState, runAction } from '../src/core.js';
 import { openDatabase } from '../src/db/index.js';
+import { buildPushItems } from '../src/push.js';
 
 function setup() {
   const directory = mkdtempSync(join(tmpdir(), 'twogether-db-'));
@@ -128,6 +129,75 @@ test('adding a trip checklist item promotes it once without duplicating the curr
   } finally {
     context.cleanup();
   }
+});
+
+test('important reminder notification time stays on the trip and survives recurrent sync', () => {
+  const context = setup();
+  try {
+    action(context.database, 'saveTripPrepDefaults', { prep:{ packing:[], reminders:[] } });
+    const created = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato', start:'2099-12-20', end:'2099-12-22' },
+      budget:'',
+    });
+    let plan=getState().plans.find((item)=>item.id===created.planId);
+    plan.prep.reminders.push({
+      id:'trip-gift',
+      text:'Buy birthday gift',
+      done:false,
+      addedBy:'Principessa',
+      notifyAt:'2099-12-19T17:30:00.000Z',
+    });
+
+    const saved=action(context.database,'saveTripPrep',{planId:created.planId,prep:plan.prep});
+    assert.equal(saved.ok,true);
+    const reminder=saved.prep.reminders.find((item)=>item.id==='trip-gift');
+    assert.equal(reminder.notifyAt,'2099-12-19T17:30:00.000Z');
+
+    const recurrent=getState().tripPrepDefaults.reminders.find((item)=>item.id===reminder.recurrentId);
+    assert.ok(recurrent);
+    assert.equal(Object.prototype.hasOwnProperty.call(recurrent,'notifyAt'),false);
+
+    action(context.database,'saveTripPrepDefaults',{
+      prep:{packing:[],reminders:[{...recurrent,text:'Buy the birthday gift'}]},
+    });
+    plan=getState().plans.find((item)=>item.id===created.planId);
+    const synced=plan.prep.reminders.find((item)=>item.id==='trip-gift');
+    assert.equal(synced.text,'Buy the birthday gift');
+    assert.equal(synced.notifyAt,'2099-12-19T17:30:00.000Z');
+  } finally {
+    context.cleanup();
+  }
+});
+
+test('scheduled important reminders only create push items once they are due', () => {
+  const state={
+    plans:[{
+      id:'plan-reminder',
+      meta:{location:'Italy',city:'Lonato',start:'2099-12-20',end:'2099-12-22'},
+      prep:{
+        updatedAt:'2026-09-30T10:00:00.000Z',
+        packing:[],
+        reminders:[{id:'gift-reminder',text:'Buy birthday gift',done:false,notifyAt:'2026-10-01T12:00:00.000Z'}],
+      },
+    }],
+    trips:[],
+    tripPrepDefaults:{packing:[],reminders:[]},
+    finances:{Principessa:[],Principe:[]},
+    financeProfiles:{Principessa:{},Principe:{}},
+  };
+
+  const before=buildPushItems(state,'Principessa','Europe/Amsterdam',new Date('2026-10-01T11:59:00.000Z'));
+  assert.equal(before.some((item)=>String(item.eventKey).startsWith('trip-reminder:')),false);
+
+  const due=buildPushItems(state,'Principessa','Europe/Amsterdam',new Date('2026-10-01T12:00:01.000Z'));
+  const item=due.find((entry)=>String(entry.eventKey).startsWith('trip-reminder:'));
+  assert.ok(item);
+  assert.equal(item.title,'Buy birthday gift');
+  assert.equal(item.body,'Lonato · Important reminder');
+
+  state.plans[0].prep.reminders[0].done=true;
+  const completed=buildPushItems(state,'Principessa','Europe/Amsterdam',new Date('2026-10-01T12:05:00.000Z'));
+  assert.equal(completed.some((entry)=>String(entry.eventKey).startsWith('trip-reminder:')),false);
 });
 
 test('deleting a recurrent-linked item from one trip does not let recurrent sync add it back', () => {
