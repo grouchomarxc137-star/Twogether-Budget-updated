@@ -23,7 +23,6 @@ import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { countryFlag } from './country-flags.js';
-import { tripImage } from './trip-images.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -442,13 +441,12 @@ function simplifiedCard(item) {
   const pct = item.available && item.available > 0 ? Math.min(100, Math.max(0, (item.spent / item.available) * 100)) : 0;
   const over = item.left != null && item.left < 0;
   const name = item.meta?.city || locationLabel(item.meta);
-  const country = locationLabel(item.meta);
-  const image = tripImage(name, country);
+  const flag = cardCountryEmoji(item.meta);
   return '<div class="tv2-swipe-row" data-swipe-kind="'+item.kind+'" data-swipe-id="'+esc(item.id)+'">'+
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
-      '<span class="tv2-card-photo" aria-hidden="true"><img src="'+esc(image)+'" alt="" loading="lazy" decoding="async"></span>'+
+      '<span class="tv2-card-corner-flag" aria-hidden="true">'+esc(flag)+'</span>'+
       '<span class="tv2-card-content">'+
         '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
         '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
@@ -3358,13 +3356,16 @@ function filterTripStories() {
   if (!shown) { const e = document.createElement('div'); e.className = 'empty-state gallery-empty tw-story-empty'; e.innerHTML = '<strong>No confirmed trips yet</strong><span>Completed trips move here after both of you confirm them.</span>'; root.appendChild(e); }
 }
 
-// Confirmed Trip Story cards already render their destination image in overview.js.
+// Confirmed Trip Story cards use the native country flag emoji too.
 function decorateTripStories() {
   const root = $('#tripGallery'); if (!root) return;
-  $('.trip-story-card', root).forEach((card) => {
+  $$('.trip-story-card', root).forEach((card) => {
+    const country = ($('.trip-country', card)?.textContent || '').trim();
     const art = $('.trip-story-photo', card);
     if (!art) return;
-    art.classList.remove('trip-story-flag');
+    art.classList.add('trip-story-flag');
+    art.textContent = countryFlag(country);
+    art.setAttribute('aria-label', country ? country+' flag' : 'Country flag');
     card.style.removeProperty('--v28-story-bg');
     delete card.dataset.v28Background;
   });
@@ -3473,7 +3474,7 @@ function enhanceCardArt(card) {
   const main = $('.tw-current-main', card); if (!main) return;
   const country = $('.trip-country', card)?.textContent?.trim() || 'Trip', city = $('h3', card)?.textContent?.trim() || 'Trip';
   const art = document.createElement('div'); art.className = 'tw-trip-art'; art.setAttribute('aria-hidden', 'true');
-  art.innerHTML = `<span class="tw-trip-emoji">${countryFlag(country)}</span><span class="tw-trip-monogram">${(city[0] || 'T').toUpperCase()}</span>`;
+  art.innerHTML = `<span class="tw-trip-emoji">${COUNTRY_EMOJI[country] || '✦'}</span><span class="tw-trip-monogram">${(city[0] || 'T').toUpperCase()}</span>`;
   card.insertBefore(art, main);
   const status = $('.tw-current-status', card);
   if (status) { const text = status.textContent.toLowerCase(); status.dataset.status = text.includes('progress') ? 'progress' : 'planned'; }
@@ -3482,20 +3483,19 @@ function enhanceCardArt(card) {
 function ensureCardArt() { $$('#twCurrentTrips .tw-current-card').forEach(enhanceCardArt); }
 
 function enhanceCardPhotos() {
-  $('#twCurrentTrips .tw-current-card').forEach((card) => {
+  $$('#twCurrentTrips .tw-current-card').forEach((card) => {
     const art = $('.tw-trip-art', card); if (!art) return;
     $('.tw-trip-monogram', art)?.remove();
     const country = ($('.trip-country', card)?.textContent || '').trim();
-    const city = ($('h3', card)?.textContent || '').trim();
-    card.dataset.v21City = city.toLowerCase();
     card.dataset.v21Country = country.toLowerCase();
-    const image = tripImage(city, country);
-    const bg = `linear-gradient(180deg,rgba(255,255,255,.02),rgba(25,18,10,.18)),url("${image}")`;
-    art.style.backgroundImage = bg;
-    card.style.setProperty('--v27-trip-bg', bg);
-    card.dataset.v27Background = '1';
+    art.style.backgroundImage = 'none';
+    card.style.removeProperty('--v27-trip-bg');
+    delete card.dataset.v27Background;
     const flag = $('.tw-trip-emoji', art);
-    if (flag) flag.textContent = '';
+    if (flag) {
+      flag.textContent = countryFlag(country);
+      flag.setAttribute('aria-label', country ? country+' flag' : 'Country flag');
+    }
   });
 }
 function enhanceCardMedia() { ensureCardArt(); enhanceCardPhotos(); }
