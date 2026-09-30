@@ -1862,3 +1862,80 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 .tv2-check-text-scroll.is-longpress-scroll .tv2-check-text{
   pointer-events:none;
 }
+
+
+/* Keep trip country photos contained at the approved card size. */
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card,
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past{
+  box-sizing:border-box;
+  height:158px;
+  min-height:158px;
+  max-height:158px;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo{
+  height:130px;
+  min-height:130px;
+  max-height:130px;
+  min-width:0;
+  overflow:hidden;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo img{
+  display:block;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  max-width:100%;
+  max-height:100%;
+  object-fit:cover;
+  object-position:center;
+}
+
+#log #tripGallery .trip-story-card{
+  box-sizing:border-box;
+  height:158px!important;
+  min-height:158px!important;
+  max-height:158px!important;
+}
+#log #tripGallery .trip-story-photo{
+  height:130px;
+  min-height:130px;
+  max-height:130px;
+  min-width:0;
+  overflow:hidden;
+}
+#log #tripGallery .trip-story-photo img{
+  display:block;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  max-width:100%;
+  max-height:100%;
+  object-fit:cover;
+  object-position:center;
+}
+
+@media(max-width:620px){
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card,
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past{
+    height:116px;
+    min-height:116px;
+    max-height:116px;
+  }
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo{
+    height:96px;
+    min-height:96px;
+    max-height:96px;
+  }
+  #log #tripGallery .trip-story-card{
+    height:116px!important;
+    min-height:116px!important;
+    max-height:116px!important;
+  }
+  #log #tripGallery .trip-story-photo{
+    height:96px;
+    min-height:96px;
+    max-height:96px;
+  }
+}
