@@ -1443,6 +1443,11 @@ function openSimplifiedChecklist(plan) {
         moveChecklistSlot(rows[0]);
         return;
       }
+      const lastRect=rows[rows.length-1].getBoundingClientRect();
+      if(ghostCenter>=lastRect.top+lastRect.height/2-.5){
+        moveChecklistSlot(null);
+        return;
+      }
     }
 
     for(const row of rows){
@@ -2134,6 +2139,11 @@ function openRecurrentChecklistItems(plan) {
       const firstRect=rows[0].getBoundingClientRect();
       if(ghostTop<=firstRect.top+1){
         moveRecurrentSlot(rows[0]);
+        return;
+      }
+      const lastRect=rows[rows.length-1].getBoundingClientRect();
+      if(ghostCenter>=lastRect.top+lastRect.height/2-.5){
+        moveRecurrentSlot(null);
         return;
       }
     }
