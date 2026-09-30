@@ -1303,7 +1303,7 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 
 
 /* Optional date/time notifications for Important reminders. */
-.tv2-check-row.has-reminder-notify{
+.tv2-check-swipe-row .tv2-check-row.has-reminder-notify:not(.is-completed){
   grid-template-columns:30px minmax(0,1fr) 32px 32px;
 }
 .tv2-check-notify,
@@ -1405,7 +1405,7 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   color:var(--tv2-on-primary);
 }
 @media(max-width:390px){
-  .tv2-check-row.has-reminder-notify{
+  .tv2-check-swipe-row .tv2-check-row.has-reminder-notify:not(.is-completed){
     grid-template-columns:28px minmax(0,1fr) 30px 30px;
     gap:6px;
   }

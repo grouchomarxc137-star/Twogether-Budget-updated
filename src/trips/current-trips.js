@@ -1713,8 +1713,9 @@ function openSimplifiedChecklist(plan) {
   sheet.addEventListener('touchstart',(e)=>{
     if(state.busy||deleteConfirmLayer||e.touches.length!==1)return;
     const t=e.touches[0];
+    const notificationTarget=e.target.closest?.('[data-check-notify]');
     const handle=checklistHandleForTouch(e.target,t);
-    const protectedZone=!!handle||isChecklistProtectedTouch(t);
+    const protectedZone=!notificationTarget&&(!!handle||isChecklistProtectedTouch(t));
 
     if(handle){
       sheet.__tv2CancelSwipeDown?.();
