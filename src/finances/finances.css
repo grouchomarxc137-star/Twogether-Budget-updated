@@ -4384,7 +4384,11 @@ dialog.finance-log-host .tv2-backdrop {
     width:min(82vw,350px)!important;
     min-width:min(82vw,350px)!important;
     max-width:min(82vw,350px)!important;
-    min-height:0!important;
+    height:285px!important;
+    min-height:285px!important;
+    max-height:285px!important;
+    display:flex!important;
+    flex-direction:column;
     align-self:center;
     scroll-snap-align:center;
     scroll-snap-stop:always;
@@ -4458,6 +4462,31 @@ dialog.finance-log-host .tv2-backdrop {
   [data-fin-view="balances"] .finance-current-row,
   [data-fin-view="balances"] .finance-current-metrics {
     font-size:14px;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-items {
+    min-height:0;
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-items::-webkit-scrollbar {
+    display:none;
+  }
+
+  [data-fin-view="balances"] .finance-current-title,
+  [data-fin-view="balances"] .finance-current-metrics,
+  [data-fin-view="balances"] .finance-card-actions,
+  [data-fin-view="balances"] .finance-add {
+    flex:0 0 auto;
+  }
+
+  [data-fin-view="balances"] .finance-wallet-items .finance-current-row:first-child {
+    border-top:0;
   }
 
   [data-fin-view="balances"] .finance-card-actions {

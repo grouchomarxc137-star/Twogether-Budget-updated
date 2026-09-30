@@ -84,8 +84,10 @@ export function renderSharedJar() {
     nextRow.type = 'button';
     nextRow.className = 'finance-current-row v33-shared-jar-bank';
     nextRow.setAttribute('aria-label', 'View Shared Jar transaction history');
+    const itemScroller = $('[data-fin-wallet-items]', cashCard);
     const addBankButton = $('[data-fin-add-bank]', cashCard);
     if (row) row.replaceWith(nextRow);
+    else if (itemScroller) itemScroller.appendChild(nextRow);
     else if (addBankButton) cashCard.insertBefore(nextRow, addBankButton);
     else cashCard.appendChild(nextRow);
     row = nextRow;
