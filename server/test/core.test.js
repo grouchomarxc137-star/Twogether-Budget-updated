@@ -185,6 +185,41 @@ test('shared and personal checklist layers persist without changing legacy share
   }
 });
 
+test('trip notes persist with dates and shared or personal scope without recurrent saves wiping them', () => {
+  const context = setup();
+  try {
+    const saved=action(context.database,'saveTripNotes',{
+      notes:[
+        {id:'shared-note',text:'Black hoodie is already at Principe’s',addedBy:'Principessa',personalFor:'',createdAt:'2026-09-30T18:00:00.000Z'},
+        {id:'private-note',text:'Bring my yellow charger',addedBy:'Principessa',personalFor:'Principessa'}
+      ]
+    },'Principessa');
+    assert.equal(saved.ok,true);
+    assert.equal(saved.notes.length,2);
+    assert.equal(saved.notes[0].createdAt,'2026-09-30T18:00:00.000Z');
+    assert.equal(saved.notes[1].personalFor,'Principessa');
+    assert.ok(Number.isFinite(Date.parse(saved.notes[1].createdAt)));
+
+    const recurrentSave=action(context.database,'saveTripPrepDefaults',{
+      prep:{packing:[],reminders:[]}
+    },'Principe');
+    assert.equal(recurrentSave.ok,true);
+    assert.equal(recurrentSave.prep.notes.length,2);
+    assert.equal(recurrentSave.prep.notes.find((item)=>item.id==='shared-note').text,'Black hoodie is already at Principe’s');
+
+    const hidden=action(context.database,'saveTripNotes',{
+      notes:saved.notes.map((item)=>item.id==='shared-note'
+        ? {...item,personal:{Principessa:{hidden:true,text:'My hidden hoodie note'}}}
+        : item)
+    },'Principessa');
+    const shared=hidden.notes.find((item)=>item.id==='shared-note');
+    assert.equal(shared.personal.Principessa.hidden,true);
+    assert.equal(shared.personal.Principessa.text,'My hidden hoodie note');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('important reminder notification time stays on the trip and survives recurrent sync', () => {
   const context = setup();
   try {

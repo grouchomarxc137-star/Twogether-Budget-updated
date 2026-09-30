@@ -962,14 +962,16 @@ function tripPrepSnapshot(plan) {
 
 function recurrentPrepSnapshot() {
   const stored = remoteState?.tripPrepDefaults || {};
-  const initialized = !!stored.updatedAt || Array.isArray(stored.packing) || Array.isArray(stored.reminders);
+  const initialized = !!stored.updatedAt || Array.isArray(stored.packing) || Array.isArray(stored.reminders) || Array.isArray(stored.notes);
   const source = initialized ? stored : {
     packing: checklistSeed(CHECKLIST_DEFAULTS.packing),
     reminders: checklistSeed(CHECKLIST_DEFAULTS.reminders),
+    notes: [],
   };
   return {
     packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
     reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
+    notes: (Array.isArray(source.notes) ? source.notes : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal), createdAt:String(item.createdAt || '') })),
   };
 }
 
@@ -1114,6 +1116,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   if (!plan) return;
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
+  prep.notes = JSON.parse(JSON.stringify(recurrentPrepSnapshot().notes || []));
   const state = { error:'', packingMine:!!initialPersonal, busy:false, reminderDraftText:'', reminderDraftNotifyAt:'' };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
@@ -1140,6 +1143,24 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     if(!date||!time)return '';
     const d=new Date(date+'T'+time+':00');
     return Number.isNaN(d.getTime())?'':d.toISOString();
+  };
+  const noteDateLabel=(value)=>{
+    const d=new Date(String(value||''));
+    if(Number.isNaN(d.getTime()))return 'Added recently';
+    return 'Added '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  };
+
+  const noteRowHtml = (item) => {
+    const viewItem=checklistViewItem(item,state.packingMine,actor());
+    return '<div class="tv2-check-swipe-row tv2-check-note-swipe" data-check-swipe data-check-kind="notes" data-check-id="'+esc(item.id)+'">'+
+      '<div class="tv2-check-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
+      '<div class="tv2-check-row tv2-check-note-row" data-check-kind="notes" data-check-id="'+esc(item.id)+'">'+
+        '<div class="tv2-check-note-copy">'+
+          '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(viewItem.text)+'" aria-label="Trip note"></div>'+
+          '<small>'+esc(noteDateLabel(item.createdAt))+'</small>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
   };
 
   const rowHtml = (kind, item, completed = false) => {
@@ -1171,6 +1192,17 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
       '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
       '<div class="tv2-check-add '+(isReminder?'is-reminder-add':'')+'"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item" value="'+esc(isReminder?state.reminderDraftText:'')+'">'+notifyButton+'<button type="button" data-check-add="'+kind+'">Add</button></div>'+
+    '</section>';
+  };
+
+  const notesSection = () => {
+    const personal=state.packingMine;
+    const visible=checklistItemsForView(prep.notes,personal,actor());
+    const ownerClass=personal?(actor()==='Principe'?' is-principe':' is-principessa'):'';
+    return '<section class="tv2-check-section tv2-check-notes'+(personal?' is-mine-packing':'')+ownerClass+'" data-check-section="notes">'+
+      '<div class="tv2-check-section-head"><h3>Notes</h3><span>'+visible.length+'</span></div>'+
+      '<div class="tv2-check-list">'+(visible.length?visible.map(noteRowHtml).join(''):'<p class="tv2-check-empty">'+(personal?'No personal notes yet.':'No shared notes yet.')+'</p>')+'</div>'+
+      '<div class="tv2-check-add"><input data-check-new="notes" maxlength="160" placeholder="Add a note for next trip"><button type="button" data-check-add="notes">Add</button></div>'+
     '</section>';
   };
 
@@ -1217,6 +1249,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       '<div class="tv2-sheet-head tv2-checklist-head" data-check-personal-toggle role="button" tabindex="0" aria-pressed="'+(personal?'true':'false')+'" aria-label="'+esc(personal?'Show all checklist items':'Show only '+me+' checklist items')+'"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2>'+(personal?'<span class="tv2-check-personal-mode">'+esc(me)+'</span>':'')+'</div><button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button></div>'+
       activeSection('packing','Packing / things to take')+
       activeSection('reminders','Important reminders')+
+      notesSection()+
       completedSection()+
       '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>';
     requestAnimationFrame(() => {
@@ -1238,6 +1271,16 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),notifyAt:String(item.notifyAt||''),personal:checklistPersonalPayload(item.personal)})),
     };
   }
+  function cleanNotes(source=prep.notes) {
+    return (Array.isArray(source)?source:[]).filter((item)=>String(item.text||'').trim()).map((item)=>({
+      id:item.id,
+      text:String(item.text||'').trim(),
+      addedBy:checklistAddedBy(item.addedBy),
+      personalFor:checklistPersonalFor(item.personalFor),
+      personal:checklistPersonalPayload(item.personal),
+      createdAt:String(item.createdAt||''),
+    }));
+  }
   let checklistSaveQueue=Promise.resolve();
   function saveChecklistSnapshot(snapshot) {
     state.error='';
@@ -1256,6 +1299,27 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   function autoSaveChecklist() {
     return saveChecklistSnapshot(cleanPrep()).catch((err)=>{
       state.error=err?.message||'Could not update checklist';
+      if(sheet?.isConnected)render();
+      return null;
+    });
+  }
+  let notesSaveQueue=Promise.resolve();
+  function saveNotesSnapshot(source=prep.notes) {
+    state.error='';
+    const payload=cleanNotes(source);
+    notesSaveQueue=notesSaveQueue.catch(()=>{}).then(()=>
+      window.TwogetherAPI.post('saveTripNotes',{notes:payload},actor())
+    ).then((result)=>{
+      if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
+      if(Array.isArray(result?.notes))prep.notes=JSON.parse(JSON.stringify(result.notes));
+      return result;
+    });
+    notesSaveQueue.catch(()=>{});
+    return notesSaveQueue;
+  }
+  function autoSaveNotes() {
+    return saveNotesSnapshot(prep.notes).catch((err)=>{
+      state.error=err?.message||'Could not update notes';
       if(sheet?.isConnected)render();
       return null;
     });
@@ -1334,6 +1398,15 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
     const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
     const next={ id:uid(), text, done:false, addedBy:actor(), personalFor:state.packingMine?actor():'', personal:{} };
+    if(kind==='notes'){
+      delete next.done;
+      next.createdAt=new Date().toISOString();
+      prep.notes.push(next);
+      render();
+      autoSaveNotes();
+      requestAnimationFrame(() => sheet.querySelector('[data-check-new="notes"]')?.focus());
+      return;
+    }
     if(kind==='reminders'&&state.reminderDraftNotifyAt)next.notifyAt=state.reminderDraftNotifyAt;
     prep[kind].push(next);
     if(kind==='reminders'){
@@ -1402,10 +1475,11 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     closeDeleteConfirm();
     deleteConfirmLayer=document.createElement('div');
     deleteConfirmLayer.className='tv2-confirm-layer';
+    const isNote=kind==='notes';
     deleteConfirmLayer.innerHTML=
       '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
       '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2ChecklistDeleteTitle">'+
-        '<h2 id="tv2ChecklistDeleteTitle">Delete checklist item?</h2>'+
+        '<h2 id="tv2ChecklistDeleteTitle">'+(isNote?'Delete note?':'Delete checklist item?')+'</h2>'+
         '<p>Are you sure you want to delete <strong>'+esc(viewItem.text||'this item')+'</strong>?</p>'+
         '<p class="tv2-confirm-error" aria-live="polite"></p>'+
         '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
@@ -1427,8 +1501,9 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       const error=deleteConfirmLayer.querySelector('.tv2-confirm-error');
       if(error)error.textContent='';
       const next={
-        packing:prep.packing.map((entry)=>({...entry})),
-        reminders:prep.reminders.map((entry)=>({...entry})),
+        packing:prep.packing.map((entry)=>JSON.parse(JSON.stringify(entry))),
+        reminders:prep.reminders.map((entry)=>JSON.parse(JSON.stringify(entry))),
+        notes:prep.notes.map((entry)=>JSON.parse(JSON.stringify(entry))),
       };
       const previousKind=prep[kind].map((entry)=>JSON.parse(JSON.stringify(entry)));
       const target=next[kind].find((entry)=>entry.id===id);
@@ -1437,11 +1512,12 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       prep[kind]=next[kind];
       try{
         state.busy=true;
-        await saveChecklistSnapshot(cleanPrep());
+        if(kind==='notes')await saveNotesSnapshot(prep.notes);
+        else await saveChecklistSnapshot(cleanPrep());
         state.busy=false;
         closeDeleteConfirm();
         render();
-        simplifiedSnack('Checklist item deleted');
+        simplifiedSnack(kind==='notes'?'Note deleted':'Checklist item deleted');
       }catch(err){
         prep[kind]=previousKind;
         state.busy=false;
@@ -1981,7 +2057,8 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       setTimeout(()=>render(item.id),180);
     } else if(e.target.matches('[data-check-text]')) {
       checklistSetViewField(item,state.packingMine,actor(),'text',e.target.value.trim());
-      autoSaveChecklist();
+      if(row.dataset.checkKind==='notes')autoSaveNotes();
+      else autoSaveChecklist();
     }
   });
   sheet.addEventListener('input',(e)=>{
@@ -2115,9 +2192,11 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     requestAnimationFrame(()=>sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
   function recurrentPayload(source=prep) {
+    const existingNotes=recurrentPrepSnapshot().notes||[];
     return {
       packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
+      notes:existingNotes.map((item)=>({id:item.id,text:String(item.text||'').trim(),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal),createdAt:String(item.createdAt||'')})),
     };
   }
   let recurrentSaveQueue=Promise.resolve();

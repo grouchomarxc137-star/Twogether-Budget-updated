@@ -1999,3 +1999,33 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   border-color:#ddd4ca;
   box-shadow:0 6px 18px rgba(69,52,43,.035);
 }
+
+
+/* Checklist notes that carry into future trips. */
+.tv2-check-notes .tv2-check-list{
+  gap:0;
+}
+.tv2-check-swipe-row .tv2-check-row.tv2-check-note-row:not(.is-completed){
+  grid-template-columns:minmax(0,1fr);
+  min-height:58px;
+  align-items:start;
+  padding:5px 0;
+}
+.tv2-check-note-copy{
+  min-width:0;
+  display:grid;
+  gap:0;
+}
+.tv2-check-note-row .tv2-check-text{
+  padding:6px 0 2px;
+}
+.tv2-check-note-copy>small{
+  display:block;
+  margin:0 0 6px;
+  color:var(--tv2-faint);
+  font-size:11px;
+  line-height:1.2;
+}
+.tv2-check-notes .tv2-check-add input::placeholder{
+  color:var(--tv2-faint);
+}

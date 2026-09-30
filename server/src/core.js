@@ -354,8 +354,12 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
     if (action === 'saveTripPrepDefaults') {
       const previous = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
-      const next = sanitizeTripPrepDefaults_(payload.prep || {});
+      const incoming = payload.prep && typeof payload.prep === 'object' ? payload.prep : {};
+      const source = Object.assign({}, incoming);
+      if(!Object.prototype.hasOwnProperty.call(source,'notes'))source.notes=previous.notes;
+      const next = sanitizeTripPrepDefaults_(source);
       const now = new Date().toISOString();
+      next.notes=next.notes.map(function(note){return Object.assign({},note,{createdAt:note.createdAt||now});});
       next.updatedAt = now;
       next.updatedBy = actor;
       const updatedPlans = syncRecurrentPrepIntoUpcomingPlans_(state, previous, next, actor, now);
@@ -363,6 +367,20 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       addAudit_(state, actor, 'saveTripPrepDefaults', 'trip-prep-defaults');
       saveState_(state);
       return output_({ok:true,prep:state.tripPrepDefaults,updatedPlans:updatedPlans});
+    }
+
+    if (action === 'saveTripNotes') {
+      const current = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
+      const now = new Date().toISOString();
+      current.notes=(Array.isArray(payload.notes)?payload.notes:[]).slice(0,120).map(prepNote_).filter(function(note){return !!note.text;}).map(function(note){
+        return Object.assign({},note,{createdAt:note.createdAt||now});
+      });
+      current.updatedAt=now;
+      current.updatedBy=actor;
+      state.tripPrepDefaults=current;
+      addAudit_(state,actor,'saveTripNotes','trip-notes');
+      saveState_(state);
+      return output_({ok:true,notes:current.notes,prep:current});
     }
 
     if (action === 'saveTripPrep') {
@@ -1139,6 +1157,12 @@ function prepNotifyAt_(value){
   const stamp=Date.parse(raw);
   return Number.isFinite(stamp)?new Date(stamp).toISOString():'';
 }
+function prepCreatedAt_(value){
+  const raw=cleanText_(value,40);
+  if(!raw)return '';
+  const stamp=Date.parse(raw);
+  return Number.isFinite(stamp)?new Date(stamp).toISOString():'';
+}
 function prepPersonalFor_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
 function prepPersonalEntry_(value){
   const s=value&&typeof value==='object'?value:{},out={};
@@ -1179,6 +1203,7 @@ function mergePrepPersonalDefaults_(previousDefault,nextDefault,tripValue){
   return out;
 }
 function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),notifyAt:prepNotifyAt_(x&&x.notifyAt),personal:prepPersonal_(x&&x.personal)};}
+function prepNote_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),text:cleanText_(x&&x.text,160),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),personal:prepPersonal_(x&&x.personal),createdAt:prepCreatedAt_(x&&x.createdAt)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
@@ -1196,6 +1221,7 @@ function defaultTripPrepDefaults_(){
       {id:'default-reminder-2',text:"Don't forget to ask mom to make work sandwich",done:false},
       {id:'default-reminder-3',text:"Don't forget to take pictures of the Airbnb when you arrive",done:false}
     ],
+    notes:[],
     updatedAt:'',
     updatedBy:'Unknown'
   };
@@ -1206,6 +1232,7 @@ function sanitizeTripPrepDefaults_(value){
   const out=sanitizeTripPrep_(value);
   out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
+  out.notes=(Array.isArray(value.notes)?value.notes:[]).slice(0,120).map(prepNote_).filter(function(item){return !!item.text;});
   return out;
 }
 function tripPrepForNewPlan_(value,actor,now){
@@ -2300,7 +2327,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveTripPrepDefaults', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
