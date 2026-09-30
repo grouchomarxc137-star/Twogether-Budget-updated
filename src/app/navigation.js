@@ -974,6 +974,7 @@ function installEdgeSubnavSelector() {
 
   document.addEventListener('touchstart', (event) => {
     if (!isMobile() || edgeSubnav.tracking || event.touches.length !== 1 || hasBlockingSurface()) return;
+    if (event.target?.closest?.('#twNotificationButton,.tw-notification-button')) return;
     const touch = event.touches[0];
     if (touch.clientX < window.innerWidth - 28) return;
 
