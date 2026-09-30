@@ -131,6 +131,60 @@ test('adding a trip checklist item promotes it once without duplicating the curr
   }
 });
 
+test('shared and personal checklist layers persist without changing legacy shared items', () => {
+  const context = setup();
+  try {
+    action(context.database, 'saveTripPrepDefaults', { prep:{ packing:[], reminders:[] } });
+    const created = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato', start:'2099-12-10', end:'2099-12-12' },
+      budget:'',
+    });
+    let plan=getState().plans.find((item)=>item.id===created.planId);
+    plan.prep.packing.push({
+      id:'shared-socks',text:'Socks',done:false,addedBy:'Principessa',personalFor:'',
+      personal:{Principessa:{text:'My socks',done:true,order:0}}
+    });
+    plan.prep.packing.push({
+      id:'private-socks',text:'2 socks',done:false,addedBy:'Principessa',personalFor:'Principessa'
+    });
+
+    const saved=action(context.database,'saveTripPrep',{planId:created.planId,prep:plan.prep},'Principessa');
+    assert.equal(saved.ok,true);
+    const savedShared=saved.prep.packing.find((item)=>item.id==='shared-socks');
+    const savedPrivate=saved.prep.packing.find((item)=>item.id==='private-socks');
+    assert.equal(savedShared.personalFor,'');
+    assert.equal(savedPrivate.personalFor,'Principessa');
+    assert.equal(savedShared.personal.Principessa.text,'My socks');
+    assert.equal(savedShared.personal.Principessa.done,true);
+
+    const defaults=getState().tripPrepDefaults.packing;
+    const sharedDefault=defaults.find((item)=>item.id===savedShared.recurrentId);
+    const privateDefault=defaults.find((item)=>item.id===savedPrivate.recurrentId);
+    assert.ok(sharedDefault);
+    assert.ok(privateDefault);
+    assert.equal(sharedDefault.personalFor,'');
+    assert.equal(privateDefault.personalFor,'Principessa');
+
+    const legacy=action(context.database,'saveTripPrepDefaults',{
+      prep:{
+        packing:[...defaults,{id:'legacy-shared',text:'Legacy shared',done:false,addedBy:'Principe'}],
+        reminders:[]
+      }
+    },'Principessa');
+    assert.equal(legacy.prep.packing.find((item)=>item.id==='legacy-shared').personalFor,'');
+
+    const future=action(context.database,'savePlan',{
+      meta:{location:'Italy',city:'Verona',start:'2099-12-20',end:'2099-12-22'},
+      budget:''
+    },'Principe');
+    const futurePlan=getState().plans.find((item)=>item.id===future.planId);
+    assert.ok(futurePlan.prep.packing.some((item)=>item.recurrentId===sharedDefault.id&&item.personalFor===''));
+    assert.ok(futurePlan.prep.packing.some((item)=>item.recurrentId===privateDefault.id&&item.personalFor==='Principessa'));
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('important reminder notification time stays on the trip and survives recurrent sync', () => {
   const context = setup();
   try {

@@ -230,6 +230,30 @@ function planName(meta) {
   return cleanText(meta?.city || (meta?.location === 'Other' ? meta?.otherLocation : meta?.location) || 'Trip', 100) || 'Trip';
 }
 
+function prepPersonalFor(value) {
+  return value === 'Principessa' || value === 'Principe' ? value : '';
+}
+function prepPersonalOverride(item,actor) {
+  const personal=item?.personal&&typeof item.personal==='object'?item.personal:{};
+  return personal?.[actor]&&typeof personal[actor]==='object'?personal[actor]:{};
+}
+function prepItemsForActor(items,actor) {
+  return (Array.isArray(items)?items:[]).filter((item)=>{
+    const owner=prepPersonalFor(item?.personalFor);
+    if(owner&&owner!==actor)return false;
+    if(!owner&&prepPersonalOverride(item,actor).hidden===true)return false;
+    return true;
+  }).map((item)=>{
+    const owner=prepPersonalFor(item?.personalFor);
+    if(owner)return item;
+    const override=prepPersonalOverride(item,actor),view={...item};
+    if(Object.prototype.hasOwnProperty.call(override,'text'))view.text=cleanText(override.text,160);
+    if(Object.prototype.hasOwnProperty.call(override,'done'))view.done=!!override.done;
+    if(Object.prototype.hasOwnProperty.call(override,'notifyAt'))view.notifyAt=cleanText(override.notifyAt,40);
+    return view;
+  });
+}
+
 function buildTripPushItems(state, actor, today, timeZone, now) {
   const items = [];
   const plans = Array.isArray(state?.plans) ? state.plans : [];
@@ -254,7 +278,7 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
     };
 
     if(!locked){
-      for(const reminder of Array.isArray(prep.reminders)?prep.reminders:[]){
+      for(const reminder of prepItemsForActor(prep.reminders,actor)){
         if(reminder?.done)continue;
         const text=cleanText(reminder?.text,160);
         const reminderId=cleanText(reminder?.id,80);
@@ -273,8 +297,8 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
     }
 
     if (!locked && reminderStage) {
-      const reminders = (Array.isArray(prep.reminders) ? prep.reminders : []).filter((item) => !item?.done && cleanText(item?.text, 160));
-      const packing = (Array.isArray(prep.packing) ? prep.packing : []).filter((item) => !item?.done && cleanText(item?.text, 160));
+      const reminders = prepItemsForActor(prep.reminders,actor).filter((item) => !item?.done && cleanText(item?.text, 160));
+      const packing = prepItemsForActor(prep.packing,actor).filter((item) => !item?.done && cleanText(item?.text, 160));
       if (reminders.length || packing.length) {
         const name = planName(meta);
         const title = reminderStage === 'important'

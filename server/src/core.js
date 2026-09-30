@@ -1139,7 +1139,46 @@ function prepNotifyAt_(value){
   const stamp=Date.parse(raw);
   return Number.isFinite(stamp)?new Date(stamp).toISOString():'';
 }
-function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy),notifyAt:prepNotifyAt_(x&&x.notifyAt)};}
+function prepPersonalFor_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
+function prepPersonalEntry_(value){
+  const s=value&&typeof value==='object'?value:{},out={};
+  if(Object.prototype.hasOwnProperty.call(s,'text'))out.text=cleanText_(s.text,160);
+  if(Object.prototype.hasOwnProperty.call(s,'done'))out.done=!!s.done;
+  if(Object.prototype.hasOwnProperty.call(s,'hidden'))out.hidden=!!s.hidden;
+  if(Object.prototype.hasOwnProperty.call(s,'notifyAt'))out.notifyAt=prepNotifyAt_(s.notifyAt);
+  if(Number.isFinite(Number(s.order)))out.order=Math.max(0,Math.min(9999,Number(s.order)));
+  return out;
+}
+function prepPersonal_(value){
+  const s=value&&typeof value==='object'?value:{},out={};
+  ACTORS.forEach(function(name){
+    const entry=prepPersonalEntry_(s[name]);
+    if(Object.keys(entry).length)out[name]=entry;
+  });
+  return out;
+}
+function mergePrepPersonalDefaults_(previousDefault,nextDefault,tripValue){
+  const previous=prepPersonal_(previousDefault),next=prepPersonal_(nextDefault),trip=prepPersonal_(tripValue),out={};
+  ACTORS.forEach(function(name){
+    const prevEntry=previous[name]||{},nextEntry=next[name]||{},tripEntry=trip[name]||{};
+    const merged={};
+    const keys={};
+    Object.keys(prevEntry).forEach(function(key){keys[key]=true;});
+    Object.keys(nextEntry).forEach(function(key){keys[key]=true;});
+    Object.keys(tripEntry).forEach(function(key){keys[key]=true;});
+    Object.keys(keys).forEach(function(key){
+      const tripHas=Object.prototype.hasOwnProperty.call(tripEntry,key);
+      const prevHas=Object.prototype.hasOwnProperty.call(prevEntry,key);
+      const nextHas=Object.prototype.hasOwnProperty.call(nextEntry,key);
+      if(tripHas&&(!prevHas||tripEntry[key]!==prevEntry[key]))merged[key]=tripEntry[key];
+      else if(nextHas)merged[key]=nextEntry[key];
+      else if(tripHas&&!prevHas)merged[key]=tripEntry[key];
+    });
+    if(Object.keys(merged).length)out[name]=merged;
+  });
+  return out;
+}
+function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),notifyAt:prepNotifyAt_(x&&x.notifyAt),personal:prepPersonal_(x&&x.personal)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
@@ -1165,15 +1204,15 @@ function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
-  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy};});
-  out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy};});
+  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
+  out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   return out;
 }
 function tripPrepForNewPlan_(value,actor,now){
   const source=sanitizeTripPrepDefaults_(value);
   return {
-    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};}),
-    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};}),
+    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};}),
+    reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};}),
     updatedAt:now||new Date().toISOString(),
     updatedBy:actor
   };
@@ -1192,7 +1231,7 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
 
     const defaultByText={};
     nextDefaults[kind].forEach(function(item){
-      const key=normalizedPrepText_(item&&item.text);
+      const key=prepPersonalFor_(item&&item.personalFor)+'|'+normalizedPrepText_(item&&item.text);
       if(key&&!defaultByText[key])defaultByText[key]=item;
     });
 
@@ -1205,9 +1244,12 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
     next[kind].forEach(function(item){
       if(!item||previousIds[item.id])return;
       if(prepAddedBy_(item.addedBy)!==actor)return;
+      const personalFor=prepPersonalFor_(item.personalFor);
+      if(personalFor&&personalFor!==actor)return;
       if(cleanText_(item.recurrentId,80))return;
-      const key=normalizedPrepText_(item.text);
-      if(!key)return;
+      const textKey=normalizedPrepText_(item.text);
+      if(!textKey)return;
+      const key=personalFor+'|'+textKey;
 
       const existingDefault=defaultByText[key];
       if(existingDefault){
@@ -1222,7 +1264,9 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
         id:Utilities.getUuid(),
         text:item.text,
         done:false,
-        addedBy:actor
+        addedBy:actor,
+        personalFor:personalFor,
+        personal:prepPersonal_(item.personal)
       };
       nextDefaults[kind].push(recurrent);
       defaultByText[key]=recurrent;
@@ -1236,8 +1280,8 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
 }
 function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   const existing=Array.isArray(existingItems)?existingItems.map(prepItem_):[];
-  const previous=Array.isArray(previousDefaults)?previousDefaults:[];
-  const next=Array.isArray(nextDefaults)?nextDefaults:[];
+  const previous=Array.isArray(previousDefaults)?previousDefaults.map(prepItem_):[];
+  const next=Array.isArray(nextDefaults)?nextDefaults.map(prepItem_):[];
   const previousById={};
   const nextById={};
   previous.forEach(function(item){if(item&&item.id)previousById[item.id]=item;});
@@ -1254,8 +1298,10 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
       return;
     }
     const text=normalizedPrepText_(item.text);
+    const personalFor=prepPersonalFor_(item.personalFor);
     const legacy=previous.find(function(candidate){
-      return candidate && candidate.id && !usedPrevious[candidate.id] && normalizedPrepText_(candidate.text)===text;
+      return candidate && candidate.id && !usedPrevious[candidate.id] &&
+        prepPersonalFor_(candidate.personalFor)===personalFor && normalizedPrepText_(candidate.text)===text;
     });
     if(legacy){
       item.recurrentId=legacy.id;
@@ -1270,13 +1316,20 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   next.forEach(function(item){
     const prior=matchedByDefaultId[item.id];
     if(prior){
-      recurrent.push({id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy,notifyAt:prior.notifyAt||''});
+      const previousDefault=previousById[item.id]||{};
+      recurrent.push({
+        id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy,
+        personalFor:item.personalFor,notifyAt:prior.notifyAt||'',
+        personal:mergePrepPersonalDefaults_(previousDefault.personal,item.personal,prior.personal)
+      });
       return;
     }
-    // A default that already existed but is absent from this trip was deleted
-    // from this trip on purpose. Keep it in Recurrent Items, but do not revive it.
+    // A recurrent item that already existed but is absent from this trip was removed from this trip on purpose.
     if(previousById[item.id])return;
-    recurrent.push({id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy});
+    recurrent.push({
+      id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,
+      personalFor:item.personalFor,personal:prepPersonal_(item.personal)
+    });
   });
   return recurrent.concat(custom);
 }

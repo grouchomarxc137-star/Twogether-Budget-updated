@@ -862,8 +862,88 @@ const CHECKLIST_DEFAULTS = {
 function checklistAddedBy(value) {
   return value === 'Principessa' || value === 'Principe' ? value : '';
 }
+function checklistPersonalFor(value) {
+  return value === 'Principessa' || value === 'Principe' ? value : '';
+}
+function checklistPersonalPayload(value) {
+  const source=value&&typeof value==='object'?value:{};
+  const out={};
+  ['Principessa','Principe'].forEach((name)=>{
+    const raw=source[name]&&typeof source[name]==='object'?source[name]:null;
+    if(!raw)return;
+    const next={};
+    if(Object.prototype.hasOwnProperty.call(raw,'text'))next.text=String(raw.text||'');
+    if(Object.prototype.hasOwnProperty.call(raw,'done'))next.done=!!raw.done;
+    if(Object.prototype.hasOwnProperty.call(raw,'hidden'))next.hidden=!!raw.hidden;
+    if(Object.prototype.hasOwnProperty.call(raw,'notifyAt'))next.notifyAt=String(raw.notifyAt||'');
+    if(Number.isFinite(Number(raw.order)))next.order=Number(raw.order);
+    if(Object.keys(next).length)out[name]=next;
+  });
+  return out;
+}
+function checklistPersonalOverride(item,person) {
+  const personal=item?.personal&&typeof item.personal==='object'?item.personal:{};
+  return personal?.[person]&&typeof personal[person]==='object'?personal[person]:{};
+}
+function checklistIsShared(item) {
+  return !checklistPersonalFor(item?.personalFor);
+}
+function checklistVisibleInView(item,personal,person) {
+  const owner=checklistPersonalFor(item?.personalFor);
+  if(!personal)return !owner;
+  if(owner&&owner!==person)return false;
+  return !(checklistIsShared(item)&&checklistPersonalOverride(item,person).hidden===true);
+}
+function checklistViewItem(item,personal,person) {
+  if(!personal||!checklistIsShared(item))return item;
+  const override=checklistPersonalOverride(item,person);
+  const view={...item};
+  if(Object.prototype.hasOwnProperty.call(override,'text'))view.text=String(override.text||'');
+  if(Object.prototype.hasOwnProperty.call(override,'done'))view.done=!!override.done;
+  if(Object.prototype.hasOwnProperty.call(override,'notifyAt'))view.notifyAt=String(override.notifyAt||'');
+  return view;
+}
+function checklistItemsForView(items,personal,person) {
+  const source=Array.isArray(items)?items:[];
+  const visible=source.filter((item)=>checklistVisibleInView(item,personal,person));
+  if(!personal)return visible;
+  const baseIndex=new Map(source.map((item,index)=>[item.id,index]));
+  return visible.slice().sort((a,b)=>{
+    const ao=Number(checklistPersonalOverride(a,person).order);
+    const bo=Number(checklistPersonalOverride(b,person).order);
+    const ar=Number.isFinite(ao)?ao:100000+(baseIndex.get(a.id)||0);
+    const br=Number.isFinite(bo)?bo:100000+(baseIndex.get(b.id)||0);
+    return ar-br;
+  });
+}
+function checklistSetViewField(item,personal,person,key,value) {
+  if(personal&&checklistIsShared(item)){
+    item.personal=checklistPersonalPayload(item.personal);
+    const current={...(item.personal?.[person]||{})};
+    current[key]=value;
+    item.personal[person]=current;
+    return;
+  }
+  item[key]=value;
+}
+function checklistHideInPersonalView(item,person) {
+  item.personal=checklistPersonalPayload(item.personal);
+  const current={...(item.personal?.[person]||{})};
+  current.hidden=true;
+  item.personal[person]=current;
+}
+function checklistSetPersonalOrder(items,person,ids) {
+  const rank=new Map(ids.map((id,index)=>[id,index]));
+  items.forEach((item)=>{
+    if(!rank.has(item.id))return;
+    item.personal=checklistPersonalPayload(item.personal);
+    const current={...(item.personal?.[person]||{})};
+    current.order=rank.get(item.id);
+    item.personal[person]=current;
+  });
+}
 function checklistSeed(list) {
-  return list.map((text) => ({ id: uid(), text, done:false, addedBy:'' }));
+  return list.map((text) => ({ id: uid(), text, done:false, addedBy:'', personalFor:'', personal:{} }));
 }
 function tripPrepSnapshot(plan) {
   const stored = plan?.prep || {};
@@ -888,8 +968,8 @@ function recurrentPrepSnapshot() {
     reminders: checklistSeed(CHECKLIST_DEFAULTS.reminders),
   };
   return {
-    packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy) })),
-    reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy) })),
+    packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
+    reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
   };
 }
 
@@ -908,8 +988,9 @@ function tripPrepNotificationItems() {
     const urgent = hoursUntilStart <= 12;
 
     const prep = tripPrepSnapshot(plan);
-    const reminders = (prep.reminders || []).filter((item) => !item.done && String(item.text || '').trim());
-    const packing = (prep.packing || []).filter((item) => !item.done && String(item.text || '').trim());
+    const me=actor();
+    const reminders = checklistItemsForView(prep.reminders,true,me).map((item)=>checklistViewItem(item,true,me)).filter((item) => !item.done && String(item.text || '').trim());
+    const packing = checklistItemsForView(prep.packing,true,me).map((item)=>checklistViewItem(item,true,me)).filter((item) => !item.done && String(item.text || '').trim());
     if (!reminders.length && !packing.length) return null;
 
     const name = String(meta.city || locationLabel(meta) || 'Your trip').trim();
@@ -943,8 +1024,9 @@ function scheduledTripReminderNotificationItems() {
     const trip=plan?.linkedTripId?(remoteState.trips||[]).find((item)=>item.id===plan.linkedTripId):null;
     if(trip&&isLocked(trip))return;
     const prep=tripPrepSnapshot(plan);
+    const me=actor();
     const tripName=String(plan?.meta?.city||locationLabel(plan?.meta)||'Trip').trim();
-    (prep.reminders||[]).forEach((item)=>{
+    checklistItemsForView(prep.reminders,true,me).map((item)=>checklistViewItem(item,true,me)).forEach((item)=>{
       const notifyAt=Date.parse(String(item?.notifyAt||''));
       if(item?.done||!String(item?.text||'').trim()||!Number.isFinite(notifyAt)||notifyAt>now)return;
       items.push({
@@ -972,7 +1054,7 @@ function scheduleNextTripReminderRefresh() {
   (remoteState.plans||[]).forEach((plan)=>{
     const trip=plan?.linkedTripId?(remoteState.trips||[]).find((item)=>item.id===plan.linkedTripId):null;
     if(trip&&isLocked(trip))return;
-    (tripPrepSnapshot(plan).reminders||[]).forEach((item)=>{
+    checklistItemsForView(tripPrepSnapshot(plan).reminders,true,actor()).map((item)=>checklistViewItem(item,true,actor())).forEach((item)=>{
       if(item?.done)return;
       const stamp=Date.parse(String(item?.notifyAt||''));
       if(Number.isFinite(stamp)&&stamp>now&&stamp<next)next=stamp;
@@ -1028,11 +1110,11 @@ function publishTripNotifications() {
   scheduleNextTripReminderRefresh();
 }
 
-function openSimplifiedChecklist(plan) {
+function openSimplifiedChecklist(plan, initialPersonal = false) {
   if (!plan) return;
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
-  const state = { error:'', packingMine:false, busy:false, reminderDraftText:'', reminderDraftNotifyAt:'' };
+  const state = { error:'', packingMine:!!initialPersonal, busy:false, reminderDraftText:'', reminderDraftNotifyAt:'' };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet" role="dialog" aria-modal="true" aria-label="Trip checklist"></div>';
@@ -1061,14 +1143,15 @@ function openSimplifiedChecklist(plan) {
   };
 
   const rowHtml = (kind, item, completed = false) => {
+    const viewItem=checklistViewItem(item,state.packingMine,actor());
     const canNotify=kind==='reminders'&&!completed;
-    const label=notifyLabel(item.notifyAt);
+    const label=notifyLabel(viewItem.notifyAt);
     return '<div class="tv2-check-swipe-row" data-check-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<div class="tv2-check-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
       '<div class="tv2-check-row '+(completed?'is-completed':'')+(canNotify?' has-reminder-notify':'')+'" data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
-        '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(item.done?'checked':'')+' aria-label="'+(item.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
+        '<label class="tv2-check-toggle"><input type="checkbox" data-check-toggle '+(viewItem.done?'checked':'')+' aria-label="'+(viewItem.done?'Move back to checklist':'Mark completed')+'"><span></span></label>'+
         '<div class="tv2-check-text-scroll" data-check-scroll>'+
-          '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Checklist item">'+
+          '<input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(viewItem.text)+'" aria-label="Checklist item">'+
         '</div>'+
         (canNotify?'<button type="button" class="tv2-check-notify '+(label?'is-set':'')+'" data-check-notify aria-label="'+esc(label?'Edit notification · '+label:'Add notification date and time')+'" title="'+esc(label||'Add notification')+'">'+reminderBellIcon()+'</button>':'')+
         (completed
@@ -1080,7 +1163,7 @@ function openSimplifiedChecklist(plan) {
 
   const activeSection = (kind, title) => {
     const mine=state.packingMine;
-    const active = prep[kind].filter((item)=>!item.done && (!mine || checklistAddedBy(item.addedBy)===actor()));
+    const active = checklistItemsForView(prep[kind],mine,actor()).filter((item)=>!checklistViewItem(item,mine,actor()).done);
     const ownerClass=mine?(actor()==='Principe'?' is-principe':' is-principessa'):'';
     const isReminder=kind==='reminders';
     const draftNotifyLabel=isReminder?notifyLabel(state.reminderDraftNotifyAt):'';
@@ -1094,8 +1177,8 @@ function openSimplifiedChecklist(plan) {
   const completedSection = () => {
     const mine=state.packingMine;
     const done = [
-      ...prep.packing.filter((item)=>item.done && (!mine || checklistAddedBy(item.addedBy)===actor())).map((item)=>({kind:'packing',item})),
-      ...prep.reminders.filter((item)=>item.done && (!mine || checklistAddedBy(item.addedBy)===actor())).map((item)=>({kind:'reminders',item})),
+      ...checklistItemsForView(prep.packing,mine,actor()).filter((item)=>checklistViewItem(item,mine,actor()).done).map((item)=>({kind:'packing',item})),
+      ...checklistItemsForView(prep.reminders,mine,actor()).filter((item)=>checklistViewItem(item,mine,actor()).done).map((item)=>({kind:'reminders',item})),
     ];
     if (!done.length) return '';
     return '<section class="tv2-check-section tv2-check-completed"><div class="tv2-check-section-head"><h3>Completed</h3><span>'+done.length+'</span></div>'+
@@ -1151,8 +1234,8 @@ function openSimplifiedChecklist(plan) {
   }
   function cleanPrep(source=prep) {
     return {
-      packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy)})),
-      reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),notifyAt:String(item.notifyAt||'')})),
+      packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
+      reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),notifyAt:String(item.notifyAt||''),personal:checklistPersonalPayload(item.personal)})),
     };
   }
   let checklistSaveQueue=Promise.resolve();
@@ -1184,7 +1267,7 @@ function openSimplifiedChecklist(plan) {
   }
   function openReminderNotificationEditor(item=null){
     closeReminderNotificationEditor();
-    const current=String(item?.notifyAt||state.reminderDraftNotifyAt||'');
+    const current=String((item?checklistViewItem(item,state.packingMine,actor()).notifyAt:'')||state.reminderDraftNotifyAt||'');
     const parts=notifyParts(current);
     const todayParts=notifyParts(new Date().toISOString());
     notifyEditorLayer=document.createElement('div');
@@ -1216,7 +1299,7 @@ function openSimplifiedChecklist(plan) {
     notifyEditorLayer.querySelectorAll('[data-notify-cancel]').forEach((button)=>button.addEventListener('click',cancel));
     notifyEditorLayer.querySelector('[data-notify-remove]')?.addEventListener('click',()=>{
       if(item){
-        item.notifyAt='';
+        checklistSetViewField(item,state.packingMine,actor(),'notifyAt','');
         autoSaveChecklist();
         closeReminderNotificationEditor();
         render(item.id);
@@ -1235,7 +1318,7 @@ function openSimplifiedChecklist(plan) {
         return;
       }
       if(item){
-        item.notifyAt=notifyAt;
+        checklistSetViewField(item,state.packingMine,actor(),'notifyAt',notifyAt);
         autoSaveChecklist();
         closeReminderNotificationEditor();
         render(item.id);
@@ -1250,7 +1333,7 @@ function openSimplifiedChecklist(plan) {
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
     const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
-    const next={ id:uid(), text, done:false, addedBy:actor() };
+    const next={ id:uid(), text, done:false, addedBy:actor(), personalFor:state.packingMine?actor():'', personal:{} };
     if(kind==='reminders'&&state.reminderDraftNotifyAt)next.notifyAt=state.reminderDraftNotifyAt;
     prep[kind].push(next);
     if(kind==='reminders'){
@@ -1315,6 +1398,7 @@ function openSimplifiedChecklist(plan) {
   const openChecklistDeleteConfirm=(kind,id)=>{
     const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
     if(!item)return;
+    const viewItem=checklistViewItem(item,state.packingMine,actor());
     closeDeleteConfirm();
     deleteConfirmLayer=document.createElement('div');
     deleteConfirmLayer.className='tv2-confirm-layer';
@@ -1322,7 +1406,7 @@ function openSimplifiedChecklist(plan) {
       '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
       '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2ChecklistDeleteTitle">'+
         '<h2 id="tv2ChecklistDeleteTitle">Delete checklist item?</h2>'+
-        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
+        '<p>Are you sure you want to delete <strong>'+esc(viewItem.text||'this item')+'</strong>?</p>'+
         '<p class="tv2-confirm-error" aria-live="polite"></p>'+
         '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
       '</div>';
@@ -1346,8 +1430,10 @@ function openSimplifiedChecklist(plan) {
         packing:prep.packing.map((entry)=>({...entry})),
         reminders:prep.reminders.map((entry)=>({...entry})),
       };
-      next[kind]=next[kind].filter((entry)=>entry.id!==id);
-      const previousKind=prep[kind];
+      const previousKind=prep[kind].map((entry)=>JSON.parse(JSON.stringify(entry)));
+      const target=next[kind].find((entry)=>entry.id===id);
+      if(state.packingMine&&target&&checklistIsShared(target))checklistHideInPersonalView(target,actor());
+      else next[kind]=next[kind].filter((entry)=>entry.id!==id);
       prep[kind]=next[kind];
       try{
         state.busy=true;
@@ -1731,6 +1817,10 @@ function openSimplifiedChecklist(plan) {
     const list=checklistDrag.list;
     if(!kind||!Array.isArray(prep[kind])||!list)return;
     const ids=[...list.querySelectorAll('[data-check-swipe]')].map((row)=>row.dataset.checkId);
+    if(state.packingMine){
+      checklistSetPersonalOrder(prep[kind],actor(),ids);
+      return;
+    }
     const visibleSet=new Set(ids);
     const byId=new Map(prep[kind].map((item)=>[item.id,item]));
     let index=0;
@@ -1885,12 +1975,12 @@ function openSimplifiedChecklist(plan) {
     const row=e.target.closest('.tv2-check-row'); if(!row)return;
     const item=findItem(row); if(!item)return;
     if(e.target.matches('[data-check-toggle]')){
-      item.done=e.target.checked;
+      checklistSetViewField(item,state.packingMine,actor(),'done',e.target.checked);
       autoSaveChecklist();
       row.classList.add('is-moving');
       setTimeout(()=>render(item.id),180);
     } else if(e.target.matches('[data-check-text]')) {
-      item.text=e.target.value.trim();
+      checklistSetViewField(item,state.packingMine,actor(),'text',e.target.value.trim());
       autoSaveChecklist();
     }
   });
@@ -1901,7 +1991,7 @@ function openSimplifiedChecklist(plan) {
     }
     if(!e.target.matches('[data-check-text]'))return;
     const row=e.target.closest('.tv2-check-row'),item=findItem(row);
-    if(item)item.text=e.target.value;
+    if(item)checklistSetViewField(item,state.packingMine,actor(),'text',e.target.value);
     syncChecklistTextWidth(e.target);
   });
   sheet.addEventListener('keydown',(e)=>{
@@ -1927,7 +2017,7 @@ function openSimplifiedChecklist(plan) {
     }
     const b=e.target.closest('button'); if(!b)return;
     if(b.hasAttribute('data-close')){closeReminderNotificationEditor();closeSimplifiedSheet();return;}
-    if(b.hasAttribute('data-check-recurrent')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan);return;}
+    if(b.hasAttribute('data-check-recurrent')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan,state.packingMine);return;}
     if(b.hasAttribute('data-check-new-notify')){
       const input=sheet.querySelector('[data-check-new="reminders"]');
       state.reminderDraftText=String(input?.value||'');
@@ -1946,10 +2036,10 @@ function openSimplifiedChecklist(plan) {
   render();
 }
 
-function openRecurrentChecklistItems(plan) {
+function openRecurrentChecklistItems(plan, initialPersonal = false) {
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(recurrentPrepSnapshot()));
-  const state = { busy:false, error:'' };
+  const state = { busy:false, error:'', personal:!!initialPersonal };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet tv2-recurrent-sheet" role="dialog" aria-modal="true" aria-label="Recurrent checklist items"></div>';
@@ -1959,21 +2049,25 @@ function openRecurrentChecklistItems(plan) {
 
   bindChecklistSwipeDown(simplifiedLayer, sheet);
 
-  const rowHtml = (kind,item) =>
-    '<div class="tv2-recurrent-swipe-row" data-recurrent-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
+  const rowHtml = (kind,item) => {
+    const viewItem=checklistViewItem(item,state.personal,actor());
+    return '<div class="tv2-recurrent-swipe-row" data-recurrent-swipe data-check-kind="'+kind+'" data-check-id="'+esc(item.id)+'">'+
       '<div class="tv2-recurrent-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
       '<div class="tv2-check-row tv2-recurrent-row">'+
         '<span class="tv2-recurrent-dot" aria-hidden="true"></span>'+
-        '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(item.text)+'" aria-label="Recurrent checklist item"></div>'+
+        '<div class="tv2-check-text-scroll" data-check-scroll><input class="tv2-check-text" data-check-text maxlength="160" value="'+esc(viewItem.text)+'" aria-label="Recurrent checklist item"></div>'+
         '<button type="button" class="tv2-recurrent-drag" data-recurrent-drag aria-label="Hold and drag to reorder"><i></i><i></i><i></i></button>'+
       '</div>'+
     '</div>';
+  };
 
-  const sectionHtml = (kind,title) =>
-    '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+prep[kind].length+'</span></div>'+
-      '<div class="tv2-check-list">'+(prep[kind].length?prep[kind].map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">No standard items here.</p>')+'</div>'+
+  const sectionHtml = (kind,title) => {
+    const visible=checklistItemsForView(prep[kind],state.personal,actor());
+    return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+visible.length+'</span></div>'+
+      '<div class="tv2-check-list">'+(visible.length?visible.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+(state.personal?'Nothing of yours here ♡':'No shared standard items here.')+'</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
+  };
 
   const textMeasureCanvas = document.createElement('canvas');
   const textMeasureContext = textMeasureCanvas.getContext('2d');
@@ -1995,8 +2089,12 @@ function openRecurrentChecklistItems(plan) {
   }
 
   function render() {
+    const personal=state.personal,me=actor();
+    sheet.classList.toggle('is-personal-checklist',personal);
+    sheet.classList.toggle('is-principessa',personal&&me==='Principessa');
+    sheet.classList.toggle('is-principe',personal&&me==='Principe');
     sheet.innerHTML =
-      '<div class="tv2-sheet-head"><div><button type="button" class="tv2-check-back" data-check-back>‹ Checklist</button><h2>Recurrent items</h2></div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
+      '<div class="tv2-sheet-head tv2-checklist-head" data-check-personal-toggle role="button" tabindex="0" aria-pressed="'+(personal?'true':'false')+'" aria-label="'+esc(personal?'Show shared recurrent items':'Show only '+me+' recurrent items')+'"><div><button type="button" class="tv2-check-back" data-check-back>‹ Checklist</button><h2>Recurrent items</h2>'+(personal?'<span class="tv2-check-personal-mode">'+esc(me)+'</span>':'')+'</div><button class="tv2-x" data-close aria-label="Close">✕</button></div>'+
       sectionHtml('packing','Packing / things to take')+
       sectionHtml('reminders','Important reminders')+
       '<p class="tv2-hint '+(state.error?'is-error':'')+'" aria-live="polite">'+esc(state.error)+'</p>'+
@@ -2012,14 +2110,14 @@ function openRecurrentChecklistItems(plan) {
   function addItem(kind) {
     const input=sheet.querySelector('[data-check-new="'+kind+'"]');
     const text=input?.value?.trim(); if(!text||!Array.isArray(prep[kind]))return;
-    prep[kind].push({id:uid(),text,done:false,addedBy:actor()});
+    prep[kind].push({id:uid(),text,done:false,addedBy:actor(),personalFor:state.personal?actor():'',personal:{}});
     render();
     requestAnimationFrame(()=>sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
   function recurrentPayload(source=prep) {
     return {
-      packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
-      reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy)})),
+      packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
+      reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
     };
   }
   let recurrentSaveQueue=Promise.resolve();
@@ -2050,7 +2148,7 @@ function openRecurrentChecklistItems(plan) {
       closeSimplifiedSheet();
       await refreshState(true);
       const refreshedPlan=(remoteState?.plans||[]).find((item)=>item.id===plan.id)||plan;
-      openSimplifiedChecklist(refreshedPlan);
+      openSimplifiedChecklist(refreshedPlan,state.personal);
       simplifiedSnack('Recurrent items saved');
     }catch(err){
       state.busy=false;state.error=err?.message||'Could not save recurrent items';render();
@@ -2109,6 +2207,7 @@ function openRecurrentChecklistItems(plan) {
   const openRecurrentDeleteConfirm=(kind,id)=>{
     const item=Array.isArray(prep[kind])?prep[kind].find((entry)=>entry.id===id):null;
     if(!item)return;
+    const viewItem=checklistViewItem(item,state.personal,actor());
     closeDeleteConfirm();
     deleteConfirmLayer=document.createElement('div');
     deleteConfirmLayer.className='tv2-confirm-layer';
@@ -2116,7 +2215,7 @@ function openRecurrentChecklistItems(plan) {
       '<div class="tv2-confirm-backdrop" data-confirm-cancel></div>'+
       '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="tv2RecurrentDeleteTitle">'+
         '<h2 id="tv2RecurrentDeleteTitle">Delete recurrent item?</h2>'+
-        '<p>Are you sure you want to delete <strong>'+esc(item.text||'this item')+'</strong>?</p>'+
+        '<p>Are you sure you want to delete <strong>'+esc(viewItem.text||'this item')+'</strong>?</p>'+
         '<p class="tv2-confirm-error" aria-live="polite"></p>'+
         '<div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div>'+
       '</div>';
@@ -2140,8 +2239,10 @@ function openRecurrentChecklistItems(plan) {
         packing:prep.packing.map((entry)=>({...entry})),
         reminders:prep.reminders.map((entry)=>({...entry})),
       };
-      next[kind]=next[kind].filter((entry)=>entry.id!==id);
-      const previousKind=prep[kind];
+      const previousKind=prep[kind].map((entry)=>JSON.parse(JSON.stringify(entry)));
+      const target=next[kind].find((entry)=>entry.id===id);
+      if(state.personal&&target&&checklistIsShared(target))checklistHideInPersonalView(target,actor());
+      else next[kind]=next[kind].filter((entry)=>entry.id!==id);
       prep[kind]=next[kind];
       try{
         state.busy=true;
@@ -2532,9 +2633,17 @@ function openRecurrentChecklistItems(plan) {
     const list=recurrentDrag.list;
     if(kind&&Array.isArray(prep[kind])&&list){
       const ids=[...list.querySelectorAll('[data-recurrent-swipe]')].map((row)=>row.dataset.checkId);
-      const byId=new Map(prep[kind].map((item)=>[item.id,item]));
-      const ordered=ids.map((id)=>byId.get(id)).filter(Boolean);
-      if(ordered.length===prep[kind].length)prep[kind]=ordered;
+      if(state.personal){
+        checklistSetPersonalOrder(prep[kind],actor(),ids);
+      }else{
+        const visibleSet=new Set(ids);
+        const byId=new Map(prep[kind].map((item)=>[item.id,item]));
+        let index=0;
+        prep[kind]=prep[kind].map((item)=>{
+          if(!visibleSet.has(item.id))return item;
+          return byId.get(ids[index++])||item;
+        });
+      }
     }
     resetRecurrentDrag();
     render();
@@ -2669,22 +2778,34 @@ function openRecurrentChecklistItems(plan) {
   sheet.addEventListener('input',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
-    if(item)item.text=e.target.value;
+    if(item)checklistSetViewField(item,state.personal,actor(),'text',e.target.value);
     syncRecurrentTextWidth(e.target);
   });
   sheet.addEventListener('change',(e)=>{
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
-    if(item)item.text=e.target.value.trim();
+    if(item)checklistSetViewField(item,state.personal,actor(),'text',e.target.value.trim());
   });
   sheet.addEventListener('keydown',(e)=>{
+    if(e.target.matches?.('[data-check-personal-toggle]')&&(e.key==='Enter'||e.key===' ')){
+      e.preventDefault();
+      state.personal=!state.personal;
+      render();
+      return;
+    }
     const input=e.target.closest('[data-check-new]');if(!input||e.key!=='Enter')return;
     e.preventDefault();addItem(input.dataset.checkNew);
   });
   sheet.addEventListener('click',(e)=>{
+    const header=e.target.closest('[data-check-personal-toggle]');
+    if(header&&!e.target.closest('button,input,label,a,select,textarea')){
+      state.personal=!state.personal;
+      render();
+      return;
+    }
     const b=e.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
-    if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan);return;}
+    if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan,state.personal);return;}
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
     if(b.hasAttribute('data-check-defaults-save'))saveDefaults();
   });
