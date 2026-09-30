@@ -1182,16 +1182,18 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
   const previous=Array.isArray(previousDefaults)?previousDefaults:[];
   const next=Array.isArray(nextDefaults)?nextDefaults:[];
   const previousById={};
+  const nextById={};
   previous.forEach(function(item){if(item&&item.id)previousById[item.id]=item;});
+  next.forEach(function(item){if(item&&item.id)nextById[item.id]=item;});
   const matchedByDefaultId={};
   const custom=[];
   const usedPrevious={};
 
   existing.forEach(function(item){
     let recurrentId=cleanText_(item.recurrentId,80);
-    if(recurrentId && previousById[recurrentId]){
+    if(recurrentId && (previousById[recurrentId] || nextById[recurrentId])){
       matchedByDefaultId[recurrentId]=item;
-      usedPrevious[recurrentId]=true;
+      if(previousById[recurrentId])usedPrevious[recurrentId]=true;
       return;
     }
     const text=normalizedPrepText_(item.text);
@@ -1207,11 +1209,17 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
     custom.push(item);
   });
 
-  const recurrent=next.map(function(item){
+  const recurrent=[];
+  next.forEach(function(item){
     const prior=matchedByDefaultId[item.id];
-    return prior
-      ? {id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy}
-      : {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy};
+    if(prior){
+      recurrent.push({id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy});
+      return;
+    }
+    // A default that already existed but is absent from this trip was deleted
+    // from this trip on purpose. Keep it in Recurrent Items, but do not revive it.
+    if(previousById[item.id])return;
+    recurrent.push({id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy});
   });
   return recurrent.concat(custom);
 }

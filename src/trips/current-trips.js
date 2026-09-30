@@ -1072,23 +1072,26 @@ function openSimplifiedChecklist(plan) {
     };
   }
   let checklistSaveQueue=Promise.resolve();
-  function autoSaveChecklist() {
-    const snapshot = cleanPrep();
+  function saveChecklistSnapshot(snapshot) {
     state.error='';
+    const payload=JSON.parse(JSON.stringify(snapshot||cleanPrep()));
     checklistSaveQueue=checklistSaveQueue.catch(()=>{}).then(()=>
-      window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:snapshot},actor())
+      window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:payload},actor())
     ).then((result)=>{
       if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
       if(remoteState&&result?.tripPrepDefaults)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.tripPrepDefaults));
       publishTripNotifications();
       return result;
-    }).catch((err)=>{
-      state.error=err?.message||'Could not update checklist';
-      if(sheet?.isConnected)render();
-      throw err;
     });
     checklistSaveQueue.catch(()=>{});
     return checklistSaveQueue;
+  }
+  function autoSaveChecklist() {
+    return saveChecklistSnapshot(cleanPrep()).catch((err)=>{
+      state.error=err?.message||'Could not update checklist';
+      if(sheet?.isConnected)render();
+      return null;
+    });
   }
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
@@ -1167,18 +1170,17 @@ function openSimplifiedChecklist(plan) {
         reminders:prep.reminders.map((entry)=>({...entry})),
       };
       next[kind]=next[kind].filter((entry)=>entry.id!==id);
+      const previousKind=prep[kind];
+      prep[kind]=next[kind];
       try{
         state.busy=true;
-        const result=await window.TwogetherAPI.post('saveTripPrep',{planId:plan.id,prep:cleanPrep(next)},actor());
-        prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
-        if(result?.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
-        if(remoteState&&result?.tripPrepDefaults)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.tripPrepDefaults));
+        await saveChecklistSnapshot(cleanPrep());
         state.busy=false;
         closeDeleteConfirm();
         render();
-        publishTripNotifications();
         simplifiedSnack('Checklist item deleted');
       }catch(err){
+        prep[kind]=previousKind;
         state.busy=false;
         deleteButton.disabled=false;
         deleteButton.textContent='Delete';
@@ -1901,16 +1903,23 @@ function openRecurrentChecklistItems(plan) {
         reminders:prep.reminders.map((entry)=>({...entry})),
       };
       next[kind]=next[kind].filter((entry)=>entry.id!==id);
+      const previousKind=prep[kind];
+      prep[kind]=next[kind];
       try{
         state.busy=true;
-        const result=await window.TwogetherAPI.post('saveTripPrepDefaults',{prep:recurrentPayload(next)},actor());
-        prep[kind]=prep[kind].filter((entry)=>entry.id!==id);
+        const payload=recurrentPayload();
+        recurrentSaveQueue=recurrentSaveQueue.catch(()=>{}).then(()=>
+          window.TwogetherAPI.post('saveTripPrepDefaults',{prep:payload},actor())
+        );
+        recurrentSaveQueue.catch(()=>{});
+        const result=await recurrentSaveQueue;
         if(remoteState&&result?.prep)remoteState.tripPrepDefaults=JSON.parse(JSON.stringify(result.prep));
         state.busy=false;
         closeDeleteConfirm();
         render();
         simplifiedSnack('Recurrent item deleted');
       }catch(err){
+        prep[kind]=previousKind;
         state.busy=false;
         deleteButton.disabled=false;
         deleteButton.textContent='Delete';

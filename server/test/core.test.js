@@ -106,6 +106,67 @@ test('recurrent trip checklist updates upcoming trips while preserving custom it
   }
 });
 
+test('adding a trip checklist item promotes it once without duplicating the current trip row', () => {
+  const context = setup();
+  try {
+    action(context.database, 'saveTripPrepDefaults', { prep:{ packing:[], reminders:[] } });
+    const created = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2099-12-01', end:'2099-12-03' },
+      budget: '',
+    });
+    let plan = getState().plans.find((item) => item.id === created.planId);
+    plan.prep.packing.push({ id:'trip-socks', text:'Socks', done:false, addedBy:'Principessa' });
+
+    const saved = action(context.database, 'saveTripPrep', { planId:created.planId, prep:plan.prep });
+    assert.equal(saved.ok, true);
+    assert.equal(saved.prep.packing.filter((item) => item.text === 'Socks').length, 1);
+
+    const defaults = getState().tripPrepDefaults.packing.filter((item) => item.text === 'Socks');
+    assert.equal(defaults.length, 1);
+    const savedSocks = saved.prep.packing.find((item) => item.text === 'Socks');
+    assert.equal(savedSocks.recurrentId, defaults[0].id);
+  } finally {
+    context.cleanup();
+  }
+});
+
+test('deleting a recurrent-linked item from one trip does not let recurrent sync add it back', () => {
+  const context = setup();
+  try {
+    action(context.database, 'saveTripPrepDefaults', {
+      prep: {
+        packing: [{ id:'packing-passport', text:'Passport', done:false }],
+        reminders: [],
+      },
+    });
+    const created = action(context.database, 'savePlan', {
+      meta: { location:'Italy', city:'Lonato', start:'2099-12-10', end:'2099-12-12' },
+      budget: '',
+    });
+
+    let plan = getState().plans.find((item) => item.id === created.planId);
+    plan.prep.packing = plan.prep.packing.filter((item) => item.recurrentId !== 'packing-passport');
+    assert.equal(action(context.database, 'saveTripPrep', { planId:created.planId, prep:plan.prep }).ok, true);
+
+    action(context.database, 'saveTripPrepDefaults', {
+      prep: {
+        packing: [
+          { id:'packing-passport', text:'Passport & ID', done:false },
+          { id:'packing-charger', text:'Phone charger', done:false },
+        ],
+        reminders: [],
+      },
+    });
+
+    plan = getState().plans.find((item) => item.id === created.planId);
+    assert.equal(plan.prep.packing.some((item) => item.recurrentId === 'packing-passport'), false);
+    assert.equal(plan.prep.packing.filter((item) => item.recurrentId === 'packing-charger').length, 1);
+    assert.equal(getState().tripPrepDefaults.packing.some((item) => item.id === 'packing-passport'), true);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('creates a trip plan without a budget when budget is skipped', () => {
   const context = setup();
   try {
