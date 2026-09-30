@@ -1869,7 +1869,7 @@ function openRecurringEditor(kind,index) {
       '</div>'+
     '</div>',
     'recurring-manager',
-    { back: openRecurringManager }
+    { back: openRecurringManager, keepSurfaceOnBack:true }
   );
 
   $('[data-fin-recurring-back]')?.addEventListener('click',openRecurringManager);
@@ -2937,6 +2937,7 @@ function showMini(html, mode = '', nav = {}) {
   const modal = $('#financeMiniModal');
   modal._twogetherBack = typeof nav.back === 'function' ? nav.back : closeMini;
   modal._twogetherHome = typeof nav.home === 'function' ? nav.home : closeMini;
+  modal._twogetherKeepSurfaceOnBack = nav.keepSurfaceOnBack === true;
   $('#financeMiniBody').innerHTML = html;
   const monthDetail = mode === 'month-detail';
   const recurringManager = mode === 'recurring-manager';
@@ -2960,6 +2961,7 @@ function closeMini() {
   if(modal){
     modal._twogetherBack=null;
     modal._twogetherHome=null;
+    modal._twogetherKeepSurfaceOnBack=false;
   }
 }
 

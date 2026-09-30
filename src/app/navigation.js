@@ -526,9 +526,20 @@ function restoreInlineStyle(el, values) {
   });
 }
 
-function createSurfaceVisual(surface) {
-  const target = surfaceVisualTarget(surface);
-  const backdrop = surfaceBackdrop(surface);
+function surfaceKeepsParentOnBack(surface) {
+  return !!(surface?.matches?.('.finance-mini-modal.is-recurring-manager') && surface._twogetherKeepSurfaceOnBack === true);
+}
+
+function surfaceBackVisualTarget(surface) {
+  if (!surfaceKeepsParentOnBack(surface)) return null;
+  return surface.querySelector('#financeMiniBody .finance-recurring-tv2 > .tv2-page')
+    || surface.querySelector('#financeMiniBody > *')
+    || surfaceCard(surface);
+}
+
+function createSurfaceVisual(surface, keepParent = false) {
+  const target = keepParent ? surfaceBackVisualTarget(surface) : surfaceVisualTarget(surface);
+  const backdrop = keepParent ? null : surfaceBackdrop(surface);
   if (!target) return null;
   const computedTransform = getComputedStyle(target).transform;
   return {
@@ -750,6 +761,10 @@ function installSurfaceNavigation() {
         if (dx > 10 && surfaceSwipe.startX <= 46) {
           surfaceSwipe.active = true;
           surfaceSwipe.mode = 'right';
+          if (surfaceKeepsParentOnBack(surfaceSwipe.surface)) {
+            resetSurfaceVisual(surfaceSwipe.visual,false);
+            surfaceSwipe.visual = createSurfaceVisual(surfaceSwipe.surface,true);
+          }
         } else {
           resetSurfaceSwipe(false);
           return;
