@@ -481,7 +481,9 @@ function surfaceDownReturnsToPrevious(surface) {
 
 function surfaceBlocksGlobalDown(surface) {
   const card = surfaceCard(surface);
-  return !!(surface?.matches?.('.tv2-layer') && card?.classList?.contains('tv2-recurrent-sheet'));
+  const recurrentChecklist = card?.classList?.contains('tv2-recurrent-sheet');
+  const mainChecklist = card?.classList?.contains('tv2-checklist-sheet') && !recurrentChecklist;
+  return !!(surface?.matches?.('.tv2-layer') && (recurrentChecklist || mainChecklist));
 }
 
 function surfaceBackdrop(surface) {
