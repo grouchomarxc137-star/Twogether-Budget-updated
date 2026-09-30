@@ -11,10 +11,37 @@ function jarDateLabel(value) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function financeCategoryLabel(value) {
+  return {
+    fixed:'Fixed expenses',
+    medical:'Medical',
+    subscriptions:'Subscriptions',
+    rent:'Rent',
+    groceries:'Groceries',
+    variable:'Variable expenses',
+    extra:'Extra',
+    savings:'Saved up',
+    investments:'Investments',
+    other:'Other',
+  }[String(value||'')] || 'Other';
+}
+
 function jarHistory(state) {
   const plans = Array.isArray(state?.plans) ? state.plans : [];
   const transactions = Array.isArray(state?.sharedJar?.transactions) ? state.sharedJar.transactions : [];
   return transactions.map((transaction, index) => {
+    if(transaction?.source==='finance'){
+      return {
+        id:transaction?.expenseId||String(index),
+        trip:String(transaction?.name||'Finance expense').trim()||'Finance expense',
+        category:'Finances · '+financeCategoryLabel(transaction?.category),
+        amount:n(transaction?.amount),
+        actor:String(transaction?.actor||''),
+        at:String(transaction?.at||''),
+        date:jarDateLabel(transaction?.date||transaction?.at),
+      };
+    }
+
     const plan = plans.find((item) => item?.id === transaction?.planId);
     const expense = transaction?.expenseId
       ? (Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : []).find((item) => item?.id === transaction.expenseId)

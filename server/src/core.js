@@ -829,6 +829,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
       if (existing && existing.finalized) throw new Error('This month is final and locked');
       const now = new Date().toISOString();
+      syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
       const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
       const savingsUsed = function(record) {
@@ -858,7 +859,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         const pstate=state.game[actor],settleKey='month:'+actor+':'+monthData.month;
         if (pstate.awards.financeSettlements.indexOf(settleKey) < 0) {
           const income=(monthData.incomes||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
-          const outflow=(monthData.expenses||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0)+(monthData.extraSpends||[]).filter(financeExtraSpendCountsAsOutflow_).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+          const outflow=(monthData.expenses||[]).filter(financeExpenseCountsAsOutflow_).reduce(function(sum,x){return sum+Number(x.amount||0);},0)+(monthData.extraSpends||[]).filter(financeExtraSpendCountsAsOutflow_).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
           twosDelta=Math.round((income-outflow)*100)/100;
           pstate.twos+=twosDelta;
           pstate.awards.financeSettlements.push(settleKey);
@@ -866,7 +867,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         state.game[actor]=sanitizeGameProfile_(pstate);
       }
       saveState_(state);
-      return output_({ok:true, month:monthData.month,twosDelta:twosDelta,game:sanitizeGame_(state.game),financeProfile:sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor)});
+      return output_({ok:true,month:monthData.month,monthData:monthData,twosDelta:twosDelta,game:sanitizeGame_(state.game),financeProfile:sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor),sharedJar:sanitizeSharedJar_(state.sharedJar)});
     }
 
 
@@ -1070,9 +1071,58 @@ function formatNumber_(value, maximumFractionDigits) {
 function formatMoney_(value) { return '€' + formatNumber_(value, 2); }
 function defaultSharedJar_() { return {initialBalance:870,balance:870,transactions:[]}; }
 function sanitizeSharedJar_(value) {
-  const source=value&&typeof value==='object'?value:{};let initialBalance=cleanMoney_(source.initialBalance);if(initialBalance==='')initialBalance=870;const byKey={};
-  (Array.isArray(source.transactions)?source.transactions:[]).slice(-500).forEach(function(x){const planId=cleanText_(x&&x.planId,80),expenseId=cleanText_(x&&x.expenseId,80),amount=cleanMoney_(x&&x.amount);if(!planId||amount===''||Number(amount)<=0)return;const key=expenseId?planId+'::'+expenseId:planId;byKey[key]={planId:planId,expenseId:expenseId,amount:money2_(amount),actor:cleanActor_(x&&x.actor),at:cleanText_(x&&x.at,40)};});
-  const transactions=Object.keys(byKey).map(function(k){return byKey[k];}),used=transactions.reduce(function(sum,x){return sum+Number(x.amount||0);},0);return {initialBalance:initialBalance,balance:money2_(Math.max(0,Number(initialBalance)-used)),transactions:transactions};
+  const source=value&&typeof value==='object'?value:{};
+  let initialBalance=cleanMoney_(source.initialBalance);
+  if(initialBalance==='')initialBalance=870;
+  const byKey={};
+
+  (Array.isArray(source.transactions)?source.transactions:[]).slice(-500).forEach(function(raw){
+    const x=raw&&typeof raw==='object'?raw:{};
+    const amount=cleanMoney_(x.amount);
+    if(amount===''||Number(amount)<=0)return;
+
+    if(String(x.source||'')==='finance'){
+      const financeActor=cleanActor_(x.actor);
+      const month=cleanText_(x.month,10);
+      const expenseId=cleanText_(x.expenseId,80);
+      if(financeActor==='Unknown'||!/^\d{4}-\d{2}$/.test(month)||!expenseId)return;
+      const key='finance::'+financeActor+'::'+month+'::'+expenseId;
+      byKey[key]={
+        source:'finance',
+        planId:'',
+        expenseId:expenseId,
+        month:month,
+        name:cleanText_(x.name,100),
+        category:cleanFinanceGroup_(x.category),
+        date:cleanFinanceDate_(x.date),
+        amount:money2_(amount),
+        actor:financeActor,
+        at:cleanText_(x.at,40)
+      };
+      return;
+    }
+
+    const planId=cleanText_(x.planId,80);
+    const expenseId=cleanText_(x.expenseId,80);
+    if(!planId)return;
+    const key=expenseId?planId+'::'+expenseId:planId;
+    byKey[key]={
+      source:'trip',
+      planId:planId,
+      expenseId:expenseId,
+      amount:money2_(amount),
+      actor:cleanActor_(x.actor),
+      at:cleanText_(x.at,40)
+    };
+  });
+
+  const transactions=Object.keys(byKey).map(function(k){return byKey[k];});
+  const used=transactions.reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+  return {
+    initialBalance:initialBalance,
+    balance:money2_(Math.max(0,Number(initialBalance)-used)),
+    transactions:transactions
+  };
 }
 function defaultAccommodationMeta_(){return {useJar:false,jarContribution:0,jarBalanceAfter:870,remaining:'',paymentType:'',paidUpfront:false,upfrontBy:'',shareEach:'',repayment:{debtor:'',creditor:'',amount:'',status:'none',confirmedAt:''}};}
 function sanitizeAccommodationMeta_(value){
@@ -1429,7 +1479,15 @@ function cleanFinanceGroup_(value) {
 }
 
 function sanitizeFinanceExpense_(item) {
-  return {group:cleanFinanceGroup_(item && item.group), name:cleanText_(item && item.name, 100), amount:cleanMoney_(item && item.amount), date:cleanFinanceDate_(item && item.date)};
+  const paidFrom=String(item&&item.paidFrom||'')==='sharedJar'?'sharedJar':'personal';
+  return {
+    id:cleanText_(item&&item.id,80)||(paidFrom==='sharedJar'?Utilities.getUuid():''),
+    group:cleanFinanceGroup_(item && item.group),
+    name:cleanText_(item && item.name, 100),
+    amount:cleanMoney_(item && item.amount),
+    date:cleanFinanceDate_(item && item.date),
+    paidFrom:paidFrom
+  };
 }
 
 function sanitizeFinanceReserved_(item) {
@@ -1449,10 +1507,54 @@ function sanitizeFinanceExtraSpend_(item) {
     pendingCounts: source === 'creditcard' && item && item.pendingCounts === true
   };
 }
+function financeExpenseCountsAsOutflow_(item) {
+  return !(item&&item.paidFrom==='sharedJar');
+}
 function financeExtraSpendCountsAsOutflow_(item) {
   if (!item || item.source !== 'creditcard') return true;
   if (item.status !== 'pending') return true;
   return item.pendingCounts === true;
+}
+
+function syncFinanceSharedJarTransactions_(state,actor,monthData,now) {
+  state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+  const month=cleanText_(monthData&&monthData.month,10);
+  const previousByExpenseId={};
+  state.sharedJar.transactions.forEach(function(tx){
+    if(tx.source==='finance'&&tx.actor===actor&&tx.month===month&&tx.expenseId){
+      previousByExpenseId[tx.expenseId]=tx;
+    }
+  });
+
+  const retained=state.sharedJar.transactions.filter(function(tx){
+    return !(tx.source==='finance'&&tx.actor===actor&&tx.month===month);
+  });
+  const next=(monthData.expenses||[]).filter(function(item){
+    return item&&item.paidFrom==='sharedJar'&&item.id&&Number(item.amount||0)>0;
+  }).map(function(item){
+    const previous=previousByExpenseId[item.id];
+    return {
+      source:'finance',
+      expenseId:item.id,
+      month:month,
+      name:item.name,
+      category:item.group,
+      date:item.date,
+      amount:money2_(item.amount),
+      actor:actor,
+      at:previous&&previous.at?previous.at:now
+    };
+  });
+
+  const retainedUsed=retained.reduce(function(sum,tx){return sum+Number(tx.amount||0);},0);
+  const nextUsed=next.reduce(function(sum,tx){return sum+Number(tx.amount||0);},0);
+  const available=money2_(Math.max(0,Number(state.sharedJar.initialBalance||0)-retainedUsed));
+  if(nextUsed>available+.005)throw new Error('The Shared Jar only has '+formatMoney_(available)+' available');
+
+  state.sharedJar=sanitizeSharedJar_({
+    initialBalance:state.sharedJar.initialBalance,
+    transactions:retained.concat(next)
+  });
 }
 
 
@@ -1485,11 +1587,12 @@ function sanitizeFinanceMonth_(record, actor) {
       foundFixedExtra = true;
       x.amount = extraBudget;
       x.date = '';
+      x.paidFrom = 'personal';
     }
     return true;
   });
   const partialOnly = !!(record && record.partialOnly === true);
-  if (usesExtraBudget && !partialOnly && !foundFixedExtra) expenses.push({group:'extra', name:'Extra', amount:extraBudget, date:''});
+  if (usesExtraBudget && !partialOnly && !foundFixedExtra) expenses.push({id:'',group:'extra',name:'Extra',amount:extraBudget,date:'',paidFrom:'personal'});
   if (partialOnly) expenses = expenses.filter(function(x){ return !(x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'); });
 
   const allowedExtraSources = actor === 'Principe' ? ['savings','main'] : ['creditcard','savings','main'];

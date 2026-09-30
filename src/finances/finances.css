@@ -5731,3 +5731,48 @@ dialog.finance-log-host .tv2-backdrop {
   color:#a9443c!important;
 }
 
+
+
+/* Personal finance expenses can be paid from the Shared Jar without affecting personal totals. */
+.finance-log-paid-from {
+  display:grid;
+  gap:7px;
+  margin-top:10px;
+}
+.finance-log-paid-from>span {
+  color:var(--tv2-muted);
+  font-size:12px;
+  font-weight:650;
+}
+.finance-log-paid-from-options {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.finance-log-paid-from-options button {
+  min-height:42px;
+  border:1px solid var(--tv2-line);
+  border-radius:13px;
+  background:var(--tv2-card);
+  color:var(--tv2-muted);
+  font:inherit;
+  font-size:13px;
+  font-weight:650;
+}
+.finance-log-paid-from-options button.is-active {
+  border-color:#c7aa68;
+  background:#fff8e8;
+  color:#765b1e;
+  box-shadow:0 0 0 1px rgba(199,170,104,.18);
+}
+.finance-log-paid-from-options small {
+  margin-left:4px;
+  font-size:10px;
+  font-weight:600;
+  opacity:.72;
+}
+.finance-log-paid-from-note {
+  color:var(--tv2-muted);
+  font-size:11px;
+  line-height:1.35;
+}

@@ -90,6 +90,7 @@ let financeState = {
   finances: { Principessa: [], Principe: [] },
   financeProfiles: { Principessa: freshProfile(), Principe: freshProfile() },
   plans: [],
+  sharedJar: { initialBalance:870, balance:870, transactions:[] },
 };
 let flow = null;
 let selectedMonth = '2026-09';
@@ -942,7 +943,13 @@ function normalizeFinanceRecord(rec, owner = actor()) {
   const copy = JSON.parse(JSON.stringify(rec || {}));
   const rules = financeRules(owner);
   copy.incomes = Array.isArray(copy.incomes) ? copy.incomes.map((x) => ({ ...x, date: normalizeFinanceDate(x.date, copy.month) })) : [];
-  copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({ ...x, group: normalizeGroup(x.group), date: normalizeFinanceDate(x.date, copy.month) })) : [];
+  copy.expenses = Array.isArray(copy.expenses) ? copy.expenses.map((x) => ({
+    ...x,
+    id:String(x?.id||''),
+    group:normalizeGroup(x.group),
+    date:normalizeFinanceDate(x.date, copy.month),
+    paidFrom:x?.paidFrom==='sharedJar'?'sharedJar':'personal',
+  })) : [];
   copy.partialOnly = copy.partialOnly === true;
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
   if (rules.extraTracking) {
@@ -952,8 +959,8 @@ function normalizeFinanceRecord(rec, owner = actor()) {
       copy.expenses = copy.expenses.filter((x) => !(normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'));
     } else {
       copy.expenses = copy.expenses.filter((x) => normalizeGroup(x.group) !== 'extra' || String(x.name || '').trim().toLowerCase() !== 'extra' || x === fixedExtras[0]);
-      if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ group: 'extra', name: 'Extra', amount: storedBudget, date: '' });
-      copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') { x.amount = storedBudget; x.date = ''; } });
+      if (!copy.expenses.some((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra')) copy.expenses.push({ id:'', group:'extra', name:'Extra', amount:storedBudget, date:'', paidFrom:'personal' });
+      copy.expenses.forEach((x) => { if (normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra') { x.amount = storedBudget; x.date = ''; x.paidFrom='personal'; } });
     }
   } else {
     copy.extraBudget = '';
@@ -1017,6 +1024,9 @@ function financeSalaryDate(month) {
   if (recurringDay !== '') return financeDateForDay(month, recurringDay);
   return financeDateForDay(month, 25);
 }
+function financeExpenseCountsInOutflow(item) {
+  return item?.paidFrom !== 'sharedJar';
+}
 function extraSpendCountsInOutflow(item) {
   if (!item || item.source !== 'creditcard') return true;
   if (item.status !== 'pending') return true;
@@ -1061,11 +1071,12 @@ function calc(rec) {
   const incomes = Array.isArray(rec?.incomes) ? rec.incomes : [];
   const expenses = Array.isArray(rec?.expenses) ? rec.expenses : [];
   const income = incomes.reduce((sum, x) => sum + n(x.amount), 0);
-  const normalOutflow = expenses.reduce((sum, x) => sum + n(x.amount), 0);
+  const personalExpenses = expenses.filter(financeExpenseCountsInOutflow);
+  const normalOutflow = personalExpenses.reduce((sum, x) => sum + n(x.amount), 0);
   const extraOverspendAmount = extraSpendsOutflowTotal(rec);
   const outflow = normalOutflow + extraOverspendAmount;
-  const savings = expenses.filter((x) => normalizeGroup(x.group) === 'savings').reduce((sum, x) => sum + n(x.amount), 0);
-  const investmentContribution = expenses.filter((x) => normalizeGroup(x.group) === 'investments').reduce((sum, x) => sum + n(x.amount), 0);
+  const savings = personalExpenses.filter((x) => normalizeGroup(x.group) === 'savings').reduce((sum, x) => sum + n(x.amount), 0);
+  const investmentContribution = personalExpenses.filter((x) => normalizeGroup(x.group) === 'investments').reduce((sum, x) => sum + n(x.amount), 0);
   const extraBudget = hasValue(rec?.extraBudget) ? n(rec.extraBudget) : (financeRules().extraBudget || 0);
   const extraSpent = extraBudget + extraOverspendAmount;
   const extraDelta = -extraOverspendAmount;
@@ -1145,6 +1156,9 @@ async function loadState() {
           Principe: normalizeProfile(state?.financeProfiles?.Principe),
         },
         plans: Array.isArray(state?.plans) ? state.plans : [],
+        sharedJar: state?.sharedJar && typeof state.sharedJar==='object'
+          ? JSON.parse(JSON.stringify(state.sharedJar))
+          : {initialBalance:870,balance:870,transactions:[]},
       };
       renderPage();
       await syncFinanceReminders();
@@ -2031,9 +2045,10 @@ async function saveDirectMonthRecord(rec, message = 'Transaction saved', options
   next.finalizedAt = '';
   const result = await post('saveFinanceMonth',{monthData:next});
   if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
+  if (result?.sharedJar) financeState.sharedJar = JSON.parse(JSON.stringify(result.sharedJar));
   const list = financeState.finances[actor()] || [];
   const idx = list.findIndex((item)=>item.month===next.month);
-  const saved = normalizeFinanceRecord({...next,updatedAt:new Date().toISOString(),updatedBy:actor()},actor());
+  const saved = normalizeFinanceRecord(result?.monthData||{...next,updatedAt:new Date().toISOString(),updatedBy:actor()},actor());
   if (idx >= 0) list[idx]=saved; else list.push(saved);
   list.sort((a,b)=>String(a.month).localeCompare(String(b.month)));
   selectedMonth=saved.month;
@@ -2065,6 +2080,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     group:editingKind==='expense'?normalizeGroup(editingItem?.group):'',
     newCategoryName:'',
     date:editingItem?normalizeFinanceDate(editingItem.date,rec.month):'',
+    paidFrom:editingKind==='expense'&&editingItem?.paidFrom==='sharedJar'?'sharedJar':'personal',
     more:!!editingItem,
     busy:false,
     error:'',
@@ -2080,6 +2096,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const isExtraUsed=()=>state.category==='extra-used';
   const selectedExtraSource=()=>isExtraUsed()?String(state.selectedItemId||''):'';
   const isCreditCardExtra=()=>selectedExtraSource()==='creditcard';
+  const isRegularExpense=()=>!!state.category&&state.category!=='income'&&!isExtraUsed();
   const hasChosenItem=()=>!!state.selectedItemId || isOther() || isCustomCategory();
   const validExtraDate=()=>!isCreditCardExtra() || (!!normalizeFinanceDate(state.date) && state.date.slice(0,7) >= rec.month);
   const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim()&&validExtraDate();
@@ -2206,6 +2223,20 @@ function openFinanceTransactionSheet(rec, edit = null) {
         (isCreditCardExtra()?'<label class="tv2-field"><span>Date it leaves your account</span><input id="financeLogExtraDate" type="date" min="'+rec.month+'-01" value="'+esc(state.date)+'"></label>':'')+
         '</div>'
       : '';
+    const categoryDetail=isExtraUsed()
+      ? extraDetail
+      : isOther()
+        ? '<label class="tv2-field finance-log-name"><span>New category <small>Optional</small></span><input id="financeLogCategoryName" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts" value="'+esc(state.newCategoryName)+'"></label><label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Vet, haircut, birthday gift" value="'+esc(state.name)+'"></label>'
+        : isCustomCategory()
+          ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
+          : '';
+    const jarBalance=n(financeState.sharedJar?.balance??0);
+    const paymentSourceHtml=isRegularExpense()
+      ? '<div class="finance-log-paid-from"><span>Paid from</span><div class="finance-log-paid-from-options">'+
+          '<button type="button" data-fin-log-paid-from="personal" class="'+(state.paidFrom==='personal'?'is-active':'')+'">My money</button>'+
+          '<button type="button" data-fin-log-paid-from="sharedJar" class="'+(state.paidFrom==='sharedJar'?'is-active':'')+'">Shared Jar <small>'+money(jarBalance)+'</small></button>'+
+        '</div>'+(state.paidFrom==='sharedJar'?'<small class="finance-log-paid-from-note">This stays in your finance log but is deducted only from the Shared Jar.</small>':'')+'</div>'
+      : '';
     sheet.className='tv2-sheet finance-log-sheet'+(tone?' finance-log-sheet-tone-'+tone:'');
     const tiles=!drillDown
       ? categories.map((item)=>categoryTile(item,false)).join('')
@@ -2219,13 +2250,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:isExtraUsed()
-        ? extraDetail
-        : isOther()
-          ? '<label class="tv2-field finance-log-name"><span>New category <small>Optional</small></span><input id="financeLogCategoryName" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts" value="'+esc(state.newCategoryName)+'"></label><label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="e.g. Vet, haircut, birthday gift" value="'+esc(state.name)+'"></label>'
-          : isCustomCategory()
-            ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
-            : '',
+      afterCategoriesHtml:categoryDetail+paymentSourceHtml,
       defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
@@ -2297,6 +2322,13 @@ function openFinanceTransactionSheet(rec, edit = null) {
       return;
     }
 
+    if(button.dataset.finLogPaidFrom){
+      state.paidFrom=button.dataset.finLogPaidFrom==='sharedJar'?'sharedJar':'personal';
+      state.error='';
+      render();
+      return;
+    }
+
     if(button.dataset.finLogCat){
       const clicked=button.dataset.finLogCat;
       if(state.category===clicked){
@@ -2309,6 +2341,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.name='';
       state.newCategoryName='';
       state.group=clicked==='other'||isCustomGroupKey(clicked)?clicked:'';
+      if(clicked==='income'||clicked==='extra-used')state.paidFrom='personal';
       state.date='';
       state.more=false;
       state.error='';
@@ -2436,8 +2469,15 @@ function openFinanceTransactionSheet(rec, edit = null) {
           next.incomes.push(row);
         }
       } else {
-        const row={group:state.group||financeGroupForTone(categoryForSave,state.name),name:state.name.trim(),amount:amount(),date:state.date};
-        investmentLogged=normalizeGroup(row.group)==='investments';
+        const row={
+          id:editingKind==='expense'&&editingItem?.id?String(editingItem.id):uid(),
+          group:state.group||financeGroupForTone(categoryForSave,state.name),
+          name:state.name.trim(),
+          amount:amount(),
+          date:state.date,
+          paidFrom:state.paidFrom==='sharedJar'?'sharedJar':'personal',
+        };
+        investmentLogged=normalizeGroup(row.group)==='investments'&&row.paidFrom!=='sharedJar';
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
         else {
           if(editingKind==='income'&&editingIndex>=0) next.incomes.splice(editingIndex,1);
@@ -2525,7 +2565,7 @@ function financeMonthTimeline(rec) {
         ? 'Income'
         : extra
           ? 'Money used extra · '+extraSourceShortLabel(item.source)+(item.source==='creditcard'&&item.status==='pending'?' · Pending':'')
-          : categoryLabel(tone);
+          : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
       const editable=(row.kind==='income'||row.kind==='expense')&&!locked;
       const deletable=(row.kind==='income'||row.kind==='expense'||row.kind==='extra')&&!locked;
       const rowHtml=tripExpenseRowHtml({
@@ -3780,8 +3820,9 @@ async function confirmExistingMonth(rec) {
   try {
     const result = await post('saveFinanceMonth', { monthData: d });
     if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
+    if (result?.sharedJar) financeState.sharedJar = JSON.parse(JSON.stringify(result.sharedJar));
     const list = financeState.finances[actor()] || []; const idx = list.findIndex((x) => x.month === d.month);
-    const saved = { ...d, updatedAt: new Date().toISOString(), updatedBy: actor() };
+    const saved = normalizeFinanceRecord(result?.monthData||{ ...d, updatedAt:new Date().toISOString(), updatedBy:actor() },actor());
     if (idx >= 0) list[idx] = saved; else list.push(saved);
     renderPage(); renderDetail(saved); toast('Month confirmed and locked'); setTimeout(loadState, 1200);
   } catch (err) { toast(err.message || 'Could not confirm month', 'warn'); }
@@ -3799,9 +3840,10 @@ async function saveMonth(finalize = false) {
   try {
     const result = await post('saveFinanceMonth', { monthData: d });
     if (result?.financeProfile) financeState.financeProfiles[actor()] = normalizeProfile(result.financeProfile);
+    if (result?.sharedJar) financeState.sharedJar = JSON.parse(JSON.stringify(result.sharedJar));
     const list = financeState.finances[actor()] || [];
     const idx = list.findIndex((x) => x.month === d.month);
-    const saved = { ...d, updatedAt: new Date().toISOString(), updatedBy: actor() };
+    const saved = normalizeFinanceRecord(result?.monthData||{ ...d, updatedAt:new Date().toISOString(), updatedBy:actor() },actor());
     if (idx >= 0) list[idx] = saved; else list.push(saved);
     list.sort((a, b) => String(a.month).localeCompare(String(b.month)));
     selectedMonth = d.month; flow = null; renderPage(); renderWizard(); renderDetail(saved); toast(finalize ? 'Month confirmed and locked' : 'Draft saved — you can keep editing it'); setTimeout(loadState, 1400);

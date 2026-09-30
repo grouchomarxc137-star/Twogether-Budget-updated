@@ -522,6 +522,67 @@ test('deleting the final credit card log does not revive it from legacy extra fi
   }
 });
 
+test('Shared Jar finance expenses stay in the personal log without reducing personal money', () => {
+  const context = setup();
+  try {
+    const first = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        month:'2026-10',
+        incomes:[{name:'Salary',amount:1000,date:'2026-10-01'}],
+        expenses:[
+          {id:'gift-1',group:'other',name:'Birthday gift',amount:50,date:'2026-10-05',paidFrom:'sharedJar'},
+          {id:'rent-1',group:'rent',name:'Rent',amount:100,date:'2026-10-02',paidFrom:'personal'},
+        ],
+        partialOnly:true,
+        finalized:true,
+      },
+    }, 'Principessa');
+    assert.equal(first.ok, true);
+    assert.equal(first.twosDelta, 900);
+    assert.equal(first.sharedJar.balance, 820);
+    assert.equal(first.sharedJar.transactions.filter((x) => x.source === 'finance').length, 1);
+    const firstTx = first.sharedJar.transactions.find((x) => x.source === 'finance');
+    assert.equal(firstTx.expenseId, 'gift-1');
+    assert.equal(firstTx.name, 'Birthday gift');
+    assert.equal(firstTx.actor, 'Principessa');
+    assert.equal(first.monthData.expenses.find((x) => x.id === 'gift-1').paidFrom, 'sharedJar');
+
+    // Re-open the month for the edit/delete regression without awarding Twos again.
+    const stored = getState();
+    stored.finances.Principessa[0].finalized = false;
+    stored.finances.Principessa[0].finalizedAt = '';
+    context.database.store.write(stored);
+
+    const edited = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        ...getState().finances.Principessa[0],
+        expenses:[
+          {id:'gift-1',group:'other',name:'Bigger birthday gift',amount:70,date:'2026-10-05',paidFrom:'sharedJar'},
+          {id:'rent-1',group:'rent',name:'Rent',amount:100,date:'2026-10-02',paidFrom:'personal'},
+        ],
+        finalized:false,
+      },
+    }, 'Principessa');
+    assert.equal(edited.ok, true);
+    assert.equal(edited.sharedJar.balance, 800);
+    assert.equal(edited.sharedJar.transactions.filter((x) => x.source === 'finance').length, 1);
+    assert.equal(edited.sharedJar.transactions.find((x) => x.source === 'finance').amount, 70);
+
+    const removed = action(context.database, 'saveFinanceMonth', {
+      monthData: {
+        ...getState().finances.Principessa[0],
+        expenses:[{id:'rent-1',group:'rent',name:'Rent',amount:100,date:'2026-10-02',paidFrom:'personal'}],
+        finalized:false,
+      },
+    }, 'Principessa');
+    assert.equal(removed.ok, true);
+    assert.equal(removed.sharedJar.balance, 870);
+    assert.equal(removed.sharedJar.transactions.some((x) => x.source === 'finance'), false);
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('keeps optional finance dates and recurring usual days', () => {
   const context = setup();
   try {
