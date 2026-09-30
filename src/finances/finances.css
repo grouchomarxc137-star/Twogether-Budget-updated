@@ -4652,9 +4652,30 @@ dialog.finance-log-host .tv2-backdrop {
 
 @media(max-width:760px) {
   [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="cash"] .finance-current-title h3,
-  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-current-title h3,
   [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="savings"] .finance-current-title h3 {
     font-size:22px!important;
+  }
+
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-owed-title-open {
+    padding-top:0!important;
+    padding-right:0!important;
+    min-width:0;
+  }
+
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-owed-title-open>div {
+    min-width:0;
+  }
+
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-current-title h3 {
+    font-size:19px!important;
+    line-height:1.08!important;
+    white-space:nowrap!important;
+    overflow-wrap:normal;
+  }
+
+  [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="owed"] .finance-current-title>strong {
+    font-size:20px!important;
+    margin-left:auto;
   }
 
   [data-fin-view="balances"] .finance-current-card[data-fin-wallet-card="investments"] .finance-current-title h3 {
