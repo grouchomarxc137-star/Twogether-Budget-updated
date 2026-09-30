@@ -1697,8 +1697,12 @@ function openSimplifiedChecklist(plan) {
     const sourceCard=checklistDrag.row.querySelector('.tv2-check-row');
     if(!sourceCard)return;
     const rect=sourceCard.getBoundingClientRect();
+    const sourceStyle=getComputedStyle(sourceCard);
     const ghost=sourceCard.cloneNode(true);
     ghost.classList.add('tv2-check-drag-ghost');
+    ghost.style.gridTemplateColumns=sourceStyle.gridTemplateColumns;
+    ghost.style.columnGap=sourceStyle.columnGap;
+    ghost.style.rowGap=sourceStyle.rowGap;
     ghost.querySelectorAll('input,button').forEach((control)=>{
       control.tabIndex=-1;
       control.setAttribute('aria-hidden','true');
@@ -2494,8 +2498,12 @@ function openRecurrentChecklistItems(plan) {
     const sourceCard=recurrentDrag.row.querySelector('.tv2-recurrent-row');
     if(!sourceCard)return;
     const rect=sourceCard.getBoundingClientRect();
+    const sourceStyle=getComputedStyle(sourceCard);
     const ghost=sourceCard.cloneNode(true);
     ghost.classList.add('tv2-recurrent-drag-ghost');
+    ghost.style.gridTemplateColumns=sourceStyle.gridTemplateColumns;
+    ghost.style.columnGap=sourceStyle.columnGap;
+    ghost.style.rowGap=sourceStyle.rowGap;
     ghost.querySelectorAll('input,button').forEach((control)=>{
       control.tabIndex=-1;
       control.setAttribute('aria-hidden','true');
