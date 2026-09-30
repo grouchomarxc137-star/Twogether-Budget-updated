@@ -82,29 +82,76 @@ function installStyles() {
     .v5-review-row.review-paid-under{background:#edf4e9!important;box-shadow:inset 3px 0 0 #93b489}
     .v5-review-row.review-paid-over{background:#f8ebe8!important;box-shadow:inset 3px 0 0 #c9877a}
     .v5-review-row.review-paid-on{background:#f1f0eb!important}
-    .confirmed-spend-overview{margin:16px 0}
-    .confirmed-spend-card{position:relative;background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);border:1px solid #e6dbcf;border-radius:24px;padding:22px;box-shadow:0 10px 28px rgba(62,45,31,.055);cursor:pointer;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
-    .confirmed-spend-card.is-principessa{border-color:#d6ad45;box-shadow:0 0 0 2px rgba(214,173,69,.18),0 10px 28px rgba(96,72,24,.08);background:linear-gradient(180deg,#fffdf5 0%,#fbf5e5 100%)}
-    .confirmed-spend-card.is-principe{border-color:#e68145;box-shadow:0 0 0 2px rgba(230,129,69,.18),0 10px 28px rgba(114,62,27,.08);background:linear-gradient(180deg,#fffaf6 0%,#fcf0e7 100%)}
-    .confirmed-spend-card:focus-visible{outline:2px solid rgba(102,86,69,.55);outline-offset:3px}
-    .confirmed-spend-mode{position:absolute;top:14px;right:14px;z-index:3;display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border:1px solid rgba(112,94,75,.12);border-radius:999px;background:rgba(255,255,255,.76);color:#74685e;font-size:11px;font-weight:700;letter-spacing:.04em}
-    .confirmed-spend-card.is-principessa .confirmed-spend-mode{border-color:rgba(214,173,69,.35);color:#8a6814}
-    .confirmed-spend-card.is-principe .confirmed-spend-mode{border-color:rgba(230,129,69,.35);color:#a65220}
-    .confirmed-spend-visual{display:grid;grid-template-columns:minmax(180px,230px) minmax(0,1fr);align-items:center;gap:28px;padding:4px 4px 20px}
-    .confirmed-donut{width:min(230px,100%);aspect-ratio:1;height:auto;border-radius:50%;display:grid;place-items:center;margin:0 auto;position:relative}
-    .confirmed-donut::after{content:"";position:absolute;width:66%;aspect-ratio:1;height:auto;border-radius:50%;background:#fffdf9;box-shadow:0 1px 0 rgba(74,57,43,.05)}
-    .confirmed-donut-center{position:relative;z-index:1;display:grid;justify-items:center;text-align:center;gap:3px;padding:10px}
-    .confirmed-donut-center strong{font-size:22px;line-height:1.05;font-variant-numeric:tabular-nums}.confirmed-donut-center span{font-size:12px;color:#857a70;margin:0}
-    .confirmed-spend-meta{min-width:0}.confirmed-spend-meta>span{display:block;margin-bottom:5px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
-    .confirmed-spend-meta h3{margin:0;font-size:28px;line-height:1.1;font-weight:600}.confirmed-spend-meta p{margin:8px 0 0;color:#7d7269;font-size:14px;line-height:1.45}
-    .confirmed-spend-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:17px 2px 8px;border-top:1px solid rgba(110,89,70,.1)}
-    .confirmed-spend-head h4{margin:0;font-size:17px}.confirmed-spend-head span{color:#91877e;font-size:11px;text-align:right}
-    .confirmed-legend{display:grid}.confirmed-legend-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:11px;align-items:center;min-height:51px;border-top:1px solid rgba(110,89,70,.08)}
-    .confirmed-legend-row:first-child{border-top:0}.confirmed-legend-row i{width:9px;height:9px;border-radius:50%}.confirmed-legend-row span{min-width:0;display:grid;gap:1px;color:inherit}.confirmed-legend-row span strong{font-size:14px;font-weight:620}.confirmed-legend-row span small{color:#91877e;font-size:11px}.confirmed-legend-row>b{font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
-    .confirmed-spend-empty{padding:24px 4px 12px;color:#91877e;font-size:14px;text-align:center}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-heading{padding:0 0 7px}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-heading h2{margin:4px 0 2px;font-size:31px;line-height:1.06}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-heading p{font-size:13px;line-height:1.3}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-total{align-items:center;margin:5px 0 4px;padding:10px 0;border-top:1px solid rgba(110,89,70,.09);border-bottom:1px solid rgba(110,89,70,.09)}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-total span{font-size:11px}
+    #tripModalBody.confirmed-trip-redesign .trip-modal-total strong{font-size:25px;line-height:1}
+    #tripModalBody.confirmed-trip-redesign .match-box.ok{display:inline-flex;width:auto;max-width:100%;align-items:center;gap:0;margin:8px 0 4px;padding:6px 10px;border-radius:999px;background:#eef3eb;border-color:#dbe5d7;color:#587052;font-size:12px;line-height:1.2}
+    #tripModalBody.confirmed-trip-redesign .match-box.ok span{display:none}
+    #tripModalBody.confirmed-trip-redesign .budget-check{grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 8px;border:0;border-radius:16px;background:#f7f4ef;box-shadow:inset 0 0 0 1px rgba(110,89,70,.07)}
+    #tripModalBody.confirmed-trip-redesign .budget-check>div{padding:10px 11px;border-right:1px solid rgba(110,89,70,.08);border-bottom:0}
+    #tripModalBody.confirmed-trip-redesign .budget-check>div:nth-child(2){display:none}
+    #tripModalBody.confirmed-trip-redesign .budget-check>div:last-child{border-right:0}
+    #tripModalBody.confirmed-trip-redesign .budget-check span{font-size:9px;letter-spacing:.06em}
+    #tripModalBody.confirmed-trip-redesign .budget-check strong{font-size:13px;line-height:1.25}
+    #tripModalBody.confirmed-trip-redesign .budget-check.ok .budget-result,
+    #tripModalBody.confirmed-trip-redesign .budget-check.warn .budget-result{background:transparent}
+    #tripModalBody.confirmed-trip-redesign .trip-budget-comparison{display:none}
+    .confirmed-spend-overview{margin:12px 0 2px}
+    .confirmed-spend-card{position:relative;background:#fffdfa;border:1px solid #e7ded5;border-radius:20px;padding:16px;box-shadow:0 7px 22px rgba(62,45,31,.04);touch-action:pan-y}
+    .confirmed-spend-card.is-principessa{border-color:#e4d8b8;background:#fffdf8}
+    .confirmed-spend-card.is-principe{border-color:#ead7ca;background:#fffaf7}
+    .confirmed-spend-switch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 0 15px;padding:4px;border-radius:14px;background:#f3f0eb}
+    .confirmed-spend-switch button{min-width:0;min-height:34px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:#81766d;font:inherit;font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .confirmed-spend-switch button.is-active{background:#fffdfa;color:#332d28;box-shadow:0 1px 5px rgba(70,54,42,.09)}
+    .confirmed-spend-switch button[data-confirmed-mode="principessa"].is-active{color:#8a6814}
+    .confirmed-spend-switch button[data-confirmed-mode="principe"].is-active{color:#a65220}
+    .confirmed-spend-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 10px}
+    .confirmed-spend-title h3{margin:0;font-size:17px;line-height:1.2;font-weight:600}
+    .confirmed-spend-title small{color:#91877e;font-size:10px;white-space:nowrap}
+    .confirmed-spend-visual{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr);align-items:center;gap:22px}
+    .confirmed-donut-shell{position:relative;width:min(220px,100%);aspect-ratio:1;margin:0 auto}
+    .confirmed-donut-svg{display:block;width:100%;height:100%;overflow:visible}
+    .confirmed-donut-track{fill:none;stroke:#ece7e1;stroke-width:12}
+    .confirmed-donut-segment{fill:none;stroke-width:12;cursor:pointer;transition:opacity .16s ease,stroke-width .16s ease,filter .16s ease}
+    .confirmed-donut-segment.is-muted{opacity:.25}
+    .confirmed-donut-segment.is-selected{stroke-width:15;filter:drop-shadow(0 1px 2px rgba(60,45,34,.16))}
+    .confirmed-donut-segment:focus{outline:none;filter:drop-shadow(0 0 2px rgba(60,45,34,.45))}
+    .confirmed-donut-center{pointer-events:none;position:absolute;inset:23%;z-index:2;display:grid;place-content:center;justify-items:center;text-align:center;gap:3px}
+    .confirmed-donut-center span{max-width:110px;color:#857a70;font-size:10px;line-height:1.15;margin:0}
+    .confirmed-donut-center strong{font-size:22px;line-height:1.04;font-variant-numeric:tabular-nums}
+    .confirmed-donut-center small{color:#91877e;font-size:10px;line-height:1.2}
+    .confirmed-spend-side{min-width:0;display:grid;gap:11px;align-content:center}
+    .confirmed-spend-summary{display:grid;gap:2px;padding:0 2px}
+    .confirmed-spend-summary span{color:#91877e;font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:750}
+    .confirmed-spend-summary strong{font-size:18px;line-height:1.15;font-weight:600}
+    .confirmed-spend-summary small{color:#857a70;font-size:11px;line-height:1.35}
+    .confirmed-legend{display:flex;flex-wrap:wrap;gap:7px}
+    .confirmed-legend-chip{display:inline-flex;align-items:center;gap:6px;min-height:30px;max-width:100%;padding:0 9px;border:1px solid #e6ddd4;border-radius:999px;background:#fffdfa;color:#6f655c;font:inherit;font-size:10.5px;line-height:1;white-space:nowrap}
+    .confirmed-legend-chip i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--confirmed-color)}
+    .confirmed-legend-chip.is-selected{border-color:var(--confirmed-color);color:#332d28;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--confirmed-color) 35%,transparent)}
+    .confirmed-spend-empty{padding:18px 4px 8px;color:#91877e;font-size:12px;text-align:center}
     .submission-grid.confirmed-submissions-hidden{display:none!important}
     .budget-locked-note{font-size:11px;color:var(--muted);padding:8px 2px 0}
-    @media(max-width:720px){.trip-budget-grid,.review-budget-check{grid-template-columns:1fr}.review-budget-check>div{border-right:0;border-bottom:1px solid var(--line)}.review-budget-check>div:last-child{border-bottom:0}.confirmed-spend-card{padding:18px 16px;border-radius:21px}.confirmed-spend-visual{grid-template-columns:1fr;gap:16px;text-align:center}.confirmed-donut{width:min(205px,72vw)}.confirmed-spend-meta h3{font-size:24px}.confirmed-spend-head{align-items:flex-start}.confirmed-spend-head span{max-width:175px}}
+    @media(max-width:720px){
+      .trip-budget-grid,.review-budget-check{grid-template-columns:1fr}
+      .review-budget-check>div{border-right:0;border-bottom:1px solid var(--line)}
+      .review-budget-check>div:last-child{border-bottom:0}
+      #tripModalBody.confirmed-trip-redesign .trip-modal-heading h2{font-size:29px}
+      #tripModalBody.confirmed-trip-redesign .trip-modal-total strong{font-size:24px}
+      #tripModalBody.confirmed-trip-redesign .budget-check{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+      #tripModalBody.confirmed-trip-redesign .budget-check>div{border-bottom:0!important}
+      #tripModalBody.confirmed-trip-redesign .budget-check>div:first-child{border-right:1px solid rgba(110,89,70,.08)!important}
+      .confirmed-spend-card{padding:14px;border-radius:18px}
+      .confirmed-spend-switch{margin-bottom:13px}
+      .confirmed-spend-visual{grid-template-columns:1fr;gap:13px}
+      .confirmed-donut-shell{width:min(205px,62vw)}
+      .confirmed-spend-side{gap:9px;text-align:center}
+      .confirmed-spend-summary{justify-items:center}
+      .confirmed-legend{justify-content:center}
+    }
   `;
   document.head.appendChild(style);
 }
@@ -253,16 +300,21 @@ function confirmedPersonalCategories(plan, person) {
 
 function decorateConfirmedSpend() {
   const root = document.getElementById('tripModalBody');
-  if (!root || root.querySelector('.confirmed-spend-overview')) return;
+  if (!root) return;
   const confirmed = [...root.querySelectorAll('.match-box.ok strong')].some((el) => /confirmed by both/i.test(el.textContent || ''));
-  if (!confirmed) return;
+  root.classList.toggle('confirmed-trip-redesign', confirmed);
+  if (!confirmed || root.querySelector('.confirmed-spend-overview')) return;
+
   const cards = [...root.querySelectorAll('.submission-card')];
   if (cards.length < 2) return;
+
+  const totalLabel = root.querySelector('.trip-modal-total span');
+  if (totalLabel) totalLabel.textContent = 'Total spent';
 
   const state = getState();
   const tripId = root.dataset.tripId || '';
   const plan = (state.plans || []).find((item) => item.linkedTripId === tripId) || null;
-  const me = actor(), other = me === 'Principessa' ? 'Principe' : 'Principessa';
+  const me = actor();
   const totalCategories = categoryData(cards[0]);
   const total = parseMoney(root.querySelector('.trip-modal-total strong')?.textContent) || 0;
   const personal = {
@@ -282,83 +334,94 @@ function decorateConfirmedSpend() {
   const analysis = document.createElement('div');
   analysis.className = 'confirmed-spend-overview';
   let mode = 'total';
-  let longPressed = false;
-  let longTimer = null;
-  let startX = 0, startY = 0;
+  let selectedIndex = -1;
+
+  const personForMode = () => mode === 'principessa' ? 'Principessa' : mode === 'principe' ? 'Principe' : '';
 
   const render = () => {
-    const viewed = mode === 'mine' ? me : mode === 'other' ? other : '';
+    const viewed = personForMode();
     const categories = viewed ? personal[viewed] : totalCategories;
     const viewedTotal = viewed ? (hasDetailed ? personalTotals[viewed] : fallbackPaid[viewed]) : total;
-    const safeTotal = Math.max(viewedTotal, 0.01);
-    let degrees = 0;
-    const stops = categories.map((item, index) => {
-      const start = degrees;
-      degrees += (item.amount / safeTotal) * 360;
-      return `${COLORS[index % COLORS.length]} ${start}deg ${degrees}deg`;
-    }).join(',');
+    const categoryTotal = categories.reduce((sum, item) => sum + item.amount, 0);
+    const chartTotal = Math.max(viewedTotal, categoryTotal, .01);
+    if (selectedIndex >= categories.length) selectedIndex = -1;
+
+    let offset = 0;
+    const segments = categories.map((item, index) => {
+      const segmentPct = Math.max(0, Math.min(100, (item.amount / chartTotal) * 100));
+      const pct = viewedTotal > .005 ? (item.amount / viewedTotal) * 100 : 0;
+      const color = COLORS[index % COLORS.length];
+      const selected = selectedIndex === index;
+      const muted = selectedIndex >= 0 && !selected;
+      const dashOffset = -offset;
+      offset += segmentPct;
+      return '<circle class="confirmed-donut-segment'+(selected?' is-selected':'')+(muted?' is-muted':'')+'" cx="60" cy="60" r="48" pathLength="100" transform="rotate(-90 60 60)" stroke="'+color+'" stroke-dasharray="'+segmentPct.toFixed(4)+' '+(100-segmentPct).toFixed(4)+'" stroke-dashoffset="'+dashOffset.toFixed(4)+'" data-confirmed-category="'+index+'" tabindex="0" role="button" aria-label="'+esc(item.label)+': '+esc(money(item.amount))+', '+pct.toFixed(0)+' percent"></circle>';
+    }).join('');
+
+    const selected = selectedIndex >= 0 ? categories[selectedIndex] : null;
+    const selectedPct = selected && viewedTotal > .005 ? (selected.amount / viewedTotal) * 100 : 0;
+    const centerHtml = selected
+      ? '<span>'+esc(selected.label)+'</span><strong>'+money(selected.amount)+'</strong><small>'+selectedPct.toFixed(selectedPct < 10 ? 1 : 0)+'% of '+(viewed ? esc(viewed)+' spending' : 'this trip')+'</small>'
+      : '<span>'+(viewed ? 'Paid by '+esc(viewed) : 'Total spent')+'</span><strong>'+money(viewedTotal)+'</strong><small>'+(categories.length ? 'Tap a color' : 'No category data')+'</small>';
+
     const legend = categories.length
       ? categories.map((item, index) => {
-          const pct = viewedTotal > .005 ? (item.amount / viewedTotal) * 100 : 0;
-          return `<div class="confirmed-legend-row"><i style="background:${COLORS[index % COLORS.length]}"></i><span><strong>${esc(item.label)}</strong><small>${pct.toFixed(0)}% of ${viewed ? viewed + ' spending' : 'this trip'}</small></span><b>${money(item.amount)}</b></div>`;
+          const color = COLORS[index % COLORS.length];
+          return '<button type="button" class="confirmed-legend-chip'+(selectedIndex===index?' is-selected':'')+'" data-confirmed-category="'+index+'" style="--confirmed-color:'+color+'"><i aria-hidden="true"></i><span>'+esc(item.label)+'</span></button>';
         }).join('')
-      : `<div class="confirmed-spend-empty">${viewed && !hasDetailed ? 'Personal category details are not available for this older trip.' : viewed ? `${esc(viewed)} has no personal Trip spending logged.` : 'No spending entered yet.'}</div>`;
-    const cls = viewed ? ' is-' + viewed.toLowerCase() : '';
+      : '<div class="confirmed-spend-empty">'+(viewed && !hasDetailed ? 'Personal category details are not available for this older trip.' : viewed ? esc(viewed)+' has no personal Trip spending logged.' : 'No spending entered yet.')+'</div>';
+
     const modeLabel = viewed || 'Together';
-    const centerLabel = viewed ? viewed + ' spent' : 'Total spent';
-    const title = viewed ? viewed + ' spending' : 'Where the money went';
-    const hint = mode === 'total'
-      ? `Tap for ${esc(me)} · hold for ${esc(other)}`
-      : `Tap for Together · hold for ${esc(other)}`;
+    const cls = viewed ? ' is-' + viewed.toLowerCase() : '';
     const detail = viewed
-      ? (hasDetailed ? `${money(viewedTotal)} paid by ${esc(viewed)}` : `${money(viewedTotal)} paid · category detail unavailable`)
-      : `${money(total)} across the confirmed trip`;
+      ? (hasDetailed ? money(viewedTotal)+' paid by '+esc(viewed) : money(viewedTotal)+' paid · category detail unavailable')
+      : money(total)+' across the confirmed trip';
 
-    analysis.innerHTML = `<section class="confirmed-spend-card${cls}" role="button" tabindex="0" aria-label="Confirmed trip spending view: ${esc(modeLabel)}">
-      <span class="confirmed-spend-mode">${esc(modeLabel)}</span>
-      <div class="confirmed-spend-visual">
-        <div class="confirmed-donut" style="background:${categories.length ? `conic-gradient(${stops})` : '#e8e2d9'}"><div class="confirmed-donut-center"><span>${esc(centerLabel)}</span><strong>${money(viewedTotal)}</strong></div></div>
-        <div class="confirmed-spend-meta"><span>CONFIRMED TRIP</span><h3>${esc(title)}</h3><p>${detail}</p></div>
-      </div>
-      <div class="confirmed-spend-head"><h4>${viewed ? 'Personal breakdown' : 'Category breakdown'}</h4><span>${hint}</span></div>
-      <div class="confirmed-legend">${legend}</div>
-    </section>`;
+    analysis.innerHTML = '<section class="confirmed-spend-card'+cls+'" aria-label="Confirmed trip spending view: '+esc(modeLabel)+'">'+
+      '<div class="confirmed-spend-switch" role="tablist" aria-label="Choose whose expenses to view">'+
+        '<button type="button" role="tab" data-confirmed-mode="total" class="'+(mode==='total'?'is-active':'')+'" aria-selected="'+(mode==='total')+'">Together</button>'+
+        '<button type="button" role="tab" data-confirmed-mode="principessa" class="'+(mode==='principessa'?'is-active':'')+'" aria-selected="'+(mode==='principessa')+'">Principessa</button>'+
+        '<button type="button" role="tab" data-confirmed-mode="principe" class="'+(mode==='principe'?'is-active':'')+'" aria-selected="'+(mode==='principe')+'">Principe</button>'+
+      '</div>'+
+      '<div class="confirmed-spend-title"><h3>Spending breakdown</h3><small>Tap a color</small></div>'+
+      '<div class="confirmed-spend-visual">'+
+        '<div class="confirmed-donut-shell">'+
+          '<svg class="confirmed-donut-svg" viewBox="0 0 120 120" aria-label="Trip spending donut">'+
+            '<circle class="confirmed-donut-track" cx="60" cy="60" r="48"></circle>'+segments+
+          '</svg>'+
+          '<div class="confirmed-donut-center">'+centerHtml+'</div>'+
+        '</div>'+
+        '<div class="confirmed-spend-side">'+
+          '<div class="confirmed-spend-summary"><span>'+esc(modeLabel)+'</span><strong>'+money(viewedTotal)+'</strong><small>'+detail+'</small></div>'+
+          '<div class="confirmed-legend">'+legend+'</div>'+
+        '</div>'+
+      '</div>'+
+    '</section>';
   };
 
-  const clearLongPress = () => {
-    if (longTimer) clearTimeout(longTimer);
-    longTimer = null;
-  };
-
-  analysis.addEventListener('pointerdown', (event) => {
-    if (!event.target.closest('.confirmed-spend-card') || event.button !== 0) return;
-    longPressed = false;
-    startX = event.clientX; startY = event.clientY;
-    clearLongPress();
-    longTimer = setTimeout(() => {
-      longPressed = true;
-      mode = 'other';
-      render();
-    }, 550);
-  });
-  analysis.addEventListener('pointermove', (event) => {
-    if (Math.abs(event.clientX - startX) > 12 || Math.abs(event.clientY - startY) > 12) clearLongPress();
-  });
-  analysis.addEventListener('pointerup', clearLongPress);
-  analysis.addEventListener('pointercancel', clearLongPress);
-  analysis.addEventListener('contextmenu', (event) => {
-    if (event.target.closest('.confirmed-spend-card')) event.preventDefault();
-  });
   analysis.addEventListener('click', (event) => {
-    if (!event.target.closest('.confirmed-spend-card')) return;
-    if (longPressed) { longPressed = false; return; }
-    mode = mode === 'total' ? 'mine' : 'total';
+    const modeButton = event.target.closest?.('[data-confirmed-mode]');
+    if (modeButton) {
+      mode = modeButton.dataset.confirmedMode || 'total';
+      selectedIndex = -1;
+      render();
+      return;
+    }
+    const categoryTarget = event.target.closest?.('[data-confirmed-category]');
+    if (!categoryTarget) return;
+    const index = Number(categoryTarget.dataset.confirmedCategory);
+    if (!Number.isInteger(index)) return;
+    selectedIndex = selectedIndex === index ? -1 : index;
     render();
   });
+
   analysis.addEventListener('keydown', (event) => {
-    if (!event.target.closest('.confirmed-spend-card') || (event.key !== 'Enter' && event.key !== ' ')) return;
+    const categoryTarget = event.target.closest?.('.confirmed-donut-segment[data-confirmed-category]');
+    if (!categoryTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
     event.preventDefault();
-    mode = mode === 'total' ? 'mine' : 'total';
+    const index = Number(categoryTarget.dataset.confirmedCategory);
+    if (!Number.isInteger(index)) return;
+    selectedIndex = selectedIndex === index ? -1 : index;
     render();
   });
 
