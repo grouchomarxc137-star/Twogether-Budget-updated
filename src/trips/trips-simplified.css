@@ -1974,3 +1974,28 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))!important;
   }
 }
+
+
+/* Past trips: keep the new card layout, but visually soften completed trips. */
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past{
+  background:#f7f4ef;
+  border-color:#e5ddd4;
+  box-shadow:0 4px 14px rgba(69,52,43,.025);
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-photo{
+  background:#ebe5dd;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-photo img{
+  opacity:.72;
+  filter:saturate(.55) brightness(.98);
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-content{
+  opacity:.78;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-money{
+  color:var(--muted);
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past:hover{
+  border-color:#ddd4ca;
+  box-shadow:0 6px 18px rgba(69,52,43,.035);
+}
