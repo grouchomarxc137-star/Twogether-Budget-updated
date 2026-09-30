@@ -100,9 +100,9 @@ function installStyles() {
     #tripModalBody.confirmed-trip-redesign .budget-check.warn .budget-result{background:transparent}
     #tripModalBody.confirmed-trip-redesign .trip-budget-comparison{display:none}
     .confirmed-spend-overview{margin:12px 0 2px}
-    .confirmed-spend-card{position:relative;background:#fffdfa;border:1px solid #e7ded5;border-radius:20px;padding:16px;box-shadow:0 7px 22px rgba(62,45,31,.04);touch-action:pan-y}
-    .confirmed-spend-card.is-principessa{border-color:#e4d8b8;background:#fffdf8}
-    .confirmed-spend-card.is-principe{border-color:#ead7ca;background:#fffaf7}
+    .confirmed-spend-card{position:relative;background:linear-gradient(180deg,#fffefa 0%,#fbf7f0 100%);border:1px solid #e6dbcf;border-radius:20px;padding:16px;box-shadow:0 7px 22px rgba(62,45,31,.04);touch-action:pan-y;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+    .confirmed-spend-card.is-principessa{border-color:#d6ad45;box-shadow:0 0 0 2px rgba(214,173,69,.18),0 8px 24px rgba(96,72,24,.08);background:linear-gradient(180deg,#fffdf5 0%,#fbf5e5 100%)}
+    .confirmed-spend-card.is-principe{border-color:#e68145;box-shadow:0 0 0 2px rgba(230,129,69,.18),0 8px 24px rgba(114,62,27,.08);background:linear-gradient(180deg,#fffaf6 0%,#fcf0e7 100%)}
     .confirmed-spend-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 10px}
     .confirmed-spend-title h3{margin:0;font-size:17px;line-height:1.2;font-weight:600}
     .confirmed-spend-title small{color:#91877e;font-size:10px;white-space:nowrap}
