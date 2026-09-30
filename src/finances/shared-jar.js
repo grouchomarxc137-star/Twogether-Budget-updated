@@ -62,7 +62,7 @@ function jarHistory(state) {
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
-export function renderSharedJar() {
+export function renderSharedJar(stateOverride = null, profileOverride = null) {
   const root = $('#financeCurrent'); if (!root) return;
 
   // Clean up the old standalone card if it is still present in the DOM.
@@ -71,12 +71,13 @@ export function renderSharedJar() {
   const cashCard = $('[data-fin-current-cash]', root) || $('.finance-current-card', root);
   if (!cashCard) return;
 
-  const state = currentState();
+  const state = stateOverride || currentState();
   const jar = state?.sharedJar || { balance: 870, initialBalance: 870, transactions: [] };
   const jarBalance = n(jar.balance ?? 870);
   const history = jarHistory(state);
   const latest = history[0] || null;
-  const bankTotal = (profile()?.bankAccounts || []).reduce((sum, account) => sum + n(account?.balance), 0);
+  const financeProfile = profileOverride || profile();
+  const bankTotal = (financeProfile?.bankAccounts || []).reduce((sum, account) => sum + n(account?.balance), 0);
 
   let row = $('.v33-shared-jar-bank', cashCard);
   if (!row || row.tagName !== 'BUTTON') {

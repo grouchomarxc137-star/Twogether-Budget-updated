@@ -10,6 +10,7 @@ import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 import { openFinanceSubview, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
+import { renderSharedJar } from './shared-jar.js';
 
 const MONTHS = [
   ['2026-01', 'Jan 2026'], ['2026-02', 'Feb 2026'], ['2026-03', 'Mar 2026'], ['2026-04', 'Apr 2026'],
@@ -1555,6 +1556,7 @@ function renderCurrentPanel() {
     if (event.target.closest('button')) return;
     openOwedHistory();
   });
+  renderSharedJar(financeState,p);
   bindFinanceWalletCarousel(root);
 }
 
