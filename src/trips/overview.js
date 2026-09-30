@@ -19,6 +19,7 @@ import {
 import { getState, isBackendV3, postAction, syncNow } from './state.js';
 import { beginEdit, beginJoin } from './wizard.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
+import { tripImage } from './trip-images.js';
 
 let openTripId = '';
 let selectedMonthlyKey = '';
@@ -42,9 +43,11 @@ export function renderTripGallery() {
     else if (t.submissions.Principessa && t.submissions.Principe && d.length) { status = 'Needs discussion'; statusClass = 'status-warn'; }
     else if (t.submissions.Principessa && t.submissions.Principe) { status = 'Awaiting confirmation'; statusClass = 'status-wait'; }
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
+    const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country);
     return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
-      <div class="trip-card-top"><span class="trip-country">${esc(locationLabel(m))}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
-      <h3>${esc(m.city || locationLabel(m))}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
+      <span class="trip-story-photo" aria-hidden="true"><img src="${esc(image)}" alt="" loading="lazy" decoding="async"></span>
+      <div class="trip-card-top"><span class="trip-country">${esc(country)}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
+      <h3>${esc(city)}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
       <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
