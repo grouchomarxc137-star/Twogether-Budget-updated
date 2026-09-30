@@ -1939,3 +1939,38 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     max-height:96px;
   }
 }
+
+
+/* Keep New trip reachable at the bottom of the Trips screen. */
+#twCurrentTrips.tv2-root:not(.tv2-trip-view)>.tv2-page{
+  padding-bottom:calc(98px + env(safe-area-inset-bottom,0px));
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-dock{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:40;
+  padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(to top,var(--tv2-bg) 70%,rgba(247,244,239,0));
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-dock .tv2-primary{
+  max-width:528px;
+  margin:0 auto;
+  display:block;
+}
+#log #twCurrentTripsSection.tv2-current-host + .trip-gallery-section{
+  padding-bottom:calc(98px + env(safe-area-inset-bottom,0px))!important;
+}
+
+@media(max-width:620px){
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view)>.tv2-page{
+    padding-bottom:calc(88px + env(safe-area-inset-bottom,0px));
+  }
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-dock{
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+  }
+  #log #twCurrentTripsSection.tv2-current-host + .trip-gallery-section{
+    padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))!important;
+  }
+}
