@@ -55,12 +55,14 @@ export function renderTripGallery() {
     else if (t.submissions.Principessa && t.submissions.Principe) { status = 'Awaiting confirmation'; statusClass = 'status-wait'; }
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
     const city = m.city || locationLabel(m), country = locationLabel(m), flag = countryFlag(country);
+    const left = e.budget > 0 ? e.budget - e.total : null;
+    const over = left != null && left < 0;
     const pct = e.budget > 0 ? Math.min(100, Math.max(0, (e.total / e.budget) * 100)) : 0;
     return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
       <span class="trip-story-title-row"><strong><span class="trip-story-flag" aria-hidden="true">${esc(flag)}</span><span class="trip-story-name">${esc(city)}</span></strong><small>${esc(shortStoryRange(m.start,m.end))}</small></span>
       <span class="trip-story-sub">Confirmed trip</span>
-      <span class="trip-story-money"><span>${e.estimated ? '~ ' : ''}${money(e.total)} spent</span><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></span>
-      ${e.budget > 0 ? '<span class="trip-story-bar '+(budget.tone==='warn'?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>' : ''}
+      <span class="trip-story-money"><span>${e.estimated ? '~ ' : ''}${money(e.total)} spent</span><span class="${over ? 'is-over' : ''}">${left == null ? 'No budget set' : money(Math.abs(left)) + (over ? ' over' : ' left')}</span></span>
+      ${e.budget > 0 ? '<span class="trip-story-bar '+(over?'is-over':'')+'"><i style="width:'+pct.toFixed(1)+'%"></i></span>' : ''}
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
   }).join('');

@@ -1914,30 +1914,31 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 }
 
 
-/* Compact text-only trip cards — matched to the approved reference. */
+/* Trips / Trip Stories cards — exact approved reference proportions. */
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card,
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past{
-  position:relative;
+  box-sizing:border-box;
   display:block;
   width:100%;
-  min-height:108px;
-  padding:15px 16px 13px;
+  height:110px;
+  min-height:110px;
+  padding:20px 14px 14px;
   border:1px solid var(--line);
-  border-radius:20px;
+  border-radius:18px;
   background:var(--card);
-  box-shadow:0 5px 16px rgba(69,52,43,.035);
+  box-shadow:none;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-content{
   display:grid;
   min-width:0;
-  gap:5px;
+  gap:0;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-top{
   display:flex;
   justify-content:space-between;
   align-items:flex-start;
   gap:10px;
-  padding-left:0;
+  padding:0;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-top strong,
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-top strong{
@@ -1945,13 +1946,13 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   flex:1 1 auto;
   display:flex;
   align-items:center;
-  gap:7px;
+  gap:5px;
   overflow:hidden;
-  font-size:19px;
-  line-height:1.15;
-  font-weight:600;
-  letter-spacing:-.01em;
   white-space:nowrap;
+  font-size:16px;
+  line-height:18px;
+  font-weight:600;
+  letter-spacing:0;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-name{
   min-width:0;
@@ -1961,59 +1962,71 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-flag{
   flex:0 0 auto;
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
-  font-size:18px;
-  line-height:1;
+  font-size:15px;
+  line-height:18px;
   font-weight:400;
   text-rendering:auto;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-top small{
   flex:0 0 auto;
   color:var(--muted);
-  font-size:12px;
-  line-height:1.2;
+  font-size:11px;
+  line-height:18px;
   white-space:nowrap;
   text-align:right;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-sub{
+  margin-top:7px;
   color:var(--muted);
-  font-size:12.5px;
-  line-height:1.25;
+  font-size:12px;
+  line-height:14px;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-money,
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-money{
   display:flex;
   justify-content:space-between;
   align-items:flex-end;
-  margin-top:2px;
+  margin-top:5px;
   gap:12px;
   color:var(--ink);
-  font-size:13.5px;
-  line-height:1.2;
+  font-size:13px;
+  line-height:15px;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-money>span:last-child{
+  text-align:right;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card .tv2-bar{
-  height:6px;
-  margin-top:1px;
+  display:block;
+  width:100%;
+  height:5px;
+  margin-top:5px;
+  overflow:hidden;
   border-radius:999px;
   background:#e9e4dc;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card .tv2-bar i{
+  display:block;
+  height:100%;
   border-radius:inherit;
+  background:var(--sage);
 }
 
-/* Trip Stories use the same card language. */
+/* Trip Stories are deliberately identical to Trips. */
 #log #tripGallery .trip-story-card{
+  box-sizing:border-box;
   display:grid!important;
   grid-template-columns:minmax(0,1fr)!important;
   grid-template-rows:none!important;
-  gap:5px!important;
+  gap:0!important;
   width:100%;
-  min-height:108px!important;
-  padding:15px 16px 13px!important;
+  height:110px!important;
+  min-height:110px!important;
+  padding:20px 14px 14px!important;
   border:1px solid var(--line)!important;
-  border-radius:20px!important;
+  border-radius:18px!important;
   background:var(--card)!important;
   background-image:none!important;
-  box-shadow:0 5px 16px rgba(69,52,43,.035)!important;
+  box-shadow:none!important;
   transform:none;
   text-align:left!important;
 }
@@ -2028,13 +2041,13 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   flex:1 1 auto;
   display:flex;
   align-items:center;
-  gap:7px;
+  gap:5px;
   overflow:hidden;
   white-space:nowrap;
-  font-size:19px!important;
-  line-height:1.15!important;
+  font-size:16px!important;
+  line-height:18px!important;
   font-weight:600!important;
-  letter-spacing:-.01em!important;
+  letter-spacing:0!important;
 }
 #log #tripGallery .trip-story-name{
   min-width:0;
@@ -2044,42 +2057,48 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 #log #tripGallery .trip-story-title-row small{
   flex:0 0 auto;
   color:var(--muted)!important;
-  font-size:12px!important;
-  line-height:1.2!important;
+  font-size:11px!important;
+  line-height:18px!important;
   white-space:nowrap;
 }
 #log #tripGallery .trip-story-flag{
   flex:0 0 auto;
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
-  font-size:18px!important;
-  line-height:1!important;
+  font-size:15px!important;
+  line-height:18px!important;
   font-weight:400!important;
   text-rendering:auto;
 }
 #log #tripGallery .trip-story-sub{
+  margin-top:7px;
   color:var(--muted)!important;
-  font-size:12.5px!important;
-  line-height:1.25!important;
+  font-size:12px!important;
+  line-height:14px!important;
 }
 #log #tripGallery .trip-story-money{
   display:flex!important;
   justify-content:space-between!important;
   align-items:flex-end!important;
   gap:12px!important;
-  margin-top:2px!important;
+  margin-top:5px!important;
   color:var(--ink)!important;
-  font-size:13.5px!important;
-  line-height:1.2!important;
+  font-size:13px!important;
+  line-height:15px!important;
 }
 #log #tripGallery .trip-story-money>span:last-child{
-  max-width:48%;
-  color:var(--muted)!important;
-  font-size:11.5px!important;
+  max-width:none;
+  color:var(--ink)!important;
+  font-size:13px!important;
   text-align:right!important;
+}
+#log #tripGallery .trip-story-money>span.is-over{
+  color:var(--over)!important;
 }
 #log #tripGallery .trip-story-bar{
   display:block;
-  height:6px;
+  width:100%;
+  height:5px;
+  margin-top:5px;
   overflow:hidden;
   border-radius:999px;
   background:#e9e4dc;
@@ -2107,53 +2126,75 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   text-shadow:none!important;
 }
 
+/* Keep exactly the same proportions on mobile. */
 @media(max-width:620px){
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card,
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past{
-    min-height:102px;
-    padding:13px 14px 12px;
+    height:110px;
+    min-height:110px;
+    padding:20px 14px 14px;
     border-radius:18px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-top strong,
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-top strong{
-    font-size:17.5px;
+    font-size:16px;
+    line-height:18px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-flag{
-    font-size:16px;
+    font-size:15px;
+    line-height:18px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-top small{
     font-size:11px;
+    line-height:18px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-sub{
-    font-size:11.5px;
+    margin-top:7px;
+    font-size:12px;
+    line-height:14px;
   }
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-money,
   #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-money{
-    margin-top:1px;
-    font-size:12px;
+    margin-top:5px;
+    font-size:13px;
+    line-height:15px;
+  }
+  #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card .tv2-bar{
+    height:5px;
+    margin-top:5px;
   }
 
   #log #tripGallery .trip-story-card{
-    min-height:102px!important;
-    padding:13px 14px 12px!important;
+    height:110px!important;
+    min-height:110px!important;
+    padding:20px 14px 14px!important;
     border-radius:18px!important;
   }
   #log #tripGallery .trip-story-title-row strong{
-    font-size:17.5px!important;
+    font-size:16px!important;
+    line-height:18px!important;
   }
   #log #tripGallery .trip-story-title-row small{
     font-size:11px!important;
+    line-height:18px!important;
   }
   #log #tripGallery .trip-story-flag{
-    font-size:16px!important;
+    font-size:15px!important;
+    line-height:18px!important;
   }
   #log #tripGallery .trip-story-sub{
-    font-size:11.5px!important;
-  }
-  #log #tripGallery .trip-story-money{
+    margin-top:7px;
     font-size:12px!important;
+    line-height:14px!important;
   }
+  #log #tripGallery .trip-story-money,
   #log #tripGallery .trip-story-money>span:last-child{
-    font-size:10.5px!important;
+    margin-top:5px!important;
+    font-size:13px!important;
+    line-height:15px!important;
+  }
+  #log #tripGallery .trip-story-bar{
+    height:5px;
+    margin-top:5px;
   }
 }
