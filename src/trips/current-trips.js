@@ -1008,9 +1008,10 @@ function openSimplifiedChecklist(plan) {
   };
 
   const completedSection = () => {
+    const mine=state.packingMine;
     const done = [
-      ...prep.packing.filter((item)=>item.done).map((item)=>({kind:'packing',item})),
-      ...prep.reminders.filter((item)=>item.done).map((item)=>({kind:'reminders',item})),
+      ...prep.packing.filter((item)=>item.done && (!mine || checklistAddedBy(item.addedBy)===actor())).map((item)=>({kind:'packing',item})),
+      ...prep.reminders.filter((item)=>item.done && (!mine || checklistAddedBy(item.addedBy)===actor())).map((item)=>({kind:'reminders',item})),
     ];
     if (!done.length) return '';
     return '<section class="tv2-check-section tv2-check-completed"><div class="tv2-check-section-head"><h3>Completed</h3><span>'+done.length+'</span></div>'+
@@ -1040,8 +1041,13 @@ function openSimplifiedChecklist(plan) {
 
   function render(moveId = '') {
     if (!sheet) return;
+    const personal=state.packingMine;
+    const me=actor();
+    sheet.classList.toggle('is-personal-checklist',personal);
+    sheet.classList.toggle('is-principessa',personal&&me==='Principessa');
+    sheet.classList.toggle('is-principe',personal&&me==='Principe');
     sheet.innerHTML =
-      '<div class="tv2-sheet-head tv2-checklist-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2></div><button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button></div>'+
+      '<div class="tv2-sheet-head tv2-checklist-head" data-check-personal-toggle role="button" tabindex="0" aria-pressed="'+(personal?'true':'false')+'" aria-label="'+esc(personal?'Show all checklist items':'Show only '+me+' checklist items')+'"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>Checklist</h2>'+(personal?'<span class="tv2-check-personal-mode">'+esc(me)+'</span>':'')+'</div><button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button></div>'+
       activeSection('packing','Packing / things to take')+
       activeSection('reminders','Important reminders')+
       completedSection()+
@@ -1682,6 +1688,12 @@ function openSimplifiedChecklist(plan) {
     syncChecklistTextWidth(e.target);
   });
   sheet.addEventListener('keydown',(e)=>{
+    if(e.target.matches?.('[data-check-personal-toggle]')&&(e.key==='Enter'||e.key===' ')){
+      e.preventDefault();
+      state.packingMine=!state.packingMine;
+      render();
+      return;
+    }
     const input=e.target.closest('[data-check-new]'); if(!input||e.key!=='Enter')return;
     e.preventDefault(); addItem(input.dataset.checkNew);
   });
@@ -1690,8 +1702,8 @@ function openSimplifiedChecklist(plan) {
       e.preventDefault();
       return;
     }
-    const personalCard=e.target.closest('[data-check-section="packing"],[data-check-section="reminders"]');
-    if(personalCard && !e.target.closest('input,button,label')){
+    const checklistHeader=e.target.closest('[data-check-personal-toggle]');
+    if(checklistHeader && !e.target.closest('button,input,label,a,select,textarea')){
       state.packingMine=!state.packingMine;
       render();
       return;

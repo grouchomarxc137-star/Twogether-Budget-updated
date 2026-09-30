@@ -1028,15 +1028,60 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 }
 
 
-/* Tap Packing / things to take to toggle the logged-in person's items. */
-.tv2-check-section[data-check-section="packing"]{
-  transition:background .16s ease,border-color .16s ease,box-shadow .16s ease;
+/* Tap the Checklist header to toggle the logged-in person's full checklist view. */
+.tv2-checklist-head[data-check-personal-toggle]{
+  cursor:pointer;
+  -webkit-user-select:none;
+  user-select:none;
 }
-.tv2-check-section[data-check-section="packing"].is-mine-packing.is-principessa{
-  border-color:rgba(212,170,42,.42);
+.tv2-checklist-head[data-check-personal-toggle]:focus-visible{
+  outline:2px solid rgba(102,86,69,.55);
+  outline-offset:4px;
+  border-radius:12px;
 }
-.tv2-check-section[data-check-section="packing"].is-mine-packing.is-principe{
-  border-color:rgba(215,122,43,.42);
+.tv2-check-personal-mode{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  margin-top:5px;
+  padding:0 9px;
+  border:1px solid rgba(112,94,75,.12);
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  color:#74685e;
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.04em;
+}
+.tv2-checklist-sheet{
+  transition:background .18s ease,box-shadow .18s ease;
+}
+.tv2-checklist-sheet .tv2-check-section{
+  transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principessa{
+  background:linear-gradient(180deg,#fffdf5 0%,#fbf5e5 100%);
+  box-shadow:inset 0 0 0 1px #d6ad45,0 -12px 40px rgba(96,72,24,.10);
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principessa .tv2-check-section{
+  border-color:rgba(214,173,69,.30);
+  background:rgba(255,253,249,.82);
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principessa .tv2-check-personal-mode{
+  border-color:rgba(214,173,69,.35);
+  color:#8a6814;
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principe{
+  background:linear-gradient(180deg,#fffaf6 0%,#fcf0e7 100%);
+  box-shadow:inset 0 0 0 1px #e68145,0 -12px 40px rgba(114,62,27,.10);
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principe .tv2-check-section{
+  border-color:rgba(230,129,69,.30);
+  background:rgba(255,252,249,.82);
+}
+.tv2-checklist-sheet.is-personal-checklist.is-principe .tv2-check-personal-mode{
+  border-color:rgba(230,129,69,.35);
+  color:#a65220;
 }
 
 
