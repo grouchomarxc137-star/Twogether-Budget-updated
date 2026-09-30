@@ -1804,3 +1804,15 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
     font-size:9.5px!important;
   }
 }
+
+
+/* Long checklist text: hold briefly, then drag horizontally to read it.
+   Immediate swipes remain reserved for delete. */
+.tv2-check-text-scroll.is-longpress-scroll{
+  cursor:grabbing;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.tv2-check-text-scroll.is-longpress-scroll .tv2-check-text{
+  pointer-events:none;
+}

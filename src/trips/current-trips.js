@@ -1262,8 +1262,23 @@ function openSimplifiedChecklist(plan) {
     requestAnimationFrame(() => sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
 
-  let checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  let checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,lastY:0,row:null,textScroller:null,textTimer:null,textMode:false,startScrollLeft:0};
   let checklistSwipeIgnoreUntil=0;
+
+  const clearChecklistTextScrollTimer=()=>{
+    if(checklistSwipe.textTimer)clearTimeout(checklistSwipe.textTimer);
+    checklistSwipe.textTimer=null;
+  };
+
+  const startChecklistTextScroll=()=>{
+    const scroller=checklistSwipe.textScroller;
+    if(!checklistSwipe.tracking||checklistSwipe.active||!scroller||scroller.scrollWidth<=scroller.clientWidth+2)return;
+    checklistSwipe.textMode=true;
+    checklistSwipe.startScrollLeft=scroller.scrollLeft;
+    scroller.classList.add('is-longpress-scroll');
+    resetChecklistSwipeVisual(checklistSwipe.row,false);
+    try{if(typeof navigator.vibrate==='function')navigator.vibrate(8);}catch{}
+  };
 
   const resetChecklistSwipeVisual=(row,animate=true)=>{
     if(!row)return;
@@ -1286,7 +1301,9 @@ function openSimplifiedChecklist(plan) {
   };
 
   const resetChecklistSwipeState=()=>{
-    checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+    clearChecklistTextScrollTimer();
+    checklistSwipe.textScroller?.classList.remove('is-longpress-scroll');
+    checklistSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,lastY:0,row:null,textScroller:null,textTimer:null,textMode:false,startScrollLeft:0};
   };
 
   const closeOtherChecklistSwipes=(except=null)=>{
@@ -1356,7 +1373,13 @@ function openSimplifiedChecklist(plan) {
     closeOtherChecklistSwipes(row);
     resetChecklistSwipeVisual(row,false);
     const t=e.touches[0];
-    checklistSwipe={tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,row};
+    const textScroller=e.target.closest('[data-check-scroll]');
+    const canTextScroll=!!textScroller&&textScroller.scrollWidth>textScroller.clientWidth+2;
+    checklistSwipe={
+      tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY,row,
+      textScroller:canTextScroll?textScroller:null,textTimer:null,textMode:false,startScrollLeft:textScroller?.scrollLeft||0
+    };
+    if(canTextScroll)checklistSwipe.textTimer=setTimeout(startChecklistTextScroll,260);
   },{passive:true});
 
   sheet.addEventListener('touchmove',(e)=>{
@@ -1365,9 +1388,19 @@ function openSimplifiedChecklist(plan) {
     const dx=t.clientX-checklistSwipe.startX;
     const dy=Math.abs(t.clientY-checklistSwipe.startY);
     checklistSwipe.lastX=t.clientX;
+    checklistSwipe.lastY=t.clientY;
+
+    if(checklistSwipe.textMode&&checklistSwipe.textScroller){
+      e.preventDefault();
+      const scroller=checklistSwipe.textScroller;
+      const maxScroll=Math.max(0,scroller.scrollWidth-scroller.clientWidth);
+      scroller.scrollLeft=Math.max(0,Math.min(maxScroll,checklistSwipe.startScrollLeft-dx));
+      return;
+    }
 
     if(!checklistSwipe.active){
       if(Math.abs(dx)<8&&dy<8)return;
+      clearChecklistTextScrollTimer();
       if(dx<-10&&Math.abs(dx)>dy*1.2){
         checklistSwipe.active=true;
       }else if(dy>=Math.abs(dx)||dx>10){
@@ -1396,11 +1429,18 @@ function openSimplifiedChecklist(plan) {
     }
   },{passive:false});
 
-  sheet.addEventListener('touchend',()=>{
+  sheet.addEventListener('touchend',(e)=>{
     if(!checklistSwipe.tracking||!checklistSwipe.row){
       resetChecklistSwipeState();
       return;
     }
+    if(checklistSwipe.textMode){
+      checklistSwipeIgnoreUntil=Date.now()+250;
+      e.preventDefault();
+      resetChecklistSwipeState();
+      return;
+    }
+    clearChecklistTextScrollTimer();
     const row=checklistSwipe.row;
     const dx=checklistSwipe.lastX-checklistSwipe.startX;
     const width=row.getBoundingClientRect().width||280;
@@ -1432,7 +1472,7 @@ function openSimplifiedChecklist(plan) {
       resetChecklistSwipeVisual(row,false);
       openChecklistDeleteConfirm(kind,id);
     },180);
-  },{passive:true});
+  },{passive:false});
 
   sheet.addEventListener('touchcancel',()=>{
     resetChecklistSwipeVisual(checklistSwipe.row,true);
@@ -2013,7 +2053,22 @@ function openRecurrentChecklistItems(plan) {
     }
   }
 
-  let recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+  let recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,lastY:0,row:null,textScroller:null,textTimer:null,textMode:false,startScrollLeft:0};
+
+  const clearRecurrentTextScrollTimer=()=>{
+    if(recurrentSwipe.textTimer)clearTimeout(recurrentSwipe.textTimer);
+    recurrentSwipe.textTimer=null;
+  };
+
+  const startRecurrentTextScroll=()=>{
+    const scroller=recurrentSwipe.textScroller;
+    if(!recurrentSwipe.tracking||recurrentSwipe.active||!scroller||scroller.scrollWidth<=scroller.clientWidth+2)return;
+    recurrentSwipe.textMode=true;
+    recurrentSwipe.startScrollLeft=scroller.scrollLeft;
+    scroller.classList.add('is-longpress-scroll');
+    resetRecurrentSwipeVisual(recurrentSwipe.row,false);
+    try{if(typeof navigator.vibrate==='function')navigator.vibrate(8);}catch{}
+  };
 
   const resetRecurrentSwipeVisual=(row,animate=true)=>{
     if(!row)return;
@@ -2036,7 +2091,9 @@ function openRecurrentChecklistItems(plan) {
   };
 
   const resetRecurrentSwipeState=()=>{
-    recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,row:null};
+    clearRecurrentTextScrollTimer();
+    recurrentSwipe.textScroller?.classList.remove('is-longpress-scroll');
+    recurrentSwipe={tracking:false,active:false,startX:0,startY:0,lastX:0,lastY:0,row:null,textScroller:null,textTimer:null,textMode:false,startScrollLeft:0};
   };
 
   const closeOtherRecurrentSwipes=(except=null)=>{
@@ -2112,7 +2169,13 @@ function openRecurrentChecklistItems(plan) {
     closeOtherRecurrentSwipes(row);
     resetRecurrentSwipeVisual(row,false);
     const t=e.touches[0];
-    recurrentSwipe={tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,row};
+    const textScroller=e.target.closest('[data-check-scroll]');
+    const canTextScroll=!!textScroller&&textScroller.scrollWidth>textScroller.clientWidth+2;
+    recurrentSwipe={
+      tracking:true,active:false,startX:t.clientX,startY:t.clientY,lastX:t.clientX,lastY:t.clientY,row,
+      textScroller:canTextScroll?textScroller:null,textTimer:null,textMode:false,startScrollLeft:textScroller?.scrollLeft||0
+    };
+    if(canTextScroll)recurrentSwipe.textTimer=setTimeout(startRecurrentTextScroll,260);
   },{passive:true});
 
   sheet.addEventListener('touchmove',(e)=>{
@@ -2121,9 +2184,19 @@ function openRecurrentChecklistItems(plan) {
     const dx=t.clientX-recurrentSwipe.startX;
     const dy=Math.abs(t.clientY-recurrentSwipe.startY);
     recurrentSwipe.lastX=t.clientX;
+    recurrentSwipe.lastY=t.clientY;
+
+    if(recurrentSwipe.textMode&&recurrentSwipe.textScroller){
+      e.preventDefault();
+      const scroller=recurrentSwipe.textScroller;
+      const maxScroll=Math.max(0,scroller.scrollWidth-scroller.clientWidth);
+      scroller.scrollLeft=Math.max(0,Math.min(maxScroll,recurrentSwipe.startScrollLeft-dx));
+      return;
+    }
 
     if(!recurrentSwipe.active){
       if(Math.abs(dx)<8&&dy<8)return;
+      clearRecurrentTextScrollTimer();
       if(dx<-10&&Math.abs(dx)>dy*1.2){
         recurrentSwipe.active=true;
       }else if(dy>=Math.abs(dx)||dx>10){
@@ -2152,11 +2225,17 @@ function openRecurrentChecklistItems(plan) {
     }
   },{passive:false});
 
-  sheet.addEventListener('touchend',()=>{
+  sheet.addEventListener('touchend',(e)=>{
     if(!recurrentSwipe.tracking||!recurrentSwipe.row){
       resetRecurrentSwipeState();
       return;
     }
+    if(recurrentSwipe.textMode){
+      e.preventDefault();
+      resetRecurrentSwipeState();
+      return;
+    }
+    clearRecurrentTextScrollTimer();
     const row=recurrentSwipe.row;
     const dx=recurrentSwipe.lastX-recurrentSwipe.startX;
     const width=row.getBoundingClientRect().width||280;
@@ -2187,7 +2266,7 @@ function openRecurrentChecklistItems(plan) {
       resetRecurrentSwipeVisual(row,false);
       openRecurrentDeleteConfirm(kind,id);
     },180);
-  },{passive:true});
+  },{passive:false});
 
   sheet.addEventListener('touchcancel',()=>{
     resetRecurrentSwipeVisual(recurrentSwipe.row,true);
