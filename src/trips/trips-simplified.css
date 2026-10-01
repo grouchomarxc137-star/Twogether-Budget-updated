@@ -1520,6 +1520,24 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   height:100%;
   min-height:130px;
   object-fit:cover;
+  opacity:0;
+  transition:opacity .18s ease;
+  pointer-events:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-user-drag:none;
+  -webkit-touch-callout:none;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo img.is-loaded{
+  opacity:1;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo img.is-error{
+  visibility:hidden;
+}
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-photo{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
 }
 #twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card-content{
   display:grid;
@@ -1654,6 +1672,24 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   height:100%;
   min-height:130px;
   object-fit:cover;
+  opacity:0;
+  transition:opacity .18s ease;
+  pointer-events:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-user-drag:none;
+  -webkit-touch-callout:none;
+}
+#log #tripGallery .trip-story-photo img.is-loaded{
+  opacity:1;
+}
+#log #tripGallery .trip-story-photo img.is-error{
+  visibility:hidden;
+}
+#log #tripGallery .trip-story-photo{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
 }
 #log #tripGallery .trip-card-top{
   grid-column:2;
