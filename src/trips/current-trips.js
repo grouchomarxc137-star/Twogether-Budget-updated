@@ -447,7 +447,7 @@ function simplifiedCard(item) {
     (item.kind === 'plan' ? '<span class="tv2-checklist-reveal" aria-hidden="true"><b>Checklist</b></span>' : '')+
     '<span class="tv2-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
     '<button class="tv2-card '+(item.phase==='past'?'is-past':'')+'" data-act="open-trip" data-kind="'+item.kind+'" data-id="'+esc(item.id)+'">'+
-      '<span class="tv2-card-photo" aria-hidden="true"><img src="'+esc(image)+'" alt="" loading="lazy" decoding="async"></span>'+
+      '<span class="tv2-card-photo" aria-hidden="true"><img class="tw-trip-photo-img" src="'+esc(image)+'" alt="" loading="eager" decoding="async" draggable="false"></span>'+
       '<span class="tv2-card-content">'+
         '<span class="tv2-card-top"><strong>'+esc(name)+'</strong><small>'+esc(shortRange(item.meta?.start,item.meta?.end))+'</small></span>'+
         '<span class="tv2-card-sub">'+esc(statusLine(item.meta))+'</span>'+
@@ -571,6 +571,30 @@ function renderCurrentTrips() {
   root.style.opacity = '';
   setTripFocusLock(false);
   root.innerHTML = simplifiedHome(allSimplifiedItems());
+  settleTripImages(root);
+}
+
+function settleTripImages(root = document) {
+  $('.tw-trip-photo-img, .trip-story-photo img', root).forEach((img) => {
+    img.draggable = false;
+    img.setAttribute('draggable', 'false');
+    const loaded = () => {
+      img.classList.remove('is-error');
+      img.classList.add('is-loaded');
+    };
+    const failed = () => {
+      img.classList.remove('is-loaded');
+      img.classList.add('is-error');
+    };
+    if (img.complete) {
+      if (img.naturalWidth > 0) loaded();
+      else failed();
+      return;
+    }
+    img.classList.remove('is-loaded', 'is-error');
+    img.addEventListener('load', loaded, { once: true });
+    img.addEventListener('error', failed, { once: true });
+  });
 }
 
 const EXPENSE_CATS = [
@@ -3568,6 +3592,7 @@ function decorateTripStories() {
     card.style.setProperty('--v28-story-bg', `url("${image}")`);
     card.dataset.v28Background = '1';
   });
+  settleTripImages(root);
 }
 
 export async function refreshState(force = false) {
