@@ -810,6 +810,52 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 .tv2-check-list{
   display:grid;
 }
+.tv2-check-group-title{
+  min-height:31px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:7px;
+  padding:8px 3px 5px;
+  color:#8b765c;
+  border-bottom:1px solid rgba(139,118,92,.10);
+}
+.tv2-check-group-title:first-child{
+  margin-top:0;
+}
+.tv2-check-group-title span{
+  font-size:12px;
+  font-weight:750;
+  letter-spacing:.035em;
+}
+.tv2-check-group-title b{
+  min-width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  padding:0 5px;
+  border-radius:99px;
+  background:rgba(193,151,67,.08);
+  color:var(--tv2-muted);
+  font-size:10px;
+  font-weight:750;
+}
+.tv2-check-group-title.is-empty{
+  display:none;
+}
+.tv2-checklist-sheet.is-reordering-items .tv2-check-group-title.is-empty{
+  display:flex;
+  opacity:.55;
+  border:1px dashed rgba(139,118,92,.16);
+  border-radius:9px;
+  margin:5px 0 2px;
+  padding:6px 8px;
+}
+.tv2-check-group-title + .tv2-check-swipe-row .tv2-check-row,
+.tv2-check-group-title + .tv2-recurrent-swipe-row .tv2-recurrent-row{
+  border-top:0;
+}
 .tv2-check-row{
   display:grid;
   grid-template-columns:30px minmax(0,1fr) 32px;

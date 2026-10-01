@@ -1164,12 +1164,17 @@ function prepCreatedAt_(value){
   return Number.isFinite(stamp)?new Date(stamp).toISOString():'';
 }
 function prepPersonalFor_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
+function prepSection_(value){
+  const key=cleanText_(value,24).toLowerCase();
+  return ['clothes','toiletries','electronics','documents','health','food','other'].indexOf(key)>=0?key:'';
+}
 function prepPersonalEntry_(value){
   const s=value&&typeof value==='object'?value:{},out={};
   if(Object.prototype.hasOwnProperty.call(s,'text'))out.text=cleanText_(s.text,160);
   if(Object.prototype.hasOwnProperty.call(s,'done'))out.done=!!s.done;
   if(Object.prototype.hasOwnProperty.call(s,'hidden'))out.hidden=!!s.hidden;
   if(Object.prototype.hasOwnProperty.call(s,'notifyAt'))out.notifyAt=prepNotifyAt_(s.notifyAt);
+  if(Object.prototype.hasOwnProperty.call(s,'section'))out.section=prepSection_(s.section);
   if(Number.isFinite(Number(s.order)))out.order=Math.max(0,Math.min(9999,Number(s.order)));
   return out;
 }
@@ -1202,7 +1207,7 @@ function mergePrepPersonalDefaults_(previousDefault,nextDefault,tripValue){
   });
   return out;
 }
-function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),notifyAt:prepNotifyAt_(x&&x.notifyAt),personal:prepPersonal_(x&&x.personal)};}
+function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),section:prepSection_(x&&x.section),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),notifyAt:prepNotifyAt_(x&&x.notifyAt),personal:prepPersonal_(x&&x.personal)};}
 function prepNote_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),text:cleanText_(x&&x.text,160),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),personal:prepPersonal_(x&&x.personal),createdAt:prepCreatedAt_(x&&x.createdAt)};}
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
@@ -1230,7 +1235,7 @@ function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
-  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
+  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,section:item.section,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   out.notes=(Array.isArray(value.notes)?value.notes:[]).slice(0,120).map(prepNote_).filter(function(item){return !!item.text;});
   return out;
@@ -1238,7 +1243,7 @@ function sanitizeTripPrepDefaults_(value){
 function tripPrepForNewPlan_(value,actor,now){
   const source=sanitizeTripPrepDefaults_(value);
   return {
-    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};}),
+    packing:source.packing.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,section:item.section,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};}),
     reminders:source.reminders.map(function(item){return {id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};}),
     updatedAt:now||new Date().toISOString(),
     updatedBy:actor
@@ -1291,6 +1296,7 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
         id:Utilities.getUuid(),
         text:item.text,
         done:false,
+        section:item.section,
         addedBy:actor,
         personalFor:personalFor,
         personal:prepPersonal_(item.personal)
@@ -1345,7 +1351,7 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
     if(prior){
       const previousDefault=previousById[item.id]||{};
       recurrent.push({
-        id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,addedBy:item.addedBy,
+        id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,section:prior.section||item.section,addedBy:item.addedBy,
         personalFor:item.personalFor,notifyAt:prior.notifyAt||'',
         personal:mergePrepPersonalDefaults_(previousDefault.personal,item.personal,prior.personal)
       });
@@ -1354,7 +1360,7 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
     // A recurrent item that already existed but is absent from this trip was removed from this trip on purpose.
     if(previousById[item.id])return;
     recurrent.push({
-      id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,addedBy:item.addedBy,
+      id:Utilities.getUuid(),recurrentId:item.id,text:item.text,done:false,section:item.section,addedBy:item.addedBy,
       personalFor:item.personalFor,personal:prepPersonal_(item.personal)
     });
   });

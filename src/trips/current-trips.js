@@ -866,6 +866,45 @@ const CHECKLIST_DEFAULTS = {
   packing: ['Toothbrushes', 'Slippers', 'Hair brush', 'Shampoo', 'Conditioner', 'Shower gel', 'Dishwasher detergent'],
   reminders: ["Don't forget to put fuel", "Don't forget to ask mom to make work sandwich", "Don't forget to take pictures of the Airbnb when you arrive"],
 };
+const CHECKLIST_PACKING_SECTIONS = [
+  { key:'clothes', label:'Clothes', words:['shirt','t-shirt','tshirt','top','blouse','sweater','jumper','hoodie','jacket','coat','pants','trousers','jeans','shorts','dress','skirt','underwear','bra','socks','shoe','sneaker','trainer','boot','slipper','pyjama','pajama','swimsuit','bikini','hat','cap','belt','scarf','glove'] },
+  { key:'toiletries', label:'Toiletries & care', words:['toothbrush','toothpaste','shampoo','conditioner','shower gel','soap','deodorant','perfume','makeup','skin care','skincare','cream','lotion','razor','hair brush','hairbrush','comb','floss','towel','sanitary','tampon','pad'] },
+  { key:'electronics', label:'Electronics', words:['phone','charger','charging','cable','power bank','powerbank','laptop','macbook','ipad','tablet','headphone','earphone','earbud','airpod','camera','battery','adapter','adaptor','plug','kindle','smartwatch','watch charger'] },
+  { key:'documents', label:'Documents & money', words:['passport','id card','identity card','driving licence','driving license','licence','license','boarding pass','ticket','wallet','cash','bank card','credit card','insurance','visa','reservation','booking confirmation'] },
+  { key:'health', label:'Health', words:['medicine','medication','pill','painkiller','ibuprofen','paracetamol','naproxen','bandage','first aid','vitamin','glasses','contact lens','contacts','prescription'] },
+  { key:'food', label:'Food & drinks', words:['snack','food','water','bottle','sandwich','coffee','tea','drink','juice'] },
+  { key:'other', label:'Other', words:[] },
+];
+const CHECKLIST_PACKING_SECTION_KEYS = new Set(CHECKLIST_PACKING_SECTIONS.map((section)=>section.key));
+function checklistSection(value) {
+  const key=String(value||'').trim().toLowerCase();
+  return CHECKLIST_PACKING_SECTION_KEYS.has(key)?key:'';
+}
+function inferredChecklistSection(text) {
+  const normalized=String(text||'').trim().toLowerCase().replace(/[’']/g,"'");
+  if(!normalized)return 'other';
+  for(const section of CHECKLIST_PACKING_SECTIONS){
+    if(section.key==='other')continue;
+    if(section.words.some((word)=>normalized.includes(word)))return section.key;
+  }
+  return 'other';
+}
+function checklistVisibleSection(item,personal,person) {
+  const view=checklistViewItem(item,personal,person);
+  return checklistSection(view?.section)||inferredChecklistSection(view?.text);
+}
+function checklistGroupedRows(items,personal,person,rowRenderer) {
+  const buckets=new Map(CHECKLIST_PACKING_SECTIONS.map((section)=>[section.key,[]]));
+  items.forEach((item)=>{
+    const key=checklistVisibleSection(item,personal,person);
+    (buckets.get(key)||buckets.get('other')).push(item);
+  });
+  return CHECKLIST_PACKING_SECTIONS.map((section)=>{
+    const rows=buckets.get(section.key)||[];
+    return '<div class="tv2-check-group-title '+(rows.length?'':'is-empty')+'" data-check-group-title="'+section.key+'"><span>'+esc(section.label)+'</span><b>'+rows.length+'</b></div>'+
+      rows.map(rowRenderer).join('');
+  }).join('');
+}
 function checklistAddedBy(value) {
   return value === 'Principessa' || value === 'Principe' ? value : '';
 }
@@ -883,6 +922,7 @@ function checklistPersonalPayload(value) {
     if(Object.prototype.hasOwnProperty.call(raw,'done'))next.done=!!raw.done;
     if(Object.prototype.hasOwnProperty.call(raw,'hidden'))next.hidden=!!raw.hidden;
     if(Object.prototype.hasOwnProperty.call(raw,'notifyAt'))next.notifyAt=String(raw.notifyAt||'');
+    if(Object.prototype.hasOwnProperty.call(raw,'section'))next.section=checklistSection(raw.section);
     if(Number.isFinite(Number(raw.order)))next.order=Number(raw.order);
     if(Object.keys(next).length)out[name]=next;
   });
@@ -908,6 +948,7 @@ function checklistViewItem(item,personal,person) {
   if(Object.prototype.hasOwnProperty.call(override,'text'))view.text=String(override.text||'');
   if(Object.prototype.hasOwnProperty.call(override,'done'))view.done=!!override.done;
   if(Object.prototype.hasOwnProperty.call(override,'notifyAt'))view.notifyAt=String(override.notifyAt||'');
+  if(Object.prototype.hasOwnProperty.call(override,'section'))view.section=checklistSection(override.section);
   return view;
 }
 function checklistItemsForView(items,personal,person) {
@@ -950,7 +991,7 @@ function checklistSetPersonalOrder(items,person,ids) {
   });
 }
 function checklistSeed(list) {
-  return list.map((text) => ({ id: uid(), text, done:false, addedBy:'', personalFor:'', personal:{} }));
+  return list.map((text) => ({ id: uid(), text, done:false, section:'', addedBy:'', personalFor:'', personal:{} }));
 }
 function tripPrepSnapshot(plan) {
   const stored = plan?.prep || {};
@@ -976,7 +1017,7 @@ function recurrentPrepSnapshot() {
     notes: [],
   };
   return {
-    packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
+    packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, section:checklistSection(item.section), addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
     reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
     notes: (Array.isArray(source.notes) ? source.notes : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal), createdAt:String(item.createdAt || '') })),
   };
@@ -1197,7 +1238,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const draftNotifyLabel=isReminder?notifyLabel(state.reminderDraftNotifyAt):'';
     const notifyButton=isReminder?'<button type="button" class="tv2-check-add-notify '+(draftNotifyLabel?'is-set':'')+'" data-check-new-notify aria-label="'+esc(draftNotifyLabel?'Edit notification · '+draftNotifyLabel:'Add notification date and time')+'" title="'+esc(draftNotifyLabel||'Add notification')+'">'+reminderBellIcon()+'</button>':'';
     return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
-      '<div class="tv2-check-list">'+(active.length?active.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
+      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(active.length?(kind==='packing'?checklistGroupedRows(active,mine,actor(),(item)=>rowHtml(kind,item)):active.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
       '<div class="tv2-check-add '+(isReminder?'is-reminder-add':'')+'"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item" value="'+esc(isReminder?state.reminderDraftText:'')+'">'+notifyButton+'<button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
@@ -1274,7 +1315,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   }
   function cleanPrep(source=prep) {
     return {
-      packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
+      packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,section:checklistSection(item.section),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),notifyAt:String(item.notifyAt||''),personal:checklistPersonalPayload(item.personal)})),
     };
   }
@@ -1404,7 +1445,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   function addItem(kind) {
     const input = sheet.querySelector('[data-check-new="'+kind+'"]');
     const text = input?.value?.trim(); if (!text || !Array.isArray(prep[kind])) return;
-    const next={ id:uid(), text, done:false, addedBy:actor(), personalFor:state.packingMine?actor():'', personal:{} };
+    const next={ id:uid(), text, done:false, section:'', addedBy:actor(), personalFor:state.packingMine?actor():'', personal:{} };
     if(kind==='notes'){
       delete next.done;
       next.createdAt=new Date().toISOString();
@@ -1652,6 +1693,15 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   let checklistDragPendingY=0;
   let checklistProtectedTouchId=null;
 
+  const checklistGroupForRow=(row)=>{
+    let node=row?.previousElementSibling;
+    while(node){
+      if(node.matches?.('[data-check-group-title]'))return checklistSection(node.dataset.checkGroupTitle);
+      node=node.previousElementSibling;
+    }
+    return '';
+  };
+
   const setChecklistGestureLock=(locked)=>{
     if(locked){
       simplifiedLayer.dataset.tv2GestureLock='1';
@@ -1803,6 +1853,20 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
 
   const placeChecklistSlot=(touchY)=>{
     if(!checklistDrag.active||!checklistDrag.list||!checklistDrag.row||!checklistDrag.ghost)return;
+    if(checklistDrag.kind==='packing'){
+      const titles=[...checklistDrag.list.querySelectorAll('[data-check-group-title]')];
+      const targetTitle=titles.find((title)=>{
+        const rect=title.getBoundingClientRect();
+        return rect.height>0&&touchY>=rect.top-8&&touchY<=rect.bottom+8;
+      });
+      if(targetTitle){
+        const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')];
+        const beforeRects=new Map(rows.filter((row)=>row!==checklistDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
+        if(targetTitle.nextElementSibling!==checklistDrag.row)targetTitle.insertAdjacentElement('afterend',checklistDrag.row);
+        animateChecklistLayout(beforeRects);
+        return;
+      }
+    }
     const ghostTop=touchY-checklistDrag.grabOffsetY;
     const ghostHeight=checklistDrag.ghost.getBoundingClientRect().height||checklistDrag.row.getBoundingClientRect().height;
     const ghostCenter=ghostTop+ghostHeight/2;
@@ -1899,7 +1963,19 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const kind=checklistDrag.kind;
     const list=checklistDrag.list;
     if(!kind||!Array.isArray(prep[kind])||!list)return;
-    const ids=[...list.querySelectorAll('[data-check-swipe]')].map((row)=>row.dataset.checkId);
+    const rows=[...list.querySelectorAll('[data-check-swipe]')];
+    const ids=rows.map((row)=>row.dataset.checkId);
+    if(kind==='packing'){
+      const byId=new Map(prep[kind].map((item)=>[item.id,item]));
+      rows.forEach((row)=>{
+        const item=byId.get(row.dataset.checkId);
+        if(!item)return;
+        const group=checklistGroupForRow(row)||'other';
+        const view=checklistViewItem(item,state.packingMine,actor());
+        const inferred=inferredChecklistSection(view?.text);
+        checklistSetViewField(item,state.packingMine,actor(),'section',group===inferred?'':group);
+      });
+    }
     if(state.packingMine){
       checklistSetPersonalOrder(prep[kind],actor(),ids);
       return;
@@ -2148,7 +2224,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
   const sectionHtml = (kind,title) => {
     const visible=checklistItemsForView(prep[kind],state.personal,actor());
     return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+visible.length+'</span></div>'+
-      '<div class="tv2-check-list">'+(visible.length?visible.map((item)=>rowHtml(kind,item)).join(''):'<p class="tv2-check-empty">'+(state.personal?'Nothing of yours here ♡':'No shared standard items here.')+'</p>')+'</div>'+
+      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(visible.length?(kind==='packing'?checklistGroupedRows(visible,state.personal,actor(),(item)=>rowHtml(kind,item)):visible.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(state.personal?'Nothing of yours here ♡':'No shared standard items here.')+'</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
@@ -2194,14 +2270,14 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
   function addItem(kind) {
     const input=sheet.querySelector('[data-check-new="'+kind+'"]');
     const text=input?.value?.trim(); if(!text||!Array.isArray(prep[kind]))return;
-    prep[kind].push({id:uid(),text,done:false,addedBy:actor(),personalFor:state.personal?actor():'',personal:{}});
+    prep[kind].push({id:uid(),text,done:false,section:kind==='packing'?'':'',addedBy:actor(),personalFor:state.personal?actor():'',personal:{}});
     render();
     requestAnimationFrame(()=>sheet.querySelector('[data-check-new="'+kind+'"]')?.focus());
   }
   function recurrentPayload(source=prep) {
     const existingNotes=recurrentPrepSnapshot().notes||[];
     return {
-      packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
+      packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,section:checklistSection(item.section),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       notes:existingNotes.map((item)=>({id:item.id,text:String(item.text||'').trim(),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal),createdAt:String(item.createdAt||'')})),
     };
@@ -2467,6 +2543,15 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
   let recurrentDragFrame=0;
   let recurrentDragPendingY=0;
   let recurrentProtectedTouchId=null;
+
+  const recurrentGroupForRow=(row)=>{
+    let node=row?.previousElementSibling;
+    while(node){
+      if(node.matches?.('[data-check-group-title]'))return checklistSection(node.dataset.checkGroupTitle);
+      node=node.previousElementSibling;
+    }
+    return '';
+  };
   const setRecurrentGestureLock=(locked)=>{
     if(locked){
       simplifiedLayer.dataset.tv2GestureLock='1';
@@ -2585,6 +2670,20 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
 
   const placeRecurrentSlot=(touchY)=>{
     if(!recurrentDrag.active||!recurrentDrag.list||!recurrentDrag.row||!recurrentDrag.ghost)return;
+    if(recurrentDrag.kind==='packing'){
+      const titles=[...recurrentDrag.list.querySelectorAll('[data-check-group-title]')];
+      const targetTitle=titles.find((title)=>{
+        const rect=title.getBoundingClientRect();
+        return rect.height>0&&touchY>=rect.top-8&&touchY<=rect.bottom+8;
+      });
+      if(targetTitle){
+        const rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')];
+        const beforeRects=new Map(rows.filter((row)=>row!==recurrentDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
+        if(targetTitle.nextElementSibling!==recurrentDrag.row)targetTitle.insertAdjacentElement('afterend',recurrentDrag.row);
+        animateRecurrentLayout(beforeRects);
+        return;
+      }
+    }
     const ghostTop=touchY-recurrentDrag.grabOffsetY;
     const ghostHeight=recurrentDrag.ghost.getBoundingClientRect().height||recurrentDrag.row.getBoundingClientRect().height;
     const ghostCenter=ghostTop+ghostHeight/2;
@@ -2718,7 +2817,19 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     const kind=recurrentDrag.kind;
     const list=recurrentDrag.list;
     if(kind&&Array.isArray(prep[kind])&&list){
-      const ids=[...list.querySelectorAll('[data-recurrent-swipe]')].map((row)=>row.dataset.checkId);
+      const rows=[...list.querySelectorAll('[data-recurrent-swipe]')];
+      const ids=rows.map((row)=>row.dataset.checkId);
+      if(kind==='packing'){
+        const byId=new Map(prep[kind].map((item)=>[item.id,item]));
+        rows.forEach((row)=>{
+          const item=byId.get(row.dataset.checkId);
+          if(!item)return;
+          const group=recurrentGroupForRow(row)||'other';
+          const view=checklistViewItem(item,state.personal,actor());
+          const inferred=inferredChecklistSection(view?.text);
+          checklistSetViewField(item,state.personal,actor(),'section',group===inferred?'':group);
+        });
+      }
       if(state.personal){
         checklistSetPersonalOrder(prep[kind],actor(),ids);
       }else{

@@ -220,6 +220,40 @@ test('trip notes persist with dates and shared or personal scope without recurre
   }
 });
 
+test('packing section overrides persist through recurrent defaults and trip creation', () => {
+  const context = setup();
+  try {
+    const defaults=action(context.database,'saveTripPrepDefaults',{
+      prep:{
+        packing:[
+          {id:'packing-charger',text:'Phone charger',done:false,section:'electronics'},
+          {id:'packing-passport',text:'Passport',done:false,section:'documents',personal:{Principessa:{section:'other'}}},
+        ],
+        reminders:[],
+      },
+    });
+    assert.equal(defaults.ok,true);
+    assert.equal(defaults.prep.packing.find((item)=>item.id==='packing-charger').section,'electronics');
+    assert.equal(defaults.prep.packing.find((item)=>item.id==='packing-passport').personal.Principessa.section,'other');
+
+    const created=action(context.database,'savePlan',{
+      meta:{location:'Italy',city:'Lonato',start:'2099-12-20',end:'2099-12-22'},
+      budget:'',
+    });
+    let plan=getState().plans.find((item)=>item.id===created.planId);
+    const charger=plan.prep.packing.find((item)=>item.recurrentId==='packing-charger');
+    assert.equal(charger.section,'electronics');
+
+    charger.section='clothes';
+    const saved=action(context.database,'saveTripPrep',{planId:created.planId,prep:plan.prep});
+    assert.equal(saved.ok,true);
+    plan=getState().plans.find((item)=>item.id===created.planId);
+    assert.equal(plan.prep.packing.find((item)=>item.id===charger.id).section,'clothes');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('important reminder notification time stays on the trip and survives recurrent sync', () => {
   const context = setup();
   try {
