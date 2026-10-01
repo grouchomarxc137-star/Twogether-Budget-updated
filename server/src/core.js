@@ -1182,16 +1182,14 @@ function defaultPackingSections_(){
 function prepPackingSections_(value){
   const source=Array.isArray(value)?value:defaultPackingSections_();
   const out=[],seen={};
-  let fallback='Other';
   source.slice(0,20).forEach(function(raw){
     const id=prepSection_(raw&&(raw.id||raw.key));
     const label=cleanText_(raw&&raw.label,48).trim();
-    if(id==='other'){if(label)fallback=label;return;}
     if(!id||!label||seen[id])return;
     seen[id]=true;
     out.push({id:id,label:label});
   });
-  out.push({id:'other',label:fallback});
+  if(!seen.other)out.push({id:'other',label:'Other'});
   return out;
 }
 function normalizePackingItemSections_(item,sections){

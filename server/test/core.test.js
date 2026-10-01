@@ -261,8 +261,8 @@ test('packing categories can be renamed, added and removed without losing items'
       prep:{
         packingSections:[
           {id:'electronics',label:'Tech'},
-          {id:'custom-pets',label:'Pet things'},
           {id:'other',label:'Misc'},
+          {id:'custom-pets',label:'Pet things'},
         ],
         packing:[
           {id:'packing-charger',text:'Phone charger',done:false,section:'electronics'},
@@ -272,7 +272,7 @@ test('packing categories can be renamed, added and removed without losing items'
       },
     });
     assert.equal(saved.ok,true);
-    assert.deepEqual(saved.prep.packingSections.map((section)=>section.label),['Tech','Pet things','Misc']);
+    assert.deepEqual(saved.prep.packingSections.map((section)=>section.label),['Tech','Misc','Pet things']);
     assert.equal(saved.prep.packing.find((item)=>item.id==='packing-leash').section,'custom-pets');
 
     const created=action(context.database,'savePlan',{
