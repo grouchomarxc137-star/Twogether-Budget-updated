@@ -50,10 +50,14 @@
   color:var(--accent-dark);
 }
 .brand-logo {
-  width:28px;
-  height:26px;
+  width:30px;
+  height:30px;
   display:block;
-  overflow:visible;
+  object-fit:contain;
+  pointer-events:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-user-drag:none;
 }
 
 .brand {
