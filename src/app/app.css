@@ -3,6 +3,23 @@
    navigation.css, approved-v18.css and every file's nav/identity/pwa
    touch-ups, in original relative order. */
 
+.app {
+  opacity:1;
+  visibility:visible;
+  transition:opacity .16s ease;
+}
+
+.app.tw-starting {
+  opacity:0;
+  visibility:hidden;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .app {
+    transition:none;
+  }
+}
+
 .topbar {
   display:flex;
   align-items:center;

@@ -8,7 +8,7 @@ import { DEFAULT_COMPARE } from './data.js';
 
 export const SYNC_MS = 3500;
 
-let state = normalizeState({});
+let state = normalizeState(window.__TWOGETHER_CACHED_STATE__ || {});
 let backendV3 = false;
 let syncBusy = false;
 let syncTimer = null;

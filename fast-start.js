@@ -5,6 +5,7 @@
   const CACHE_KEY = 'twogether_state_cache_v2';
   const ACTORS = ['Principessa', 'Principe'];
   const app = document.getElementById('app');
+  let revealed = false;
 
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -27,27 +28,42 @@
     }
   } catch {}
 
-  function revealApp() {
-    if (!app) return;
-    app.style.transition = 'opacity .12s ease';
-    app.style.visibility = 'visible';
-    app.style.opacity = '1';
-  }
-
   function loadFont() {
-    if (document.getElementById('twogetherCrimsonFont')) return;
-    const link = document.createElement('link');
-    link.id = 'twogetherCrimsonFont';
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap';
-    document.head.appendChild(link);
+    const existing = document.getElementById('twogetherCrimsonFont');
+    if (existing) return Promise.resolve();
+    return new Promise((resolve) => {
+      const link = document.createElement('link');
+      link.id = 'twogetherCrimsonFont';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600;700&display=swap';
+      link.onload = resolve;
+      link.onerror = resolve;
+      document.head.appendChild(link);
+    });
   }
 
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', () => requestAnimationFrame(revealApp), { once: true });
-    window.addEventListener('load', () => setTimeout(loadFont, 0), { once: true });
-  } else {
-    requestAnimationFrame(revealApp);
-    setTimeout(loadFont, 0);
+  const fontReady = loadFont()
+    .then(() => document.fonts?.ready || undefined)
+    .catch(() => undefined);
+
+  function revealApp() {
+    if (!app || revealed) return;
+    revealed = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => app.classList.remove('tw-starting'));
+    });
   }
+
+  function revealStable() {
+    Promise.race([
+      fontReady,
+      new Promise((resolve) => setTimeout(resolve, 350)),
+    ]).finally(revealApp);
+  }
+
+  document.addEventListener('twogether:startup-ready', revealStable, { once: true });
+
+  // Never leave the app hidden if a network request or third-party asset stalls.
+  window.addEventListener('load', () => setTimeout(revealStable, 850), { once: true });
+  setTimeout(revealStable, 1400);
 })();

@@ -41,6 +41,13 @@ let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, 
 let deleteConfirmLayer = null;
 let tripNotificationTimer = null;
 let tripFocusScrollY = 0;
+let startupReadySent = false;
+
+function markStartupReady() {
+  if (startupReadySent) return;
+  startupReadySent = true;
+  document.dispatchEvent(new CustomEvent('twogether:startup-ready'));
+}
 
 function has(v) { return v !== '' && v != null; }
 function isLocked(t) { return !!(t?.confirmed?.Principessa && t?.confirmed?.Principe); }
@@ -3585,7 +3592,10 @@ export async function refreshState(force = false) {
     publishTripNotifications();
   }
   catch (err) { if (force) toast(err.message || 'Could not refresh shared trips', 'warn'); }
-  finally { refreshing = false; }
+  finally {
+    refreshing = false;
+    markStartupReady();
+  }
 }
 
 function enhanceTripChoices() {
