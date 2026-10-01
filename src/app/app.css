@@ -6,7 +6,7 @@
 .app {
   opacity:1;
   visibility:visible;
-  transition:opacity .16s ease;
+  transition:opacity .26s cubic-bezier(.22,.8,.28,1);
 }
 
 .app.tw-starting {
