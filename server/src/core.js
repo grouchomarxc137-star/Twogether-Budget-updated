@@ -357,6 +357,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const incoming = payload.prep && typeof payload.prep === 'object' ? payload.prep : {};
       const source = Object.assign({}, incoming);
       if(!Object.prototype.hasOwnProperty.call(source,'notes'))source.notes=previous.notes;
+      if(!Object.prototype.hasOwnProperty.call(source,'packingSections'))source.packingSections=previous.packingSections;
       const next = sanitizeTripPrepDefaults_(source);
       const now = new Date().toISOString();
       next.notes=next.notes.map(function(note){return Object.assign({},note,{createdAt:note.createdAt||now});});
@@ -1165,8 +1166,45 @@ function prepCreatedAt_(value){
 }
 function prepPersonalFor_(value){const who=cleanActor_(value);return ACTORS.includes(who)?who:'';}
 function prepSection_(value){
-  const key=cleanText_(value,24).toLowerCase();
-  return ['clothes','toiletries','electronics','documents','health','food','other'].indexOf(key)>=0?key:'';
+  return cleanText_(value,80).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,80);
+}
+function defaultPackingSections_(){
+  return [
+    {id:'clothes',label:'Clothes'},
+    {id:'toiletries',label:'Toiletries & care'},
+    {id:'electronics',label:'Electronics'},
+    {id:'documents',label:'Documents & money'},
+    {id:'health',label:'Health'},
+    {id:'food',label:'Food & drinks'},
+    {id:'other',label:'Other'}
+  ];
+}
+function prepPackingSections_(value){
+  const source=Array.isArray(value)?value:defaultPackingSections_();
+  const out=[],seen={};
+  let fallback='Other';
+  source.slice(0,20).forEach(function(raw){
+    const id=prepSection_(raw&&(raw.id||raw.key));
+    const label=cleanText_(raw&&raw.label,48).trim();
+    if(id==='other'){if(label)fallback=label;return;}
+    if(!id||!label||seen[id])return;
+    seen[id]=true;
+    out.push({id:id,label:label});
+  });
+  out.push({id:'other',label:fallback});
+  return out;
+}
+function normalizePackingItemSections_(item,sections){
+  const next=prepItem_(item),valid={};
+  prepPackingSections_(sections).forEach(function(section){valid[section.id]=true;});
+  if(next.section&&!valid[next.section])next.section='other';
+  const personal=prepPersonal_(next.personal);
+  ACTORS.forEach(function(name){
+    const entry=personal[name];
+    if(entry&&entry.section&&!valid[entry.section])entry.section='other';
+  });
+  next.personal=personal;
+  return next;
 }
 function prepPersonalEntry_(value){
   const s=value&&typeof value==='object'?value:{},out={};
@@ -1212,6 +1250,7 @@ function prepNote_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),tex
 function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
+    packingSections:defaultPackingSections_(),
     packing:[
       {id:'default-packing-1',text:'Toothbrushes',done:false},
       {id:'default-packing-2',text:'Slippers',done:false},
@@ -1235,7 +1274,11 @@ function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
-  out.packing=out.packing.map(function(item){return {id:item.id,text:item.text,done:false,section:item.section,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
+  out.packingSections=prepPackingSections_(value.packingSections);
+  out.packing=out.packing.map(function(item){
+    const normalized=normalizePackingItemSections_(item,out.packingSections);
+    return {id:normalized.id,text:normalized.text,done:false,section:normalized.section,addedBy:normalized.addedBy,personalFor:normalized.personalFor,personal:normalized.personal};
+  });
   out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   out.notes=(Array.isArray(value.notes)?value.notes:[]).slice(0,120).map(prepNote_).filter(function(item){return !!item.text;});
   return out;
@@ -1375,7 +1418,8 @@ function syncRecurrentPrepIntoUpcomingPlans_(state,previousDefaults,nextDefaults
     if(!start || start<today)return plan;
     const linked=plan.linkedTripId?state.trips.find(function(item){return item.id===plan.linkedTripId;}):null;
     if(linked&&isTripLocked_(linked))return plan;
-    plan.prep.packing=mergeRecurrentPrepKind_(plan.prep.packing,previousDefaults.packing,nextDefaults.packing);
+    plan.prep.packing=mergeRecurrentPrepKind_(plan.prep.packing,previousDefaults.packing,nextDefaults.packing)
+      .map(function(item){return normalizePackingItemSections_(item,nextDefaults.packingSections);});
     plan.prep.reminders=mergeRecurrentPrepKind_(plan.prep.reminders,previousDefaults.reminders,nextDefaults.reminders);
     plan.prep.updatedAt=now;
     plan.prep.updatedBy=actor;

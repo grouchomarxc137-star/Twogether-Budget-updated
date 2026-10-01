@@ -807,6 +807,91 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   font-size:12px;
   font-weight:650;
 }
+.tv2-check-section-tools{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.tv2-check-section-tools button{
+  min-height:28px;
+  padding:4px 8px!important;
+  border:1px solid #e3d5bf!important;
+  border-radius:9px!important;
+  background:#fbf5e9!important;
+  color:#8a6c36!important;
+  font:inherit!important;
+  font-size:11.5px!important;
+  font-weight:700!important;
+}
+.tv2-check-category-manager{
+  display:grid;
+  gap:7px;
+  margin:2px 0 5px;
+  padding:10px;
+  border:1px solid rgba(190,158,103,.20);
+  border-radius:13px;
+  background:#fcf8f0;
+}
+.tv2-check-category-manager>p{
+  margin:0 0 1px;
+  color:var(--tv2-muted);
+  font-size:12px;
+  font-weight:700;
+}
+.tv2-check-category-manager>small{
+  color:var(--tv2-muted);
+  font-size:11.5px;
+  line-height:1.35;
+}
+.tv2-check-category-row,
+.tv2-check-category-add{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:7px;
+}
+.tv2-check-category-row input,
+.tv2-check-category-add input{
+  min-width:0;
+  height:36px;
+  border:1px solid var(--tv2-line);
+  border-radius:9px;
+  background:var(--tv2-card);
+  padding:0 9px;
+  color:var(--tv2-ink);
+  font-size:14px!important;
+}
+.tv2-check-category-row button,
+.tv2-check-category-add button{
+  min-width:36px;
+  height:36px;
+  padding:0 9px!important;
+  border:1px solid var(--tv2-line)!important;
+  border-radius:9px!important;
+  background:var(--tv2-card)!important;
+  color:var(--tv2-muted)!important;
+  font:inherit!important;
+  font-size:13px!important;
+  font-weight:700!important;
+}
+.tv2-check-category-row button{
+  width:36px;
+  padding:0!important;
+  color:#a35f50!important;
+}
+.tv2-check-category-fixed{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:58px!important;
+  height:30px!important;
+  padding:0 7px!important;
+  background:transparent!important;
+  color:var(--tv2-faint)!important;
+  font-size:10.5px!important;
+  font-weight:650!important;
+}
+
 .tv2-check-list{
   display:grid;
 }
@@ -852,6 +937,12 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   margin:5px 0 2px;
   padding:6px 8px;
 }
+.tv2-checklist-sheet.is-reordering-items .tv2-check-group-title{
+  border-radius:9px;
+  background:rgba(193,151,67,.045);
+  transition:background .12s ease,border-color .12s ease;
+}
+
 .tv2-check-group-title + .tv2-check-swipe-row .tv2-check-row,
 .tv2-check-group-title + .tv2-recurrent-swipe-row .tv2-recurrent-row{
   border-top:0;

@@ -254,6 +254,54 @@ test('packing section overrides persist through recurrent defaults and trip crea
   }
 });
 
+test('packing categories can be renamed, added and removed without losing items', () => {
+  const context = setup();
+  try {
+    const saved=action(context.database,'saveTripPrepDefaults',{
+      prep:{
+        packingSections:[
+          {id:'electronics',label:'Tech'},
+          {id:'custom-pets',label:'Pet things'},
+          {id:'other',label:'Misc'},
+        ],
+        packing:[
+          {id:'packing-charger',text:'Phone charger',done:false,section:'electronics'},
+          {id:'packing-leash',text:'Dog leash',done:false,section:'custom-pets'},
+        ],
+        reminders:[],
+      },
+    });
+    assert.equal(saved.ok,true);
+    assert.deepEqual(saved.prep.packingSections.map((section)=>section.label),['Tech','Pet things','Misc']);
+    assert.equal(saved.prep.packing.find((item)=>item.id==='packing-leash').section,'custom-pets');
+
+    const created=action(context.database,'savePlan',{
+      meta:{location:'Italy',city:'Lonato',start:'2099-12-24',end:'2099-12-27'},
+      budget:'',
+    });
+    let plan=getState().plans.find((item)=>item.id===created.planId);
+    assert.equal(plan.prep.packing.find((item)=>item.recurrentId==='packing-leash').section,'custom-pets');
+
+    const removed=action(context.database,'saveTripPrepDefaults',{
+      prep:{
+        packingSections:[
+          {id:'electronics',label:'Tech'},
+          {id:'other',label:'Misc'},
+        ],
+        packing:saved.prep.packing,
+        reminders:[],
+      },
+    });
+    assert.equal(removed.ok,true);
+    assert.equal(removed.prep.packing.find((item)=>item.id==='packing-leash').section,'other');
+
+    plan=getState().plans.find((item)=>item.id===created.planId);
+    assert.equal(plan.prep.packing.find((item)=>item.recurrentId==='packing-leash').section,'other');
+  } finally {
+    context.cleanup();
+  }
+});
+
 test('important reminder notification time stays on the trip and survives recurrent sync', () => {
   const context = setup();
   try {

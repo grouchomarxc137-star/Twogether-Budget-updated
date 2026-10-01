@@ -866,7 +866,7 @@ const CHECKLIST_DEFAULTS = {
   packing: ['Toothbrushes', 'Slippers', 'Hair brush', 'Shampoo', 'Conditioner', 'Shower gel', 'Dishwasher detergent'],
   reminders: ["Don't forget to put fuel", "Don't forget to ask mom to make work sandwich", "Don't forget to take pictures of the Airbnb when you arrive"],
 };
-const CHECKLIST_PACKING_SECTIONS = [
+const CHECKLIST_PACKING_SECTION_DEFS = [
   { key:'clothes', label:'Clothes', words:['shirt','t-shirt','tshirt','top','blouse','sweater','jumper','hoodie','jacket','coat','pants','trousers','jeans','shorts','dress','skirt','underwear','bra','socks','shoe','sneaker','trainer','boot','slipper','pyjama','pajama','swimsuit','bikini','hat','cap','belt','scarf','glove'] },
   { key:'toiletries', label:'Toiletries & care', words:['toothbrush','toothpaste','shampoo','conditioner','shower gel','soap','deodorant','perfume','makeup','skin care','skincare','cream','lotion','razor','hair brush','hairbrush','comb','floss','towel','sanitary','tampon','pad'] },
   { key:'electronics', label:'Electronics', words:['phone','charger','charging','cable','power bank','powerbank','laptop','macbook','ipad','tablet','headphone','earphone','earbud','airpod','camera','battery','adapter','adaptor','plug','kindle','smartwatch','watch charger'] },
@@ -875,33 +875,58 @@ const CHECKLIST_PACKING_SECTIONS = [
   { key:'food', label:'Food & drinks', words:['snack','food','water','bottle','sandwich','coffee','tea','drink','juice'] },
   { key:'other', label:'Other', words:[] },
 ];
-const CHECKLIST_PACKING_SECTION_KEYS = new Set(CHECKLIST_PACKING_SECTIONS.map((section)=>section.key));
 function checklistSection(value) {
-  const key=String(value||'').trim().toLowerCase();
-  return CHECKLIST_PACKING_SECTION_KEYS.has(key)?key:'';
+  return String(value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,80);
 }
-function inferredChecklistSection(text) {
+function defaultChecklistPackingSections() {
+  return CHECKLIST_PACKING_SECTION_DEFS.map((section)=>({id:section.key,label:section.label}));
+}
+function checklistPackingSections(source=remoteState?.tripPrepDefaults?.packingSections) {
+  const raw=Array.isArray(source)?source:defaultChecklistPackingSections();
+  const seen=new Set();
+  const out=[];
+  raw.forEach((section)=>{
+    const id=checklistSection(section?.id||section?.key);
+    const label=String(section?.label||'').trim().slice(0,48);
+    if(!id||id==='other'||seen.has(id)||!label)return;
+    seen.add(id);
+    out.push({id,label});
+  });
+  const fallbackRaw=raw.find((section)=>checklistSection(section?.id||section?.key)==='other');
+  const fallbackLabel=String(fallbackRaw?.label||'Other').trim().slice(0,48)||'Other';
+  out.push({id:'other',label:fallbackLabel});
+  return out.slice(0,20);
+}
+function checklistCategoryId() {
+  return 'custom-'+String(uid()).toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,28);
+}
+function inferredChecklistSection(text,sections=checklistPackingSections()) {
   const normalized=String(text||'').trim().toLowerCase().replace(/[’']/g,"'");
   if(!normalized)return 'other';
-  for(const section of CHECKLIST_PACKING_SECTIONS){
-    if(section.key==='other')continue;
+  const allowed=new Set(sections.map((section)=>section.id));
+  for(const section of CHECKLIST_PACKING_SECTION_DEFS){
+    if(section.key==='other'||!allowed.has(section.key))continue;
     if(section.words.some((word)=>normalized.includes(word)))return section.key;
   }
   return 'other';
 }
-function checklistVisibleSection(item,personal,person) {
+function checklistVisibleSection(item,personal,person,sections=checklistPackingSections()) {
   const view=checklistViewItem(item,personal,person);
-  return checklistSection(view?.section)||inferredChecklistSection(view?.text);
+  const allowed=new Set(sections.map((section)=>section.id));
+  const explicit=checklistSection(view?.section);
+  if(explicit&&allowed.has(explicit))return explicit;
+  return inferredChecklistSection(view?.text,sections);
 }
-function checklistGroupedRows(items,personal,person,rowRenderer) {
-  const buckets=new Map(CHECKLIST_PACKING_SECTIONS.map((section)=>[section.key,[]]));
+function checklistGroupedRows(items,personal,person,rowRenderer,sections=checklistPackingSections()) {
+  const groups=checklistPackingSections(sections);
+  const buckets=new Map(groups.map((section)=>[section.id,[]]));
   items.forEach((item)=>{
-    const key=checklistVisibleSection(item,personal,person);
+    const key=checklistVisibleSection(item,personal,person,groups);
     (buckets.get(key)||buckets.get('other')).push(item);
   });
-  return CHECKLIST_PACKING_SECTIONS.map((section)=>{
-    const rows=buckets.get(section.key)||[];
-    return '<div class="tv2-check-group-title '+(rows.length?'':'is-empty')+'" data-check-group-title="'+section.key+'"><span>'+esc(section.label)+'</span><b>'+rows.length+'</b></div>'+
+  return groups.map((section)=>{
+    const rows=buckets.get(section.id)||[];
+    return '<div class="tv2-check-group-title '+(rows.length?'':'is-empty')+'" data-check-group-title="'+esc(section.id)+'"><span>'+esc(section.label)+'</span><b>'+rows.length+'</b></div>'+
       rows.map(rowRenderer).join('');
   }).join('');
 }
@@ -1020,6 +1045,7 @@ function recurrentPrepSnapshot() {
     packing: (Array.isArray(source.packing) ? source.packing : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, section:checklistSection(item.section), addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
     reminders: (Array.isArray(source.reminders) ? source.reminders : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), done:false, addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal) })),
     notes: (Array.isArray(source.notes) ? source.notes : []).map((item) => ({ id:item.id || uid(), text:String(item.text || ''), addedBy:checklistAddedBy(item.addedBy), personalFor:checklistPersonalFor(item.personalFor), personal:checklistPersonalPayload(item.personal), createdAt:String(item.createdAt || '') })),
+    packingSections: checklistPackingSections(source.packingSections),
   };
 }
 
@@ -1237,8 +1263,12 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const isReminder=kind==='reminders';
     const draftNotifyLabel=isReminder?notifyLabel(state.reminderDraftNotifyAt):'';
     const notifyButton=isReminder?'<button type="button" class="tv2-check-add-notify '+(draftNotifyLabel?'is-set':'')+'" data-check-new-notify aria-label="'+esc(draftNotifyLabel?'Edit notification · '+draftNotifyLabel:'Add notification date and time')+'" title="'+esc(draftNotifyLabel||'Add notification')+'">'+reminderBellIcon()+'</button>':'';
-    return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+active.length+'</span></div>'+
-      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(active.length?(kind==='packing'?checklistGroupedRows(active,mine,actor(),(item)=>rowHtml(kind,item)):active.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
+    const sectionTools=kind==='packing'
+      ? '<div class="tv2-check-section-tools"><span>'+active.length+'</span><button type="button" data-check-categories>Categories</button></div>'
+      : '<span>'+active.length+'</span>';
+    const packingSections=checklistPackingSections();
+    return '<section class="tv2-check-section'+(mine?' is-mine-packing':'')+ownerClass+'" data-check-section="'+kind+'"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3>'+sectionTools+'</div>'+
+      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(active.length?(kind==='packing'?checklistGroupedRows(active,mine,actor(),(item)=>rowHtml(kind,item),packingSections):active.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(mine?'Nothing of yours here ♡':'All clear here ♡')+'</p>')+'</div>'+
       '<div class="tv2-check-add '+(isReminder?'is-reminder-add':'')+'"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add another item" value="'+esc(isReminder?state.reminderDraftText:'')+'">'+notifyButton+'<button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
@@ -1690,6 +1720,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   },{passive:true});
 
   let checklistDragFrame=0;
+  let checklistAutoScrollFrame=0;
   let checklistDragPendingY=0;
   let checklistProtectedTouchId=null;
 
@@ -1790,6 +1821,10 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       cancelAnimationFrame(checklistDragFrame);
       checklistDragFrame=0;
     }
+    if(checklistAutoScrollFrame){
+      cancelAnimationFrame(checklistAutoScrollFrame);
+      checklistAutoScrollFrame=0;
+    }
     cleanupChecklistDragVisual();
     setChecklistGestureLock(false);
     checklistDrag={
@@ -1851,19 +1886,35 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     checklistDragHaptic();
   };
 
+  const checklistGroupTitleForY=(touchY)=>{
+    const titles=[...checklistDrag.list.querySelectorAll('[data-check-group-title]')].filter((title)=>title.getBoundingClientRect().height>0);
+    if(!titles.length)return null;
+    let target=titles[0];
+    for(const title of titles){
+      const rect=title.getBoundingClientRect();
+      if(touchY>=rect.top+rect.height*.45)target=title;
+      else break;
+    }
+    return target;
+  };
+
   const placeChecklistSlot=(touchY)=>{
     if(!checklistDrag.active||!checklistDrag.list||!checklistDrag.row||!checklistDrag.ghost)return;
     if(checklistDrag.kind==='packing'){
-      const titles=[...checklistDrag.list.querySelectorAll('[data-check-group-title]')];
-      const targetTitle=titles.find((title)=>{
-        const rect=title.getBoundingClientRect();
-        return rect.height>0&&touchY>=rect.top-8&&touchY<=rect.bottom+8;
-      });
-      if(targetTitle){
-        const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')];
-        const beforeRects=new Map(rows.filter((row)=>row!==checklistDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
-        if(targetTitle.nextElementSibling!==checklistDrag.row)targetTitle.insertAdjacentElement('afterend',checklistDrag.row);
-        animateChecklistLayout(beforeRects);
+      const title=checklistGroupTitleForY(touchY);
+      if(title){
+        const nextTitle=(()=>{let node=title.nextElementSibling;while(node&&!node.matches?.('[data-check-group-title]'))node=node.nextElementSibling;return node;})();
+        const rows=[];
+        let node=title.nextElementSibling;
+        while(node&&node!==nextTitle){
+          if(node.matches?.('[data-check-swipe]')&&node!==checklistDrag.row)rows.push(node);
+          node=node.nextElementSibling;
+        }
+        const before=rows.find((row)=>{
+          const rect=row.getBoundingClientRect();
+          return touchY<rect.top+rect.height/2;
+        })||nextTitle||null;
+        moveChecklistSlot(before);
         return;
       }
     }
@@ -1871,28 +1922,10 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const ghostHeight=checklistDrag.ghost.getBoundingClientRect().height||checklistDrag.row.getBoundingClientRect().height;
     const ghostCenter=ghostTop+ghostHeight/2;
     const rows=[...checklistDrag.list.querySelectorAll('[data-check-swipe]')].filter((row)=>row!==checklistDrag.row);
-    let before=null;
-
-    if(rows.length){
-      const firstRect=rows[0].getBoundingClientRect();
-      if(ghostTop<=firstRect.top+1){
-        moveChecklistSlot(rows[0]);
-        return;
-      }
-      const lastRect=rows[rows.length-1].getBoundingClientRect();
-      if(ghostCenter>=lastRect.top+lastRect.height/2-.5){
-        moveChecklistSlot(null);
-        return;
-      }
-    }
-
-    for(const row of rows){
+    const before=rows.find((row)=>{
       const rect=row.getBoundingClientRect();
-      if(ghostCenter<=rect.top+rect.height/2+.5){
-        before=row;
-        break;
-      }
-    }
+      return ghostCenter<rect.top+rect.height/2;
+    })||null;
     moveChecklistSlot(before);
   };
 
@@ -1921,6 +1954,34 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       checklistDragFrame=0;
       paintChecklistDrag(checklistDragPendingY);
     });
+  };
+
+  const startChecklistAutoScroll=()=>{
+    if(checklistAutoScrollFrame)return;
+    const tick=()=>{
+      if(!checklistDrag.active){
+        checklistAutoScrollFrame=0;
+        return;
+      }
+      const rect=sheet.getBoundingClientRect();
+      const edge=Math.min(96,Math.max(62,rect.height*.18));
+      const y=checklistDrag.lastY;
+      let delta=0;
+      if(y<rect.top+edge){
+        const strength=Math.min(1,Math.max(0,(rect.top+edge-y)/edge));
+        delta=-(4+18*strength*strength);
+      }else if(y>rect.bottom-edge){
+        const strength=Math.min(1,Math.max(0,(y-(rect.bottom-edge))/edge));
+        delta=4+18*strength*strength;
+      }
+      if(delta){
+        const before=sheet.scrollTop;
+        sheet.scrollTop+=delta;
+        if(Math.abs(sheet.scrollTop-before)>.1)scheduleChecklistDragPaint(y);
+      }
+      checklistAutoScrollFrame=requestAnimationFrame(tick);
+    };
+    checklistAutoScrollFrame=requestAnimationFrame(tick);
   };
 
   const beginChecklistDrag=()=>{
@@ -1957,6 +2018,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     checklistDrag.row.classList.add('is-reorder-slot');
     sheet.classList.add('is-reordering-items');
     checklistDragHaptic();
+    startChecklistAutoScroll();
   };
 
   const applyChecklistOrder=()=>{
@@ -1972,7 +2034,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
         if(!item)return;
         const group=checklistGroupForRow(row)||'other';
         const view=checklistViewItem(item,state.packingMine,actor());
-        const inferred=inferredChecklistSection(view?.text);
+        const inferred=inferredChecklistSection(view?.text,checklistPackingSections());
         checklistSetViewField(item,state.packingMine,actor(),'section',group===inferred?'':group);
       });
     }
@@ -2063,14 +2125,6 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
       else return;
     }
     if(!checklistDrag.active)return;
-
-    const sheetRect=sheet.getBoundingClientRect();
-    const edge=64;
-    if(t.clientY<sheetRect.top+edge){
-      sheet.scrollTop-=Math.min(12,(sheetRect.top+edge-t.clientY)*.20);
-    }else if(t.clientY>sheetRect.bottom-edge){
-      sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.20);
-    }
 
     scheduleChecklistDragPaint(t.clientY);
   },{passive:false,capture:true});
@@ -2178,6 +2232,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
     const b=e.target.closest('button'); if(!b)return;
     if(b.hasAttribute('data-close')){closeReminderNotificationEditor();closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-recurrent')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan,state.packingMine);return;}
+    if(b.hasAttribute('data-check-categories')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan,state.packingMine,true);return;}
     if(b.hasAttribute('data-check-new-notify')){
       const input=sheet.querySelector('[data-check-new="reminders"]');
       state.reminderDraftText=String(input?.value||'');
@@ -2196,10 +2251,10 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   render();
 }
 
-function openRecurrentChecklistItems(plan, initialPersonal = false) {
+function openRecurrentChecklistItems(plan, initialPersonal = false, initialCategoriesOpen = false) {
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(recurrentPrepSnapshot()));
-  const state = { busy:false, error:'', personal:!!initialPersonal };
+  const state = { busy:false, error:'', personal:!!initialPersonal, categoriesOpen:!!initialCategoriesOpen };
   simplifiedLayer = document.createElement('div');
   simplifiedLayer.className = 'tv2-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet tv2-checklist-sheet tv2-recurrent-sheet" role="dialog" aria-modal="true" aria-label="Recurrent checklist items"></div>';
@@ -2221,10 +2276,32 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     '</div>';
   };
 
+  const categoryManagerHtml = () => {
+    const rows=checklistPackingSections(prep.packingSections).map((section)=>
+      '<div class="tv2-check-category-row" data-check-category-row="'+esc(section.id)+'">'+
+        '<input data-check-category-label="'+esc(section.id)+'" maxlength="48" value="'+esc(section.label)+'" aria-label="Category name">'+
+        (section.id==='other'
+          ? '<span class="tv2-check-category-fixed">Fallback</span>'
+          : '<button type="button" data-check-category-remove="'+esc(section.id)+'" aria-label="Remove '+esc(section.label)+'">✕</button>')+
+      '</div>'
+    ).join('');
+    return '<div class="tv2-check-category-manager">'+
+      '<p>Organise packing categories</p>'+
+      rows+
+      '<div class="tv2-check-category-add"><input data-check-category-new maxlength="48" placeholder="New category"><button type="button" data-check-category-add>Add</button></div>'+
+      '<small>Items group themselves automatically. Drag an item into another category whenever you want to correct it.</small>'+
+    '</div>';
+  };
+
   const sectionHtml = (kind,title) => {
     const visible=checklistItemsForView(prep[kind],state.personal,actor());
-    return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3><span>'+visible.length+'</span></div>'+
-      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(visible.length?(kind==='packing'?checklistGroupedRows(visible,state.personal,actor(),(item)=>rowHtml(kind,item)):visible.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(state.personal?'Nothing of yours here ♡':'No shared standard items here.')+'</p>')+'</div>'+
+    const packingSections=checklistPackingSections(prep.packingSections);
+    const sectionTools=kind==='packing'
+      ? '<div class="tv2-check-section-tools"><span>'+visible.length+'</span><button type="button" data-check-categories aria-expanded="'+(state.categoriesOpen?'true':'false')+'">'+(state.categoriesOpen?'Done':'Categories')+'</button></div>'
+      : '<span>'+visible.length+'</span>';
+    return '<section class="tv2-check-section"><div class="tv2-check-section-head"><h3>'+esc(title)+'</h3>'+sectionTools+'</div>'+
+      (kind==='packing'&&state.categoriesOpen?categoryManagerHtml():'')+
+      '<div class="tv2-check-list" data-check-list-kind="'+kind+'">'+(visible.length?(kind==='packing'?checklistGroupedRows(visible,state.personal,actor(),(item)=>rowHtml(kind,item),packingSections):visible.map((item)=>rowHtml(kind,item)).join('')):'<p class="tv2-check-empty">'+(state.personal?'Nothing of yours here ♡':'No shared standard items here.')+'</p>')+'</div>'+
       '<div class="tv2-check-add"><input data-check-new="'+kind+'" maxlength="160" placeholder="Add standard item"><button type="button" data-check-add="'+kind+'">Add</button></div>'+
     '</section>';
   };
@@ -2280,6 +2357,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
       packing:source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,section:checklistSection(item.section),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       reminders:source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,text:String(item.text||'').trim(),done:false,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       notes:existingNotes.map((item)=>({id:item.id,text:String(item.text||'').trim(),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal),createdAt:String(item.createdAt||'')})),
+      packingSections:checklistPackingSections(source.packingSections),
     };
   }
   let recurrentSaveQueue=Promise.resolve();
@@ -2541,6 +2619,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
   },{passive:true});
 
   let recurrentDragFrame=0;
+  let recurrentAutoScrollFrame=0;
   let recurrentDragPendingY=0;
   let recurrentProtectedTouchId=null;
 
@@ -2668,19 +2747,35 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     dragHaptic();
   };
 
+  const recurrentGroupTitleForY=(touchY)=>{
+    const titles=[...recurrentDrag.list.querySelectorAll('[data-check-group-title]')].filter((title)=>title.getBoundingClientRect().height>0);
+    if(!titles.length)return null;
+    let target=titles[0];
+    for(const title of titles){
+      const rect=title.getBoundingClientRect();
+      if(touchY>=rect.top+rect.height*.45)target=title;
+      else break;
+    }
+    return target;
+  };
+
   const placeRecurrentSlot=(touchY)=>{
     if(!recurrentDrag.active||!recurrentDrag.list||!recurrentDrag.row||!recurrentDrag.ghost)return;
     if(recurrentDrag.kind==='packing'){
-      const titles=[...recurrentDrag.list.querySelectorAll('[data-check-group-title]')];
-      const targetTitle=titles.find((title)=>{
-        const rect=title.getBoundingClientRect();
-        return rect.height>0&&touchY>=rect.top-8&&touchY<=rect.bottom+8;
-      });
-      if(targetTitle){
-        const rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')];
-        const beforeRects=new Map(rows.filter((row)=>row!==recurrentDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
-        if(targetTitle.nextElementSibling!==recurrentDrag.row)targetTitle.insertAdjacentElement('afterend',recurrentDrag.row);
-        animateRecurrentLayout(beforeRects);
+      const title=recurrentGroupTitleForY(touchY);
+      if(title){
+        const nextTitle=(()=>{let node=title.nextElementSibling;while(node&&!node.matches?.('[data-check-group-title]'))node=node.nextElementSibling;return node;})();
+        const rows=[];
+        let node=title.nextElementSibling;
+        while(node&&node!==nextTitle){
+          if(node.matches?.('[data-recurrent-swipe]')&&node!==recurrentDrag.row)rows.push(node);
+          node=node.nextElementSibling;
+        }
+        const before=rows.find((row)=>{
+          const rect=row.getBoundingClientRect();
+          return touchY<rect.top+rect.height/2;
+        })||nextTitle||null;
+        moveRecurrentSlot(before);
         return;
       }
     }
@@ -2688,28 +2783,10 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     const ghostHeight=recurrentDrag.ghost.getBoundingClientRect().height||recurrentDrag.row.getBoundingClientRect().height;
     const ghostCenter=ghostTop+ghostHeight/2;
     const rows=[...recurrentDrag.list.querySelectorAll('[data-recurrent-swipe]')].filter((row)=>row!==recurrentDrag.row);
-    let before=null;
-
-    if(rows.length){
-      const firstRect=rows[0].getBoundingClientRect();
-      if(ghostTop<=firstRect.top+1){
-        moveRecurrentSlot(rows[0]);
-        return;
-      }
-      const lastRect=rows[rows.length-1].getBoundingClientRect();
-      if(ghostCenter>=lastRect.top+lastRect.height/2-.5){
-        moveRecurrentSlot(null);
-        return;
-      }
-    }
-
-    for(const row of rows){
+    const before=rows.find((row)=>{
       const rect=row.getBoundingClientRect();
-      if(ghostCenter<=rect.top+rect.height/2+.5){
-        before=row;
-        break;
-      }
-    }
+      return ghostCenter<rect.top+rect.height/2;
+    })||null;
     moveRecurrentSlot(before);
   };
 
@@ -2740,6 +2817,34 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     });
   };
 
+  const startRecurrentAutoScroll=()=>{
+    if(recurrentAutoScrollFrame)return;
+    const tick=()=>{
+      if(!recurrentDrag.active){
+        recurrentAutoScrollFrame=0;
+        return;
+      }
+      const rect=sheet.getBoundingClientRect();
+      const edge=Math.min(96,Math.max(62,rect.height*.18));
+      const y=recurrentDrag.lastY;
+      let delta=0;
+      if(y<rect.top+edge){
+        const strength=Math.min(1,Math.max(0,(rect.top+edge-y)/edge));
+        delta=-(4+18*strength*strength);
+      }else if(y>rect.bottom-edge){
+        const strength=Math.min(1,Math.max(0,(y-(rect.bottom-edge))/edge));
+        delta=4+18*strength*strength;
+      }
+      if(delta){
+        const before=sheet.scrollTop;
+        sheet.scrollTop+=delta;
+        if(Math.abs(sheet.scrollTop-before)>.1)scheduleRecurrentDragPaint(y);
+      }
+      recurrentAutoScrollFrame=requestAnimationFrame(tick);
+    };
+    recurrentAutoScrollFrame=requestAnimationFrame(tick);
+  };
+
   const cleanupRecurrentDragVisual=()=>{
     recurrentDrag.ghost?.remove();
     recurrentDrag.ghost=null;
@@ -2756,6 +2861,10 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     if(recurrentDragFrame){
       cancelAnimationFrame(recurrentDragFrame);
       recurrentDragFrame=0;
+    }
+    if(recurrentAutoScrollFrame){
+      cancelAnimationFrame(recurrentAutoScrollFrame);
+      recurrentAutoScrollFrame=0;
     }
     cleanupRecurrentDragVisual();
     setRecurrentGestureLock(false);
@@ -2811,6 +2920,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     recurrentDrag.row.classList.add('is-reorder-slot');
     sheet.classList.add('is-reordering-items');
     dragHaptic();
+    startRecurrentAutoScroll();
   };
 
   const finishRecurrentDrag=()=>{
@@ -2826,7 +2936,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
           if(!item)return;
           const group=recurrentGroupForRow(row)||'other';
           const view=checklistViewItem(item,state.personal,actor());
-          const inferred=inferredChecklistSection(view?.text);
+          const inferred=inferredChecklistSection(view?.text,checklistPackingSections(prep.packingSections));
           checklistSetViewField(item,state.personal,actor(),'section',group===inferred?'':group);
         });
       }
@@ -2913,14 +3023,6 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     }
     if(!recurrentDrag.active)return;
 
-    const sheetRect=sheet.getBoundingClientRect();
-    const edge=64;
-    if(t.clientY<sheetRect.top+edge){
-      sheet.scrollTop-=Math.min(12,(sheetRect.top+edge-t.clientY)*.20);
-    }else if(t.clientY>sheetRect.bottom-edge){
-      sheet.scrollTop+=Math.min(12,(t.clientY-(sheetRect.bottom-edge))*.20);
-    }
-
     scheduleRecurrentDragPaint(t.clientY);
   },{passive:false,capture:true});
 
@@ -2973,12 +3075,28 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
   },{passive:false,capture:true});
 
   sheet.addEventListener('input',(e)=>{
+    if(e.target.matches('[data-check-category-label]')){
+      const id=checklistSection(e.target.dataset.checkCategoryLabel);
+      const stored=prep.packingSections.find((entry)=>checklistSection(entry.id)===id);
+      if(stored)stored.label=String(e.target.value||'').slice(0,48);
+      sheet.querySelectorAll('[data-check-group-title="'+CSS.escape(id)+'"] span').forEach((label)=>{
+        label.textContent=String(e.target.value||'').trim()||(id==='other'?'Other':'Category');
+      });
+      return;
+    }
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
     if(item)checklistSetViewField(item,state.personal,actor(),'text',e.target.value);
     syncRecurrentTextWidth(e.target);
   });
   sheet.addEventListener('change',(e)=>{
+    if(e.target.matches('[data-check-category-label]')){
+      const id=checklistSection(e.target.dataset.checkCategoryLabel);
+      const stored=prep.packingSections.find((entry)=>checklistSection(entry.id)===id);
+      if(stored)stored.label=String(e.target.value||'').trim().slice(0,48)||(id==='other'?'Other':'Category');
+      render();
+      return;
+    }
     if(!e.target.matches('[data-check-text]'))return;
     const item=findItem(e.target.closest('.tv2-check-row'));
     if(item)checklistSetViewField(item,state.personal,actor(),'text',e.target.value.trim());
@@ -2988,6 +3106,12 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
       e.preventDefault();
       state.personal=!state.personal;
       render();
+      return;
+    }
+    const categoryInput=e.target.closest('[data-check-category-new]');
+    if(categoryInput&&e.key==='Enter'){
+      e.preventDefault();
+      sheet.querySelector('[data-check-category-add]')?.click();
       return;
     }
     const input=e.target.closest('[data-check-new]');if(!input||e.key!=='Enter')return;
@@ -3003,6 +3127,38 @@ function openRecurrentChecklistItems(plan, initialPersonal = false) {
     const b=e.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan,state.personal);return;}
+    if(b.hasAttribute('data-check-categories')){state.categoriesOpen=!state.categoriesOpen;render();return;}
+    if(b.hasAttribute('data-check-category-add')){
+      const input=sheet.querySelector('[data-check-category-new]');
+      const label=String(input?.value||'').trim().slice(0,48);
+      if(!label)return;
+      const sections=checklistPackingSections(prep.packingSections);
+      if(sections.some((section)=>section.label.toLowerCase()===label.toLowerCase())){
+        state.error='That category already exists.';
+        render();
+        return;
+      }
+      prep.packingSections=[...sections.filter((section)=>section.id!=='other'),{id:checklistCategoryId(),label},sections.find((section)=>section.id==='other')||{id:'other',label:'Other'}];
+      state.error='';
+      render();
+      requestAnimationFrame(()=>sheet.querySelector('[data-check-category-new]')?.focus());
+      return;
+    }
+    if(b.hasAttribute('data-check-category-remove')){
+      const id=checklistSection(b.dataset.checkCategoryRemove);
+      if(!id||id==='other')return;
+      prep.packingSections=checklistPackingSections(prep.packingSections).filter((section)=>section.id!==id);
+      prep.packing.forEach((item)=>{
+        if(checklistSection(item.section)===id)item.section='other';
+        item.personal=checklistPersonalPayload(item.personal);
+        ['Principessa','Principe'].forEach((name)=>{
+          const entry=item.personal?.[name];
+          if(entry&&checklistSection(entry.section)===id)entry.section='other';
+        });
+      });
+      render();
+      return;
+    }
     if(b.dataset.checkAdd){addItem(b.dataset.checkAdd);return;}
     if(b.hasAttribute('data-check-defaults-save'))saveDefaults();
   });
