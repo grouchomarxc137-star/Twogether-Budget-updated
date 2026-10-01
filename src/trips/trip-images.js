@@ -64,6 +64,33 @@ function stableImageIndex(seed, length) {
   return (hash >>> 0) % length;
 }
 
+const preloadCache = new Map();
+
+function preloadTripImage(url) {
+  if (!url || typeof Image === 'undefined') return Promise.resolve();
+  if (preloadCache.has(url)) return preloadCache.get(url);
+  const pending = new Promise((resolve) => {
+    const image = new Image();
+    let finished = false;
+    const finish = async () => {
+      if (finished) return;
+      finished = true;
+      try { if (image.decode) await image.decode(); } catch {}
+      resolve();
+    };
+    image.onload = finish;
+    image.onerror = finish;
+    image.src = url;
+    if (image.complete) finish();
+  });
+  preloadCache.set(url, pending);
+  return pending;
+}
+
+export function preloadTripImages(urls) {
+  return Promise.all(Array.from(new Set((urls || []).filter(Boolean))).map(preloadTripImage));
+}
+
 export function tripImage(city, country, seed = '') {
   const countryName = String(country || '').trim();
   const normalizedCountry = countryKey(countryName);

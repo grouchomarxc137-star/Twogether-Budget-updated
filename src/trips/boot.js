@@ -7,7 +7,7 @@ import { $, $$ } from '../lib/dom.js';
 import { toast } from '../lib/toast.js';
 import { initIdentity } from '../app/identity.js';
 import { syncNow, startSyncLoop } from './state.js';
-import { renderDataViews, closeTripModal, refreshModalIfOpen } from './overview.js';
+import { renderDataViews, closeTripModal, refreshModalIfOpen, preloadTripGalleryImages } from './overview.js';
 import { resetWizard, renderWizard, refreshWizardIfIdle, bindRestartWizard } from './wizard.js';
 
 function bindStatic() {
@@ -19,7 +19,8 @@ function bindStatic() {
 
 function init() {
   document.addEventListener('twogether:saved', () => syncNow(false));
-  document.addEventListener('twogether:trips-refreshed', () => {
+  document.addEventListener('twogether:trips-refreshed', async () => {
+    await preloadTripGalleryImages();
     renderDataViews();
     refreshWizardIfIdle();
     refreshModalIfOpen();
