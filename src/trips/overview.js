@@ -45,7 +45,7 @@ export function renderTripGallery() {
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
     const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country, t.id);
     return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
-      <span class="trip-story-photo" aria-hidden="true"><img src="${esc(image)}" alt="" loading="lazy" decoding="async"></span>
+      <span class="trip-story-photo" aria-hidden="true"><img class="tw-trip-photo-img" src="${esc(image)}" alt="" loading="eager" decoding="async" draggable="false"></span>
       <div class="trip-card-top"><span class="trip-country">${esc(country)}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
       <h3>${esc(city)}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
       <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
