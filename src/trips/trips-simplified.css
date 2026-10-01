@@ -849,6 +849,10 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   overflow:hidden;
   border-radius:9px;
 }
+.tv2-checklist-sheet.is-reordering-categories .tv2-check-category-swipe-row{
+  will-change:transform;
+}
+
 .tv2-check-category-row{
   position:relative;
   z-index:2;
@@ -991,6 +995,19 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
 
 .tv2-check-list{
   display:grid;
+  max-height:min(48dvh,420px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.tv2-check-list::-webkit-scrollbar{
+  display:none;
+}
+.tv2-checklist-sheet.is-reordering-items .tv2-check-list{
+  scroll-behavior:auto!important;
+  overscroll-behavior:none;
 }
 .tv2-check-group-title{
   min-height:31px;

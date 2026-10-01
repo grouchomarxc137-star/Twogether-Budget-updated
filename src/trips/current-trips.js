@@ -1932,13 +1932,13 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   };
 
   const clampChecklistDragY=(touchY)=>{
-    if(!checklistDrag.ghost)return touchY;
-    const sheetRect=sheet.getBoundingClientRect();
+    if(!checklistDrag.ghost||!checklistDrag.list)return touchY;
+    const listRect=checklistDrag.list.getBoundingClientRect();
     const ghostHeight=checklistDrag.ghost.getBoundingClientRect().height||checklistDrag.row?.getBoundingClientRect().height||0;
     const grab=Math.max(0,Math.min(ghostHeight,checklistDrag.grabOffsetY));
-    const pad=8;
-    const minY=sheetRect.top+pad+grab;
-    const maxY=sheetRect.bottom-pad-Math.max(0,ghostHeight-grab);
+    const pad=4;
+    const minY=listRect.top+pad+grab;
+    const maxY=listRect.bottom-pad-Math.max(0,ghostHeight-grab);
     if(maxY<minY)return (minY+maxY)/2;
     return Math.max(minY,Math.min(maxY,touchY));
   };
@@ -1963,26 +1963,27 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   const startChecklistAutoScroll=()=>{
     if(checklistAutoScrollFrame)return;
     const tick=()=>{
-      if(!checklistDrag.active){
+      if(!checklistDrag.active||!checklistDrag.list){
         checklistAutoScrollFrame=0;
         return;
       }
-      const rect=sheet.getBoundingClientRect();
-      const edge=Math.min(112,Math.max(76,rect.height*.19));
+      const scroller=checklistDrag.list;
+      const rect=scroller.getBoundingClientRect();
+      const edge=Math.min(82,Math.max(54,rect.height*.22));
       const y=checklistDrag.lastY;
       let delta=0;
       if(y<rect.top+edge){
         const strength=Math.min(1,Math.max(0,(rect.top+edge-y)/edge));
-        delta=-(5+24*strength*strength);
+        delta=-(4+18*strength*strength);
       }else if(y>rect.bottom-edge){
         const strength=Math.min(1,Math.max(0,(y-(rect.bottom-edge))/edge));
-        delta=5+24*strength*strength;
+        delta=4+18*strength*strength;
       }
       if(delta){
-        const maxScroll=Math.max(0,sheet.scrollHeight-sheet.clientHeight);
-        const before=sheet.scrollTop;
-        sheet.scrollTop=Math.max(0,Math.min(maxScroll,before+delta));
-        if(Math.abs(sheet.scrollTop-before)>.1)scheduleChecklistDragPaint(y);
+        const maxScroll=Math.max(0,scroller.scrollHeight-scroller.clientHeight);
+        const before=scroller.scrollTop;
+        scroller.scrollTop=Math.max(0,Math.min(maxScroll,before+delta));
+        if(Math.abs(scroller.scrollTop-before)>.1)scheduleChecklistDragPaint(y);
       }
       checklistAutoScrollFrame=requestAnimationFrame(tick);
     };
@@ -2660,13 +2661,42 @@ function openRecurrentChecklistItems(plan, initialPersonal = false, initialCateg
     if(touch.clientY<rect.top||touch.clientY>rect.bottom||touch.clientX<rect.right-52||touch.clientX>rect.right)return null;
     return row.querySelector('[data-check-category-drag]');
   };
+  const animateCategoryLayout=(beforeRects)=>{
+    requestAnimationFrame(()=>{
+      if(!categoryDrag.list)return;
+      const rows=[...categoryDrag.list.querySelectorAll('[data-check-category-swipe]')];
+      rows.forEach((row)=>{
+        if(row===categoryDrag.row)return;
+        const oldTop=beforeRects.get(row);
+        if(oldTop==null)return;
+        const newTop=row.getBoundingClientRect().top;
+        const delta=oldTop-newTop;
+        if(Math.abs(delta)<.5)return;
+        row.style.transition='none';
+        row.style.transform='translate3d(0,'+delta+'px,0)';
+        void row.offsetHeight;
+        row.style.transition='transform .17s cubic-bezier(.22,.8,.28,1)';
+        row.style.transform='translate3d(0,0,0)';
+        setTimeout(()=>{
+          if(row?.isConnected){
+            row.style.transition='';
+            row.style.transform='';
+          }
+        },190);
+      });
+    });
+  };
   const moveCategorySlot=(beforeRow)=>{
     if(!categoryDrag.active||!categoryDrag.list||!categoryDrag.row)return;
     const anchor=categoryDrag.list.querySelector('.tv2-check-category-add');
     const currentNext=categoryDrag.row.nextElementSibling;
     if((beforeRow&&currentNext===beforeRow)||(!beforeRow&&currentNext===anchor))return;
+    const rows=[...categoryDrag.list.querySelectorAll('[data-check-category-swipe]')];
+    const beforeRects=new Map(rows.filter((row)=>row!==categoryDrag.row).map((row)=>[row,row.getBoundingClientRect().top]));
     if(beforeRow)categoryDrag.list.insertBefore(categoryDrag.row,beforeRow);
     else if(anchor)categoryDrag.list.insertBefore(categoryDrag.row,anchor);
+    animateCategoryLayout(beforeRects);
+    try{if(typeof navigator.vibrate==='function')navigator.vibrate(8);}catch{}
   };
   const placeCategorySlot=(touchY)=>{
     if(!categoryDrag.active||!categoryDrag.row||!categoryDrag.list)return;
@@ -3235,13 +3265,13 @@ function openRecurrentChecklistItems(plan, initialPersonal = false, initialCateg
   };
 
   const clampRecurrentDragY=(touchY)=>{
-    if(!recurrentDrag.ghost)return touchY;
-    const sheetRect=sheet.getBoundingClientRect();
+    if(!recurrentDrag.ghost||!recurrentDrag.list)return touchY;
+    const listRect=recurrentDrag.list.getBoundingClientRect();
     const ghostHeight=recurrentDrag.ghost.getBoundingClientRect().height||recurrentDrag.row?.getBoundingClientRect().height||0;
     const grab=Math.max(0,Math.min(ghostHeight,recurrentDrag.grabOffsetY));
-    const pad=8;
-    const minY=sheetRect.top+pad+grab;
-    const maxY=sheetRect.bottom-pad-Math.max(0,ghostHeight-grab);
+    const pad=4;
+    const minY=listRect.top+pad+grab;
+    const maxY=listRect.bottom-pad-Math.max(0,ghostHeight-grab);
     if(maxY<minY)return (minY+maxY)/2;
     return Math.max(minY,Math.min(maxY,touchY));
   };
@@ -3266,26 +3296,27 @@ function openRecurrentChecklistItems(plan, initialPersonal = false, initialCateg
   const startRecurrentAutoScroll=()=>{
     if(recurrentAutoScrollFrame)return;
     const tick=()=>{
-      if(!recurrentDrag.active){
+      if(!recurrentDrag.active||!recurrentDrag.list){
         recurrentAutoScrollFrame=0;
         return;
       }
-      const rect=sheet.getBoundingClientRect();
-      const edge=Math.min(112,Math.max(76,rect.height*.19));
+      const scroller=recurrentDrag.list;
+      const rect=scroller.getBoundingClientRect();
+      const edge=Math.min(82,Math.max(54,rect.height*.22));
       const y=recurrentDrag.lastY;
       let delta=0;
       if(y<rect.top+edge){
         const strength=Math.min(1,Math.max(0,(rect.top+edge-y)/edge));
-        delta=-(5+24*strength*strength);
+        delta=-(4+18*strength*strength);
       }else if(y>rect.bottom-edge){
         const strength=Math.min(1,Math.max(0,(y-(rect.bottom-edge))/edge));
-        delta=5+24*strength*strength;
+        delta=4+18*strength*strength;
       }
       if(delta){
-        const maxScroll=Math.max(0,sheet.scrollHeight-sheet.clientHeight);
-        const before=sheet.scrollTop;
-        sheet.scrollTop=Math.max(0,Math.min(maxScroll,before+delta));
-        if(Math.abs(sheet.scrollTop-before)>.1)scheduleRecurrentDragPaint(y);
+        const maxScroll=Math.max(0,scroller.scrollHeight-scroller.clientHeight);
+        const before=scroller.scrollTop;
+        scroller.scrollTop=Math.max(0,Math.min(maxScroll,before+delta));
+        if(Math.abs(scroller.scrollTop-before)>.1)scheduleRecurrentDragPaint(y);
       }
       recurrentAutoScrollFrame=requestAnimationFrame(tick);
     };
