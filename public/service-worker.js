@@ -1,8 +1,8 @@
-const CACHE = 'twogether-v5';
+const CACHE = 'twogether-v6';
 const FALLBACK = './index.html';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', FALLBACK, './manifest.webmanifest', './app-icon-192.jpg?v=4', './app-icon-512.jpg?v=4'])).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', FALLBACK, './manifest.webmanifest', './app-icon.svg?v=5'])).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -43,8 +43,8 @@ self.addEventListener('push', (event) => {
       for (const message of messages) {
         await self.registration.showNotification(String(message.title || 'Twogether'), {
           body:String(message.body || ''),
-          icon:'./app-icon-192.jpg?v=4',
-          badge:'./app-icon-192.jpg?v=4',
+          icon:'./app-icon.svg?v=5',
+          badge:'./app-icon.svg?v=5',
           tag:String(message.tag || message.id || 'twogether-notification'),
           renotify:true,
           data:{ url:String(message.url || './') },
@@ -53,8 +53,8 @@ self.addEventListener('push', (event) => {
     } catch {
       await self.registration.showNotification('Twogether', {
         body:'You have a new notification.',
-        icon:'./app-icon-192.jpg?v=4',
-        badge:'./app-icon-192.jpg?v=4',
+        icon:'./app-icon.svg?v=5',
+        badge:'./app-icon.svg?v=5',
         tag:'twogether-notification',
         data:{ url:'./' },
       });
