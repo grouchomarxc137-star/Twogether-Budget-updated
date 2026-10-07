@@ -400,13 +400,17 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
       const ownerIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
       if (planIdx < 0 || ownerIdx < 0) throw new Error('Trip or saved accommodation not found');
+
       const plan = sanitizePlan_(state.plans[planIdx]);
       const linkedTrip = plan.linkedTripId ? state.trips.find(function(t){ return t.id === plan.linkedTripId; }) : null;
       if (linkedTrip && isTripLocked_(linkedTrip)) throw new Error('This trip is already confirmed by both of you');
-      const existingAccom = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses.accom);
-      if (existingAccom.total !== '' || existingAccom.accommodation.paymentType) {
+
+      const existingEntry = plan.expenseEntries.find(function(item){ return item.category === 'accommodation'; });
+      const legacyAccom = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses.accom);
+      if (existingEntry || legacyAccom.total !== '' || legacyAccom.accommodation.paymentType) {
         throw new Error('This trip already has an accommodation expense');
       }
+
       const owner = sanitizePlan_(state.plans[ownerIdx]);
       const favorite = owner.stayTracker.saved.find(function(item){ return item.id === favoriteId; });
       if (!favorite) throw new Error('Saved accommodation not found');
@@ -415,47 +419,38 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const total = cleanMoney_(latest && latest.price);
       if (total === '') throw new Error('Update this accommodation price before selecting it');
 
-      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
-      const shareEach = money2_(Number(total) / 2);
-      const current = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses.accom);
-      current.total = total;
-      current.totalUncertain = false;
-      current.totalKnownBy = actor;
-      current.totals.Principessa = total;
-      current.totals.Principe = total;
-      current.mode.Principessa = 'shared';
-      current.mode.Principe = 'shared';
-      current.paid.Principessa = shareEach;
-      current.paid.Principe = shareEach;
-      current.unknown.Principessa = false;
-      current.unknown.Principe = false;
-      current.accommodation = {
+      const now = new Date().toISOString();
+      const expense = sanitizeTripExpense_({
+        id:Utilities.getUuid(),
+        category:'accommodation',
+        amount:total,
+        paidBy:'both',
+        split:'shared',
+        forActor:'',
+        date:now.slice(0,10),
+        note:favorite.name || 'Airbnb accommodation',
+        uncertain:false,
         useJar:false,
-        jarContribution:0,
-        jarBalanceAfter:state.sharedJar.balance,
-        remaining:Number(total),
-        paymentType:'shared',
-        paidUpfront:false,
-        upfrontBy:'',
-        shareEach:shareEach,
-        repayment:{debtor:'',creditor:'',amount:'',status:'none',confirmedAt:''}
-      };
-      current.updatedAt = new Date().toISOString();
-      current.updatedBy = actor;
-      plan.sharedExpenses.accom = current;
+        loggedBy:actor,
+        createdAt:now,
+        updatedAt:now
+      },actor);
+      plan.expenseEntries.push(expense);
+
       plan.stayTracker.selected = {
         ownerPlanId:ownerPlanId,
         favoriteId:favoriteId,
-        selectedAt:current.updatedAt,
-        priceAtSelection:total
+        selectedAt:now,
+        priceAtSelection:total,
+        expenseId:expense.id
       };
-      plan.updatedAt = current.updatedAt;
+      plan.updatedAt = now;
       plan.updatedBy = actor;
-      syncSharedExpenseIntoPlanAndTrip_(state, plan, 'accom');
       state.plans[planIdx] = plan;
+      resetPlanTripConfirmations_(state,plan);
       addAudit_(state, actor, 'selectStayForTrip', plan.id);
       saveState_(state);
-      return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,selected:plan.stayTracker.selected});
+      return output_({ok:true,planId:plan.id,expense:expense,selected:plan.stayTracker.selected});
     }
 
     if (action === 'unselectStayForTrip') {
@@ -469,49 +464,59 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const selected = plan.stayTracker && plan.stayTracker.selected || {};
       if (!selected.favoriteId) throw new Error('No accommodation is selected for this trip');
 
-      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
-      state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){
-        return !(x.planId === planId && !x.expenseId);
-      });
-      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
-
-      plan.sharedExpenses.accom = emptySharedExpense_();
-      plan.stayTracker.selected = sanitizeStaySelection_({});
-      ACTORS.forEach(function(name){
-        if (plan.partials && plan.partials[name]) {
-          plan.partials[name].accom = 0;
-          plan.partials[name].uncertain = Object.assign({}, plan.partials[name].uncertain || {});
-          plan.partials[name].uncertain.accom = false;
-        }
-      });
-
-      const now = new Date().toISOString();
-      plan.updatedAt = now;
-      plan.updatedBy = actor;
-
-      if (plan.linkedTripId) {
-        const tripIdx = state.trips.findIndex(function(t){ return t.id === plan.linkedTripId; });
-        if (tripIdx >= 0) {
-          const trip = sanitizeTripRecord_(state.trips[tripIdx]);
-          trip.sharedExpenses.accom = emptySharedExpense_();
-          ACTORS.forEach(function(name){
-            if (trip.submissions[name]) {
-              trip.submissions[name].accom = 0;
-              trip.submissions[name].uncertain = Object.assign({}, trip.submissions[name].uncertain || {});
-              trip.submissions[name].uncertain.accom = false;
-            }
-          });
-          trip.confirmed = {Principessa:false,Principe:false};
-          trip.updatedAt = now;
-          trip.updatedBy = actor;
-          state.trips[tripIdx] = trip;
+      const expenseId = cleanText_(selected.expenseId,80);
+      if (expenseId) {
+        const expenseIdx = plan.expenseEntries.findIndex(function(item){ return item.id === expenseId; });
+        if (expenseIdx >= 0) plan.expenseEntries.splice(expenseIdx,1);
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+        state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){
+          return !(x.planId === planId && x.expenseId === expenseId);
+        });
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      } else {
+        // Backward compatibility for stays selected before Our Stays began using normal trip expenses.
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+        state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){
+          return !(x.planId === planId && !x.expenseId);
+        });
+        state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+        plan.sharedExpenses.accom = emptySharedExpense_();
+        ACTORS.forEach(function(name){
+          if (plan.partials && plan.partials[name]) {
+            plan.partials[name].accom = 0;
+            plan.partials[name].uncertain = Object.assign({}, plan.partials[name].uncertain || {});
+            plan.partials[name].uncertain.accom = false;
+          }
+        });
+        if (plan.linkedTripId) {
+          const tripIdx = state.trips.findIndex(function(t){ return t.id === plan.linkedTripId; });
+          if (tripIdx >= 0) {
+            const trip = sanitizeTripRecord_(state.trips[tripIdx]);
+            trip.sharedExpenses.accom = emptySharedExpense_();
+            ACTORS.forEach(function(name){
+              if (trip.submissions[name]) {
+                trip.submissions[name].accom = 0;
+                trip.submissions[name].uncertain = Object.assign({}, trip.submissions[name].uncertain || {});
+                trip.submissions[name].uncertain.accom = false;
+              }
+            });
+            trip.confirmed = {Principessa:false,Principe:false};
+            trip.updatedAt = new Date().toISOString();
+            trip.updatedBy = actor;
+            state.trips[tripIdx] = trip;
+          }
         }
       }
 
+      const now = new Date().toISOString();
+      plan.stayTracker.selected = sanitizeStaySelection_({});
+      plan.updatedAt = now;
+      plan.updatedBy = actor;
       state.plans[planIdx] = plan;
+      resetPlanTripConfirmations_(state,plan);
       addAudit_(state, actor, 'unselectStayForTrip', plan.id);
       saveState_(state);
-      return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,selected:plan.stayTracker.selected,sharedJar:state.sharedJar});
+      return output_({ok:true,planId:plan.id,selected:plan.stayTracker.selected,sharedJar:state.sharedJar});
     }
 
     if (action === 'saveStayTrackerSnapshot') {
@@ -771,10 +776,10 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const planId=cleanText_(payload.planId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),linkedTrip=plan.linkedTripId?state.trips.find(x=>x.id===plan.linkedTripId):null;if(linkedTrip&&isTripLocked_(linkedTrip))throw new Error('This trip is already confirmed by both of you');const raw=payload.expense||{},id=cleanText_(raw.id,80),at=id?plan.expenseEntries.findIndex(x=>x.id===id):-1,prev=at>=0?plan.expenseEntries[at]:null,now=new Date().toISOString(),expense=sanitizeTripExpense_(Object.assign({},raw,{id:id||Utilities.getUuid(),loggedBy:prev&&prev.loggedBy||actor,createdAt:prev&&prev.createdAt||now,updatedAt:now}),actor);
       if(expense.amount===''||Number(expense.amount)<=0)throw new Error('Enter a valid expense amount');if(!expense.paidBy)throw new Error('Choose who paid');if(expense.split==='personal'&&expense.paidBy==='both')throw new Error('Choose one payer for a personal expense');if(expense.split==='personal'&&!expense.forActor)expense.forActor=actor;if(!expense.date)expense.date=now.slice(0,10);
       state.sharedJar=sanitizeSharedJar_(state.sharedJar);const old=state.sharedJar.transactions.find(x=>x.planId===planId&&x.expenseId===expense.id),available=money2_(Number(state.sharedJar.balance||0)+Number(old&&old.amount||0)),jar=expense.useJar?money2_(Number(expense.amount)*.2):0;if(jar>available+.005)throw new Error('The Shared Jar only has '+formatMoney_(available)+' available');expense.jarContribution=jar;state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expense.id));if(jar>0)state.sharedJar.transactions.push({planId:planId,expenseId:expense.id,amount:jar,actor:actor,at:now});state.sharedJar=sanitizeSharedJar_(state.sharedJar);
-      if(at>=0)plan.expenseEntries[at]=expense;else plan.expenseEntries.push(expense);plan.updatedAt=now;plan.updatedBy=actor;state.plans[idx]=plan;resetPlanTripConfirmations_(state,plan);addAudit_(state,actor,at>=0?'updateTripExpense':'addTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,expense:expense,sharedJar:state.sharedJar});
+      if(at>=0)plan.expenseEntries[at]=expense;else plan.expenseEntries.push(expense);if(plan.stayTracker&&plan.stayTracker.selected&&plan.stayTracker.selected.expenseId===expense.id&&expense.category!=='accommodation')plan.stayTracker.selected=sanitizeStaySelection_({});plan.updatedAt=now;plan.updatedBy=actor;state.plans[idx]=plan;resetPlanTripConfirmations_(state,plan);addAudit_(state,actor,at>=0?'updateTripExpense':'addTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,expense:expense,sharedJar:state.sharedJar});
     }
     if (action === 'deleteTripExpense') {
-      const planId=cleanText_(payload.planId,80),expenseId=cleanText_(payload.expenseId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),linkedTrip=plan.linkedTripId?state.trips.find(x=>x.id===plan.linkedTripId):null;if(linkedTrip&&isTripLocked_(linkedTrip))throw new Error('Confirmed trip expenses cannot be deleted');const at=plan.expenseEntries.findIndex(x=>x.id===expenseId);if(at<0)throw new Error('Expense not found');plan.expenseEntries.splice(at,1);state.sharedJar=sanitizeSharedJar_(state.sharedJar);state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expenseId));state.sharedJar=sanitizeSharedJar_(state.sharedJar);plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;state.plans[idx]=plan;resetPlanTripConfirmations_(state,plan);addAudit_(state,actor,'deleteTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,sharedJar:state.sharedJar});
+      const planId=cleanText_(payload.planId,80),expenseId=cleanText_(payload.expenseId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),linkedTrip=plan.linkedTripId?state.trips.find(x=>x.id===plan.linkedTripId):null;if(linkedTrip&&isTripLocked_(linkedTrip))throw new Error('Confirmed trip expenses cannot be deleted');const at=plan.expenseEntries.findIndex(x=>x.id===expenseId);if(at<0)throw new Error('Expense not found');plan.expenseEntries.splice(at,1);if(plan.stayTracker&&plan.stayTracker.selected&&plan.stayTracker.selected.expenseId===expenseId)plan.stayTracker.selected=sanitizeStaySelection_({});state.sharedJar=sanitizeSharedJar_(state.sharedJar);state.sharedJar.transactions=state.sharedJar.transactions.filter(x=>!(x.planId===planId&&x.expenseId===expenseId));state.sharedJar=sanitizeSharedJar_(state.sharedJar);plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;state.plans[idx]=plan;resetPlanTripConfirmations_(state,plan);addAudit_(state,actor,'deleteTripExpense',plan.id);saveState_(state);return output_({ok:true,planId:plan.id,sharedJar:state.sharedJar});
     }
 
     if (action === 'saveTripRepayment') {
@@ -2608,7 +2613,8 @@ function sanitizeStaySelection_(item) {
     ownerPlanId:cleanText_(source.ownerPlanId,80),
     favoriteId:cleanText_(source.favoriteId,80),
     selectedAt:cleanText_(source.selectedAt,40),
-    priceAtSelection:cleanMoney_(source.priceAtSelection)
+    priceAtSelection:cleanMoney_(source.priceAtSelection),
+    expenseId:cleanText_(source.expenseId,80)
   };
 }
 
