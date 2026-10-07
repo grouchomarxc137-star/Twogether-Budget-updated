@@ -249,6 +249,114 @@ function handleAction_(actionValue, payloadValue, actorValue) {
     }
 
 
+    if (action === 'saveStaySearchPreferences') {
+      const planId = cleanText_(payload.planId, 80);
+      const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      plan.stayTracker.area = cleanText_(payload.area,120) || plan.stayTracker.area || 'lake-garda';
+      plan.stayTracker.preferences = sanitizeStayPreferences_(payload.preferences);
+      plan.updatedAt = new Date().toISOString();
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+      saveState_(state);
+      return output_({ok:true,planId:plan.id,stayTracker:plan.stayTracker});
+    }
+
+    if (action === 'saveStayFavorite') {
+      const planId = cleanText_(payload.planId, 80);
+      const targetPlanIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      if (targetPlanIdx < 0) throw new Error('Budget plan not found');
+      const incoming = sanitizeStayFavorite_(payload.favorite || {});
+      if (!incoming.url) throw new Error('Add the accommodation link first');
+      if (!incoming.name) throw new Error('Add a name for this accommodation');
+      const urlKey = stayUrlKey_(incoming.url);
+      let ownerPlanIdx = targetPlanIdx;
+      let existingIdx = -1;
+      state.plans.some(function(rawPlan, index){
+        const safePlan = sanitizePlan_(rawPlan);
+        const found = safePlan.stayTracker.saved.findIndex(function(item){ return stayUrlKey_(item.url) === urlKey; });
+        if (found >= 0) { ownerPlanIdx = index; existingIdx = found; state.plans[index] = safePlan; return true; }
+        return false;
+      });
+      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
+      const now = new Date().toISOString();
+      const favorite = existingIdx >= 0 ? ownerPlan.stayTracker.saved[existingIdx] : sanitizeStayFavorite_({
+        id: Utilities.getUuid(), createdAt: now
+      });
+      favorite.source = incoming.source;
+      favorite.url = incoming.url;
+      favorite.name = incoming.name;
+      favorite.city = incoming.city;
+      favorite.area = incoming.area;
+      favorite.image = incoming.image;
+      favorite.note = incoming.note;
+      favorite.requirements = incoming.requirements;
+      favorite.updatedAt = now;
+      if (!favorite.createdAt) favorite.createdAt = now;
+      const price = cleanMoney_(payload.price);
+      if (price !== '') {
+        const contextPlan = sanitizePlan_(state.plans[targetPlanIdx]);
+        favorite.history.push(sanitizeStayFavoritePrice_({
+          price: price, checkedAt: cleanText_(payload.checkedAt,40) || now,
+          planId: contextPlan.id, start: contextPlan.meta.start, end: contextPlan.meta.end
+        }));
+        favorite.history = favorite.history.slice(-200);
+      }
+      if (existingIdx >= 0) ownerPlan.stayTracker.saved[existingIdx] = favorite;
+      else ownerPlan.stayTracker.saved.push(favorite);
+      ownerPlan.updatedAt = now;
+      ownerPlan.updatedBy = actor;
+      state.plans[ownerPlanIdx] = ownerPlan;
+      addAudit_(state, actor, 'saveStayFavorite', favorite.id);
+      saveState_(state);
+      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+    }
+
+    if (action === 'updateStayFavoritePrice') {
+      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
+      const favoriteId = cleanText_(payload.favoriteId,80);
+      const contextPlanId = cleanText_(payload.contextPlanId,80);
+      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
+      const contextPlanIdx = state.plans.findIndex(function(x){ return x.id === contextPlanId; });
+      if (ownerPlanIdx < 0 || contextPlanIdx < 0) throw new Error('Trip not found');
+      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
+      const favoriteIdx = ownerPlan.stayTracker.saved.findIndex(function(item){ return item.id === favoriteId; });
+      if (favoriteIdx < 0) throw new Error('Accommodation not found');
+      const price = cleanMoney_(payload.price);
+      if (price === '') throw new Error('Enter the current total price');
+      const contextPlan = sanitizePlan_(state.plans[contextPlanIdx]);
+      const now = cleanText_(payload.checkedAt,40) || new Date().toISOString();
+      const favorite = ownerPlan.stayTracker.saved[favoriteIdx];
+      favorite.history.push(sanitizeStayFavoritePrice_({
+        price:price, checkedAt:now, planId:contextPlan.id, start:contextPlan.meta.start, end:contextPlan.meta.end
+      }));
+      favorite.history = favorite.history.slice(-200);
+      favorite.updatedAt = now;
+      ownerPlan.stayTracker.saved[favoriteIdx] = favorite;
+      ownerPlan.updatedAt = now;
+      ownerPlan.updatedBy = actor;
+      state.plans[ownerPlanIdx] = ownerPlan;
+      addAudit_(state, actor, 'updateStayFavoritePrice', favorite.id);
+      saveState_(state);
+      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+    }
+
+    if (action === 'deleteStayFavorite') {
+      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
+      const favoriteId = cleanText_(payload.favoriteId,80);
+      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
+      if (ownerPlanIdx < 0) throw new Error('Trip not found');
+      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
+      ownerPlan.stayTracker.saved = ownerPlan.stayTracker.saved.filter(function(item){ return item.id !== favoriteId; });
+      ownerPlan.updatedAt = new Date().toISOString();
+      ownerPlan.updatedBy = actor;
+      state.plans[ownerPlanIdx] = ownerPlan;
+      addAudit_(state, actor, 'deleteStayFavorite', favoriteId);
+      saveState_(state);
+      return output_({ok:true});
+    }
+
     if (action === 'saveStayTrackerSnapshot') {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
@@ -2284,6 +2392,59 @@ function tripSettlement_(plan) {
   };
 }
 
+function stayUrlKey_(value) {
+  const text=cleanText_(value,900);
+  try {
+    const u=new URL(text);
+    return (u.origin+u.pathname).replace(/\/$/,'').toLowerCase();
+  } catch (_) {
+    return text.split(/[?#]/)[0].replace(/\/$/,'').toLowerCase();
+  }
+}
+function sanitizeStayPreferences_(value) {
+  const source=value&&typeof value==='object'?value:{};
+  const max=cleanMoney_(source.maxTotal);
+  return {
+    maxTotal:max,
+    parking:source.parking===true,
+    washingMachine:source.washingMachine===true,
+    entirePlace:source.entirePlace!==false,
+    bedrooms:Math.min(8,Math.max(0,Math.floor(Number(source.bedrooms)||0))),
+    wifi:source.wifi===true,
+    kitchen:source.kitchen===true,
+    airConditioning:source.airConditioning===true,
+    pool:source.pool===true
+  };
+}
+function sanitizeStayFavoritePrice_(item) {
+  const source=item&&typeof item==='object'?item:{};
+  return {
+    price:cleanMoney_(source.price),
+    checkedAt:cleanText_(source.checkedAt,40),
+    planId:cleanText_(source.planId,80),
+    start:cleanText_(source.start,20),
+    end:cleanText_(source.end,20)
+  };
+}
+function sanitizeStayFavorite_(item) {
+  const source=item&&typeof item==='object'?item:{};
+  const provider=String(source.source||'').toLowerCase()==='airbnb'?'airbnb':'booking';
+  return {
+    id:cleanText_(source.id,80)||Utilities.getUuid(),
+    source:provider,
+    url:cleanText_(source.url,900),
+    name:cleanText_(source.name,180),
+    city:cleanText_(source.city,160),
+    area:cleanText_(source.area,120),
+    image:cleanText_(source.image,900),
+    note:cleanText_(source.note,500),
+    requirements:sanitizeStayPreferences_(source.requirements),
+    history:(Array.isArray(source.history)?source.history:[]).slice(-200).map(sanitizeStayFavoritePrice_).filter(function(x){return x.price!==''&&x.checkedAt;}),
+    createdAt:cleanText_(source.createdAt,40),
+    updatedAt:cleanText_(source.updatedAt,40)
+  };
+}
+
 function sanitizeStayTrackerSnapshot_(item) {
   const source=item&&typeof item==='object'?item:{};
   return {
@@ -2300,6 +2461,8 @@ function sanitizeStayTracker_(value) {
   const area=['lake-garda','bergamo'].indexOf(String(source.area||''))>=0?String(source.area):'lake-garda';
   return {
     area:area,
+    preferences:sanitizeStayPreferences_(source.preferences),
+    saved:(Array.isArray(source.saved)?source.saved:[]).slice(0,120).map(sanitizeStayFavorite_).filter(function(item){return item.url&&item.name;}),
     lastCheckedAt:cleanText_(source.lastCheckedAt,40),
     history:(Array.isArray(source.history)?source.history:[]).slice(-800).map(sanitizeStayTrackerSnapshot_).filter(function(item){return item.accommodationId&&item.price!==''&&item.checkedAt;})
   };
@@ -2422,7 +2585,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoritePrice', 'deleteStayFavorite', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
