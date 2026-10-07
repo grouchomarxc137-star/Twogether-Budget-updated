@@ -19,13 +19,13 @@ html body #app#app .our-stays-root *{
 .our-stays-head p{margin:4px 0 0;color:var(--tv2-muted);font-size:15px}
 .our-stays-add{width:42px;height:42px;border:1px solid var(--tv2-line)!important;border-radius:14px!important;background:var(--tv2-card)!important;font-size:24px!important;line-height:1!important;box-shadow:0 7px 22px rgba(62,48,37,.045)}
 
-.our-stays-switcher{display:grid;gap:7px;padding:14px 15px;border:1px solid var(--tv2-line);border-radius:18px;background:var(--tv2-card)}
-.our-stays-switcher label{display:grid;gap:5px}
-.our-stays-switcher label>span{color:var(--tv2-muted);font-size:12.5px;font-weight:600}
-.our-stays-switcher select{width:100%;min-height:42px;border:0;border-bottom:1px solid var(--tv2-line);border-radius:0;background:transparent;color:var(--tv2-ink);font:inherit;font-size:16px;font-weight:600;padding:0 26px 2px 0;outline:0}
-.our-stays-switcher select:focus{border-color:var(--tv2-primary)}
-.our-stays-date{display:flex;align-items:center;gap:8px;color:var(--tv2-muted);font-size:12.5px}
-.our-stays-date small{padding:2px 8px;border-radius:999px;background:var(--tv2-jar);color:var(--tv2-ink);font-size:11.5px;font-weight:600}
+.our-stays-switcher{display:grid;gap:7px}
+.our-stays-picker-label{padding:0 3px;color:var(--tv2-muted);font-size:12.5px;font-weight:600}
+.our-stays-picker-button{width:100%;min-height:62px;padding:11px 14px!important;border:1px solid var(--tv2-line)!important;border-radius:18px!important;background:var(--tv2-card)!important;display:flex!important;align-items:center;justify-content:space-between;gap:12px;text-align:left;box-shadow:0 7px 22px rgba(62,48,37,.035)}
+.our-stays-picker-button>span{display:grid;gap:3px;min-width:0}
+.our-stays-picker-button strong{font-size:16px;font-weight:650;color:var(--tv2-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.our-stays-picker-button small{font-size:12px;color:var(--tv2-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.our-stays-picker-button>b{width:30px;height:30px;display:grid;place-items:center;flex:0 0 auto;border-radius:10px;background:var(--tv2-jar);color:var(--tv2-muted);font-size:15px;font-weight:600}
 
 .our-stays-search{display:grid;gap:8px}
 .our-stays-airbnb{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:11px;min-height:64px;padding:10px 13px;border:1px solid #ead9dd;border-radius:18px;background:var(--stay-rose);color:var(--stay-rose-ink);text-decoration:none}
@@ -145,3 +145,12 @@ body.stay-modal-open{overflow:hidden}
 @media(prefers-reduced-motion:reduce){
   .our-stay-card{transition:none}
 }
+
+.our-stays-trip-list{display:grid;border-top:1px solid var(--tv2-line,#ebe4da)}
+.our-stays-trip-list>button{min-height:58px;padding:10px 2px!important;border:0!important;border-bottom:1px solid var(--tv2-line,#ebe4da)!important;background:transparent!important;color:var(--tv2-ink,#26221e)!important;display:flex!important;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.our-stays-trip-list>button>span{display:grid;gap:2px;min-width:0}
+.our-stays-trip-list>button strong{font-size:15px;font-weight:650}
+.our-stays-trip-list>button small{font-size:12px;color:var(--tv2-muted,#7a736b)}
+.our-stays-trip-list>button>b{color:var(--tv2-faint,#a39c93);font-size:20px;font-weight:500}
+.our-stays-trip-list>button.active strong::after{content:' · current';color:var(--stay-sage-ink);font-size:11px;font-weight:600}
+.our-stays-trip-list-empty{margin:16px 2px 4px;color:var(--tv2-muted,#7a736b);font-size:13px;line-height:1.4}
