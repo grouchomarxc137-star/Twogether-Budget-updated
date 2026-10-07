@@ -458,6 +458,62 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,selected:plan.stayTracker.selected});
     }
 
+    if (action === 'unselectStayForTrip') {
+      const planId = cleanText_(payload.planId,80);
+      const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      if (planIdx < 0) throw new Error('Trip not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const linkedTrip = plan.linkedTripId ? state.trips.find(function(t){ return t.id === plan.linkedTripId; }) : null;
+      if (linkedTrip && isTripLocked_(linkedTrip)) throw new Error('This trip is already confirmed by both of you');
+
+      const selected = plan.stayTracker && plan.stayTracker.selected || {};
+      if (!selected.favoriteId) throw new Error('No accommodation is selected for this trip');
+
+      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      state.sharedJar.transactions = state.sharedJar.transactions.filter(function(x){
+        return !(x.planId === planId && !x.expenseId);
+      });
+      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+
+      plan.sharedExpenses.accom = emptySharedExpense_();
+      plan.stayTracker.selected = sanitizeStaySelection_({});
+      ACTORS.forEach(function(name){
+        if (plan.partials && plan.partials[name]) {
+          plan.partials[name].accom = 0;
+          plan.partials[name].uncertain = Object.assign({}, plan.partials[name].uncertain || {});
+          plan.partials[name].uncertain.accom = false;
+        }
+      });
+
+      const now = new Date().toISOString();
+      plan.updatedAt = now;
+      plan.updatedBy = actor;
+
+      if (plan.linkedTripId) {
+        const tripIdx = state.trips.findIndex(function(t){ return t.id === plan.linkedTripId; });
+        if (tripIdx >= 0) {
+          const trip = sanitizeTripRecord_(state.trips[tripIdx]);
+          trip.sharedExpenses.accom = emptySharedExpense_();
+          ACTORS.forEach(function(name){
+            if (trip.submissions[name]) {
+              trip.submissions[name].accom = 0;
+              trip.submissions[name].uncertain = Object.assign({}, trip.submissions[name].uncertain || {});
+              trip.submissions[name].uncertain.accom = false;
+            }
+          });
+          trip.confirmed = {Principessa:false,Principe:false};
+          trip.updatedAt = now;
+          trip.updatedBy = actor;
+          state.trips[tripIdx] = trip;
+        }
+      }
+
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, 'unselectStayForTrip', plan.id);
+      saveState_(state);
+      return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,selected:plan.stayTracker.selected,sharedJar:state.sharedJar});
+    }
+
     if (action === 'saveStayTrackerSnapshot') {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
@@ -2697,7 +2753,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
