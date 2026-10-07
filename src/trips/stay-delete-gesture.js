@@ -44,7 +44,7 @@ async function deleteFavorite(id){
 }
 function openConfirm(id){
   closeConfirm();
-  const fav=(window.TwogetherAPI?.state?.()?.stayFavorites||[]).find((x)=>x.id===id);if(!fav)return;
+  const fav=(window.__TWOGETHER_CACHED_STATE__?.stayFavorites||[]).find((x)=>x.id===id);if(!fav)return;
   confirmLayer=document.createElement('div');
   confirmLayer.className='tv2-confirm-layer';
   confirmLayer.innerHTML='<div class="tv2-confirm-backdrop" data-confirm-cancel></div><div class="tv2-confirm-card" role="dialog" aria-modal="true"><h2>Delete favourite?</h2><p>Are you sure you want to delete <strong>'+esc(fav.name||'this stay')+'</strong>?</p><p class="tv2-confirm-note">This removes it from Our Stays. Any trip expense already logged stays untouched.</p><p class="tv2-confirm-error" aria-live="polite"></p><div class="tv2-confirm-actions"><button type="button" data-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-confirm-delete>Delete</button></div></div>';
