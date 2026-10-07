@@ -329,6 +329,7 @@ const SURFACE_SELECTORS = [
   '.tv2-confirm-layer',
   'dialog.finance-log-host[open]',
   '.tv2-layer',
+  '.stay-modal',
   '.finance-mini-modal.show',
   '.tw-notification-layer.show',
   '#v27Modal:not([hidden])',
@@ -465,6 +466,7 @@ function surfaceCard(surface) {
   if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-card');
   if (surface.matches('#tripModal')) return surface.querySelector('.trip-modal-card');
   if (surface.matches('.tv2-layer')) return surface.querySelector('.tv2-sheet');
+  if (surface.matches('.stay-modal')) return surface.querySelector('.stay-modal-sheet');
   if (surface.matches('dialog.current-overview')) return surface.querySelector('.overview-trip-shell,.overview-shell') || surface.firstElementChild;
   if (surface.matches('#workflowV5Overlay')) return surface.querySelector('.v5-question') || surface;
   if (surface.matches('#twCurrentTrips.tv2-trip-view')) return surface;
@@ -495,6 +497,7 @@ function surfaceBackdrop(surface) {
   if (surface.matches('#workflowBudgetModal')) return surface.querySelector('.v5-budget-backdrop');
   if (surface.matches('#tripModal')) return surface.querySelector('.trip-modal-backdrop');
   if (surface.matches('.tv2-confirm-layer')) return surface.querySelector('.tv2-confirm-backdrop');
+  if (surface.matches('.stay-modal')) return surface.querySelector('.stay-modal-backdrop');
   if (surface.matches('.tv2-layer,dialog.finance-log-host')) return surface.querySelector('.tv2-backdrop');
   return null;
 }
