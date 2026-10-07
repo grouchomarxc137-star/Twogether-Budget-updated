@@ -223,7 +223,11 @@ function render(){
 function bind(){
   document.getElementById('ourStayPlanPicker')?.addEventListener('click',openTripPicker);
   ['ourStaySaveTop','ourStaySaveInline','ourStaySaveEmpty'].forEach((id) => document.getElementById(id)?.addEventListener('click',openSaveModal));
-  document.querySelectorAll('[data-stay-details]').forEach((button) => button.addEventListener('click',() => openDetails(button.dataset.ownerPlan,button.dataset.stayDetails)));
+  document.querySelectorAll('[data-stay-details]').forEach((button) => button.addEventListener('click',(event) => {
+    const swipe=button.closest('.our-stay-swipe');
+    if(swipe?.classList.contains('is-delete-open')){event.preventDefault();return;}
+    openDetails(button.dataset.ownerPlan,button.dataset.stayDetails);
+  }));
   document.querySelectorAll('[data-select-stay]').forEach((button) => button.addEventListener('click',() => selectStay(button.dataset.ownerPlan,button.dataset.selectStay)));
   bindStaySwipeDelete();
 }
