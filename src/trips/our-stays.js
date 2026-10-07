@@ -100,21 +100,20 @@ function tripHistory(favorite, plan){
     .filter((row) => row.start === plan.meta.start && row.end === plan.meta.end)
     .sort((a,b) => String(a.checkedAt).localeCompare(String(b.checkedAt)));
 }
-function latestAny(favorite){
-  return [...(Array.isArray(favorite.history) ? favorite.history : [])]
-    .sort((a,b) => String(a.checkedAt).localeCompare(String(b.checkedAt))).pop() || null;
-}
 function priceInfo(favorite, plan){
-  const history = tripHistory(favorite, plan);
-  const current = history[history.length - 1] || null;
-  const previous = history[history.length - 2] || null;
-  const latest = current || latestAny(favorite);
-  let change = '';
-  if (current && previous) {
-    const diff = Math.round((Number(current.price) - Number(previous.price)) * 100) / 100;
-    change = Math.abs(diff) < .01 ? 'Same' : diff < 0 ? '↓ ' + money(Math.abs(diff)) : '↑ ' + money(diff);
+  if(!plan)return {current:null,previous:null,latest:null,change:'',unavailable:false};
+  const events=tripHistory(favorite,plan);
+  const latestEvent=events[events.length-1]||null;
+  const unavailable=latestEvent?.status==='unavailable';
+  const prices=events.filter((row)=>row.status!=='unavailable'&&row.price!==''&&row.price!=null);
+  const current=prices[prices.length-1]||null;
+  const previous=prices[prices.length-2]||null;
+  let change='';
+  if(current&&previous){
+    const diff=Math.round((Number(current.price)-Number(previous.price))*100)/100;
+    change=Math.abs(diff)<.01?'Same':diff<0?'↓ '+money(Math.abs(diff)):'↑ '+money(diff);
   }
-  return { current, previous, latest, change };
+  return {current,previous,latest:current,change,unavailable};
 }
 function isSelected(favorite, plan){
   const chosen=plan?.stayTracker?.selected||{};
@@ -124,10 +123,12 @@ function tripName(plan){
   return clean(plan?.meta?.city)||clean(plan?.meta?.otherLocation)||clean(plan?.meta?.location)||'Trip';
 }
 function sortedFavorites(plan){
-  return allFavorites().sort((a,b) => {
-    const pa = Number(priceInfo(a,plan).latest?.price || Infinity);
-    const pb = Number(priceInfo(b,plan).latest?.price || Infinity);
-    if (pa !== pb) return pa - pb;
+  return allFavorites().sort((a,b)=>{
+    if(!plan)return clean(a.name).localeCompare(clean(b.name));
+    const ia=priceInfo(a,plan),ib=priceInfo(b,plan);
+    if(ia.unavailable!==ib.unavailable)return ia.unavailable?1:-1;
+    const pa=Number(ia.current?.price||Infinity),pb=Number(ib.current?.price||Infinity);
+    if(pa!==pb)return pa-pb;
     return clean(a.name).localeCompare(clean(b.name));
   });
 }
@@ -180,23 +181,21 @@ function overviewPanel(){
 }
 function stayCard(favorite,plan){
   const info=priceInfo(favorite,plan);
-  const displayPrice=info.latest?.price;
   const selected=!!plan&&isSelected(favorite,plan);
   const note=clean(favorite.note);
   return '<article class="our-stay-swipe" data-stay-swipe="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
     '<button class="our-stay-delete-underlay" type="button" data-swipe-delete="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Delete</button>' +
-    '<div class="our-stay-card'+(selected?' is-selected':'')+'">' +
+    '<div class="our-stay-card'+(selected?' is-selected':'')+(info.unavailable?' is-unavailable':'')+'">' +
       '<button class="our-stay-main" type="button" data-stay-details="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
         '<span class="our-stay-photo '+(favorite.image?'':'is-empty')+'"'+(favorite.image?' style="background-image:url(&quot;'+esc(favorite.image)+'&quot;)"':'')+'></span>' +
         '<span class="our-stay-copy"><strong>'+esc(favorite.name||'Airbnb stay')+'</strong><small>'+(plan?esc(dateRange(plan.meta.start,plan.meta.end)):'Saved Airbnb')+'</small>' +
           (note?'<em>♡ '+esc(note)+'</em>':'') +
         '</span>' +
-        '<span class="our-stay-money"><strong>'+(displayPrice!=null?money(displayPrice):'—')+'</strong>' +
-          (info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'') +
-          '<i>›</i>' +
-        '</span>' +
+        (plan?'<span class="our-stay-money">'+
+          (info.unavailable?'<strong class="unavailable-label">Unavailable</strong>':('<strong>'+(info.current?money(info.current.price):'Add price')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')))+
+          '<i>›</i></span>':'<span class="our-stay-money is-overview"><i>›</i></span>') +
       '</button>' +
-      (plan&&!selected?'<div class="our-stay-quick"><button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select this stay</button></div>':'') +
+      (plan&&!selected&&!info.unavailable?'<div class="our-stay-quick"><button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select this stay</button></div>':'') +
       (selected?'<div class="our-stay-selected">♡ Selected for this trip</div>':'') +
     '</div>' +
   '</article>';
@@ -307,23 +306,22 @@ async function saveFavorite(){
   }
 }
 function openDetails(ownerPlanId,favoriteId){
-  const found=favoriteById(ownerPlanId,favoriteId); if(!found)return;
+  const found=favoriteById(ownerPlanId,favoriteId);if(!found)return;
   const plan=selectedPlan();
   const selected=!!plan&&isSelected(found.favorite,plan);
   const info=priceInfo(found.favorite,plan);
-  const rows=[...(found.favorite.history||[])].sort((a,b)=>String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,4);
+  const rows=plan?tripHistory(found.favorite,plan).filter((row)=>row.status!=='unavailable'&&row.price!==''&&row.price!=null).slice().reverse().slice(0,4):[];
   const link=plan?buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}):found.favorite.url;
   const subtitle=plan?dateRange(plan.meta.start,plan.meta.end,true):'Saved in Our Stays';
   showModal(modalHead('AIRBNB',found.favorite.name,subtitle) +
-    (found.favorite.image?'<div class="stay-detail-photo" style="background-image:url(&quot;'+esc(found.favorite.image)+'&quot;)"></div>':'<div class="stay-detail-photo is-empty">⌂</div>') +
-    '<div class="stay-detail-price"><span>Latest price</span><strong>'+(info.latest?money(info.latest.price):'—')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')+'</div>' +
+    (found.favorite.image?'<div class="stay-detail-photo'+(info.unavailable?' is-unavailable':'')+'" style="background-image:url(&quot;'+esc(found.favorite.image)+'&quot;)"></div>':'<div class="stay-detail-photo is-empty">⌂</div>') +
+    (plan?(info.unavailable?'<div class="stay-detail-unavailable"><strong>Unavailable</strong><span>Not available for these trip dates.</span></div>':'<div class="stay-detail-price"><span>Current price</span><strong>'+(info.current?money(info.current.price):'—')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')+'</div>'):'') +
     (found.favorite.note?'<div class="stay-detail-notes"><span>Our note</span><p>'+esc(found.favorite.note)+'</p></div>':'') +
-    (plan?'<div class="stay-detail-primary">'+
-      (!selected?'<button id="stayDetailSelect" class="stay-modal-primary" type="button">Select this stay</button>':'<button id="stayDetailExpense" class="stay-modal-primary" type="button">Edit in trip</button><button id="stayDetailUnselect" class="stay-text-danger" type="button">Unselect from trip</button>')+
-    '</div>':'') +
+    (plan?'<div class="stay-detail-primary">'+(!selected&&!info.unavailable&&info.current?'<button id="stayDetailSelect" class="stay-modal-primary" type="button">Select this stay</button>':'')+(selected?'<button id="stayDetailExpense" class="stay-modal-primary" type="button">Edit in trip</button><button id="stayDetailUnselect" class="stay-text-danger" type="button">Unselect from trip</button>':'')+'</div>':'') +
     '<a class="stay-airbnb-action" href="'+esc(link)+'" target="_blank" rel="noopener noreferrer"><span class="stay-airbnb-mark">⌂</span><span><strong>Open in Airbnb</strong><small>'+(plan?'Dates + 2 guests ready':'View this stay')+'</small></span><b>↗</b></a>' +
     '<div class="stay-detail-chips">' +
-      (plan?'<button id="stayDetailPrice" type="button">€ Update price</button>':'') +
+      (plan?'<button id="stayDetailPrice" type="button">€ '+(info.current?'Update price':'Add price')+'</button>':'') +
+      (plan&&!info.unavailable?'<button id="stayDetailUnavailable" type="button">Unavailable</button>':'') +
       '<button id="stayEditNotes" type="button">♡ '+(found.favorite.note?'Edit note':'Add note')+'</button>' +
     '</div>' +
     (rows.length>1?'<details class="stay-detail-history"><summary>Price history</summary>'+rows.map((row)=>'<div><b>'+money(row.price)+'</b><small>'+esc(dateRange(row.start,row.end))+'</small></div>').join('')+'</details>':''));
@@ -331,6 +329,7 @@ function openDetails(ownerPlanId,favoriteId){
   document.getElementById('stayDetailExpense')?.addEventListener('click',()=>openTripExpenseEditor(plan.id,plan.stayTracker?.selected?.expenseId||''));
   document.getElementById('stayDetailUnselect')?.addEventListener('click',()=>unselectStay(plan.id));
   document.getElementById('stayDetailPrice')?.addEventListener('click',()=>openPriceModal(ownerPlanId,favoriteId,plan.id));
+  document.getElementById('stayDetailUnavailable')?.addEventListener('click',()=>markUnavailable(ownerPlanId,favoriteId,plan.id));
   document.getElementById('stayEditNotes')?.addEventListener('click',()=>openEditNotes(ownerPlanId,favoriteId));
 }
 function openEditNotes(ownerPlanId,favoriteId){
@@ -415,6 +414,15 @@ function openPriceModal(ownerPlanId,favoriteId,planId){
       '<label><span>Current total price</span><div class="stay-big-price"><b>€</b><input id="stayUpdatedPrice" inputmode="decimal" value="'+esc(info.current?.price??info.latest?.price??'')+'" placeholder="0"></div></label>' +
       '<button id="stayPriceSave" class="stay-modal-primary" type="button">Update price</button></div>',{back:()=>openDetails(ownerPlanId,favoriteId)});
   document.getElementById('stayPriceSave')?.addEventListener('click',()=>updatePrice(ownerPlanId,favoriteId,plan.id));
+}
+async function markUnavailable(ownerPlanId,favoriteId,planId){
+  const plan=planById(planId),who=actor();if(!plan||!who)return;
+  try{
+    await post('markStayFavoriteUnavailable',{favoriteId,contextPlanId:plan.id,checkedAt:new Date().toISOString()},who);
+    toast('Marked unavailable for this trip');
+    await refreshState();
+    openDetails(ownerPlanId,favoriteId);
+  }catch(error){toast(error.message||'Could not mark this stay unavailable','warn');}
 }
 async function updatePrice(ownerPlanId,favoriteId,planId){
   const plan=planById(planId),who=actor(); if(!plan||!who)return;
