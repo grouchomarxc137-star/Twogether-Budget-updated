@@ -6,7 +6,8 @@
 // src/shop/boot.js for why that ordering matters.
 import { installPwa } from './app/pwa.js';
 import { initNotifications } from './app/notifications.js';
-import { initPushNotifications } from './app/push.js';\nimport './trips/stay-tracker.js';
+import { initPushNotifications } from './app/push.js';
+import './trips/stay-tracker.js';
 
 installPwa();
 initPushNotifications();
