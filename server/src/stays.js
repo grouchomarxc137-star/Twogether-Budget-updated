@@ -117,7 +117,20 @@ function cityLabel(details) {
   return cleanString(textValue(details?.location?.city_name) || textValue(details?.city_name) || textValue(details?.location?.address) || '', 160);
 }
 function totalPrice(item) {
-  const candidates = [item?.price?.total?.booker, item?.price?.total, item?.price?.display?.booker, item?.price?.display, item?.price?.base?.booker, item?.price?.base];
+  const candidates = [
+    item?.price?.total?.booker_currency,
+    item?.price?.total?.accommodation_currency,
+    item?.price?.total?.booker,
+    item?.price?.total,
+    item?.price?.display?.booker_currency,
+    item?.price?.display?.accommodation_currency,
+    item?.price?.display?.booker,
+    item?.price?.display,
+    item?.price?.base?.booker_currency,
+    item?.price?.base?.accommodation_currency,
+    item?.price?.base?.booker,
+    item?.price?.base,
+  ];
   for (const candidate of candidates) {
     if (Number.isFinite(Number(candidate))) return Number(candidate);
   }
