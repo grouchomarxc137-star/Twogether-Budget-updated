@@ -26,9 +26,21 @@ let selectedMonthlyKey = '';
 let monthlyViewMode = 'combined';
 let monthlyIgnoreClickUntil = 0;
 
+// One historical development-only trip remains in persisted data. Keep it out
+// of every user-facing trip view and aggregate without touching stored data.
+function isExcludedTestTrip(trip) {
+  const meta = tripMeta(trip);
+  return String(meta?.city || '').trim().toLowerCase() === 'test'
+    && String(meta?.start || '') === '2026-08-01'
+    && String(meta?.end || '') === '2026-08-02';
+}
+function visibleTrips(state = getState()) {
+  return (Array.isArray(state?.trips) ? state.trips : []).filter((trip) => !isExcludedTestTrip(trip));
+}
+
 export function preloadTripGalleryImages() {
   const state = getState();
-  const urls = state.trips.filter(isLocked).map((trip) => {
+  const urls = visibleTrips(state).filter(isLocked).map((trip) => {
     const meta = tripMeta(trip);
     const city = meta.city || locationLabel(meta);
     return tripImage(city, locationLabel(meta), trip.id);
@@ -40,12 +52,13 @@ export function renderTripGallery() {
   const root = $('#tripGallery');
   if (!root) return;
   const state = getState();
-  if (!state.trips.length) {
+  const trips = visibleTrips(state);
+  if (!trips.length) {
     root.innerHTML = '<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>';
     return;
   }
 
-  const sorted = state.trips.filter(isLocked).sort((a, b) => String(tripMeta(b).start || b.updatedAt || '').localeCompare(String(tripMeta(a).start || a.updatedAt || '')));
+  const sorted = trips.filter(isLocked).sort((a, b) => String(tripMeta(b).start || b.updatedAt || '').localeCompare(String(tripMeta(a).start || a.updatedAt || '')));
   root.innerHTML = sorted.map((t) => {
     const e = effectiveTrip(t), m = tripMeta(t), d = differences(t), budget = budgetInfo(t);
     let status = ''; let statusClass = 'status-wait';
@@ -101,7 +114,7 @@ function renderTripModal(id) {
   const root = $('#tripModalBody');
   const state = getState();
   if (root) root.dataset.tripId = id;
-  const t = state.trips.find((x) => x.id === id);
+  const t = visibleTrips(state).find((x) => x.id === id);
   if (!root || !t) return;
   const e = effectiveTrip(t), m = tripMeta(t), diff = differences(t), budget = budgetInfo(t);
   const both = !!(t.submissions.Principessa && t.submissions.Principe);
@@ -238,7 +251,7 @@ function personalMonthlyStat(state, monthKey, person, tripCount) {
 export function renderMonthly() {
   const body = $('#monthlyBody');
   if (!body) return;
-  const trips = getState().trips.map(effectiveTrip);
+  const trips = visibleTrips().map(effectiveTrip);
   const stats = MONTHS.map(([key, label]) => {
     const monthTrips = trips.filter((t) => String(t.start || '').slice(0, 7) === key);
     const s = { key, label, trips: monthTrips.length, accom: 0, groceries: 0, eat: 0, travel: 0, fuel: 0, tolls: 0, other: 0, total: 0, estimated: false };
@@ -371,7 +384,7 @@ export function renderMonthly() {
 }
 
 function actualCurrentSituation() {
-  const trips = getState().trips.filter((t) => {
+  const trips = visibleTrips().filter((t) => {
     const start = tripMeta(t).start || '';
     return start >= '2026-01-01' && start <= '2026-12-31';
   });
