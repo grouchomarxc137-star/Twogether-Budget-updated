@@ -370,6 +370,10 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
       ownerPlan.stayTracker.saved = ownerPlan.stayTracker.saved.filter(function(item){ return item.id !== favoriteId; });
       const now = new Date().toISOString();
+      const ownerSelected = ownerPlan.stayTracker && ownerPlan.stayTracker.selected || {};
+      if (ownerSelected.ownerPlanId === ownerPlanId && ownerSelected.favoriteId === favoriteId) {
+        ownerPlan.stayTracker.selected = sanitizeStaySelection_({});
+      }
       ownerPlan.updatedAt = now;
       ownerPlan.updatedBy = actor;
       state.plans[ownerPlanIdx] = ownerPlan;
