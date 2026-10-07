@@ -211,8 +211,8 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         }
       } else {
         const meta = sanitizePlanMeta_(payload.meta || {});
-        if (!meta.location || !meta.city || !meta.start || !meta.end) {
-          throw new Error('Add the trip location, city and dates first');
+        if (!meta.location || (!meta.city && meta.location !== 'Italy') || !meta.start || !meta.end) {
+          throw new Error(meta.location === 'Italy' ? 'Add the trip location and dates first' : 'Add the trip location, city and dates first');
         }
         plan = sanitizePlan_({
           id: Utilities.getUuid(),
@@ -248,6 +248,32 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true, planId:plan.id});
     }
 
+
+    if (action === 'saveStayTrackerSnapshot') {
+      const planId = cleanText_(payload.planId, 80);
+      const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      if (planIdx < 0) throw new Error('Budget plan not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const checkedAt = cleanText_(payload.checkedAt, 40) || new Date().toISOString();
+      const rows = (Array.isArray(payload.results) ? payload.results : []).slice(0,60).map(function(item){
+        return sanitizeStayTrackerSnapshot_(Object.assign({}, item, {checkedAt:cleanText_(item && item.checkedAt,40) || checkedAt}));
+      }).filter(function(item){ return item.accommodationId && item.price !== ''; });
+      plan.stayTracker.area = ['lake-garda','bergamo'].indexOf(String(payload.area || '')) >= 0 ? String(payload.area) : plan.stayTracker.area;
+      const existing = Array.isArray(plan.stayTracker.history) ? plan.stayTracker.history : [];
+      const seen = new Set(existing.map(function(item){ return item.accommodationId+'|'+item.checkedAt; }));
+      rows.forEach(function(item){
+        const key=item.accommodationId+'|'+item.checkedAt;
+        if(!seen.has(key)){existing.push(item);seen.add(key);}
+      });
+      plan.stayTracker.history = existing.slice(-800);
+      plan.stayTracker.lastCheckedAt = checkedAt;
+      plan.updatedAt = new Date().toISOString();
+      plan.updatedBy = actor;
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, 'saveStayTrackerSnapshot', plan.id);
+      saveState_(state);
+      return output_({ok:true,planId:plan.id,stayTracker:plan.stayTracker});
+    }
 
     if (action === 'saveAccommodationExpense') {
       const planId = cleanText_(payload.planId, 80);
@@ -2258,6 +2284,27 @@ function tripSettlement_(plan) {
   };
 }
 
+function sanitizeStayTrackerSnapshot_(item) {
+  const source=item&&typeof item==='object'?item:{};
+  return {
+    accommodationId:cleanText_(source.accommodationId,100),
+    name:cleanText_(source.name,180),
+    price:cleanMoney_(source.price),
+    currency:cleanText_(source.currency,8)||'EUR',
+    url:cleanText_(source.url,900),
+    checkedAt:cleanText_(source.checkedAt,40)
+  };
+}
+function sanitizeStayTracker_(value) {
+  const source=value&&typeof value==='object'?value:{};
+  const area=['lake-garda','bergamo'].indexOf(String(source.area||''))>=0?String(source.area):'lake-garda';
+  return {
+    area:area,
+    lastCheckedAt:cleanText_(source.lastCheckedAt,40),
+    history:(Array.isArray(source.history)?source.history:[]).slice(-800).map(sanitizeStayTrackerSnapshot_).filter(function(item){return item.accommodationId&&item.price!==''&&item.checkedAt;})
+  };
+}
+
 function sanitizePlan_(plan) {
   const budgets = plan && plan.budgets || {};
   const partials = plan && plan.partials || {};
@@ -2276,6 +2323,7 @@ function sanitizePlan_(plan) {
     expenseEntries:(Array.isArray(plan&&plan.expenseEntries)?plan.expenseEntries:[]).slice(-500).map(function(x){return sanitizeTripExpense_(x,x&&x.loggedBy);}).filter(function(x){return x.amount!==''&&!!x.paidBy;}),
     repayments:(Array.isArray(plan&&plan.repayments)?plan.repayments:[]).slice(-300).map(function(x){return sanitizeTripRepayment_(x,x&&x.from);}).filter(function(x){return x.amount!==''&&Number(x.amount)>0&&!!x.from&&!!x.to&&x.from!==x.to;}),
     prep: sanitizeTripPrep_(plan && plan.prep),
+    stayTracker: sanitizeStayTracker_(plan && plan.stayTracker),
     linkedTripId: cleanText_(plan && plan.linkedTripId, 80),
     createdAt: cleanText_(plan && plan.createdAt, 40),
     createdBy: cleanActor_(plan && plan.createdBy),
@@ -2374,7 +2422,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
