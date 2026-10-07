@@ -719,7 +719,9 @@ function installSurfaceNavigation() {
     if (!explicitClose && !outside) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    goSurfaceHome();
+    // Expense editors sit on top of a trip card; dismiss only the editor.
+    if (surface.matches('.tv2-expense-layer')) goSurfaceBack(surface);
+    else goSurfaceHome();
   }, true);
 
   document.addEventListener('touchstart', (event) => {
