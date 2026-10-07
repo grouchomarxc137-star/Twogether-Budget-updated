@@ -112,9 +112,18 @@ function ensureCurrentTrips() {
 }
 
 function expenseTotal(plan, trip) {
+  const entries = tripEntries(plan);
+  if (entries.length) {
+    return entries.reduce((sum, entry) => {
+      const amount = Math.max(0, n(entry?.amount));
+      const jar = Math.min(amount, Math.max(0, n(entry?.jarContribution)));
+      return sum + (amount - jar);
+    }, 0);
+  }
+
   const a = trip?.submissions?.Principessa || plan?.partials?.Principessa || {};
   const b = trip?.submissions?.Principe || plan?.partials?.Principe || {};
-  const legacy = MONEY_KEYS.reduce((sum, key) => {
+  return MONEY_KEYS.reduce((sum, key) => {
     const shared = plan?.sharedExpenses?.[key] || trip?.sharedExpenses?.[key];
     const total = has(shared?.total)
       ? n(shared.total)
@@ -125,11 +134,6 @@ function expenseTotal(plan, trip) {
         })();
     const jar = key === 'accom' ? Math.min(total, Math.max(0, n(shared?.accommodation?.jarContribution))) : 0;
     return sum + Math.max(0, total - jar);
-  }, 0);
-  return legacy + tripEntries(plan).reduce((sum, entry) => {
-    const amount = Math.max(0, n(entry?.amount));
-    const jar = Math.min(amount, Math.max(0, n(entry?.jarContribution)));
-    return sum + (amount - jar);
   }, 0);
 }
 
