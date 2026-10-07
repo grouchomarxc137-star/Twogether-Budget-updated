@@ -61,6 +61,7 @@ export function openDatabase(databasePath) {
 
   const putAppState = db.prepare('INSERT OR IGNORE INTO app_state (key, json) VALUES (?, ?)');
   putAppState.run('sharedJar', encode(DEFAULT_JAR));
+  putAppState.run('stayFavorites', '[]');
   putAppState.run('tripPrepDefaults', encode(DEFAULT_TRIP_PREP_DEFAULTS));
   putAppState.run('compare', encode(DEFAULT_COMPARE));
   putAppState.run('gameSignals', '[]');
@@ -109,6 +110,7 @@ export function openDatabase(databasePath) {
       version: Number(meta.version) || 18,
       trips: selectTrips.all().map((row) => decode(row.json, {})),
       plans: selectPlans.all().map((row) => decode(row.json, {})),
+      stayFavorites: decode(appValue.get('stayFavorites')?.json, []),
       finances,
       financeProfiles,
       sharedJar: decode(appValue.get('sharedJar')?.json, DEFAULT_JAR),
@@ -145,6 +147,7 @@ export function openDatabase(databasePath) {
     }
 
     upsertAppState.run('sharedJar', encode(state.sharedJar || DEFAULT_JAR));
+    upsertAppState.run('stayFavorites', encode(state.stayFavorites || []));
     upsertAppState.run('tripPrepDefaults', encode(state.tripPrepDefaults || DEFAULT_TRIP_PREP_DEFAULTS));
     upsertAppState.run('compare', encode(state.compare || DEFAULT_COMPARE));
     upsertAppState.run('gameSignals', encode(state.game?.signals || []));
@@ -154,7 +157,7 @@ export function openDatabase(databasePath) {
 
   function reset() {
     writeTransaction({
-      version: 18, trips: [], plans: [], finances: { Principessa: [], Principe: [] },
+      version: 18, trips: [], plans: [], stayFavorites: [], finances: { Principessa: [], Principe: [] },
       financeProfiles: { Principessa: clone(DEFAULT_FINANCE_PROFILE), Principe: clone(DEFAULT_FINANCE_PROFILE) },
       sharedJar: clone(DEFAULT_JAR),
       tripPrepDefaults: clone(DEFAULT_TRIP_PREP_DEFAULTS),
