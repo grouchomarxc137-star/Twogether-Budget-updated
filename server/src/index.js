@@ -5,6 +5,7 @@ import express from 'express';
 import { configureStateStore, getState, runAction } from './core.js';
 import { openDatabase } from './db/index.js';
 import { createPushService } from './push.js';
+import { createStaySearchService } from './stays.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const databasePath = resolve(process.env.DATABASE_PATH || resolve(here, '../data/twogether.db'));
@@ -19,6 +20,9 @@ const database = openDatabase(databasePath);
 configureStateStore(database.store);
 const pushService = createPushService({
   db: database.db,
+  readState: () => database.db.transaction(() => getState())(),
+});
+const staySearchService = createStaySearchService({
   readState: () => database.db.transaction(() => getState())(),
 });
 
@@ -75,6 +79,21 @@ app.get('/api/events', (req, res) => {
   res.write('retry: 1500\n\n');
   liveClients.set(key, { clientId, res });
   req.on('close', () => liveClients.delete(key));
+});
+
+app.get('/api/stays/areas', (_req, res) => {
+  res.json({ ok:true, areas:staySearchService.areas() });
+});
+
+app.post('/api/stays/search', async (req, res) => {
+  try {
+    res.json(await staySearchService.search(req.body || {}));
+  } catch (error) {
+    res.status(error?.code === 'BOOKING_NOT_CONFIGURED' ? 503 : 400).json({
+      ok:false,
+      error:error?.message || 'Could not check live accommodation prices',
+    });
+  }
 });
 
 app.get('/api/push/public-key', (_req, res) => {
