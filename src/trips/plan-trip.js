@@ -207,12 +207,19 @@ async function saveTrip() {
   const button = $('[data-plan-save]');
   if (button) button.disabled = true;
   try {
-    await post('savePlan', { meta, budget }, name);
+    const saved = await post('savePlan', { meta, budget }, name);
     closeBudgetModal();
-    toast('Trip planned — Stay Tracker is ready');
-    await refreshState();
+    toast('Trip planned');
+    const latest = await refreshState();
     setTimeout(() => window.TwogetherV18?.refresh?.(true), 80);
-    setTimeout(() => document.querySelector('[data-sheet="stay-tracker"]')?.click(), 120);
+    const savedPlan = latest?.plans?.find?.((item) => item.id === saved?.planId);
+    const accomTotal = savedPlan?.sharedExpenses?.accom?.total;
+    const hasAccommodation = accomTotal !== '' && accomTotal != null;
+    if (String(meta.location || '').toLowerCase() === 'italy' && !hasAccommodation) {
+      setTimeout(() => document.dispatchEvent(new CustomEvent('twogether:open-our-stays', { detail:{ planId:saved?.planId || '' } })), 100);
+    } else {
+      setTimeout(() => $('#twCurrentTripsSection')?.scrollIntoView({ behavior:'smooth', block:'start' }), 120);
+    }
   } catch (error) {
     toast(error.message || 'Could not save the trip', 'warn');
     if (button) button.disabled = false;
