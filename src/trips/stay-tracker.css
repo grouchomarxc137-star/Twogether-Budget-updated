@@ -207,3 +207,39 @@ body.stay-modal-open{overflow:hidden}
   font-size:11.5px;
   text-align:right;
 }
+
+.our-stay-trip-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:0 10px 10px;
+}
+.our-stay-trip-actions>a{
+  min-height:34px;
+  padding:0 10px;
+  border:1px solid #ead9dd;
+  border-radius:999px;
+  background:var(--stay-rose);
+  color:var(--stay-rose-ink);
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  text-decoration:none;
+  font-size:11.5px;
+  font-weight:650;
+}
+.our-stay-trip-actions>a span{
+  font-size:12px;
+  opacity:.75;
+}
+.our-stay-trip-actions .select{
+  min-height:34px;
+  padding:0 12px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:var(--tv2-primary)!important;
+  color:var(--tv2-on-primary)!important;
+  font-size:11.5px!important;
+  font-weight:650!important;
+}
