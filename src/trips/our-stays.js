@@ -154,7 +154,7 @@ function stayCard(favorite, plan){
       '<a href="' + esc(checkUrl) + '" target="_blank" rel="noopener noreferrer">' + (plan ? 'Check dates' : 'Open') + ' ↗</a>' +
       (plan ? '<button type="button" data-update-price="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Update price</button>' : '') +
       (plan && !expenseExists ? '<button class="select" type="button" data-select-stay="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Select</button>' : '') +
-      (selected ? '<span class="selected">✓ Selected</span>' : '') +
+      (selected ? '<span class="selected">✓ Selected</span><button type="button" data-unselect-stay>Unselect</button>' : '') +
       (plan && expenseExists ? '<button type="button" data-edit-accommodation>Trip expense</button>' : '') +
     '</div>' +
   '</article>';
@@ -190,6 +190,7 @@ function bind(){
   document.querySelectorAll('[data-stay-details]').forEach((button) => button.addEventListener('click',() => openDetails(button.dataset.ownerPlan,button.dataset.stayDetails)));
   document.querySelectorAll('[data-update-price]').forEach((button) => button.addEventListener('click',() => openPriceModal(button.dataset.ownerPlan,button.dataset.updatePrice)));
   document.querySelectorAll('[data-select-stay]').forEach((button) => button.addEventListener('click',() => selectStay(button.dataset.ownerPlan,button.dataset.selectStay)));
+  document.querySelectorAll('[data-unselect-stay]').forEach((button) => button.addEventListener('click',unselectStay));
   document.querySelectorAll('[data-edit-accommodation]').forEach((button) => button.addEventListener('click',openTripExpenseEditor));
 }
 function favoriteById(ownerPlanId,favoriteId){
@@ -322,6 +323,15 @@ async function selectStay(ownerPlanId,favoriteId){
     toast('Stay selected and accommodation expense logged');
     await refreshState();
   } catch (error) { toast(error.message || 'Could not select this stay','warn'); }
+}
+async function unselectStay(){
+  const plan = selectedPlan(), who = actor(); if (!plan || !who) return;
+  if (!window.confirm('Unselect this stay? Its accommodation expense will be removed from this trip too.')) return;
+  try {
+    await post('unselectStayForTrip',{planId:plan.id},who);
+    toast('Stay unselected and accommodation expense removed');
+    await refreshState();
+  } catch (error) { toast(error.message || 'Could not unselect this stay','warn'); }
 }
 function openTripExpenseEditor(){
   const plan = selectedPlan(); if (!plan) return;
