@@ -1,4 +1,5 @@
 name: Our Stays card correction verification
+# verify clean card UI
 on:
   push:
     branches: [test]
