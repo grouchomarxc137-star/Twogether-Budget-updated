@@ -209,10 +209,10 @@ async function saveTrip() {
   try {
     await post('savePlan', { meta, budget }, name);
     closeBudgetModal();
-    toast('Trip planned');
+    toast('Trip planned — Stay Tracker is ready');
     await refreshState();
     setTimeout(() => window.TwogetherV18?.refresh?.(true), 80);
-    setTimeout(() => $('#twCurrentTripsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    setTimeout(() => document.querySelector('[data-sheet="stay-tracker"]')?.click(), 120);
   } catch (error) {
     toast(error.message || 'Could not save the trip', 'warn');
     if (button) button.disabled = false;
