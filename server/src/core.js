@@ -338,6 +338,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const favorite = state.stayFavorites[favoriteIdx];
       favorite.history.push(sanitizeStayFavoritePrice_({
         price:price,
+        status:'available',
         checkedAt:now,
         planId:safeContext ? safeContext.id : '',
         start:safeContext ? safeContext.meta.start : '',
@@ -347,6 +348,33 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       favorite.updatedAt = now;
       state.stayFavorites[favoriteIdx] = favorite;
       addAudit_(state, actor, 'updateStayFavoritePrice', favorite.id);
+      saveState_(state);
+      return output_({ok:true,favorite:favorite,ownerPlanId:''});
+    }
+
+    if (action === 'markStayFavoriteUnavailable') {
+      const favoriteId = cleanText_(payload.favoriteId,80);
+      const contextPlanId = cleanText_(payload.contextPlanId,80);
+      const contextPlan = state.plans.find(function(x){ return x.id === contextPlanId; });
+      if (!contextPlan) throw new Error('Trip not found');
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
+      const favoriteIdx = state.stayFavorites.findIndex(function(item){ return item.id === favoriteId; });
+      if (favoriteIdx < 0) throw new Error('Accommodation not found');
+      const safeContext = sanitizePlan_(contextPlan);
+      const now = cleanText_(payload.checkedAt,40) || new Date().toISOString();
+      const favorite = state.stayFavorites[favoriteIdx];
+      favorite.history.push(sanitizeStayFavoritePrice_({
+        price:'',
+        status:'unavailable',
+        checkedAt:now,
+        planId:safeContext.id,
+        start:safeContext.meta.start,
+        end:safeContext.meta.end
+      }));
+      favorite.history = favorite.history.slice(-200);
+      favorite.updatedAt = now;
+      state.stayFavorites[favoriteIdx] = favorite;
+      addAudit_(state, actor, 'markStayFavoriteUnavailable', favorite.id);
       saveState_(state);
       return output_({ok:true,favorite:favorite,ownerPlanId:''});
     }
@@ -2561,6 +2589,7 @@ function sanitizeStayFavoritePrice_(item) {
   const source=item&&typeof item==='object'?item:{};
   return {
     price:cleanMoney_(source.price),
+    status:cleanText_(source.status,20)==='unavailable'?'unavailable':'available',
     checkedAt:cleanText_(source.checkedAt,40),
     planId:cleanText_(source.planId,80),
     start:cleanText_(source.start,20),
@@ -2580,7 +2609,7 @@ function sanitizeStayFavorite_(item) {
     image:cleanText_(source.image,900),
     note:cleanText_(source.note,500),
     requirements:sanitizeStayPreferences_(source.requirements),
-    history:(Array.isArray(source.history)?source.history:[]).slice(-200).map(sanitizeStayFavoritePrice_).filter(function(x){return x.price!==''&&x.checkedAt;}),
+    history:(Array.isArray(source.history)?source.history:[]).slice(-200).map(sanitizeStayFavoritePrice_).filter(function(x){return x.checkedAt&&(x.price!==''||x.status==='unavailable');}),
     createdAt:cleanText_(source.createdAt,40),
     updatedAt:cleanText_(source.updatedAt,40)
   };
@@ -2774,7 +2803,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
