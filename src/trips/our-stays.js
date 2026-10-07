@@ -1,6 +1,6 @@
 import { actor, esc, money, post } from './budget-state.js';
 import { toast } from '../lib/toast.js';
-import { buildAirbnbSearchUrl, buildListingCheckUrl } from './stay-search-links.js';
+import { buildAirbnbSearchUrl, buildListingCheckUrl, OUR_STAYS_ITALY_BOUNDS } from './stay-search-links.js';
 
 const API_BASE = import.meta.env?.DEV ? 'http://localhost:4310' : '';
 const ROOT_ID = 'stayTrackerRoot';
@@ -100,12 +100,19 @@ function planOptions(){
       esc((plan.meta.city || plan.meta.location || 'Trip') + ' · ' + dateRange(plan.meta.start,plan.meta.end)) + '</option>').join('');
 }
 function searchPanel(plan){
-  const input = { destination:destinationFor(plan), start:plan.meta.start, end:plan.meta.end, adults:2 };
+  const broadItaly = isItalian(plan);
+  const input = {
+    destination:broadItaly ? 'Bergamo to Lake Garda, Italy' : destinationFor(plan),
+    bounds:broadItaly ? OUR_STAYS_ITALY_BOUNDS : null,
+    start:plan.meta.start,
+    end:plan.meta.end,
+    adults:2
+  };
   const airbnb = buildAirbnbSearchUrl(input);
   return '<section class="our-stays-search">' +
-    '<div class="our-stays-search-copy"><span class="stay-label">FIND A PLACE</span><strong>' + esc(destinationFor(plan)) + '</strong><p>' + esc(dateRange(plan.meta.start,plan.meta.end)) + ' · 2 guests already filled in.</p></div>' +
+    '<div class="our-stays-search-copy"><span class="stay-label">FIND A PLACE</span><strong>' + esc(broadItaly ? 'Bergamo → Lonato → Lake Garda' : destinationFor(plan)) + '</strong><p>' + esc(dateRange(plan.meta.start,plan.meta.end)) + ' · 2 guests · Manerba to Peschiera, including inland Lonato and Bergamo.</p></div>' +
     '<div class="our-stays-search-links">' +
-      '<a class="airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer"><b>⌂</b><span>Search Airbnb<small>Dates + 2 guests ready</small></span><i>↗</i></a>' +
+      '<a class="airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer"><b>⌂</b><span>Search Airbnb<small>Dates + guests + our area ready</small></span><i>↗</i></a>' +
     '</div>' +
     (hasAccommodationExpense(plan) ? '<div class="our-stays-expense-done">✓ Accommodation expense already logged for this trip. Our Stays will not add another.</div>' : '') +
   '</section>';
