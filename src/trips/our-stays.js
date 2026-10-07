@@ -17,11 +17,27 @@ function plans(){
     .sort((a,b) => String(a.meta.start).localeCompare(String(b.meta.start)));
 }
 function planById(id){ return plans().find((plan) => plan.id === id) || null; }
-function selectedPlan(){ return selectedPlanId === OVERVIEW ? null : planById(selectedPlanId); }
-function hasAccommodationExpense(plan){
-  const total = plan?.sharedExpenses?.accom?.total;
-  return total !== '' && total != null;
+function localDay(){
+  const date=new Date();
+  const pad=(value)=>String(value).padStart(2,'0');
+  return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
 }
+function hasAccommodationExpense(plan){
+  const normalExpense=(Array.isArray(plan?.expenseEntries)?plan.expenseEntries:[]).some((entry)=>entry?.category==='accommodation');
+  const legacyTotal=plan?.sharedExpenses?.accom?.total;
+  return normalExpense || (legacyTotal !== '' && legacyTotal != null);
+}
+function tripLocked(plan){
+  if(!plan?.linkedTripId)return false;
+  const trip=(Array.isArray(state?.trips)?state.trips:[]).find((item)=>item.id===plan.linkedTripId);
+  return !!(trip?.confirmed?.Principessa && trip?.confirmed?.Principe);
+}
+function eligiblePlans(){
+  const today=localDay();
+  return plans().filter((plan)=>plan.meta.end>=today && !tripLocked(plan) && !hasAccommodationExpense(plan));
+}
+function eligiblePlanById(id){ return eligiblePlans().find((plan)=>plan.id===id)||null; }
+function selectedPlan(){ return selectedPlanId === OVERVIEW ? null : eligiblePlanById(selectedPlanId); }
 function isItalian(plan){ return clean(plan?.meta?.location).toLowerCase() === 'italy'; }
 function destinationFor(plan){
   const meta = plan?.meta || {};
@@ -101,6 +117,15 @@ function isSelected(favorite, plan){
   const chosen = plan?.stayTracker?.selected || {};
   return chosen.favoriteId === favorite.id && chosen.ownerPlanId === favorite.ownerPlanId;
 }
+function selectedUsage(favorite){
+  return (Array.isArray(state?.plans)?state.plans:[]).map((plan)=>({
+    plan,
+    selected:plan?.stayTracker?.selected||{}
+  })).find(({selected})=>selected.favoriteId===favorite.id&&selected.ownerPlanId===favorite.ownerPlanId)||null;
+}
+function tripName(plan){
+  return clean(plan?.meta?.city)||clean(plan?.meta?.otherLocation)||clean(plan?.meta?.location)||'Trip';
+}
 function sortedFavorites(plan){
   return allFavorites().sort((a,b) => {
     const pa = Number(priceInfo(a,plan).latest?.price || Infinity);
@@ -109,10 +134,29 @@ function sortedFavorites(plan){
     return clean(a.name).localeCompare(clean(b.name));
   });
 }
-function planOptions(){
-  return '<option value="' + OVERVIEW + '"' + (selectedPlanId === OVERVIEW ? ' selected' : '') + '>Overview · all saved stays</option>' +
-    plans().map((plan) => '<option value="' + esc(plan.id) + '"' + (plan.id === selectedPlanId ? ' selected' : '') + '>' +
-      esc((plan.meta.city || plan.meta.location || 'Trip') + ' · ' + dateRange(plan.meta.start,plan.meta.end)) + '</option>').join('');
+function tripPicker(){
+  const plan=selectedPlan();
+  const title=plan?tripName(plan):'All saved stays';
+  const meta=plan?dateRange(plan.meta.start,plan.meta.end,true):'Choose an open trip when you are searching';
+  return '<section class="our-stays-switcher"><span class="our-stays-picker-label">Looking for</span>' +
+    '<button id="ourStayPlanPicker" class="our-stays-picker-button" type="button">' +
+      '<span><strong>'+esc(title)+'</strong><small>'+esc(meta)+'</small></span><b aria-hidden="true">⌄</b>' +
+    '</button></section>';
+}
+function openTripPicker(){
+  const open=eligiblePlans();
+  showModal(modalHead('LOOKING FOR','Choose a trip','Only open trips without an accommodation expense appear here.') +
+    '<div class="our-stays-trip-list">' +
+      '<button type="button" data-stay-plan-choice="'+OVERVIEW+'" class="'+(selectedPlanId===OVERVIEW?'active':'')+'"><span><strong>All saved stays</strong><small>Browse the whole collection</small></span><b>›</b></button>' +
+      open.map((plan)=>'<button type="button" data-stay-plan-choice="'+esc(plan.id)+'" class="'+(selectedPlanId===plan.id?'active':'')+'"><span><strong>'+esc(tripName(plan))+'</strong><small>'+esc(dateRange(plan.meta.start,plan.meta.end,true))+'</small></span><b>›</b></button>').join('') +
+      (!open.length?'<p class="our-stays-trip-list-empty">No open trips need accommodation right now.</p>':'') +
+    '</div>');
+  document.querySelectorAll('[data-stay-plan-choice]').forEach((button)=>button.addEventListener('click',()=>{
+    selectedPlanId=button.dataset.stayPlanChoice||OVERVIEW;
+    try{localStorage.setItem(VIEW_KEY,selectedPlanId);}catch{}
+    closeModal();
+    render();
+  }));
 }
 function searchPanel(plan){
   const broadItaly = isItalian(plan);
@@ -132,7 +176,6 @@ function searchPanel(plan){
       '<i>↗</i>' +
     '</a>' +
     '<div class="our-stays-tripmeta"><span>' + esc(dateRange(plan.meta.start,plan.meta.end)) + '</span><b>2 guests</b></div>' +
-    (hasAccommodationExpense(plan) ? '<button class="our-stays-expense-done" type="button" data-edit-accommodation>✓ Accommodation logged <span>Edit in Trips ›</span></button>' : '') +
   '</section>';
 }
 function overviewPanel(){
@@ -141,9 +184,8 @@ function overviewPanel(){
 function stayCard(favorite, plan){
   const info = priceInfo(favorite, plan);
   const displayPrice = info.latest?.price;
-  const selected = !!plan && isSelected(favorite,plan);
-  const expenseExists = !!plan && hasAccommodationExpense(plan);
-  return '<article class="our-stay-card' + (selected ? ' is-selected' : '') + '">' +
+  const usage = selectedUsage(favorite);
+  return '<article class="our-stay-card' + (usage ? ' is-selected' : '') + '">' +
     '<button class="our-stay-main" type="button" data-stay-details="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">' +
       '<span class="our-stay-photo ' + (favorite.image ? '' : 'is-empty') + '"' + (favorite.image ? ' style="background-image:url(&quot;' + esc(favorite.image) + '&quot;)"' : '') + '></span>' +
       '<span class="our-stay-copy"><strong>' + esc(favorite.name || 'Airbnb stay') + '</strong><small>' + (plan ? esc(dateRange(plan.meta.start,plan.meta.end)) : 'Saved Airbnb') + '</small>' +
@@ -154,22 +196,20 @@ function stayCard(favorite, plan){
         '<i>›</i>' +
       '</span>' +
     '</button>' +
-    (plan && !expenseExists ? '<div class="our-stay-quick"><button class="select" type="button" data-select-stay="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Select this stay</button></div>' : '') +
-    (selected ? '<div class="our-stay-selected">♡ Selected for this trip</div>' : '') +
+    (plan ? '<div class="our-stay-quick"><button class="select" type="button" data-select-stay="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Select this stay</button></div>' : '') +
+    (usage ? '<div class="our-stay-selected">♡ Selected · ' + esc(tripName(usage.plan)) + '</div>' : '') +
   '</article>';
 }
 function render(){
   const el = root(); if (!el) return;
-  if (selectedPlanId !== OVERVIEW && !planById(selectedPlanId)) selectedPlanId = OVERVIEW;
+  if (selectedPlanId !== OVERVIEW && !eligiblePlanById(selectedPlanId)) selectedPlanId = OVERVIEW;
   const plan = selectedPlan();
   const favorites = sortedFavorites(plan);
   el.innerHTML = '<div class="tv2-root our-stays-root"><div class="tv2-page our-stays-page">' +
     '<header class="our-stays-head"><div><h1>Our Stays</h1><p>Airbnbs we love ♡</p></div>' +
       (plan ? '<button id="ourStaySaveTop" class="our-stays-add" type="button" aria-label="Save a place">＋</button>' : '') +
     '</header>' +
-    '<section class="our-stays-switcher"><label><span>Looking for</span><select id="ourStayPlanSelect">' + planOptions() + '</select></label>' +
-      (plan ? '<div class="our-stays-date"><span>' + esc(dateRange(plan.meta.start,plan.meta.end,true)) + '</span><small>2 guests</small></div>' : '') +
-    '</section>' +
+    tripPicker() +
     (plan ? searchPanel(plan) : overviewPanel()) +
     '<section class="our-stays-collection"><div class="our-stays-section-title"><div><h2>Saved stays</h2><span>' + favorites.length + '</span></div>' +
       (plan && favorites.length ? '<button id="ourStaySaveInline" type="button">＋ Add</button>' : '') + '</div>' +
@@ -180,25 +220,25 @@ function render(){
   bind();
 }
 function bind(){
-  document.getElementById('ourStayPlanSelect')?.addEventListener('change',(event) => {
-    selectedPlanId = event.target.value;
-    try { localStorage.setItem(VIEW_KEY,selectedPlanId); } catch {}
-    render();
-  });
+  document.getElementById('ourStayPlanPicker')?.addEventListener('click',openTripPicker);
   ['ourStaySaveTop','ourStaySaveInline','ourStaySaveEmpty'].forEach((id) => document.getElementById(id)?.addEventListener('click',openSaveModal));
   document.querySelectorAll('[data-stay-details]').forEach((button) => button.addEventListener('click',() => openDetails(button.dataset.ownerPlan,button.dataset.stayDetails)));
   document.querySelectorAll('[data-select-stay]').forEach((button) => button.addEventListener('click',() => selectStay(button.dataset.ownerPlan,button.dataset.selectStay)));
-  document.querySelectorAll('[data-edit-accommodation]').forEach((button) => button.addEventListener('click',openTripExpenseEditor));
 }
 function favoriteById(ownerPlanId,favoriteId){
   const owner = (state?.plans || []).find((plan) => plan.id === ownerPlanId);
   const favorite = (owner?.stayTracker?.saved || []).find((item) => item.id === favoriteId);
   return favorite ? {owner,favorite} : null;
 }
-function showModal(inner){
+function showModal(inner,options={}){
   const host = document.getElementById('stayModalRoot'); if (!host) return;
-  host.innerHTML = '<div class="stay-modal" aria-hidden="false"><button class="stay-modal-backdrop" data-stay-close aria-label="Close"></button><section class="stay-modal-sheet" role="dialog" aria-modal="true"><span class="stay-modal-handle" aria-hidden="true"></span>' + inner + '</section></div>';
+  host.innerHTML = '<div class="stay-modal'+(options.back?' has-back':'')+'" aria-hidden="false"><button class="stay-modal-backdrop" data-stay-close aria-label="Close"></button><section class="stay-modal-sheet" role="dialog" aria-modal="true"><span class="stay-modal-handle" aria-hidden="true"></span>' + inner + '</section></div>';
   document.body.classList.add('stay-modal-open');
+  const surface=host.querySelector('.stay-modal');
+  if(surface){
+    surface._twogetherBack=typeof options.back==='function'?options.back:closeModal;
+    surface._twogetherHome=closeModal;
+  }
   host.querySelectorAll('[data-stay-close]').forEach((button) => button.addEventListener('click',closeModal));
 }
 function closeModal(){
@@ -206,7 +246,7 @@ function closeModal(){
   document.body.classList.remove('stay-modal-open');
 }
 function modalHead(kicker,title,copy){
-  return '<div class="stay-modal-head"><div><span class="stay-label">' + esc(kicker) + '</span><h2>' + esc(title) + '</h2>' + (copy ? '<p>' + esc(copy) + '</p>' : '') + '</div><button data-stay-close type="button" aria-label="Close">×</button></div>';
+  return '<div class="stay-modal-head"><div><span class="stay-label">' + esc(kicker) + '</span><h2>' + esc(title) + '</h2>' + (copy ? '<p>' + esc(copy) + '</p>' : '') + '</div></div>';
 }
 function openSaveModal(){
   if (!selectedPlan()) return;
