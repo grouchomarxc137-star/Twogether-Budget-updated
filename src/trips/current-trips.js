@@ -636,7 +636,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     category: uiCategoryFromEntry(existing),
     paidBy: existing?.paidBy || me,
     split: existing?.split || 'shared',
-    forActor: existing?.split === 'personal' && existing?.paidBy && existing.paidBy !== 'both' ? existing.paidBy : (existing?.forActor || me),
+    forActor: existing?.forActor || (existing?.split === 'personal' && existing?.paidBy && existing.paidBy !== 'both' ? existing.paidBy : me),
     date: existing?.date || new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
     note: existing?.note || '',
     uncertain: !!existing?.uncertain,
@@ -796,7 +796,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
           return;
         }
         state.category=key;
-        state.amountText='';
+        // Preserve the rest of an existing expense when only its category changes.
         if(state.category!=='stay')state.useJar=false;
         if(state.category==='owed'){
           state.more=false;
@@ -842,7 +842,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     try {
       await window.TwogetherAPI.post('saveTripExpense',{planId:plan.id,expense:{
         id:existing?.id||'',category:mapped.category,foodType:mapped.foodType,transportType:mapped.transportType,name:'',
-        amount:amount(),paidBy:state.paidBy,split:state.paidBy==='both'?'shared':state.split,forActor:state.split==='personal'?state.paidBy:'',
+        amount:amount(),paidBy:state.paidBy,split:state.paidBy==='both'?'shared':state.split,forActor:state.split==='personal'?state.forActor:'',
         date:state.date,note:state.note.trim(),uncertain:!!state.uncertain,useJar:state.category==='stay'&&!!state.useJar
       }},actor());
       const savedAmount=amount(), savedLabel=EXPENSE_CATS.find((x)=>x[0]===state.category)?.[1]||'Expense';
