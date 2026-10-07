@@ -124,39 +124,38 @@ function searchPanel(plan){
     adults:2
   };
   const airbnb = buildAirbnbSearchUrl(input);
+  const area = broadItaly ? 'Manerba · Lonato · Peschiera · Bergamo' : destinationFor(plan);
   return '<section class="our-stays-search">' +
-    '<div class="our-stays-search-copy"><span class="stay-label">FIND A PLACE</span><strong>' + esc(broadItaly ? 'Bergamo → Lonato → Lake Garda' : destinationFor(plan)) + '</strong><p>' + esc(dateRange(plan.meta.start,plan.meta.end)) + ' · 2 guests · Manerba to Peschiera, including inland Lonato and Bergamo.</p></div>' +
-    '<div class="our-stays-search-links">' +
-      '<a class="airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer"><b>⌂</b><span>Search Airbnb<small>Dates + guests + our area ready</small></span><i>↗</i></a>' +
-    '</div>' +
-    (hasAccommodationExpense(plan) ? '<div class="our-stays-expense-done">✓ Accommodation expense already logged for this trip. Our Stays will not add another.</div>' : '') +
+    '<a class="our-stays-airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer">' +
+      '<span class="our-stays-airbnb-icon">⌂</span>' +
+      '<span><strong>Search Airbnb</strong><small>' + esc(area) + '</small></span>' +
+      '<i>↗</i>' +
+    '</a>' +
+    '<div class="our-stays-tripmeta"><span>' + esc(dateRange(plan.meta.start,plan.meta.end)) + '</span><b>2 guests</b></div>' +
+    (hasAccommodationExpense(plan) ? '<button class="our-stays-expense-done" type="button" data-edit-accommodation>✓ Accommodation logged <span>Edit in Trips ›</span></button>' : '') +
   '</section>';
 }
 function overviewPanel(){
-  return '<section class="our-stays-overview-note"><span>♡</span><div><strong>Your accommodation watchlist</strong><p>Choose a trip above to apply its dates to every saved stay and compare the newest prices.</p></div></section>';
+  return '<section class="our-stays-overview-note"><span>♡</span><div><strong>Our little stay collection</strong><p>Choose a trip above when you want to recheck prices for new dates.</p></div></section>';
 }
 function stayCard(favorite, plan){
   const info = priceInfo(favorite, plan);
-  const source = 'Airbnb';
   const displayPrice = info.latest?.price;
-  const checkUrl = plan ? buildListingCheckUrl(favorite.url,favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}) : favorite.url;
   const selected = !!plan && isSelected(favorite,plan);
   const expenseExists = !!plan && hasAccommodationExpense(plan);
-  return '<article class="our-stay-card">' +
+  return '<article class="our-stay-card' + (selected ? ' is-selected' : '') + '">' +
     '<button class="our-stay-main" type="button" data-stay-details="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">' +
       '<span class="our-stay-photo ' + (favorite.image ? '' : 'is-empty') + '"' + (favorite.image ? ' style="background-image:url(&quot;' + esc(favorite.image) + '&quot;)"' : '') + '></span>' +
-      '<span class="our-stay-copy"><span class="our-stay-source">' + esc(source) + '</span><strong>' + esc(favorite.name || source + ' stay') + '</strong><small>' + (plan ? esc(dateRange(plan.meta.start,plan.meta.end)) : 'Saved favourite') + '</small></span>' +
+      '<span class="our-stay-copy"><strong>' + esc(favorite.name || 'Airbnb stay') + '</strong><small>' + (plan ? esc(dateRange(plan.meta.start,plan.meta.end)) : 'Saved Airbnb') + '</small>' +
+        (favorite.note ? '<em>✎ Note</em>' : '') +
+      '</span>' +
       '<span class="our-stay-money"><strong>' + (displayPrice != null ? money(displayPrice) : '—') + '</strong>' +
         (info.change ? '<b class="' + (info.change.startsWith('↓') ? 'down' : info.change.startsWith('↑') ? 'up' : 'same') + '">' + esc(info.change) + '</b>' : '') +
+        '<i>›</i>' +
       '</span>' +
     '</button>' +
-    '<div class="our-stay-actions">' +
-      '<a href="' + esc(checkUrl) + '" target="_blank" rel="noopener noreferrer">' + (plan ? 'Check dates' : 'Open') + ' ↗</a>' +
-      (plan ? '<button type="button" data-update-price="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Update price</button>' : '') +
-      (plan && !expenseExists ? '<button class="select" type="button" data-select-stay="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Select</button>' : '') +
-      (selected ? '<span class="selected">✓ Selected</span><button type="button" data-unselect-stay>Unselect</button>' : '') +
-      (plan && expenseExists ? '<button type="button" data-edit-accommodation>Trip expense</button>' : '') +
-    '</div>' +
+    (plan && !expenseExists ? '<div class="our-stay-quick"><button class="select" type="button" data-select-stay="' + esc(favorite.id) + '" data-owner-plan="' + esc(favorite.ownerPlanId) + '">Select this stay</button></div>' : '') +
+    (selected ? '<div class="our-stay-selected">♡ Selected for this trip</div>' : '') +
   '</article>';
 }
 function render(){
@@ -164,20 +163,20 @@ function render(){
   if (selectedPlanId !== OVERVIEW && !planById(selectedPlanId)) selectedPlanId = OVERVIEW;
   const plan = selectedPlan();
   const favorites = sortedFavorites(plan);
-  el.innerHTML = '<div class="our-stays-page">' +
-    '<header class="our-stays-head"><div><span class="eyebrow">TRIPS</span><h1>Our Stays</h1><p>Save the places you love, recheck them for new dates, and choose one when it becomes the trip accommodation.</p></div>' +
-      (plan ? '<button id="ourStaySaveTop" class="our-stays-save" type="button">＋ Save place</button>' : '') +
+  el.innerHTML = '<div class="tv2-root our-stays-root"><div class="tv2-page our-stays-page">' +
+    '<header class="our-stays-head"><div><h1>Our Stays</h1><p>Airbnbs we love ♡</p></div>' +
+      (plan ? '<button id="ourStaySaveTop" class="our-stays-add" type="button" aria-label="Save a place">＋</button>' : '') +
     '</header>' +
-    '<section class="our-stays-switcher"><label><span>View</span><select id="ourStayPlanSelect">' + planOptions() + '</select></label>' +
-      '<div class="our-stays-date"><span>' + (plan ? 'Checking for' : 'Saved collection') + '</span><strong>' + (plan ? esc(dateRange(plan.meta.start,plan.meta.end,true)) : 'All favourites') + '</strong><small>' + (plan ? '2 guests' : 'Choose a trip to recheck') + '</small></div></section>' +
+    '<section class="our-stays-switcher"><label><span>Looking for</span><select id="ourStayPlanSelect">' + planOptions() + '</select></label>' +
+      (plan ? '<div class="our-stays-date"><span>' + esc(dateRange(plan.meta.start,plan.meta.end,true)) + '</span><small>2 guests</small></div>' : '') +
+    '</section>' +
     (plan ? searchPanel(plan) : overviewPanel()) +
-    '<section class="our-stays-collection"><div class="our-stays-section-title"><div><span class="stay-label">' + (plan ? 'SAVED FOR RECHECK' : 'OUR COLLECTION') + '</span><h2>' +
-      (favorites.length ? favorites.length + ' saved ' + (favorites.length === 1 ? 'place' : 'places') : 'No saved places yet') +
-      '</h2></div>' + (plan && favorites.length ? '<button id="ourStaySaveInline" type="button">＋ Add</button>' : '') + '</div>' +
+    '<section class="our-stays-collection"><div class="our-stays-section-title"><div><h2>Saved stays</h2><span>' + favorites.length + '</span></div>' +
+      (plan && favorites.length ? '<button id="ourStaySaveInline" type="button">＋ Add</button>' : '') + '</div>' +
       (favorites.length ? '<div class="our-stays-grid">' + favorites.map((favorite) => stayCard(favorite,plan)).join('') + '</div>' :
-        '<div class="our-stays-empty"><span>♡</span><p>' + (plan ? 'Search Airbnb above, then save the places you want to compare.' : 'Your saved Airbnb places will appear here.') + '</p>' +
-        (plan ? '<button id="ourStaySaveEmpty" type="button">Save first place</button>' : '') + '</div>') +
-    '</section></div><div id="stayModalRoot"></div>';
+        '<div class="our-stays-empty"><span>♡</span><strong>No stays yet</strong><p>' + (plan ? 'Find one on Airbnb, then save it here.' : 'Choose a trip, then save the Airbnbs you like.') + '</p>' +
+        (plan ? '<button id="ourStaySaveEmpty" type="button">Save a stay</button>' : '') + '</div>') +
+    '</section></div></div><div id="stayModalRoot"></div>';
   bind();
 }
 function bind(){
@@ -188,9 +187,7 @@ function bind(){
   });
   ['ourStaySaveTop','ourStaySaveInline','ourStaySaveEmpty'].forEach((id) => document.getElementById(id)?.addEventListener('click',openSaveModal));
   document.querySelectorAll('[data-stay-details]').forEach((button) => button.addEventListener('click',() => openDetails(button.dataset.ownerPlan,button.dataset.stayDetails)));
-  document.querySelectorAll('[data-update-price]').forEach((button) => button.addEventListener('click',() => openPriceModal(button.dataset.ownerPlan,button.dataset.updatePrice)));
   document.querySelectorAll('[data-select-stay]').forEach((button) => button.addEventListener('click',() => selectStay(button.dataset.ownerPlan,button.dataset.selectStay)));
-  document.querySelectorAll('[data-unselect-stay]').forEach((button) => button.addEventListener('click',unselectStay));
   document.querySelectorAll('[data-edit-accommodation]').forEach((button) => button.addEventListener('click',openTripExpenseEditor));
 }
 function favoriteById(ownerPlanId,favoriteId){
@@ -200,7 +197,7 @@ function favoriteById(ownerPlanId,favoriteId){
 }
 function showModal(inner){
   const host = document.getElementById('stayModalRoot'); if (!host) return;
-  host.innerHTML = '<div class="stay-modal"><button class="stay-modal-backdrop" data-stay-close aria-label="Close"></button><section class="stay-modal-sheet">' + inner + '</section></div>';
+  host.innerHTML = '<div class="stay-modal" aria-hidden="false"><button class="stay-modal-backdrop" data-stay-close aria-label="Close"></button><section class="stay-modal-sheet" role="dialog" aria-modal="true"><span class="stay-modal-handle" aria-hidden="true"></span>' + inner + '</section></div>';
   document.body.classList.add('stay-modal-open');
   host.querySelectorAll('[data-stay-close]').forEach((button) => button.addEventListener('click',closeModal));
 }
@@ -209,7 +206,7 @@ function closeModal(){
   document.body.classList.remove('stay-modal-open');
 }
 function modalHead(kicker,title,copy){
-  return '<div class="stay-modal-head"><div><span class="stay-label">' + esc(kicker) + '</span><h2>' + esc(title) + '</h2><p>' + esc(copy) + '</p></div><button data-stay-close type="button">×</button></div>';
+  return '<div class="stay-modal-head"><div><span class="stay-label">' + esc(kicker) + '</span><h2>' + esc(title) + '</h2>' + (copy ? '<p>' + esc(copy) + '</p>' : '') + '</div><button data-stay-close type="button" aria-label="Close">×</button></div>';
 }
 function openSaveModal(){
   if (!selectedPlan()) return;
@@ -259,15 +256,29 @@ async function saveFavorite(){
 function openDetails(ownerPlanId,favoriteId){
   const found = favoriteById(ownerPlanId,favoriteId), plan = selectedPlan(); if (!found) return;
   const info = priceInfo(found.favorite,plan);
-  const rows = [...(found.favorite.history || [])].sort((a,b) => String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,6);
+  const rows = [...(found.favorite.history || [])].sort((a,b) => String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,4);
   const link = plan ? buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}) : found.favorite.url;
+  const selected = !!plan && isSelected(found.favorite,plan);
+  const expenseExists = !!plan && hasAccommodationExpense(plan);
   showModal(modalHead('AIRBNB',found.favorite.name,plan ? dateRange(plan.meta.start,plan.meta.end,true) : 'Saved in Our Stays') +
-    (found.favorite.image ? '<div class="stay-detail-photo" style="background-image:url(&quot;' + esc(found.favorite.image) + '&quot;)"></div>' : '') +
-    '<div class="stay-detail-price"><span>Latest saved price</span><strong>' + (info.latest ? money(info.latest.price) : '—') + '</strong>' + (info.change ? '<b>' + esc(info.change) + '</b>' : '') + '</div>' +
-    '<div class="stay-detail-notes"><span>Notes</span><p>' + (found.favorite.note ? esc(found.favorite.note) : 'No notes added.') + '</p></div>' +
-    (rows.length ? '<div class="stay-detail-history"><span>Recent prices</span>' + rows.map((row) => '<div><b>' + money(row.price) + '</b><small>' + esc(dateRange(row.start,row.end)) + '</small></div>').join('') + '</div>' : '') +
-    '<a class="stay-detail-link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open accommodation ↗</a>' +
-    '<div class="stay-detail-actions"><button id="stayEditNotes" type="button">✎ Edit notes</button><button id="stayDeleteSaved" class="danger" type="button">Remove from Our Stays</button></div>');
+    (found.favorite.image ? '<div class="stay-detail-photo" style="background-image:url(&quot;' + esc(found.favorite.image) + '&quot;)"></div>' : '<div class="stay-detail-photo is-empty">⌂</div>') +
+    '<div class="stay-detail-price"><span>Latest price</span><strong>' + (info.latest ? money(info.latest.price) : '—') + '</strong>' + (info.change ? '<b class="' + (info.change.startsWith('↓') ? 'down' : info.change.startsWith('↑') ? 'up' : 'same') + '">' + esc(info.change) + '</b>' : '') + '</div>' +
+    (found.favorite.note ? '<div class="stay-detail-notes"><span>Note</span><p>' + esc(found.favorite.note) + '</p></div>' : '') +
+    '<div class="stay-detail-primary">' +
+      (plan && !expenseExists ? '<button id="stayDetailSelect" class="stay-modal-primary" type="button">Select this stay</button>' : '') +
+      (selected ? '<button id="stayDetailExpense" class="stay-modal-primary" type="button">Edit trip expense</button><button id="stayDetailUnselect" class="stay-text-danger" type="button">Unselect from trip</button>' : '') +
+    '</div>' +
+    '<div class="stay-detail-menu">' +
+      '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer"><span>Open in Airbnb</span><b>↗</b></a>' +
+      (plan ? '<button id="stayDetailPrice" type="button"><span>Update price</span><b>›</b></button>' : '') +
+      '<button id="stayEditNotes" type="button"><span>' + (found.favorite.note ? 'Edit note' : 'Add note') + '</span><b>›</b></button>' +
+      '<button id="stayDeleteSaved" class="danger" type="button"><span>Remove from Our Stays</span><b>›</b></button>' +
+    '</div>' +
+    (rows.length > 1 ? '<details class="stay-detail-history"><summary>Price history</summary>' + rows.map((row) => '<div><b>' + money(row.price) + '</b><small>' + esc(dateRange(row.start,row.end)) + '</small></div>').join('') + '</details>' : ''));
+  document.getElementById('stayDetailSelect')?.addEventListener('click',() => { closeModal(); selectStay(ownerPlanId,favoriteId); });
+  document.getElementById('stayDetailExpense')?.addEventListener('click',() => { closeModal(); openTripExpenseEditor(); });
+  document.getElementById('stayDetailUnselect')?.addEventListener('click',() => { closeModal(); unselectStay(); });
+  document.getElementById('stayDetailPrice')?.addEventListener('click',() => openPriceModal(ownerPlanId,favoriteId));
   document.getElementById('stayEditNotes')?.addEventListener('click',() => openEditNotes(ownerPlanId,favoriteId));
   document.getElementById('stayDeleteSaved')?.addEventListener('click',() => removeFavorite(ownerPlanId,favoriteId));
 }
