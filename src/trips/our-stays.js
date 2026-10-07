@@ -37,13 +37,28 @@ function datePart(value, withYear){
   return new Intl.DateTimeFormat('en-GB', withYear ? {day:'numeric',month:'short',year:'numeric'} : {day:'numeric',month:'short'}).format(date);
 }
 function dateRange(start,end,withYear=false){ return datePart(start,withYear) + ' – ' + datePart(end,withYear); }
-function sourceFromUrl(value){ return clean(value).toLowerCase().includes('airbnb.') ? 'airbnb' : 'booking'; }
-function validStayLink(value){
-  try {
-    const url = new URL(clean(value));
-    const host = url.hostname.toLowerCase().replace(/^www\./,'');
-    return host === 'airbnb.com' || host.endsWith('.airbnb.com') || host === 'booking.com' || host.endsWith('.booking.com');
-  } catch { return false; }
+function normalizeAirbnbLink(value){
+  const raw=clean(value);
+  if(!raw)return '';
+  const markdown=/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i.exec(raw);
+  const direct=markdown?.[1] || /https?:\/\/[^\s<>"'\]\[()]+/i.exec(raw)?.[0] ||
+    (/^(?:www\.)?airbnb\.[^\s/]+\/.+/i.test(raw) ? ('https://' + raw.replace(/^https?:\/\//i,'')) : '');
+  if(!direct)return '';
+  const candidate=direct.replace(/\\&/g,'&').replace(/[),.;!?]+$/,'');
+  try{
+    const url=new URL(candidate);
+    const host=url.hostname.toLowerCase().replace(/^www\./,'');
+    const allowed=[
+      'airbnb.com','airbnb.it','airbnb.co.uk','airbnb.fr','airbnb.de','airbnb.nl','airbnb.es','airbnb.pt',
+      'airbnb.ie','airbnb.dk','airbnb.se','airbnb.no','airbnb.fi','airbnb.ca','airbnb.com.au','airbnb.co.nz',
+      'airbnb.com.br','airbnb.mx','airbnb.co.in','airbnb.jp','airbnb.co.kr','airbnb.com.sg','airbnb.com.tw',
+      'airbnb.com.hk','airbnb.co.za','airbnb.pl','airbnb.cz','airbnb.hu','airbnb.at','airbnb.ch','airbnb.be','airbnb.gr'
+    ];
+    if(!allowed.some((domain)=>host===domain||host.endsWith('.'+domain)))return '';
+    const room=url.pathname.match(/^\/rooms\/(\d+)/i);
+    if(room)return 'https://www.airbnb.com/rooms/' + room[1];
+    return url.toString();
+  }catch{return '';}
 }
 function allFavorites(){
   const found = [];
