@@ -359,51 +359,6 @@ async function removeFavorite(ownerPlanId,favoriteId){
     await refreshState();
   }catch(error){toast(error.message||'Could not remove this stay','warn');}
 }
-function bindStaySwipeDelete(){
-  let opened=null;
-  document.querySelectorAll('[data-stay-swipe]').forEach((row)=>{
-    const card=row.querySelector('.our-stay-card');
-    if(!card)return;
-    let tracking=false,startX=0,startY=0,lastX=0,moved=false;
-    const close=()=>{card.style.transform='';row.classList.remove('is-delete-open');if(opened===row)opened=null;};
-    row.addEventListener('pointerdown',(event)=>{
-      if(event.pointerType==='mouse'&&event.button!==0)return;
-      if(event.target.closest('[data-swipe-delete]'))return;
-      if(opened&&opened!==row){
-        const other=opened.querySelector('.our-stay-card');
-        if(other)other.style.transform='';
-        opened.classList.remove('is-delete-open');opened=null;
-      }
-      tracking=true;startX=lastX=event.clientX;startY=event.clientY;moved=false;
-      try{row.setPointerCapture(event.pointerId);}catch{}
-    });
-    row.addEventListener('pointermove',(event)=>{
-      if(!tracking)return;
-      const dx=event.clientX-startX,dy=event.clientY-startY;
-      if(!moved&&Math.abs(dx)<7&&Math.abs(dy)<7)return;
-      if(Math.abs(dy)>Math.abs(dx)*1.15){tracking=false;close();return;}
-      moved=true;
-      const offset=Math.max(-86,Math.min(0,dx));
-      card.style.transform='translateX('+offset+'px)';
-      if(offset<-8)event.preventDefault();
-    });
-    const finish=(event)=>{
-      if(!tracking)return;
-      tracking=false;
-      const dx=lastX-startX;
-      if(dx<-44){
-        card.style.transform='translateX(-82px)';
-        row.classList.add('is-delete-open');
-        opened=row;
-      }else close();
-      if(moved){event.preventDefault();event.stopPropagation();}
-    };
-    row.addEventListener('pointermove',(event)=>{lastX=event.clientX;},{passive:true});
-    row.addEventListener('pointerup',finish);
-    row.addEventListener('pointercancel',()=>{tracking=false;close();});
-  });
-  document.querySelectorAll('[data-swipe-delete]').forEach((button)=>button.addEventListener('click',()=>removeFavorite(button.dataset.ownerPlan,button.dataset.swipeDelete)));
-}
 function openPriceModal(ownerPlanId,favoriteId,planId){
   const found=favoriteById(ownerPlanId,favoriteId),plan=planById(planId); if(!found||!plan)return;
   const info=priceInfo(found.favorite,plan);
