@@ -6,6 +6,7 @@ import { configureStateStore, getState, runAction } from './core.js';
 import { openDatabase } from './db/index.js';
 import { createPushService } from './push.js';
 import { createStaySearchService } from './stays.js';
+import { fetchStayPreview } from './stay-preview.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const databasePath = resolve(process.env.DATABASE_PATH || resolve(here, '../data/twogether.db'));
@@ -93,6 +94,14 @@ app.post('/api/stays/search', async (req, res) => {
       ok:false,
       error:error?.message || 'Could not check live accommodation prices',
     });
+  }
+});
+
+app.post('/api/stays/preview', async (req, res) => {
+  try {
+    res.json(await fetchStayPreview(req.body?.url));
+  } catch (error) {
+    res.status(400).json({ ok:false, error:error?.message || 'Could not read accommodation details from this link' });
   }
 });
 
