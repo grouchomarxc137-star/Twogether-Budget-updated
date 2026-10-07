@@ -15,7 +15,7 @@ test('Airbnb links accept country domains and pasted share text', () => {
   assert.equal(sourceFromStayUrl('https://www.airbnb.co.uk/rooms/123'),'airbnb');
   assert.equal(
     normalizeAirbnbUrl('Check out this home on Airbnb! https://www.airbnb.it/rooms/123?viralityEntryPoint=1&s=76.'),
-    'https://www.airbnb.it/rooms/123?viralityEntryPoint=1&s=76'
+    'https://www.airbnb.com/rooms/123'
   );
   assert.throws(() => sourceFromStayUrl('https://www.booking.com/hotel/it/test.html'),/only Airbnb/i);
   assert.throws(() => sourceFromStayUrl('https://example.com/place'),/only Airbnb/i);
@@ -24,7 +24,7 @@ test('Airbnb links accept country domains and pasted share text', () => {
 test('stay preview resolves share links and keeps a fallback if metadata is blocked', async () => {
   const fakeFetch = async () => ({
     ok:false,
-    url:'https://www.airbnb.it/rooms/12345?unique_share_id=abc',
+    url:'https://www.airbnb.com/rooms/12345',
     text:async () => '',
   });
   const result = await fetchStayPreview('Shared from Airbnb https://www.airbnb.it/slink/demo',fakeFetch);
