@@ -95,10 +95,10 @@ function allFavorites(){
   });
 }
 function tripHistory(favorite, plan){
-  if (!plan) return [];
-  return (Array.isArray(favorite.history) ? favorite.history : [])
-    .filter((row) => row.start === plan.meta.start && row.end === plan.meta.end)
-    .sort((a,b) => String(a.checkedAt).localeCompare(String(b.checkedAt)));
+  if(!plan)return [];
+  return (Array.isArray(favorite.history)?favorite.history:[])
+    .filter((row)=>row.planId ? row.planId===plan.id : (row.start===plan.meta.start&&row.end===plan.meta.end))
+    .sort((a,b)=>String(a.checkedAt).localeCompare(String(b.checkedAt)));
 }
 function priceInfo(favorite, plan){
   if(!plan)return {current:null,previous:null,latest:null,change:'',unavailable:false};
@@ -183,6 +183,7 @@ function stayCard(favorite,plan){
   const info=priceInfo(favorite,plan);
   const selected=!!plan&&isSelected(favorite,plan);
   const note=clean(favorite.note);
+  const tripLink=plan?buildListingCheckUrl(favorite.url,favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}):'';
   return '<article class="our-stay-swipe" data-stay-swipe="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
     '<span class="our-stay-delete-underlay" aria-hidden="true"><b>Delete</b></span>' +
     '<div class="our-stay-card'+(selected?' is-selected':'')+(info.unavailable?' is-unavailable':'')+'">' +
@@ -195,7 +196,10 @@ function stayCard(favorite,plan){
           (info.unavailable?'<strong class="unavailable-label">Unavailable</strong>':('<strong>'+(info.current?money(info.current.price):'Add price')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')))+
           '<i>›</i></span>':'<span class="our-stay-money is-overview"><i>›</i></span>') +
       '</button>' +
-      (plan&&!selected&&!info.unavailable?'<div class="our-stay-quick"><button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select this stay</button></div>':'') +
+      (plan?'<div class="our-stay-trip-actions">' +
+        '<a href="'+esc(tripLink)+'" target="_blank" rel="noopener noreferrer">Airbnb <span>↗</span></a>' +
+        (!selected&&!info.unavailable&&info.current?'<button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select stay</button>':'') +
+      '</div>':'') +
       (selected?'<div class="our-stay-selected">♡ Selected for this trip</div>':'') +
     '</div>' +
   '</article>';
