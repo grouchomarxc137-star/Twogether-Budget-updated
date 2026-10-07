@@ -1,6 +1,6 @@
 import { actor, esc, money, post } from './budget-state.js';
 import { toast } from '../lib/toast.js';
-import { buildBookingSearchUrl, buildAirbnbSearchUrl, buildListingCheckUrl } from './stay-search-links.js';
+import { buildAirbnbSearchUrl, buildListingCheckUrl } from './stay-search-links.js';
 
 const API_BASE = import.meta.env?.DEV ? 'http://localhost:4310' : '';
 const ROOT_ID = 'stayTrackerRoot';
@@ -49,7 +49,7 @@ function allFavorites(){
   const found = [];
   (Array.isArray(state?.plans) ? state.plans : []).forEach((owner) => {
     (Array.isArray(owner?.stayTracker?.saved) ? owner.stayTracker.saved : []).forEach((favorite) => {
-      found.push({...favorite, ownerPlanId:owner.id});
+      if (favorite?.source === 'airbnb') found.push({...favorite, ownerPlanId:owner.id});
     });
   });
   const seen = new Set();
@@ -101,13 +101,11 @@ function planOptions(){
 }
 function searchPanel(plan){
   const input = { destination:destinationFor(plan), start:plan.meta.start, end:plan.meta.end, adults:2 };
-  const booking = buildBookingSearchUrl(input);
   const airbnb = buildAirbnbSearchUrl(input);
   return '<section class="our-stays-search">' +
     '<div class="our-stays-search-copy"><span class="stay-label">FIND A PLACE</span><strong>' + esc(destinationFor(plan)) + '</strong><p>' + esc(dateRange(plan.meta.start,plan.meta.end)) + ' · 2 guests already filled in.</p></div>' +
     '<div class="our-stays-search-links">' +
-      '<a href="' + esc(booking) + '" target="_blank" rel="noopener noreferrer"><b>B</b><span>Booking.com<small>Cheapest first · dates ready</small></span><i>↗</i></a>' +
-      '<a class="airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer"><b>⌂</b><span>Airbnb<small>Dates + guests ready</small></span><i>↗</i></a>' +
+      '<a class="airbnb" href="' + esc(airbnb) + '" target="_blank" rel="noopener noreferrer"><b>⌂</b><span>Search Airbnb<small>Dates + 2 guests ready</small></span><i>↗</i></a>' +
     '</div>' +
     (hasAccommodationExpense(plan) ? '<div class="our-stays-expense-done">✓ Accommodation expense already logged for this trip. Our Stays will not add another.</div>' : '') +
   '</section>';
@@ -117,7 +115,7 @@ function overviewPanel(){
 }
 function stayCard(favorite, plan){
   const info = priceInfo(favorite, plan);
-  const source = favorite.source === 'airbnb' ? 'Airbnb' : 'Booking.com';
+  const source = 'Airbnb';
   const displayPrice = info.latest?.price;
   const checkUrl = plan ? buildListingCheckUrl(favorite.url,favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}) : favorite.url;
   const selected = !!plan && isSelected(favorite,plan);
@@ -155,7 +153,7 @@ function render(){
       (favorites.length ? favorites.length + ' saved ' + (favorites.length === 1 ? 'place' : 'places') : 'No saved places yet') +
       '</h2></div>' + (plan && favorites.length ? '<button id="ourStaySaveInline" type="button">＋ Add</button>' : '') + '</div>' +
       (favorites.length ? '<div class="our-stays-grid">' + favorites.map((favorite) => stayCard(favorite,plan)).join('') + '</div>' :
-        '<div class="our-stays-empty"><span>♡</span><p>' + (plan ? 'Search above, then save the places you want to compare.' : 'Your saved Booking.com and Airbnb places will appear here.') + '</p>' +
+        '<div class="our-stays-empty"><span>♡</span><p>' + (plan ? 'Search Airbnb above, then save the places you want to compare.' : 'Your saved Airbnb places will appear here.') + '</p>' +
         (plan ? '<button id="ourStaySaveEmpty" type="button">Save first place</button>' : '') + '</div>') +
     '</section></div><div id="stayModalRoot"></div>';
   bind();
@@ -192,9 +190,9 @@ function modalHead(kicker,title,copy){
 }
 function openSaveModal(){
   if (!selectedPlan()) return;
-  showModal(modalHead('SAVE PLACE','Add to Our Stays','Paste the link and price. Twogether will try to fetch the name and main photo itself.') +
+  showModal(modalHead('SAVE PLACE','Add to Our Stays','Paste the Airbnb link and price. Twogether will try to fetch the name and main photo itself.') +
     '<div class="stay-form">' +
-      '<label><span>Booking.com or Airbnb link</span><input id="stayFavoriteUrl" type="url" placeholder="Paste accommodation link"></label>' +
+      '<label><span>Airbnb link</span><input id="stayFavoriteUrl" type="text" inputmode="url" placeholder="Paste Airbnb link or share text"></label>' +
       '<label><span>Current total price</span><div class="stay-money-input"><b>€</b><input id="stayFavoritePrice" inputmode="decimal" placeholder="0"></div></label>' +
       '<label><span>Notes <i>optional</i></span><textarea id="stayFavoriteNote" rows="3" placeholder="Anything you want to remember"></textarea></label>' +
       '<div id="stayPreviewStatus" class="stay-preview-status"></div>' +
@@ -210,20 +208,21 @@ async function loadPreview(url){
 }
 async function saveFavorite(){
   const plan = selectedPlan(), who = actor(); if (!plan || !who) return;
-  const url = clean(document.getElementById('stayFavoriteUrl')?.value);
+  const pasted = clean(document.getElementById('stayFavoriteUrl')?.value);
+  const url = normalizeAirbnbLink(pasted);
   const price = clean(document.getElementById('stayFavoritePrice')?.value).replace(',','.');
   const note = clean(document.getElementById('stayFavoriteNote')?.value);
-  if (!url) { toast('Paste the Booking.com or Airbnb link first','warn'); return; }
-  if (!validStayLink(url)) { toast('Use a Booking.com or Airbnb link','warn'); return; }
+  if (!pasted) { toast('Paste the Airbnb link first','warn'); return; }
+  if (!url) { toast('That does not look like an Airbnb link','warn'); return; }
   if (!price || !Number.isFinite(Number(price))) { toast('Add the current total price','warn'); return; }
   const button = document.getElementById('stayFavoriteSave');
   const status = document.getElementById('stayPreviewStatus');
   if (button) button.disabled = true;
   if (status) status.textContent = 'Getting the name and photo…';
-  let preview = {source:sourceFromUrl(url),name:'',image:'',url};
+  let preview = {source:'airbnb',name:'',image:'',url};
   try { preview = await loadPreview(url); }
   catch {
-    preview.name = preview.source === 'airbnb' ? 'Airbnb stay' : 'Booking.com stay';
+    preview.name = 'Airbnb stay';
     if (status) status.textContent = 'Preview blocked by the site — saving with a simple placeholder.';
   }
   try {
@@ -239,7 +238,7 @@ function openDetails(ownerPlanId,favoriteId){
   const info = priceInfo(found.favorite,plan);
   const rows = [...(found.favorite.history || [])].sort((a,b) => String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,6);
   const link = plan ? buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}) : found.favorite.url;
-  showModal(modalHead(found.favorite.source === 'airbnb' ? 'AIRBNB' : 'BOOKING.COM',found.favorite.name,plan ? dateRange(plan.meta.start,plan.meta.end,true) : 'Saved in Our Stays') +
+  showModal(modalHead('AIRBNB',found.favorite.name,plan ? dateRange(plan.meta.start,plan.meta.end,true) : 'Saved in Our Stays') +
     (found.favorite.image ? '<div class="stay-detail-photo" style="background-image:url(&quot;' + esc(found.favorite.image) + '&quot;)"></div>' : '') +
     '<div class="stay-detail-price"><span>Latest saved price</span><strong>' + (info.latest ? money(info.latest.price) : '—') + '</strong>' + (info.change ? '<b>' + esc(info.change) + '</b>' : '') + '</div>' +
     '<div class="stay-detail-notes"><span>Notes</span><p>' + (found.favorite.note ? esc(found.favorite.note) : 'No notes added.') + '</p></div>' +
