@@ -184,7 +184,7 @@ function stayCard(favorite,plan){
   const selected=!!plan&&isSelected(favorite,plan);
   const note=clean(favorite.note);
   return '<article class="our-stay-swipe" data-stay-swipe="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
-    '<button class="our-stay-delete-underlay" type="button" data-swipe-delete="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Delete</button>' +
+    '<span class="our-stay-delete-underlay" aria-hidden="true"><b>Delete</b></span>' +
     '<div class="our-stay-card'+(selected?' is-selected':'')+(info.unavailable?' is-unavailable':'')+'">' +
       '<button class="our-stay-main" type="button" data-stay-details="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
         '<span class="our-stay-photo '+(favorite.image?'':'is-empty')+'"'+(favorite.image?' style="background-image:url(&quot;'+esc(favorite.image)+'&quot;)"':'')+'></span>' +
@@ -228,7 +228,6 @@ function bind(){
     openDetails(button.dataset.ownerPlan,button.dataset.stayDetails);
   }));
   document.querySelectorAll('[data-select-stay]').forEach((button) => button.addEventListener('click',() => selectStay(button.dataset.ownerPlan,button.dataset.selectStay)));
-  bindStaySwipeDelete();
 }
 function favoriteById(ownerPlanId,favoriteId){
   const global=(Array.isArray(state?.stayFavorites)?state.stayFavorites:[]).find((item)=>item.id===favoriteId);
