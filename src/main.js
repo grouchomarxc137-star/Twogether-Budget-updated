@@ -8,6 +8,7 @@ import { installPwa } from './app/pwa.js';
 import { initNotifications } from './app/notifications.js';
 import { initPushNotifications } from './app/push.js';
 import './trips/our-stays.js';
+import './trips/stay-delete-gesture.js';
 
 installPwa();
 initPushNotifications();
