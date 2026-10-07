@@ -10,11 +10,26 @@ function slug(value) {
     .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')
     .replace(/^-+|-+$/g,'')||'stays';
 }
+export const OUR_STAYS_ITALY_BOUNDS = {
+  swLat:45.35,
+  swLng:9.55,
+  neLat:45.78,
+  neLng:10.78,
+};
+
 export function buildAirbnbSearchUrl(input={}) {
   const destination=String(input.destination||'').trim();
-  const url=new URL(`https://www.airbnb.com/s/${slug(destination)}/homes`);
+  const bounds=input.bounds&&typeof input.bounds==='object'?input.bounds:null;
+  const url=new URL(bounds ? 'https://www.airbnb.com/s/homes' : `https://www.airbnb.com/s/${slug(destination)}/homes`);
   const start=safeDate(input.start),end=safeDate(input.end);
-  url.searchParams.set('query',destination);
+  if(destination)url.searchParams.set('query',destination);
+  if(bounds){
+    url.searchParams.set('sw_lat',String(bounds.swLat));
+    url.searchParams.set('sw_lng',String(bounds.swLng));
+    url.searchParams.set('ne_lat',String(bounds.neLat));
+    url.searchParams.set('ne_lng',String(bounds.neLng));
+    url.searchParams.set('search_by_map','true');
+  }
   if(start)url.searchParams.set('checkin',start);
   if(end)url.searchParams.set('checkout',end);
   url.searchParams.set('adults',String(positiveInt(input.adults,2)));
