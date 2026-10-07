@@ -269,6 +269,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (targetPlanIdx < 0) throw new Error('Budget plan not found');
       const incoming = sanitizeStayFavorite_(payload.favorite || {});
       if (!incoming.url) throw new Error('Add the accommodation link first');
+      if (incoming.source !== 'airbnb') throw new Error('Our Stays only accepts Airbnb links now');
       const urlKey = stayUrlKey_(incoming.url);
       let ownerPlanIdx = targetPlanIdx;
       let existingIdx = -1;
