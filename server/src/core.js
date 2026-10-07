@@ -1063,7 +1063,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         trip.submissions.Principe = planTripSnapshotSubmission_(plan, 'Principe', now);
         const a = trip.submissions.Principessa, b = trip.submissions.Principe;
         const expenseTotal = MONEY_FIELDS.reduce(function(sum,key){ return sum + Number(a && a[key] || 0); }, 0);
-        const accountedTotal = Number(a && a.paid || 0) + Number(b && b.paid || 0) + planJarTotal_(plan);
+        const accountedTotal = Number(a && a.paid || 0) + Number(b && b.paid || 0);
         const paymentDifference = money2_(Math.abs(expenseTotal - accountedTotal));
         if (paymentDifference > .005) {
           throw new Error('Payment totals do not match trip expenses. ' + formatMoney_(paymentDifference) + ' is still unassigned. Fix it before confirming the trip.');
@@ -1863,6 +1863,8 @@ function planTripSnapshotSubmission_(plan, name, now) {
     const entry = sanitizeTripExpense_(raw, raw && raw.loggedBy);
     const amount = Number(entry.amount || 0);
     if (!amount) return;
+    const jarContribution = Math.min(amount, Math.max(0, Number(entry.jarContribution || 0)));
+    const spentAmount = Math.max(0, amount - jarContribution);
     let key = 'other';
     if (entry.category === 'accommodation') key = 'accom';
     else if (entry.category === 'food') key = entry.foodType === 'groceries' ? 'groceries' : 'eat';
@@ -1871,13 +1873,13 @@ function planTripSnapshotSubmission_(plan, name, now) {
       else if (entry.transportType === 'tolls' || entry.transportType === 'parking-tolls') key = 'tolls';
       else key = 'travel';
     }
-    out[key] = money2_(Number(out[key] || 0) + amount);
+    out[key] = money2_(Number(out[key] || 0) + spentAmount);
     if (entry.uncertain) out.uncertain[key] = true;
     if (key === 'other') {
       const note = cleanText_(entry.note || entry.name || (entry.category === 'activities' ? 'Activities' : ''), 80);
       if (note && notes.indexOf(note) < 0) notes.push(note);
     }
-    const remaining = Math.max(0, amount - Number(entry.jarContribution || 0));
+    const remaining = spentAmount;
     if (entry.paidBy === 'both') out.paid += remaining / 2;
     else if (entry.paidBy === name) out.paid += remaining;
   });
