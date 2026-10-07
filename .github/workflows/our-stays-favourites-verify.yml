@@ -14,8 +14,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm ci --prefix server
+      - name: Verify storage-backed favourites
+        run: node --test server/test/stay-tracker.test.js
       - name: Focused Our Stays tests
-        run: node --test server/test/stay-tracker.test.js server/test/stay-preview.test.js server/test/stay-search-links.test.js
+        run: node --test server/test/stay-preview.test.js server/test/stay-search-links.test.js
       - name: Full test suite
         run: npm test
         continue-on-error: true
