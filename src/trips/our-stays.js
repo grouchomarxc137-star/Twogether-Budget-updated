@@ -38,6 +38,13 @@ function datePart(value, withYear){
 }
 function dateRange(start,end,withYear=false){ return datePart(start,withYear) + ' – ' + datePart(end,withYear); }
 function sourceFromUrl(value){ return clean(value).toLowerCase().includes('airbnb.') ? 'airbnb' : 'booking'; }
+function validStayLink(value){
+  try {
+    const url = new URL(clean(value));
+    const host = url.hostname.toLowerCase().replace(/^www\./,'');
+    return host === 'airbnb.com' || host.endsWith('.airbnb.com') || host === 'booking.com' || host.endsWith('.booking.com');
+  } catch { return false; }
+}
 function allFavorites(){
   const found = [];
   (Array.isArray(state?.plans) ? state.plans : []).forEach((owner) => {
@@ -207,6 +214,7 @@ async function saveFavorite(){
   const price = clean(document.getElementById('stayFavoritePrice')?.value).replace(',','.');
   const note = clean(document.getElementById('stayFavoriteNote')?.value);
   if (!url) { toast('Paste the Booking.com or Airbnb link first','warn'); return; }
+  if (!validStayLink(url)) { toast('Use a Booking.com or Airbnb link','warn'); return; }
   if (!price || !Number.isFinite(Number(price))) { toast('Add the current total price','warn'); return; }
   const button = document.getElementById('stayFavoriteSave');
   const status = document.getElementById('stayPreviewStatus');
