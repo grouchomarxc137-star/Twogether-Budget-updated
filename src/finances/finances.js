@@ -2721,7 +2721,7 @@ function bindFinanceMonthSwipe(rec) {
     root.style.opacity='.7';
     resetPageState();
     resetRowState();
-    setTimeout(()=>{if(mode==='right')backFromFinanceMonth(rec);else dismissFinanceMonth(rec);},185);
+    setTimeout(()=>{dismissFinanceMonth(rec);},185);
   };
 
   const paintDelete=(row,distance)=>{
@@ -2948,7 +2948,8 @@ function renderDetail(rec) {
     renderDetail(latest);
   });
   financeMonthDialog._twogetherBack=()=>backFromFinanceMonth(rec);
-  financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();backFromFinanceMonth(rec);});
+  financeMonthDialog._twogetherHome=()=>dismissFinanceMonth(rec);
+  financeMonthDialog.addEventListener('cancel',(event)=>{event.preventDefault();dismissFinanceMonth(rec);});
   financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',()=>backFromFinanceMonth(rec));
   financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
   financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
