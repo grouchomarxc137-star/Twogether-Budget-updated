@@ -44,3 +44,20 @@ test('stay preview reads Airbnb metadata when available', async () => {
   assert.equal(result.name,'Lake House');
   assert.equal(result.image,'https://a0.muscache.com/photo.jpg');
 });
+
+
+test('full Airbnb.nl room links are shortened to a clean canonical room link', () => {
+  const longUrl = 'https://www.airbnb.nl/rooms/1415105780236535921?adults=2&check_in=2026-10-30&check_out=2026-11-02&search_mode=regular_search&photo_id=2163991499&previous_page_section_name=1000';
+  assert.equal(
+    normalizeAirbnbUrl(longUrl),
+    'https://www.airbnb.com/rooms/1415105780236535921'
+  );
+});
+
+test('markdown-style pasted Airbnb links with escaped ampersands are accepted', () => {
+  const pasted = '[https://www.airbnb.nl/rooms/1415105780236535921?adults=2&check_in=2026-10-30](https://www.airbnb.nl/rooms/1415105780236535921?adults=2\\&check_in=2026-10-30\\&check_out=2026-11-02)';
+  assert.equal(
+    normalizeAirbnbUrl(pasted),
+    'https://www.airbnb.com/rooms/1415105780236535921'
+  );
+});
