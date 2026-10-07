@@ -23,11 +23,14 @@ test('prepared Airbnb search carries the requested Bergamo to Garda map area, da
 });
 
 test('saved Airbnb links reopen with the new trip dates', () => {
-  const airbnb = new URL(buildListingCheckUrl('https://www.airbnb.it/rooms/12345?foo=bar','airbnb',{
+  const airbnb = new URL(buildListingCheckUrl('https://www.airbnb.it/rooms/12345?foo=bar&check_in=2099-01-01&check_out=2099-01-03&adults=7','airbnb',{
     start:'2099-10-01',end:'2099-10-04',adults:2,
   }));
   assert.equal(airbnb.searchParams.get('check_in'),'2099-10-01');
   assert.equal(airbnb.searchParams.get('check_out'),'2099-10-04');
   assert.equal(airbnb.searchParams.get('adults'),'2');
+  assert.equal(airbnb.searchParams.get('children'),'0');
+  assert.equal(airbnb.searchParams.get('infants'),'0');
+  assert.equal(airbnb.searchParams.get('pets'),'0');
   assert.equal(airbnb.searchParams.get('foo'),'bar');
 });
