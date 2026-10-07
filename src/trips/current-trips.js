@@ -4138,8 +4138,7 @@ function bindSimplifiedSwipe(section) {
     resetState();
     setTimeout(() => {
       if (simplifiedView.name !== 'trip') return;
-      if(mode==='right')backFromCurrentTrip();
-      else closeCurrentTripToHome({dismiss:true});
+      closeCurrentTripToHome({dismiss:true});
     }, 185);
   };
 
