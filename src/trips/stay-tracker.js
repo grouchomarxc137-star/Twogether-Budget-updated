@@ -47,7 +47,8 @@ function areaFromCity(city) {
 }
 function inferArea(plan) {
   const city=clean(plan?.meta?.city);
-  return areaFromCity(city)||clean(plan?.stayTracker?.area)||selectedArea||'lake-garda';
+  if(city)return areaFromCity(city);
+  return clean(plan?.stayTracker?.area)||selectedArea||'lake-garda';
 }
 function isItalyWithoutCity(plan) {
   return normalize(plan?.meta?.location)==='italy'&&!clean(plan?.meta?.city);
@@ -98,10 +99,11 @@ function allFavorites() {
 }
 function favoriteMatches(favorite,plan) {
   const city=clean(plan?.meta?.city);
-  const planArea=areaFromCity(city)||inferArea(plan);
+  const knownArea=areaFromCity(city);
   const favArea=clean(favorite.area)||areaFromCity(favorite.city);
-  if(planArea==='lake-garda'||planArea==='bergamo')return favArea===planArea;
-  return !!city&&normalize(favorite.city)===normalize(city);
+  if(knownArea)return favArea===knownArea;
+  if(city)return normalize(favorite.city)===normalize(city);
+  return favArea===selectedArea;
 }
 function favoriteHistoryForTrip(favorite,plan) {
   return (Array.isArray(favorite.history)?favorite.history:[])
@@ -157,7 +159,10 @@ function render() {
   if(!plans.length)return renderEmpty();
   const plan=selectedPlan();
   if(!selectedPlanId||!plans.some((item)=>item.id===selectedPlanId))selectedPlanId=plan.id;
-  selectedArea=inferArea(plan);
+  if(!isItalyWithoutCity(plan)){
+    const inferred=inferArea(plan);
+    if(inferred)selectedArea=inferred;
+  }
   const prefs=prefsFor(plan);
   const favorites=matchingFavorites(plan);
   const tripNights=nights(plan.meta.start,plan.meta.end);
@@ -257,7 +262,7 @@ function bind() {
   document.getElementById('stayTripSelect')?.addEventListener('change',(event)=>{
     selectedPlanId=event.target.value;
     try{localStorage.setItem(VIEW_KEY,selectedPlanId);}catch{}
-    selectedArea=inferArea(selectedPlan());
+    selectedArea=inferArea(selectedPlan())||'lake-garda';
     render();
   });
   document.querySelectorAll('[data-stay-area]').forEach((button)=>button.addEventListener('click',()=>{
@@ -287,7 +292,7 @@ function bindPreparedSearch(id,provider) {
 }
 function persistPrefs(prefs=readPrefs()) {
   const plan=selectedPlan();const who=actor();if(!plan||!who)return;
-  const payload={planId:plan.id,area:selectedArea,preferences:prefs};
+  const payload={planId:plan.id,area:areaFromCity(plan.meta.city)||selectedArea,preferences:prefs};
   post('saveStaySearchPreferences',payload,who).then(refreshState).catch(()=>{});
 }
 function sourceFromUrl(value) {
