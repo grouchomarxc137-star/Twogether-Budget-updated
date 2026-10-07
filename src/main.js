@@ -7,7 +7,7 @@
 import { installPwa } from './app/pwa.js';
 import { initNotifications } from './app/notifications.js';
 import { initPushNotifications } from './app/push.js';
-import './trips/stay-tracker.js';
+import './trips/our-stays.js';
 
 installPwa();
 initPushNotifications();
