@@ -4,6 +4,7 @@ on:
     branches: [test]
 jobs:
   verify:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
