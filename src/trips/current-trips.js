@@ -568,9 +568,13 @@ function renderCurrentTrips() {
       section.classList.add('tv2-focus-open');
       setTripFocusLock(true);
       root.innerHTML = simplifiedView.budgetEditor ? simplifiedPersonalBudgetEditor(plan) : simplifiedTrip(plan, trip);
+      root._twogetherBack = () => backFromCurrentTrip();
+      root._twogetherHome = () => closeCurrentTripToHome({dismiss:true});
       return;
     }
   }
+  root._twogetherBack = null;
+  root._twogetherHome = null;
   root.classList.remove('tv2-trip-view');
   section.classList.remove('tv2-focus-open');
   root.style.transition = '';
