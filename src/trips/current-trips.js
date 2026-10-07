@@ -4419,11 +4419,16 @@ function enhanceTripModal() {
   const plan = (remoteState?.plans || []).find((item) => String(item?.linkedTripId || '') === tripId) || null;
   const exactMismatches = plan ? paymentMismatchDetails(plan) : [];
   const jarTotal = plan ? planJarTotal(plan) : 0;
-  const assignedTotal = paidTotal == null ? null : paidTotal + jarTotal;
+  // Current confirmed snapshots store spending net of Shared Jar contributions,
+  // so their payer totals are already directly comparable with Total spent.
+  // Older gross snapshots still need the Jar added once for reconciliation.
+  const paidOnlyDelta = total != null && paidTotal != null ? total - paidTotal : null;
+  const legacyGrossSnapshot = paidOnlyDelta != null && jarTotal > .005 && Math.abs(paidOnlyDelta - jarTotal) <= .01;
+  const assignedTotal = paidTotal == null ? null : paidTotal + (legacyGrossSnapshot ? jarTotal : 0);
   const delta = total != null && assignedTotal != null ? total - assignedTotal : null;
   const hasMismatch = exactMismatches.length > 0 || (delta != null && Math.abs(delta) > .01);
   const mismatchSig = exactMismatches.map((item) => item.id+':'+item.amount).join('|');
-  const sig = differences.length+'|'+total+'|'+paidTotal+'|'+jarTotal+'|'+delta+'|'+mismatchSig;
+  const sig = differences.length+'|'+total+'|'+paidTotal+'|'+jarTotal+'|'+legacyGrossSnapshot+'|'+delta+'|'+mismatchSig;
   if (root.dataset.v18WarningSig === sig) return;
   root.dataset.v18WarningSig = sig;
   root.querySelectorAll('.tw-trip-warning').forEach((item) => item.remove());
