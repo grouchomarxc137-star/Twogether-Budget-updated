@@ -674,23 +674,14 @@ function goSurfaceBack(surface = topSurface()) {
   closeSurface(surface, false);
 }
 
-function goSurfaceHome() {
-  if (surfaceHomeBusy) return;
+function goSurfaceHome(surface = topSurface()) {
+  if (!surface || surfaceHomeBusy) return;
   surfaceHomeBusy = true;
-  let count = 0;
-  const closeNext = () => {
-    const surface = topSurface();
-    if (!surface || count++ >= 10) {
-      surfaceHomeBusy = false;
-      return;
-    }
-    if (!closeSurface(surface, true)) {
-      surfaceHomeBusy = false;
-      return;
-    }
-    setTimeout(closeNext, 0);
-  };
-  closeNext();
+  try {
+    closeSurface(surface, true);
+  } finally {
+    setTimeout(() => { surfaceHomeBusy = false; }, 0);
+  }
 }
 
 function resetSurfaceSwipe(resetVisual = false) {
@@ -719,9 +710,8 @@ function installSurfaceNavigation() {
     if (!explicitClose && !outside) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    // Expense editors sit on top of a trip card; dismiss only the editor.
-    if (surface.matches('.tv2-expense-layer')) goSurfaceBack(surface);
-    else goSurfaceHome();
+    // Dismiss only the visible top layer. The screen beneath must stay untouched.
+    goSurfaceHome(surface);
   }, true);
 
   document.addEventListener('touchstart', (event) => {
@@ -766,10 +756,7 @@ function installSurfaceNavigation() {
         if (dx > 10 && surfaceSwipe.startX <= 46) {
           surfaceSwipe.active = true;
           surfaceSwipe.mode = 'right';
-          if (surfaceKeepsParentOnBack(surfaceSwipe.surface)) {
-            resetSurfaceVisual(surfaceSwipe.visual,false);
-            surfaceSwipe.visual = createSurfaceVisual(surfaceSwipe.surface,true);
-          }
+          // A swipe dismissal moves the whole top layer, never an underlying card.
         } else {
           resetSurfaceSwipe(false);
           return;
@@ -814,8 +801,8 @@ function installSurfaceNavigation() {
     event.preventDefault();
     event.stopImmediatePropagation();
     finishSurfaceVisual(visual,mode,() => {
-      if (mode === 'right' || surfaceDownReturnsToPrevious(surface)) goSurfaceBack(surface);
-      else goSurfaceHome();
+      // Both swipe directions dismiss only the top layer.
+      goSurfaceHome(surface);
     });
   }, { passive:false, capture:true });
 
