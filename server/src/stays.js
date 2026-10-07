@@ -194,7 +194,7 @@ export function createStaySearchService({ readState }) {
       const airbnb = verifiedAirbnbMatches();
       const nights = nightsBetween(dates.start, dates.end);
       const results = ranked.map((item) => {
-        const id = String(item>id), details = detailsById.get(id) || {};
+        const id = String(item.id), details = detailsById.get(id) || {};
         const names = facilityNames(details, constants);
         const name = cleanString(textValue(details.name) || `Booking.com stay ${id}`, 180);
         const city = cityLabel(details);
