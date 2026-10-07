@@ -22,6 +22,7 @@ function defaultState_() {
     version: 18,
     trips: [],
     plans: [],
+    stayFavorites: [],
     tripPrepDefaults: defaultTripPrepDefaults_(),
     finances: {Principessa:[], Principe:[]},
     financeProfiles: {
@@ -44,10 +45,12 @@ function readState_() {
   try {
     const parsed = stateStore.read();
     const base = defaultState_();
+    const plans = Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [];
     const state = {
       version: 18,
       trips: Array.isArray(parsed.trips) ? parsed.trips.map(migrateTrip_) : [],
-      plans: Array.isArray(parsed.plans) ? parsed.plans.map(sanitizePlan_) : [],
+      plans: plans,
+      stayFavorites: collectStayFavorites_(parsed.stayFavorites, plans),
       tripPrepDefaults: sanitizeTripPrepDefaults_(parsed.tripPrepDefaults),
       finances: sanitizeFinances_(parsed.finances),
       financeProfiles: sanitizeFinanceProfiles_(parsed.financeProfiles),
@@ -174,6 +177,7 @@ function saveState_(state) {
   state.audit = Array.isArray(state.audit) ? state.audit.slice(-MAX_AUDIT) : [];
   state.plans = Array.isArray(state.plans) ? state.plans.map(sanitizePlan_) : [];
   state.trips = Array.isArray(state.trips) ? state.trips.map(sanitizeTripRecord_) : [];
+  state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
   state.tripPrepDefaults = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
   state.finances = sanitizeFinances_(state.finances);
   state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
@@ -265,129 +269,101 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
     if (action === 'saveStayFavorite') {
       const planId = cleanText_(payload.planId, 80);
-      const targetPlanIdx = state.plans.findIndex(function(x){ return x.id === planId; });
-      if (targetPlanIdx < 0) throw new Error('Budget plan not found');
+      const contextPlan = planId ? state.plans.find(function(x){ return x.id === planId; }) : null;
+      if (planId && !contextPlan) throw new Error('Trip not found');
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
       const incoming = sanitizeStayFavorite_(payload.favorite || {});
       if (!incoming.url) throw new Error('Add the accommodation link first');
       if (incoming.source !== 'airbnb') throw new Error('Our Stays only accepts Airbnb links now');
       const urlKey = stayUrlKey_(incoming.url);
-      let ownerPlanIdx = targetPlanIdx;
-      let existingIdx = -1;
-      state.plans.some(function(rawPlan, index){
-        const safePlan = sanitizePlan_(rawPlan);
-        const found = safePlan.stayTracker.saved.findIndex(function(item){ return stayUrlKey_(item.url) === urlKey; });
-        if (found >= 0) { ownerPlanIdx = index; existingIdx = found; state.plans[index] = safePlan; return true; }
-        return false;
-      });
-      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
+      let favoriteIdx = state.stayFavorites.findIndex(function(item){ return stayUrlKey_(item.url) === urlKey; });
       const now = new Date().toISOString();
-      const favorite = existingIdx >= 0 ? ownerPlan.stayTracker.saved[existingIdx] : sanitizeStayFavorite_({
-        id: Utilities.getUuid(), createdAt: now
+      const favorite = favoriteIdx >= 0 ? state.stayFavorites[favoriteIdx] : sanitizeStayFavorite_({
+        id: Utilities.getUuid(), source:'airbnb', createdAt: now
       });
-      favorite.source = incoming.source;
+      favorite.source = 'airbnb';
       favorite.url = incoming.url;
-      favorite.name = incoming.name || (incoming.source === 'airbnb' ? 'Airbnb stay' : 'Booking.com stay');
-      favorite.city = incoming.city;
-      favorite.area = incoming.area;
-      favorite.image = incoming.image;
-      favorite.note = incoming.note;
-      favorite.requirements = incoming.requirements;
+      favorite.name = incoming.name || favorite.name || 'Airbnb stay';
+      favorite.city = incoming.city || favorite.city;
+      favorite.area = incoming.area || favorite.area;
+      favorite.image = incoming.image || favorite.image;
+      if (payload.favorite && Object.prototype.hasOwnProperty.call(payload.favorite,'note')) favorite.note = incoming.note;
       favorite.updatedAt = now;
       if (!favorite.createdAt) favorite.createdAt = now;
       const price = cleanMoney_(payload.price);
       if (price !== '') {
-        const contextPlan = sanitizePlan_(state.plans[targetPlanIdx]);
+        const safeContext = contextPlan ? sanitizePlan_(contextPlan) : null;
         favorite.history.push(sanitizeStayFavoritePrice_({
-          price: price, checkedAt: cleanText_(payload.checkedAt,40) || now,
-          planId: contextPlan.id, start: contextPlan.meta.start, end: contextPlan.meta.end
+          price: price,
+          checkedAt: cleanText_(payload.checkedAt,40) || now,
+          planId: safeContext ? safeContext.id : '',
+          start: safeContext ? safeContext.meta.start : '',
+          end: safeContext ? safeContext.meta.end : ''
         }));
         favorite.history = favorite.history.slice(-200);
       }
-      if (existingIdx >= 0) ownerPlan.stayTracker.saved[existingIdx] = favorite;
-      else ownerPlan.stayTracker.saved.push(favorite);
-      ownerPlan.updatedAt = now;
-      ownerPlan.updatedBy = actor;
-      state.plans[ownerPlanIdx] = ownerPlan;
+      if (favoriteIdx >= 0) state.stayFavorites[favoriteIdx] = favorite;
+      else state.stayFavorites.push(favorite);
       addAudit_(state, actor, 'saveStayFavorite', favorite.id);
       saveState_(state);
-      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+      return output_({ok:true,favorite:favorite,ownerPlanId:''});
     }
 
     if (action === 'updateStayFavoriteDetails') {
-      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
       const favoriteId = cleanText_(payload.favoriteId,80);
-      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
-      if (ownerPlanIdx < 0) throw new Error('Trip not found');
-      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
-      const favoriteIdx = ownerPlan.stayTracker.saved.findIndex(function(item){ return item.id === favoriteId; });
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
+      const favoriteIdx = state.stayFavorites.findIndex(function(item){ return item.id === favoriteId; });
       if (favoriteIdx < 0) throw new Error('Accommodation not found');
-      const favorite = ownerPlan.stayTracker.saved[favoriteIdx];
+      const favorite = state.stayFavorites[favoriteIdx];
       favorite.note = cleanText_(payload.note,500);
       favorite.updatedAt = new Date().toISOString();
-      ownerPlan.stayTracker.saved[favoriteIdx] = favorite;
-      ownerPlan.updatedAt = favorite.updatedAt;
-      ownerPlan.updatedBy = actor;
-      state.plans[ownerPlanIdx] = ownerPlan;
+      state.stayFavorites[favoriteIdx] = favorite;
       addAudit_(state, actor, 'updateStayFavoriteDetails', favorite.id);
       saveState_(state);
-      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+      return output_({ok:true,favorite:favorite,ownerPlanId:''});
     }
 
     if (action === 'updateStayFavoritePrice') {
-      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
       const favoriteId = cleanText_(payload.favoriteId,80);
       const contextPlanId = cleanText_(payload.contextPlanId,80);
-      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
-      const contextPlanIdx = state.plans.findIndex(function(x){ return x.id === contextPlanId; });
-      if (ownerPlanIdx < 0 || contextPlanIdx < 0) throw new Error('Trip not found');
-      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
-      const favoriteIdx = ownerPlan.stayTracker.saved.findIndex(function(item){ return item.id === favoriteId; });
+      const contextPlan = contextPlanId ? state.plans.find(function(x){ return x.id === contextPlanId; }) : null;
+      if (contextPlanId && !contextPlan) throw new Error('Trip not found');
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
+      const favoriteIdx = state.stayFavorites.findIndex(function(item){ return item.id === favoriteId; });
       if (favoriteIdx < 0) throw new Error('Accommodation not found');
       const price = cleanMoney_(payload.price);
       if (price === '') throw new Error('Enter the current total price');
-      const contextPlan = sanitizePlan_(state.plans[contextPlanIdx]);
+      const safeContext = contextPlan ? sanitizePlan_(contextPlan) : null;
       const now = cleanText_(payload.checkedAt,40) || new Date().toISOString();
-      const favorite = ownerPlan.stayTracker.saved[favoriteIdx];
+      const favorite = state.stayFavorites[favoriteIdx];
       favorite.history.push(sanitizeStayFavoritePrice_({
-        price:price, checkedAt:now, planId:contextPlan.id, start:contextPlan.meta.start, end:contextPlan.meta.end
+        price:price,
+        checkedAt:now,
+        planId:safeContext ? safeContext.id : '',
+        start:safeContext ? safeContext.meta.start : '',
+        end:safeContext ? safeContext.meta.end : ''
       }));
       favorite.history = favorite.history.slice(-200);
       favorite.updatedAt = now;
-      ownerPlan.stayTracker.saved[favoriteIdx] = favorite;
-      ownerPlan.updatedAt = now;
-      ownerPlan.updatedBy = actor;
-      state.plans[ownerPlanIdx] = ownerPlan;
+      state.stayFavorites[favoriteIdx] = favorite;
       addAudit_(state, actor, 'updateStayFavoritePrice', favorite.id);
       saveState_(state);
-      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+      return output_({ok:true,favorite:favorite,ownerPlanId:''});
     }
 
     if (action === 'deleteStayFavorite') {
-      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
       const favoriteId = cleanText_(payload.favoriteId,80);
-      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
-      if (ownerPlanIdx < 0) throw new Error('Trip not found');
-      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
-      ownerPlan.stayTracker.saved = ownerPlan.stayTracker.saved.filter(function(item){ return item.id !== favoriteId; });
-      const now = new Date().toISOString();
-      const ownerSelected = ownerPlan.stayTracker && ownerPlan.stayTracker.selected || {};
-      if (ownerSelected.ownerPlanId === ownerPlanId && ownerSelected.favoriteId === favoriteId) {
-        ownerPlan.stayTracker.selected = sanitizeStaySelection_({});
-      }
-      ownerPlan.updatedAt = now;
-      ownerPlan.updatedBy = actor;
-      state.plans[ownerPlanIdx] = ownerPlan;
-      state.plans = state.plans.map(function(rawPlan,index){
-        if (index === ownerPlanIdx) return state.plans[index];
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
+      const before = state.stayFavorites.length;
+      state.stayFavorites = state.stayFavorites.filter(function(item){ return item.id !== favoriteId; });
+      state.plans = state.plans.map(function(rawPlan){
         const plan = sanitizePlan_(rawPlan);
+        plan.stayTracker.saved = plan.stayTracker.saved.filter(function(item){ return item.id !== favoriteId; });
         const selected = plan.stayTracker && plan.stayTracker.selected || {};
-        if (selected.ownerPlanId === ownerPlanId && selected.favoriteId === favoriteId) {
-          plan.stayTracker.selected = sanitizeStaySelection_({});
-          plan.updatedAt = now;
-          plan.updatedBy = actor;
-        }
+        if (selected.favoriteId === favoriteId) plan.stayTracker.selected = sanitizeStaySelection_({});
         return plan;
       });
+      if (before === state.stayFavorites.length) throw new Error('Accommodation not found');
       addAudit_(state, actor, 'deleteStayFavorite', favoriteId);
       saveState_(state);
       return output_({ok:true});
@@ -398,8 +374,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const ownerPlanId = cleanText_(payload.ownerPlanId,80);
       const favoriteId = cleanText_(payload.favoriteId,80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
-      const ownerIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
-      if (planIdx < 0 || ownerIdx < 0) throw new Error('Trip or saved accommodation not found');
+      if (planIdx < 0) throw new Error('Trip not found');
 
       const plan = sanitizePlan_(state.plans[planIdx]);
       const linkedTrip = plan.linkedTripId ? state.trips.find(function(t){ return t.id === plan.linkedTripId; }) : null;
@@ -411,8 +386,12 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         throw new Error('This trip already has an accommodation expense');
       }
 
-      const owner = sanitizePlan_(state.plans[ownerIdx]);
-      const favorite = owner.stayTracker.saved.find(function(item){ return item.id === favoriteId; });
+      state.stayFavorites = collectStayFavorites_(state.stayFavorites, state.plans);
+      let favorite = state.stayFavorites.find(function(item){ return item.id === favoriteId; }) || null;
+      if (!favorite && ownerPlanId) {
+        const owner = state.plans.find(function(item){ return item.id === ownerPlanId; });
+        favorite = owner && sanitizePlan_(owner).stayTracker.saved.find(function(item){ return item.id === favoriteId; });
+      }
       if (!favorite) throw new Error('Saved accommodation not found');
       const latest = (Array.isArray(favorite.history) ? favorite.history : [])
         .slice().sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); }).pop();
@@ -438,7 +417,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       plan.expenseEntries.push(expense);
 
       plan.stayTracker.selected = {
-        ownerPlanId:ownerPlanId,
+        ownerPlanId:'',
         favoriteId:favoriteId,
         selectedAt:now,
         priceAtSelection:total,
@@ -2605,6 +2584,42 @@ function sanitizeStayFavorite_(item) {
     createdAt:cleanText_(source.createdAt,40),
     updatedAt:cleanText_(source.updatedAt,40)
   };
+}
+
+function collectStayFavorites_(globalFavorites, plans) {
+  const merged = [];
+  const byKey = new Map();
+  function add(raw) {
+    const favorite = sanitizeStayFavorite_(raw);
+    if (!favorite.url || !favorite.name || favorite.source !== 'airbnb') return;
+    const key = stayUrlKey_(favorite.url) || favorite.id;
+    const existing = byKey.get(key);
+    if (!existing) {
+      merged.push(favorite);
+      byKey.set(key, favorite);
+      return;
+    }
+    if (favorite.updatedAt && (!existing.updatedAt || favorite.updatedAt > existing.updatedAt)) {
+      existing.name = favorite.name || existing.name;
+      existing.image = favorite.image || existing.image;
+      existing.note = favorite.note || existing.note;
+      existing.city = favorite.city || existing.city;
+      existing.area = favorite.area || existing.area;
+      existing.updatedAt = favorite.updatedAt;
+    }
+    const histories = [...(existing.history || []), ...(favorite.history || [])];
+    const seen = new Set();
+    existing.history = histories.filter(function(row){
+      const k=[row.price,row.checkedAt,row.planId,row.start,row.end].join('|');
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    }).sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); }).slice(-200);
+  }
+  (Array.isArray(globalFavorites) ? globalFavorites : []).forEach(add);
+  (Array.isArray(plans) ? plans : []).forEach(function(plan){
+    (plan && plan.stayTracker && Array.isArray(plan.stayTracker.saved) ? plan.stayTracker.saved : []).forEach(add);
+  });
+  return merged.slice(0,240);
 }
 
 function sanitizeStaySelection_(item) {
