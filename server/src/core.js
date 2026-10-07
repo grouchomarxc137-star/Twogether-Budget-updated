@@ -313,6 +313,26 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
     }
 
+    if (action === 'updateStayFavoriteDetails') {
+      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
+      const favoriteId = cleanText_(payload.favoriteId,80);
+      const ownerPlanIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
+      if (ownerPlanIdx < 0) throw new Error('Trip not found');
+      const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
+      const favoriteIdx = ownerPlan.stayTracker.saved.findIndex(function(item){ return item.id === favoriteId; });
+      if (favoriteIdx < 0) throw new Error('Accommodation not found');
+      const favorite = ownerPlan.stayTracker.saved[favoriteIdx];
+      favorite.note = cleanText_(payload.note,500);
+      favorite.updatedAt = new Date().toISOString();
+      ownerPlan.stayTracker.saved[favoriteIdx] = favorite;
+      ownerPlan.updatedAt = favorite.updatedAt;
+      ownerPlan.updatedBy = actor;
+      state.plans[ownerPlanIdx] = ownerPlan;
+      addAudit_(state, actor, 'updateStayFavoriteDetails', favorite.id);
+      saveState_(state);
+      return output_({ok:true,favorite:favorite,ownerPlanId:ownerPlan.id});
+    }
+
     if (action === 'updateStayFavoritePrice') {
       const ownerPlanId = cleanText_(payload.ownerPlanId,80);
       const favoriteId = cleanText_(payload.favoriteId,80);
@@ -349,9 +369,21 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (ownerPlanIdx < 0) throw new Error('Trip not found');
       const ownerPlan = sanitizePlan_(state.plans[ownerPlanIdx]);
       ownerPlan.stayTracker.saved = ownerPlan.stayTracker.saved.filter(function(item){ return item.id !== favoriteId; });
-      ownerPlan.updatedAt = new Date().toISOString();
+      const now = new Date().toISOString();
+      ownerPlan.updatedAt = now;
       ownerPlan.updatedBy = actor;
       state.plans[ownerPlanIdx] = ownerPlan;
+      state.plans = state.plans.map(function(rawPlan,index){
+        if (index === ownerPlanIdx) return state.plans[index];
+        const plan = sanitizePlan_(rawPlan);
+        const selected = plan.stayTracker && plan.stayTracker.selected || {};
+        if (selected.ownerPlanId === ownerPlanId && selected.favoriteId === favoriteId) {
+          plan.stayTracker.selected = sanitizeStaySelection_({});
+          plan.updatedAt = now;
+          plan.updatedBy = actor;
+        }
+        return plan;
+      });
       addAudit_(state, actor, 'deleteStayFavorite', favoriteId);
       saveState_(state);
       return output_({ok:true});
@@ -2661,7 +2693,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
