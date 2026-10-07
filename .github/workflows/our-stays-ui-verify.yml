@@ -1,0 +1,22 @@
+name: Our Stays UI verification
+on:
+  push:
+    branches: [test]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix server
+      - name: Focused Our Stays tests
+        run: node --test server/test/stay-tracker.test.js server/test/stay-preview.test.js server/test/stay-search-links.test.js
+      - name: Full test suite
+        run: npm test
+        continue-on-error: true
+      - name: Production build
+        run: npm run build
