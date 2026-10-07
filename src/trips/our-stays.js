@@ -265,7 +265,35 @@ function openDetails(ownerPlanId,favoriteId){
     '<div class="stay-detail-price"><span>Latest saved price</span><strong>' + (info.latest ? money(info.latest.price) : '—') + '</strong>' + (info.change ? '<b>' + esc(info.change) + '</b>' : '') + '</div>' +
     '<div class="stay-detail-notes"><span>Notes</span><p>' + (found.favorite.note ? esc(found.favorite.note) : 'No notes added.') + '</p></div>' +
     (rows.length ? '<div class="stay-detail-history"><span>Recent prices</span>' + rows.map((row) => '<div><b>' + money(row.price) + '</b><small>' + esc(dateRange(row.start,row.end)) + '</small></div>').join('') + '</div>' : '') +
-    '<a class="stay-detail-link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open accommodation ↗</a>');
+    '<a class="stay-detail-link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open accommodation ↗</a>' +
+    '<div class="stay-detail-actions"><button id="stayEditNotes" type="button">✎ Edit notes</button><button id="stayDeleteSaved" class="danger" type="button">Remove from Our Stays</button></div>');
+  document.getElementById('stayEditNotes')?.addEventListener('click',() => openEditNotes(ownerPlanId,favoriteId));
+  document.getElementById('stayDeleteSaved')?.addEventListener('click',() => removeFavorite(ownerPlanId,favoriteId));
+}
+function openEditNotes(ownerPlanId,favoriteId){
+  const found = favoriteById(ownerPlanId,favoriteId); if (!found) return;
+  showModal(modalHead('NOTES',found.favorite.name,'Add or change anything you want to remember about this stay.') +
+    '<div class="stay-form">' +
+      '<label><span>Notes</span><textarea id="stayEditedNote" rows="5" placeholder="Anything you want to remember">' + esc(found.favorite.note || '') + '</textarea></label>' +
+      '<button id="stayNoteSave" class="stay-modal-primary" type="button">Save notes</button>' +
+    '</div>');
+  document.getElementById('stayNoteSave')?.addEventListener('click',() => saveNotes(ownerPlanId,favoriteId));
+}
+async function saveNotes(ownerPlanId,favoriteId){
+  const who = actor(); if (!who) return;
+  const note = clean(document.getElementById('stayEditedNote')?.value);
+  try {
+    await post('updateStayFavoriteDetails',{ownerPlanId,favoriteId,note},who);
+    closeModal(); toast(note ? 'Notes saved' : 'Notes cleared'); await refreshState();
+  } catch (error) { toast(error.message || 'Could not save the notes','warn'); }
+}
+async function removeFavorite(ownerPlanId,favoriteId){
+  const found = favoriteById(ownerPlanId,favoriteId), who = actor(); if (!found || !who) return;
+  if (!window.confirm('Remove this stay from Our Stays? Any accommodation expense already logged for a trip will stay untouched.')) return;
+  try {
+    await post('deleteStayFavorite',{ownerPlanId,favoriteId},who);
+    closeModal(); toast('Removed from Our Stays'); await refreshState();
+  } catch (error) { toast(error.message || 'Could not remove this stay','warn'); }
 }
 function openPriceModal(ownerPlanId,favoriteId){
   const found = favoriteById(ownerPlanId,favoriteId), plan = selectedPlan(); if (!found || !plan) return;
