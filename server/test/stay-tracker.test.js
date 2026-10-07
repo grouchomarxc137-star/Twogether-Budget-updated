@@ -51,3 +51,44 @@ test('stay tracker snapshots are stored on the plan and keep price changes', () 
     assert.deepEqual(plan.stayTracker.history.map((item) => item.price), [700,650]);
   } finally { context.cleanup(); }
 });
+
+
+test('stay search preferences and favourites persist and can be repriced for a later trip', () => {
+  const context = setup();
+  try {
+    const first = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Desenzano del Garda', start:'2099-06-10', end:'2099-06-17' }, budget:'',
+    });
+    const second = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-09-03', end:'2099-09-08' }, budget:'',
+    });
+    assert.equal(action(context.database, 'saveStaySearchPreferences', {
+      planId:first.planId, area:'lake-garda',
+      preferences:{ maxTotal:900, parking:true, washingMachine:true, entirePlace:true, bedrooms:1 },
+    }).ok, true);
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:first.planId, price:700, checkedAt:'2099-01-01T10:00:00.000Z',
+      favorite:{
+        source:'airbnb', url:'https://www.airbnb.com/rooms/12345?check_in=2099-06-10',
+        name:'Casa sul Garda', city:'Desenzano del Garda', area:'lake-garda',
+      },
+    });
+    assert.equal(saved.ok, true);
+    assert.equal(saved.favorite.history.length, 1);
+    assert.equal(saved.favorite.history[0].start, '2099-06-10');
+
+    const repriced = action(context.database, 'updateStayFavoritePrice', {
+      ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id, contextPlanId:second.planId,
+      price:625, checkedAt:'2099-02-01T10:00:00.000Z',
+    });
+    assert.equal(repriced.ok, true);
+
+    const owner = getState().plans.find((plan) => plan.id === saved.ownerPlanId);
+    const favorite = owner.stayTracker.saved.find((item) => item.id === saved.favorite.id);
+    assert.equal(owner.stayTracker.preferences.parking, true);
+    assert.equal(owner.stayTracker.preferences.washingMachine, true);
+    assert.deepEqual(favorite.history.map((item) => item.price), [700,625]);
+    assert.equal(favorite.history[1].start, '2099-09-03');
+    assert.equal(favorite.url, 'https://www.airbnb.com/rooms/12345?check_in=2099-06-10');
+  } finally { context.cleanup(); }
+});
