@@ -15,14 +15,17 @@ function allowedHost(hostname) {
 export function normalizeAirbnbUrl(rawValue) {
   const raw=clean(rawValue);
   if(!raw)throw new Error('Paste an Airbnb link');
-  const direct=/https?:\/\/[^\s<>"']+/i.exec(raw)?.[0]
+  const markdown=/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i.exec(raw);
+  const direct=markdown?.[1] || /https?:\/\/[^\s<>"'\]\[()]+/i.exec(raw)?.[0]
     || (/^(?:www\.)?airbnb\.[^\s/]+\/.+/i.test(raw) ? ('https://'+raw.replace(/^https?:\/\//i,'')) : '');
   if(!direct)throw new Error('Paste a valid Airbnb link');
-  const candidate=direct.replace(/[),.;!?]+$/,'');
+  const candidate=direct.replace(/\\&/g,'&').replace(/[),.;!?]+$/,'');
   let url;
   try{url=new URL(candidate);}catch{throw new Error('Paste a valid Airbnb link');}
   if(url.protocol!=='https:'&&url.protocol!=='http:')throw new Error('Paste a normal Airbnb link');
   if(!allowedHost(url.hostname))throw new Error('Only Airbnb links can be saved here');
+  const room=url.pathname.match(/^\/rooms\/(\d+)/i);
+  if(room)return 'https://www.airbnb.com/rooms/'+room[1];
   return url.toString();
 }
 function decodeHtml(value) {
@@ -75,12 +78,14 @@ export async function fetchStayPreview(rawUrl, fetchImpl=fetch) {
     });
     const finalUrl=new URL(response.url||url.toString());
     if(!allowedHost(finalUrl.hostname))throw new Error('The Airbnb link redirected somewhere unexpected');
+    const finalRoom=finalUrl.pathname.match(/^\/rooms\/(\d+)/i);
+    const cleanFinalUrl=finalRoom ? 'https://www.airbnb.com/rooms/'+finalRoom[1] : finalUrl.toString();
     let preview={name:'',image:''};
     if(response.ok){
       const html=await response.text();
-      preview=parseStayPreviewHtml(html.slice(0,900000),finalUrl.toString());
+      preview=parseStayPreviewHtml(html.slice(0,900000),cleanFinalUrl);
     }
-    return {ok:true,source:'airbnb',name:preview.name||'Airbnb stay',image:preview.image||'',url:finalUrl.toString()};
+    return {ok:true,source:'airbnb',name:preview.name||'Airbnb stay',image:preview.image||'',url:cleanFinalUrl};
   }catch(error){
     if(error?.name==='AbortError')throw new Error('The Airbnb preview took too long to load');
     throw error;
