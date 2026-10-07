@@ -121,3 +121,38 @@ test('selecting a saved stay logs an editable shared accommodation expense and b
     assert.match(duplicate.error, /already has an accommodation expense/i);
   } finally { context.cleanup(); }
 });
+
+
+test('saved stay notes can be edited and removing the stay preserves any logged accommodation expense', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-11-01', end:'2099-11-04' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:480, checkedAt:'2099-04-01T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/777',name:'Little Lake House',note:''},
+    });
+    const edited = action(context.database, 'updateStayFavoriteDetails', {
+      ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id, note:'Quiet terrace · check parking',
+    });
+    assert.equal(edited.ok, true);
+    assert.equal(edited.favorite.note, 'Quiet terrace · check parking');
+
+    const selected = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
+    });
+    assert.equal(selected.ok, true);
+
+    const removed = action(context.database, 'deleteStayFavorite', {
+      ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
+    });
+    assert.equal(removed.ok, true);
+
+    const plan = getState().plans.find((item) => item.id === trip.planId);
+    assert.equal(plan.stayTracker.saved.length, 0);
+    assert.equal(plan.stayTracker.selected.favoriteId, '');
+    assert.equal(plan.sharedExpenses.accom.total, 480);
+    assert.equal(plan.sharedExpenses.accom.accommodation.paymentType, 'shared');
+  } finally { context.cleanup(); }
+});
