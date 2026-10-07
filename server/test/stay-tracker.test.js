@@ -306,3 +306,45 @@ test('deleting a trip with a selected stay removes trip finances but keeps the f
     assert.equal(state.sharedJar.transactions.filter((item) => item.planId === trip.planId).length, 0);
   } finally { context.cleanup(); }
 });
+
+
+test('unavailable is trip-specific and a later price check makes the stay available again', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-10-20', end:'2099-10-23' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:620, checkedAt:'2099-07-01T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/424242',name:'Olive House',note:''},
+    });
+    assert.equal(saved.ok, true);
+
+    const unavailable = action(context.database, 'markStayFavoriteUnavailable', {
+      favoriteId:saved.favorite.id, contextPlanId:trip.planId, checkedAt:'2099-07-02T10:00:00.000Z',
+    });
+    assert.equal(unavailable.ok, true);
+    assert.equal(unavailable.favorite.history.at(-1).status, 'unavailable');
+    assert.equal(unavailable.favorite.history.at(-1).start, '2099-10-20');
+
+    const blocked = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:'', favoriteId:saved.favorite.id,
+    });
+    assert.equal(blocked.ok, false);
+    assert.match(blocked.error, /unavailable/i);
+
+    const repriced = action(context.database, 'updateStayFavoritePrice', {
+      favoriteId:saved.favorite.id, contextPlanId:trip.planId,
+      price:590, checkedAt:'2099-07-03T10:00:00.000Z',
+    });
+    assert.equal(repriced.ok, true);
+    assert.equal(repriced.favorite.history.at(-1).status, 'available');
+    assert.equal(repriced.favorite.history.at(-1).price, 590);
+
+    const selected = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:'', favoriteId:saved.favorite.id,
+    });
+    assert.equal(selected.ok, true);
+    assert.equal(selected.expense.amount, 590);
+  } finally { context.cleanup(); }
+});
