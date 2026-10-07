@@ -128,7 +128,7 @@ function lastFinanceView() {
 function isInsideHub(name) {
   if (name === 'trips') {
     const activeSheet = $('.sheet.active');
-    return !!activeSheet && ['log', 'monthly', 'compare'].includes(activeSheet.id);
+    return !!activeSheet && ['log', 'stay-tracker', 'monthly', 'compare'].includes(activeSheet.id);
   }
   if (name === 'finances') {
     const financeSheet = $('#finances');
@@ -163,7 +163,7 @@ function activateMobileHub(name) {
     $('#wishlistHub')?.classList.remove('active');
     $('#tripSubnav')?.classList.remove('hidden'); $('#financeSubnav')?.classList.add('hidden');
     let last = lastTripView();
-    if (!['log', 'monthly', 'compare'].includes(last)) last = 'log';
+    if (!['log', 'stay-tracker', 'monthly', 'compare'].includes(last)) last = 'log';
     const target = $(`#tripSubnav .tab[data-sheet="${last}"]`) || $('#tripSubnav .tab[data-sheet="log"]');
     if (target) target.click();
     else $$('.sheet').forEach((x) => x.classList.toggle('active', x.id === 'log'));
@@ -189,7 +189,7 @@ function ensureNavigation() {
   if ($('.tw-v18-nav-wrap')) return;
   const hub = $('.hub-tabs'); if (!hub) return;
   const defs = [
-    { key: 'trips', items: [['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
+    { key: 'trips', items: [['Log trip', () => $('.trip-subnav [data-sheet="log"]')], ['Our Stays', () => $('.trip-subnav [data-sheet="stay-tracker"]')], ['Monthly', () => $('.trip-subnav [data-sheet="monthly"]')], ['Compare', () => $('.trip-subnav [data-sheet="compare"]')]] },
     { key: 'finances', items: [['Log Finances', () => $('.finance-subnav [data-fin-subview="monthly"]')], ['Monthly', () => $('.finance-subnav [data-fin-subview="overview"]')], ['Wallet', () => $('.finance-subnav [data-fin-subview="balances"]')], ['Test scenarios', () => $('.finance-subnav [data-fin-subview="scenarios"]')]] },
   ];
   defs.forEach((def) => {
@@ -856,9 +856,10 @@ function currentEdgeSection() {
   }
 
   const activeSheet = $('.sheet.active');
-  if (activeSheet && ['log','monthly','compare'].includes(activeSheet.id)) {
+  if (activeSheet && ['log','stay-tracker','monthly','compare'].includes(activeSheet.id)) {
     const items = [
       ['Trips', $('#tripSubnav [data-sheet="log"]'), activeSheet.id === 'log'],
+      ['Our Stays', $('#tripSubnav [data-sheet="stay-tracker"]'), activeSheet.id === 'stay-tracker'],
       ['Monthly', $('#tripSubnav [data-sheet="monthly"]'), activeSheet.id === 'monthly'],
       ['Compare', $('#tripSubnav [data-sheet="compare"]'), activeSheet.id === 'compare'],
     ].filter((item) => item[1]);
