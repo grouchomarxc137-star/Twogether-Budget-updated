@@ -133,7 +133,7 @@
 <link rel="stylesheet" href="/src/app/app.css">
 <link rel="stylesheet" href="/src/trips/trips.css">
 <link rel="stylesheet" href="/src/trips/current-trip-actions.css">
-<link rel="stylesheet" href="/src/trips/trips-simplified.css">
+<link rel="stylesheet" href="/src/trips/trips-simplified.css">\n<link rel="stylesheet" href="/src/trips/stay-tracker.css">
 <link rel="stylesheet" href="/src/finances/finances.css">
 <link rel="stylesheet" href="/src/wishlist/wishlist.css">
 <link rel="stylesheet" href="/src/shop/shop.css">
@@ -159,7 +159,7 @@
     <button class="hub-tab tab" data-hub="finances" data-sheet="finances" type="button">My finances</button>
   </nav>
   <nav class="tabs trip-subnav" id="tripSubnav" role="tablist" aria-label="Trip pages">
-    <button class="tab active" data-sheet="log" type="button">Trips</button>
+    <button class="tab active" data-sheet="log" type="button">Trips</button>\n    <button class="tab" data-sheet="stay-tracker" type="button">Stay Tracker</button>
     <button class="tab" data-sheet="monthly" type="button">Monthly</button>
     <button class="tab" data-sheet="compare" type="button">Compare</button>
   </nav>
@@ -179,7 +179,7 @@
 
     </section>
 
-    <section id="monthly" class="sheet">
+    <section id="stay-tracker" class="sheet"><div id="stayTrackerRoot"></div></section>\n\n    <section id="monthly" class="sheet">
       <div class="page-heading"><span class="eyebrow">OVERVIEW</span><h1>Your monthly picture</h1><p>January through December 2026. Trips that are not fully confirmed yet remain marked as estimates.</p></div>
       <div class="kpis">
         <div class="kpi"><span>12-month total</span><strong id="kpiTotal">€0</strong></div>
