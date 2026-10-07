@@ -727,6 +727,9 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   };
   simplifiedLayer = document.createElement('div'); simplifiedLayer.className = 'tv2-layer tv2-expense-layer';
   simplifiedLayer.innerHTML = '<div class="tv2-backdrop" data-close></div><div class="tv2-sheet" role="dialog" aria-modal="true"></div>';
+  // This editor is a one-level overlay: every shared back/home gesture closes only it.
+  simplifiedLayer._twogetherBack = () => closeSimplifiedSheet();
+  simplifiedLayer._twogetherHome = () => closeSimplifiedSheet();
   document.body.appendChild(simplifiedLayer); document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-sheet');
   function refreshLive() {
