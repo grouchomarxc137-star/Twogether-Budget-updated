@@ -53,7 +53,7 @@ test('stay tracker snapshots are stored on the plan and keep price changes', () 
 });
 
 
-test('stay search preferences and favourites persist and can be repriced for a later trip', () => {
+test('stay favourites live in the shared library and can be repriced for a later trip', () => {
   const context = setup();
   try {
     const first = action(context.database, 'savePlan', {
@@ -74,19 +74,21 @@ test('stay search preferences and favourites persist and can be repriced for a l
       },
     });
     assert.equal(saved.ok, true);
+    assert.equal(saved.ownerPlanId, '');
     assert.equal(saved.favorite.history.length, 1);
     assert.equal(saved.favorite.history[0].start, '2099-06-10');
 
     const repriced = action(context.database, 'updateStayFavoritePrice', {
-      ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id, contextPlanId:second.planId,
+      favoriteId:saved.favorite.id, contextPlanId:second.planId,
       price:625, checkedAt:'2099-02-01T10:00:00.000Z',
     });
     assert.equal(repriced.ok, true);
 
-    const owner = getState().plans.find((plan) => plan.id === saved.ownerPlanId);
-    const favorite = owner.stayTracker.saved.find((item) => item.id === saved.favorite.id);
-    assert.equal(owner.stayTracker.preferences.parking, true);
-    assert.equal(owner.stayTracker.preferences.washingMachine, true);
+    const state = getState();
+    const firstPlan = state.plans.find((plan) => plan.id === first.planId);
+    const favorite = state.stayFavorites.find((item) => item.id === saved.favorite.id);
+    assert.equal(firstPlan.stayTracker.preferences.parking, true);
+    assert.equal(firstPlan.stayTracker.preferences.washingMachine, true);
     assert.deepEqual(favorite.history.map((item) => item.price), [700,625]);
     assert.equal(favorite.history[1].start, '2099-09-03');
     assert.equal(favorite.url, 'https://www.airbnb.com/rooms/12345?check_in=2099-06-10');
@@ -157,8 +159,9 @@ test('saved stay notes can be edited and removing the stay preserves any logged 
     });
     assert.equal(removed.ok, true);
 
-    const plan = getState().plans.find((item) => item.id === trip.planId);
-    assert.equal(plan.stayTracker.saved.length, 0);
+    const state = getState();
+    const plan = state.plans.find((item) => item.id === trip.planId);
+    assert.equal(state.stayFavorites.length, 0);
     assert.equal(plan.stayTracker.selected.favoriteId, '');
     assert.equal(plan.expenseEntries.length, 1);
     assert.equal(plan.expenseEntries[0].category, 'accommodation');
@@ -237,5 +240,69 @@ test('manually deleting the selected accommodation expense clears the stay selec
     assert.equal(plan.expenseEntries.length, 0);
     assert.equal(plan.stayTracker.selected.favoriteId, '');
     assert.equal(plan.stayTracker.selected.expenseId, '');
+  } finally { context.cleanup(); }
+});
+
+
+test('a stay can be saved to Our Stays with no trip at all', () => {
+  const context = setup();
+  try {
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:'',
+      price:'',
+      checkedAt:'2099-06-01T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/123456',name:'Future Favourite',note:'Try this one sometime'},
+    });
+    assert.equal(saved.ok, true);
+    assert.equal(saved.ownerPlanId, '');
+    const state = getState();
+    assert.equal(state.plans.length, 0);
+    assert.equal(state.stayFavorites.length, 1);
+    assert.equal(state.stayFavorites[0].name, 'Future Favourite');
+    assert.equal(state.stayFavorites[0].history.length, 0);
+  } finally { context.cleanup(); }
+});
+
+test('deleting an unselected trip never deletes its saved favourite', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Desenzano del Garda', start:'2099-08-01', end:'2099-08-03' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:420, checkedAt:'2099-06-01T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/654321',name:'Permanent Favourite',note:''},
+    });
+    assert.equal(saved.ok, true);
+    assert.equal(action(context.database, 'deleteCurrentTrip', {kind:'plan',id:trip.planId}).ok, true);
+    const state = getState();
+    assert.equal(state.plans.length, 0);
+    assert.equal(state.stayFavorites.length, 1);
+    assert.equal(state.stayFavorites[0].id, saved.favorite.id);
+  } finally { context.cleanup(); }
+});
+
+test('deleting a trip with a selected stay removes trip finances but keeps the favourite', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-08-10', end:'2099-08-13' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:510, checkedAt:'2099-06-02T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/7654321',name:'Favourite With Trip',note:''},
+    });
+    const selected = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:'', favoriteId:saved.favorite.id,
+    });
+    assert.equal(selected.ok, true);
+    assert.equal(getState().plans[0].expenseEntries.length, 1);
+
+    assert.equal(action(context.database, 'deleteCurrentTrip', {kind:'plan',id:trip.planId}).ok, true);
+    const state = getState();
+    assert.equal(state.plans.length, 0);
+    assert.equal(state.stayFavorites.length, 1);
+    assert.equal(state.stayFavorites[0].id, saved.favorite.id);
+    assert.equal(state.sharedJar.transactions.filter((item) => item.planId === trip.planId).length, 0);
   } finally { context.cleanup(); }
 });
