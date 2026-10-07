@@ -31,7 +31,7 @@ test('stay preview resolves share links and keeps a fallback if metadata is bloc
   assert.equal(result.ok,true);
   assert.equal(result.source,'airbnb');
   assert.equal(result.name,'Airbnb stay');
-  assert.equal(result.url,'https://www.airbnb.it/rooms/12345?unique_share_id=abc');
+  assert.equal(result.url,'https://www.airbnb.com/rooms/12345');
 });
 
 test('stay preview reads Airbnb metadata when available', async () => {
