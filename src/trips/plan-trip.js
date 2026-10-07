@@ -195,8 +195,8 @@ async function saveTrip() {
   };
   const budget = String(draft.budget || '').trim();
 
-  if (!meta.location || !meta.city || !meta.start || !meta.end || (meta.location === 'Other' && !meta.otherLocation)) {
-    toast('Add the destination and choose the trip dates first', 'warn');
+  if (!meta.location || (!meta.city && meta.location !== 'Italy') || !meta.start || !meta.end || (meta.location === 'Other' && !meta.otherLocation)) {
+    toast(meta.location === 'Italy' ? 'Choose the trip dates first' : 'Add the destination and choose the trip dates first', 'warn');
     return;
   }
   if (budget && !Number.isFinite(Number(budget.replace(',', '.')))) {
