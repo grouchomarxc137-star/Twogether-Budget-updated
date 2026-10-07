@@ -102,7 +102,7 @@ test('selecting a saved stay logs an editable shared accommodation expense and b
     });
     const saved = action(context.database, 'saveStayFavorite', {
       planId:trip.planId, price:540, checkedAt:'2099-03-01T10:00:00.000Z',
-      favorite:{source:'booking',url:'https://www.booking.com/hotel/it/casa.html',name:'Casa Bella',image:'https://example.com/photo.jpg',note:'Nice balcony'},
+      favorite:{source:'airbnb',url:'https://www.airbnb.it/rooms/12345',name:'Casa Bella',image:'https://example.com/photo.jpg',note:'Nice balcony'},
     });
     const selected = action(context.database, 'selectStayForTrip', {
       planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
