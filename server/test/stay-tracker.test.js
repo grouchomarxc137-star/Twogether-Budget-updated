@@ -92,3 +92,32 @@ test('stay search preferences and favourites persist and can be repriced for a l
     assert.equal(favorite.url, 'https://www.airbnb.com/rooms/12345?check_in=2099-06-10');
   } finally { context.cleanup(); }
 });
+
+
+test('selecting a saved stay logs an editable shared accommodation expense and blocks duplicates', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-10-10', end:'2099-10-13' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:540, checkedAt:'2099-03-01T10:00:00.000Z',
+      favorite:{source:'booking',url:'https://www.booking.com/hotel/it/casa.html',name:'Casa Bella',image:'https://example.com/photo.jpg',note:'Nice balcony'},
+    });
+    const selected = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
+    });
+    assert.equal(selected.ok, true);
+    const plan = getState().plans.find((item) => item.id === trip.planId);
+    assert.equal(plan.sharedExpenses.accom.total, 540);
+    assert.equal(plan.sharedExpenses.accom.accommodation.useJar, false);
+    assert.equal(plan.sharedExpenses.accom.accommodation.paymentType, 'shared');
+    assert.equal(plan.stayTracker.selected.favoriteId, saved.favorite.id);
+
+    const duplicate = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
+    });
+    assert.equal(duplicate.ok, false);
+    assert.match(duplicate.error, /already has an accommodation expense/i);
+  } finally { context.cleanup(); }
+});
