@@ -94,9 +94,16 @@ export function effectiveTrip(t) {
   });
 
   out.mismatch = !!(a && b && differences(t).length);
-  out.total = MONEY_FIELDS.reduce((sum, k) => sum + n(out[k]), 0);
+  const categoryTotal = MONEY_FIELDS.reduce((sum, k) => sum + n(out[k]), 0);
   out.paidPrincipessa = n(a?.paid);
   out.paidPrincipe = n(b?.paid);
+  const paidTotal = out.paidPrincipessa + out.paidPrincipe;
+  // Confirmed plan snapshots created before net-of-Jar totals were introduced
+  // stored gross categories but net payer amounts. Keep those existing stories
+  // consistent with Current Trips without changing ordinary legacy submissions.
+  out.total = out.locked && !out.mismatch && paidTotal > 0 && paidTotal < categoryTotal
+    ? paidTotal
+    : categoryTotal;
   out.estimated = out.provisional || out.mismatch || !out.locked || Object.values(out.uncertain).some(Boolean);
   return out;
 }
