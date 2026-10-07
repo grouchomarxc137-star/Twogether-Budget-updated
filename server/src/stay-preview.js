@@ -1,11 +1,29 @@
-const ALLOWED_HOSTS = ['airbnb.com','booking.com'];
+const AIRBNB_HOSTS = [
+  'airbnb.com','airbnb.it','airbnb.co.uk','airbnb.fr','airbnb.de','airbnb.nl','airbnb.es','airbnb.pt',
+  'airbnb.ie','airbnb.dk','airbnb.se','airbnb.no','airbnb.fi','airbnb.ca','airbnb.com.au','airbnb.co.nz',
+  'airbnb.com.br','airbnb.mx','airbnb.co.in','airbnb.jp','airbnb.co.kr','airbnb.com.sg','airbnb.com.tw',
+  'airbnb.com.hk','airbnb.co.za','airbnb.pl','airbnb.cz','airbnb.hu','airbnb.at','airbnb.ch','airbnb.be','airbnb.gr',
+];
 
 function clean(value) {
   return String(value == null ? '' : value).trim();
 }
 function allowedHost(hostname) {
   const host=clean(hostname).toLowerCase().replace(/^www\./,'');
-  return ALLOWED_HOSTS.some((domain)=>host===domain||host.endsWith('.'+domain));
+  return AIRBNB_HOSTS.some((domain)=>host===domain||host.endsWith('.'+domain));
+}
+export function normalizeAirbnbUrl(rawValue) {
+  const raw=clean(rawValue);
+  if(!raw)throw new Error('Paste an Airbnb link');
+  const direct=/https?:\/\/[^\s<>"']+/i.exec(raw)?.[0]
+    || (/^(?:www\.)?airbnb\.[^\s/]+\/.+/i.test(raw) ? ('https://'+raw.replace(/^https?:\/\//i,'')) : '');
+  if(!direct)throw new Error('Paste a valid Airbnb link');
+  const candidate=direct.replace(/[),.;!?]+$/,'');
+  let url;
+  try{url=new URL(candidate);}catch{throw new Error('Paste a valid Airbnb link');}
+  if(url.protocol!=='https:'&&url.protocol!=='http:')throw new Error('Paste a normal Airbnb link');
+  if(!allowedHost(url.hostname))throw new Error('Only Airbnb links can be saved here');
+  return url.toString();
 }
 function decodeHtml(value) {
   return clean(value)
@@ -37,15 +55,12 @@ export function parseStayPreviewHtml(html, fallbackUrl='') {
   return {name:title,image:absoluteImage};
 }
 export function sourceFromStayUrl(rawUrl) {
-  let url;
-  try{url=new URL(clean(rawUrl));}catch{throw new Error('Paste a valid Booking.com or Airbnb link');}
-  if(url.protocol!=='https:'&&url.protocol!=='http:')throw new Error('Paste a normal Booking.com or Airbnb link');
-  if(!allowedHost(url.hostname))throw new Error('Only Booking.com and Airbnb links can be saved here');
-  return url.hostname.toLowerCase().includes('airbnb')?'airbnb':'booking';
+  normalizeAirbnbUrl(rawUrl);
+  return 'airbnb';
 }
 export async function fetchStayPreview(rawUrl, fetchImpl=fetch) {
-  const source=sourceFromStayUrl(rawUrl);
-  const url=new URL(clean(rawUrl));
+  const normalized=normalizeAirbnbUrl(rawUrl);
+  const url=new URL(normalized);
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),7000);
   try{
@@ -58,15 +73,16 @@ export async function fetchStayPreview(rawUrl, fetchImpl=fetch) {
         'accept-language':'en-GB,en;q=0.9',
       },
     });
-    if(!response.ok)throw new Error('The accommodation page did not allow Twogether to read its preview');
     const finalUrl=new URL(response.url||url.toString());
-    if(!allowedHost(finalUrl.hostname))throw new Error('The accommodation link redirected somewhere unexpected');
-    const html=await response.text();
-    const preview=parseStayPreviewHtml(html.slice(0,900000),finalUrl.toString());
-    const fallback=source==='airbnb'?'Airbnb stay':'Booking.com stay';
-    return {ok:true,source,name:preview.name||fallback,image:preview.image||'',url:finalUrl.toString()};
+    if(!allowedHost(finalUrl.hostname))throw new Error('The Airbnb link redirected somewhere unexpected');
+    let preview={name:'',image:''};
+    if(response.ok){
+      const html=await response.text();
+      preview=parseStayPreviewHtml(html.slice(0,900000),finalUrl.toString());
+    }
+    return {ok:true,source:'airbnb',name:preview.name||'Airbnb stay',image:preview.image||'',url:finalUrl.toString()};
   }catch(error){
-    if(error?.name==='AbortError')throw new Error('The accommodation preview took too long to load');
+    if(error?.name==='AbortError')throw new Error('The Airbnb preview took too long to load');
     throw error;
   }finally{clearTimeout(timeout);}
 }
