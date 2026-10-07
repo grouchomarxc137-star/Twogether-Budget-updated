@@ -478,7 +478,7 @@ function surfaceUsesNativeSwipe(surface) {
 }
 
 function surfaceDownReturnsToPrevious(surface) {
-  return !!surface?.matches?.('dialog.finance-log-host,.tv2-expense-layer');
+  return !!surface?.matches?.('dialog.finance-log-host,.tv2-expense-layer,.stay-modal.has-back');
 }
 
 function surfaceBlocksGlobalDown(surface) {
