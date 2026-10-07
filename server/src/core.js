@@ -422,7 +422,9 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       }
       if (!favorite) throw new Error('Saved accommodation not found');
       const tripChecks = (Array.isArray(favorite.history) ? favorite.history : [])
-        .filter(function(item){ return item.start === plan.meta.start && item.end === plan.meta.end; })
+        .filter(function(item){
+          return item.planId ? item.planId === plan.id : (item.start === plan.meta.start && item.end === plan.meta.end);
+        })
         .slice().sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); });
       const latestCheck = tripChecks[tripChecks.length - 1] || null;
       if (latestCheck && latestCheck.status === 'unavailable') throw new Error('This accommodation is unavailable for this trip');
