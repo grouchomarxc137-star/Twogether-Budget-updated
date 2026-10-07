@@ -94,7 +94,7 @@ test('stay search preferences and favourites persist and can be repriced for a l
 });
 
 
-test('selecting a saved stay logs an editable shared accommodation expense and blocks duplicates', () => {
+test('selecting a saved stay logs a normal editable trip expense and blocks duplicates', () => {
   const context = setup();
   try {
     const trip = action(context.database, 'savePlan', {
@@ -109,10 +109,18 @@ test('selecting a saved stay logs an editable shared accommodation expense and b
     });
     assert.equal(selected.ok, true);
     const plan = getState().plans.find((item) => item.id === trip.planId);
-    assert.equal(plan.sharedExpenses.accom.total, 540);
-    assert.equal(plan.sharedExpenses.accom.accommodation.useJar, false);
-    assert.equal(plan.sharedExpenses.accom.accommodation.paymentType, 'shared');
+    assert.ok(plan.stayTracker.selected.expenseId);
     assert.equal(plan.stayTracker.selected.favoriteId, saved.favorite.id);
+    assert.equal(plan.expenseEntries.length, 1);
+    const expense = plan.expenseEntries[0];
+    assert.equal(expense.id, plan.stayTracker.selected.expenseId);
+    assert.equal(expense.category, 'accommodation');
+    assert.equal(expense.amount, 540);
+    assert.equal(expense.paidBy, 'both');
+    assert.equal(expense.split, 'shared');
+    assert.equal(expense.useJar, false);
+    assert.equal(expense.note, 'Casa Bella');
+    assert.equal(plan.sharedExpenses.accom.total, '');
 
     const duplicate = action(context.database, 'selectStayForTrip', {
       planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
@@ -152,8 +160,9 @@ test('saved stay notes can be edited and removing the stay preserves any logged 
     const plan = getState().plans.find((item) => item.id === trip.planId);
     assert.equal(plan.stayTracker.saved.length, 0);
     assert.equal(plan.stayTracker.selected.favoriteId, '');
-    assert.equal(plan.sharedExpenses.accom.total, 480);
-    assert.equal(plan.sharedExpenses.accom.accommodation.paymentType, 'shared');
+    assert.equal(plan.expenseEntries.length, 1);
+    assert.equal(plan.expenseEntries[0].category, 'accommodation');
+    assert.equal(plan.expenseEntries[0].amount, 480);
   } finally { context.cleanup(); }
 });
 
@@ -168,16 +177,29 @@ test('unselecting a stay removes its accommodation expense and restores Shared J
       planId:trip.planId, price:500, checkedAt:'2099-05-01T10:00:00.000Z',
       favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/888',name:'Lake Nest',note:''},
     });
-    assert.equal(action(context.database, 'selectStayForTrip', {
+    const selected = action(context.database, 'selectStayForTrip', {
       planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
-    }).ok, true);
+    });
+    assert.equal(selected.ok, true);
 
-    const edited = action(context.database, 'saveAccommodationExpense', {
-      planId:trip.planId, total:600, useJar:true, paymentType:'shared', paidUpfront:false,
+    const edited = action(context.database, 'saveTripExpense', {
+      planId:trip.planId,
+      expense:{
+        id:selected.expense.id,
+        category:'accommodation',
+        amount:600,
+        paidBy:'Principessa',
+        split:'shared',
+        forActor:'',
+        date:'2099-05-01',
+        note:'Lake Nest',
+        uncertain:false,
+        useJar:true,
+      },
     });
     assert.equal(edited.ok, true);
-    assert.equal(edited.sharedExpense.total, 600);
-    assert.equal(edited.sharedExpense.accommodation.useJar, true);
+    assert.equal(edited.expense.amount, 600);
+    assert.equal(edited.expense.useJar, true);
     assert.equal(edited.sharedJar.balance, 750);
 
     const removed = action(context.database, 'unselectStayForTrip', { planId:trip.planId });
@@ -185,8 +207,35 @@ test('unselecting a stay removes its accommodation expense and restores Shared J
 
     const plan = getState().plans.find((item) => item.id === trip.planId);
     assert.equal(plan.stayTracker.selected.favoriteId, '');
-    assert.equal(plan.sharedExpenses.accom.total, '');
-    assert.equal(plan.sharedExpenses.accom.accommodation.paymentType, '');
+    assert.equal(plan.expenseEntries.length, 0);
     assert.equal(getState().sharedJar.balance, 870);
+  } finally { context.cleanup(); }
+});
+
+
+test('manually deleting the selected accommodation expense clears the stay selection link', () => {
+  const context = setup();
+  try {
+    const trip = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Peschiera del Garda', start:'2099-12-10', end:'2099-12-12' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:trip.planId, price:350, checkedAt:'2099-05-02T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/999',name:'Garden Stay',note:''},
+    });
+    const selected = action(context.database, 'selectStayForTrip', {
+      planId:trip.planId, ownerPlanId:saved.ownerPlanId, favoriteId:saved.favorite.id,
+    });
+    assert.equal(selected.ok, true);
+
+    const deleted = action(context.database, 'deleteTripExpense', {
+      planId:trip.planId, expenseId:selected.expense.id,
+    });
+    assert.equal(deleted.ok, true);
+
+    const plan = getState().plans.find((item) => item.id === trip.planId);
+    assert.equal(plan.expenseEntries.length, 0);
+    assert.equal(plan.stayTracker.selected.favoriteId, '');
+    assert.equal(plan.stayTracker.selected.expenseId, '');
   } finally { context.cleanup(); }
 });
