@@ -421,10 +421,14 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         favorite = owner && sanitizePlan_(owner).stayTracker.saved.find(function(item){ return item.id === favoriteId; });
       }
       if (!favorite) throw new Error('Saved accommodation not found');
-      const latest = (Array.isArray(favorite.history) ? favorite.history : [])
-        .slice().sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); }).pop();
-      const total = cleanMoney_(latest && latest.price);
-      if (total === '') throw new Error('Update this accommodation price before selecting it');
+      const tripChecks = (Array.isArray(favorite.history) ? favorite.history : [])
+        .filter(function(item){ return item.start === plan.meta.start && item.end === plan.meta.end; })
+        .slice().sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); });
+      const latestCheck = tripChecks[tripChecks.length - 1] || null;
+      if (latestCheck && latestCheck.status === 'unavailable') throw new Error('This accommodation is unavailable for this trip');
+      const latestPrice = tripChecks.filter(function(item){ return item.status !== 'unavailable' && cleanMoney_(item.price) !== ''; }).pop() || null;
+      const total = cleanMoney_(latestPrice && latestPrice.price);
+      if (total === '') throw new Error('Update this accommodation price for these trip dates before selecting it');
 
       const now = new Date().toISOString();
       const expense = sanitizeTripExpense_({
