@@ -183,7 +183,6 @@ function stayCard(favorite,plan){
   const info=priceInfo(favorite,plan);
   const selected=!!plan&&isSelected(favorite,plan);
   const note=clean(favorite.note);
-  const tripLink=plan?buildListingCheckUrl(favorite.url,favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}):'';
   return '<article class="our-stay-swipe" data-stay-swipe="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">' +
     '<span class="our-stay-delete-underlay" aria-hidden="true"><b>Delete</b></span>' +
     '<div class="our-stay-card'+(selected?' is-selected':'')+(info.unavailable?' is-unavailable':'')+'">' +
@@ -196,10 +195,7 @@ function stayCard(favorite,plan){
           (info.unavailable?'<strong class="unavailable-label">Unavailable</strong>':('<strong>'+(info.current?money(info.current.price):'Add price')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')))+
           '<i>›</i></span>':'<span class="our-stay-money is-overview"><i>›</i></span>') +
       '</button>' +
-      (plan?'<div class="our-stay-trip-actions">' +
-        '<a href="'+esc(tripLink)+'" target="_blank" rel="noopener noreferrer">Airbnb <span>↗</span></a>' +
-        (!selected&&!info.unavailable&&info.current?'<button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select stay</button>':'') +
-      '</div>':'') +
+      (plan&&!selected&&!info.unavailable&&info.current?'<div class="our-stay-quick"><button class="select" type="button" data-select-stay="'+esc(favorite.id)+'" data-owner-plan="'+esc(favorite.ownerPlanId)+'">Select this stay</button></div>':'') +
       (selected?'<div class="our-stay-selected">♡ Selected for this trip</div>':'') +
     '</div>' +
   '</article>';
