@@ -294,50 +294,53 @@ async function saveFavorite(){
   }
 }
 function openDetails(ownerPlanId,favoriteId){
-  const found = favoriteById(ownerPlanId,favoriteId), plan = selectedPlan(); if (!found) return;
-  const info = priceInfo(found.favorite,plan);
-  const rows = [...(found.favorite.history || [])].sort((a,b) => String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,4);
-  const link = plan ? buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}) : found.favorite.url;
-  const selected = !!plan && isSelected(found.favorite,plan);
-  const expenseExists = !!plan && hasAccommodationExpense(plan);
-  showModal(modalHead('AIRBNB',found.favorite.name,plan ? dateRange(plan.meta.start,plan.meta.end,true) : 'Saved in Our Stays') +
-    (found.favorite.image ? '<div class="stay-detail-photo" style="background-image:url(&quot;' + esc(found.favorite.image) + '&quot;)"></div>' : '<div class="stay-detail-photo is-empty">⌂</div>') +
-    '<div class="stay-detail-price"><span>Latest price</span><strong>' + (info.latest ? money(info.latest.price) : '—') + '</strong>' + (info.change ? '<b class="' + (info.change.startsWith('↓') ? 'down' : info.change.startsWith('↑') ? 'up' : 'same') + '">' + esc(info.change) + '</b>' : '') + '</div>' +
-    (found.favorite.note ? '<div class="stay-detail-notes"><span>Note</span><p>' + esc(found.favorite.note) + '</p></div>' : '') +
+  const found=favoriteById(ownerPlanId,favoriteId); if(!found)return;
+  const plan=selectedPlan();
+  const usage=selectedUsage(found.favorite);
+  const info=priceInfo(found.favorite,plan);
+  const rows=[...(found.favorite.history||[])].sort((a,b)=>String(b.checkedAt).localeCompare(String(a.checkedAt))).slice(0,4);
+  const link=plan?buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2}):found.favorite.url;
+  const subtitle=plan?dateRange(plan.meta.start,plan.meta.end,true):(usage?'Selected · '+tripName(usage.plan):'Saved in Our Stays');
+  showModal(modalHead('AIRBNB',found.favorite.name,subtitle) +
+    (found.favorite.image?'<div class="stay-detail-photo" style="background-image:url(&quot;'+esc(found.favorite.image)+'&quot;)"></div>':'<div class="stay-detail-photo is-empty">⌂</div>') +
+    '<div class="stay-detail-price"><span>Latest price</span><strong>'+(info.latest?money(info.latest.price):'—')+'</strong>'+(info.change?'<b class="'+(info.change.startsWith('↓')?'down':info.change.startsWith('↑')?'up':'same')+'">'+esc(info.change)+'</b>':'')+'</div>' +
+    (found.favorite.note?'<div class="stay-detail-notes"><span>Note</span><p>'+esc(found.favorite.note)+'</p></div>':'') +
     '<div class="stay-detail-primary">' +
-      (plan && !expenseExists ? '<button id="stayDetailSelect" class="stay-modal-primary" type="button">Select this stay</button>' : '') +
-      (selected ? '<button id="stayDetailExpense" class="stay-modal-primary" type="button">Edit trip expense</button><button id="stayDetailUnselect" class="stay-text-danger" type="button">Unselect from trip</button>' : '') +
+      (plan?'<button id="stayDetailSelect" class="stay-modal-primary" type="button">Select this stay</button>':'') +
+      (usage?'<button id="stayDetailExpense" class="stay-modal-primary" type="button">Edit in trip</button><button id="stayDetailUnselect" class="stay-text-danger" type="button">Unselect from '+esc(tripName(usage.plan))+'</button>':'') +
     '</div>' +
     '<div class="stay-detail-menu">' +
-      '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer"><span>Open in Airbnb</span><b>↗</b></a>' +
-      (plan ? '<button id="stayDetailPrice" type="button"><span>Update price</span><b>›</b></button>' : '') +
-      '<button id="stayEditNotes" type="button"><span>' + (found.favorite.note ? 'Edit note' : 'Add note') + '</span><b>›</b></button>' +
+      '<a href="'+esc(link)+'" target="_blank" rel="noopener noreferrer"><span>Open in Airbnb</span><b>↗</b></a>' +
+      (plan?'<button id="stayDetailPrice" type="button"><span>Update price</span><b>›</b></button>':'') +
+      '<button id="stayEditNotes" type="button"><span>'+(found.favorite.note?'Edit note':'Add note')+'</span><b>›</b></button>' +
       '<button id="stayDeleteSaved" class="danger" type="button"><span>Remove from Our Stays</span><b>›</b></button>' +
     '</div>' +
-    (rows.length > 1 ? '<details class="stay-detail-history"><summary>Price history</summary>' + rows.map((row) => '<div><b>' + money(row.price) + '</b><small>' + esc(dateRange(row.start,row.end)) + '</small></div>').join('') + '</details>' : ''));
-  document.getElementById('stayDetailSelect')?.addEventListener('click',() => { closeModal(); selectStay(ownerPlanId,favoriteId); });
-  document.getElementById('stayDetailExpense')?.addEventListener('click',() => { closeModal(); openTripExpenseEditor(); });
-  document.getElementById('stayDetailUnselect')?.addEventListener('click',() => { closeModal(); unselectStay(); });
-  document.getElementById('stayDetailPrice')?.addEventListener('click',() => openPriceModal(ownerPlanId,favoriteId));
-  document.getElementById('stayEditNotes')?.addEventListener('click',() => openEditNotes(ownerPlanId,favoriteId));
-  document.getElementById('stayDeleteSaved')?.addEventListener('click',() => removeFavorite(ownerPlanId,favoriteId));
+    (rows.length>1?'<details class="stay-detail-history"><summary>Price history</summary>'+rows.map((row)=>'<div><b>'+money(row.price)+'</b><small>'+esc(dateRange(row.start,row.end))+'</small></div>').join('')+'</details>':''));
+  document.getElementById('stayDetailSelect')?.addEventListener('click',()=>{closeModal();selectStay(ownerPlanId,favoriteId);});
+  document.getElementById('stayDetailExpense')?.addEventListener('click',()=>openTripExpenseEditor(usage.plan.id,usage.selected.expenseId||''));
+  document.getElementById('stayDetailUnselect')?.addEventListener('click',()=>unselectStay(usage.plan.id));
+  document.getElementById('stayDetailPrice')?.addEventListener('click',()=>openPriceModal(ownerPlanId,favoriteId,plan.id));
+  document.getElementById('stayEditNotes')?.addEventListener('click',()=>openEditNotes(ownerPlanId,favoriteId));
+  document.getElementById('stayDeleteSaved')?.addEventListener('click',()=>removeFavorite(ownerPlanId,favoriteId));
 }
 function openEditNotes(ownerPlanId,favoriteId){
-  const found = favoriteById(ownerPlanId,favoriteId); if (!found) return;
+  const found=favoriteById(ownerPlanId,favoriteId); if(!found)return;
   showModal(modalHead('NOTES',found.favorite.name,'Add or change anything you want to remember about this stay.') +
     '<div class="stay-form">' +
-      '<label><span>Notes</span><textarea id="stayEditedNote" rows="5" placeholder="Anything you want to remember">' + esc(found.favorite.note || '') + '</textarea></label>' +
+      '<label><span>Notes</span><textarea id="stayEditedNote" rows="5" placeholder="Anything you want to remember">'+esc(found.favorite.note||'')+'</textarea></label>' +
       '<button id="stayNoteSave" class="stay-modal-primary" type="button">Save notes</button>' +
-    '</div>');
-  document.getElementById('stayNoteSave')?.addEventListener('click',() => saveNotes(ownerPlanId,favoriteId));
+    '</div>',{back:()=>openDetails(ownerPlanId,favoriteId)});
+  document.getElementById('stayNoteSave')?.addEventListener('click',()=>saveNotes(ownerPlanId,favoriteId));
 }
 async function saveNotes(ownerPlanId,favoriteId){
-  const who = actor(); if (!who) return;
-  const note = clean(document.getElementById('stayEditedNote')?.value);
-  try {
+  const who=actor(); if(!who)return;
+  const note=clean(document.getElementById('stayEditedNote')?.value);
+  try{
     await post('updateStayFavoriteDetails',{ownerPlanId,favoriteId,note},who);
-    closeModal(); toast(note ? 'Notes saved' : 'Notes cleared'); await refreshState();
-  } catch (error) { toast(error.message || 'Could not save the notes','warn'); }
+    toast(note?'Notes saved':'Notes cleared');
+    await refreshState();
+    openDetails(ownerPlanId,favoriteId);
+  }catch(error){toast(error.message||'Could not save the notes','warn');}
 }
 async function removeFavorite(ownerPlanId,favoriteId){
   const found = favoriteById(ownerPlanId,favoriteId), who = actor(); if (!found || !who) return;
@@ -347,61 +350,71 @@ async function removeFavorite(ownerPlanId,favoriteId){
     closeModal(); toast('Removed from Our Stays'); await refreshState();
   } catch (error) { toast(error.message || 'Could not remove this stay','warn'); }
 }
-function openPriceModal(ownerPlanId,favoriteId){
-  const found = favoriteById(ownerPlanId,favoriteId), plan = selectedPlan(); if (!found || !plan) return;
-  const info = priceInfo(found.favorite,plan);
-  const link = buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2});
-  showModal(modalHead('PRICE CHECK',found.favorite.name,'Open it for these dates, then type the new total.') +
-    '<div class="stay-price-check"><a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Check ' + esc(dateRange(plan.meta.start,plan.meta.end)) + ' ↗</a>' +
-      '<label><span>Current total price</span><div class="stay-big-price"><b>€</b><input id="stayUpdatedPrice" inputmode="decimal" value="' + esc(info.current?.price ?? info.latest?.price ?? '') + '" placeholder="0"></div></label>' +
-      '<button id="stayPriceSave" class="stay-modal-primary" type="button">Update price</button></div>');
-  document.getElementById('stayPriceSave')?.addEventListener('click',() => updatePrice(ownerPlanId,favoriteId));
+function openPriceModal(ownerPlanId,favoriteId,planId){
+  const found=favoriteById(ownerPlanId,favoriteId),plan=planById(planId); if(!found||!plan)return;
+  const info=priceInfo(found.favorite,plan);
+  const link=buildListingCheckUrl(found.favorite.url,found.favorite.source,{start:plan.meta.start,end:plan.meta.end,adults:2});
+  showModal(modalHead('PRICE CHECK',found.favorite.name,'Open Airbnb for these dates, then type the new total.') +
+    '<div class="stay-price-check"><a href="'+esc(link)+'" target="_blank" rel="noopener noreferrer">Check '+esc(dateRange(plan.meta.start,plan.meta.end))+' ↗</a>' +
+      '<label><span>Current total price</span><div class="stay-big-price"><b>€</b><input id="stayUpdatedPrice" inputmode="decimal" value="'+esc(info.current?.price??info.latest?.price??'')+'" placeholder="0"></div></label>' +
+      '<button id="stayPriceSave" class="stay-modal-primary" type="button">Update price</button></div>',{back:()=>openDetails(ownerPlanId,favoriteId)});
+  document.getElementById('stayPriceSave')?.addEventListener('click',()=>updatePrice(ownerPlanId,favoriteId,plan.id));
 }
-async function updatePrice(ownerPlanId,favoriteId){
-  const plan = selectedPlan(), who = actor(); if (!plan || !who) return;
-  const price = clean(document.getElementById('stayUpdatedPrice')?.value).replace(',','.');
-  if (!price || !Number.isFinite(Number(price))) { toast('Enter the current total price','warn'); return; }
-  try {
+async function updatePrice(ownerPlanId,favoriteId,planId){
+  const plan=planById(planId),who=actor(); if(!plan||!who)return;
+  const price=clean(document.getElementById('stayUpdatedPrice')?.value).replace(',','.');
+  if(!price||!Number.isFinite(Number(price))){toast('Enter the current total price','warn');return;}
+  try{
     await post('updateStayFavoritePrice',{ownerPlanId,favoriteId,contextPlanId:plan.id,price,checkedAt:new Date().toISOString()},who);
-    closeModal(); toast('Price updated'); await refreshState();
-  } catch (error) { toast(error.message || 'Could not update the price','warn'); }
+    toast('Price updated');
+    await refreshState();
+    openDetails(ownerPlanId,favoriteId);
+  }catch(error){toast(error.message||'Could not update the price','warn');}
 }
 async function selectStay(ownerPlanId,favoriteId){
-  const plan = selectedPlan(), who = actor(); if (!plan || !who) return;
-  if (hasAccommodationExpense(plan)) { toast('This trip already has an accommodation expense','warn'); return; }
-  try {
-    await post('selectStayForTrip',{planId:plan.id,ownerPlanId,favoriteId},who);
-    toast('Stay selected and accommodation expense logged');
+  const plan=selectedPlan(),who=actor(); if(!plan||!who)return;
+  if(hasAccommodationExpense(plan)){toast('This trip already has an accommodation expense','warn');return;}
+  try{
+    const result=await post('selectStayForTrip',{planId:plan.id,ownerPlanId,favoriteId},who);
+    selectedPlanId=OVERVIEW;
+    try{localStorage.setItem(VIEW_KEY,selectedPlanId);}catch{}
+    toast('Stay selected and added to trip expenses');
     await refreshState();
-  } catch (error) { toast(error.message || 'Could not select this stay','warn'); }
+    return result;
+  }catch(error){toast(error.message||'Could not select this stay','warn');}
 }
-async function unselectStay(){
-  const plan = selectedPlan(), who = actor(); if (!plan || !who) return;
-  if (!window.confirm('Unselect this stay? Its accommodation expense will be removed from this trip too.')) return;
-  try {
+async function unselectStay(planId){
+  const plan=planById(planId),who=actor(); if(!plan||!who)return;
+  if(!window.confirm('Unselect this stay? The linked accommodation expense will be removed from this trip too.'))return;
+  try{
     await post('unselectStayForTrip',{planId:plan.id},who);
+    closeModal();
     toast('Stay unselected and accommodation expense removed');
     await refreshState();
-  } catch (error) { toast(error.message || 'Could not unselect this stay','warn'); }
+  }catch(error){toast(error.message||'Could not unselect this stay','warn');}
 }
-function openTripExpenseEditor(){
-  const plan = selectedPlan(); if (!plan) return;
+function openTripExpenseEditor(planId,expenseId){
+  const plan=planById(planId); if(!plan)return;
+  closeModal();
   document.querySelector('[data-sheet="log"]')?.click();
-  setTimeout(() => window.TwogetherWorkflow?.start?.(plan.id),80);
+  setTimeout(()=>window.TwogetherWorkflow?.start?.(plan.id,{expenseId:expenseId||'',returnToTrip:true}),80);
+}
+function stayModalOpen(){
+  return !!document.querySelector('#stayModalRoot .stay-modal');
 }
 async function refreshState(){
-  try {
-    state = await window.TwogetherAPI.remoteState();
-    if (selectedPlanId !== OVERVIEW && !planById(selectedPlanId)) selectedPlanId = OVERVIEW;
-    render();
-  } catch {
-    state = {plans:[]};
-    render();
+  try{
+    state=await window.TwogetherAPI.remoteState();
+    if(selectedPlanId!==OVERVIEW&&!eligiblePlanById(selectedPlanId))selectedPlanId=OVERVIEW;
+    if(!stayModalOpen())render();
+  }catch{
+    state={plans:[],trips:[]};
+    if(!stayModalOpen())render();
   }
 }
 function openForPlan(planId){
-  selectedPlanId = planId && planById(planId) ? planId : OVERVIEW;
-  try { localStorage.setItem(VIEW_KEY,selectedPlanId); } catch {}
+  selectedPlanId=planId&&eligiblePlanById(planId)?planId:OVERVIEW;
+  try{localStorage.setItem(VIEW_KEY,selectedPlanId);}catch{}
   document.querySelector('[data-sheet="stay-tracker"]')?.click();
   render();
 }
