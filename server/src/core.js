@@ -269,7 +269,6 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (targetPlanIdx < 0) throw new Error('Budget plan not found');
       const incoming = sanitizeStayFavorite_(payload.favorite || {});
       if (!incoming.url) throw new Error('Add the accommodation link first');
-      if (!incoming.name) throw new Error('Add a name for this accommodation');
       const urlKey = stayUrlKey_(incoming.url);
       let ownerPlanIdx = targetPlanIdx;
       let existingIdx = -1;
@@ -286,7 +285,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       });
       favorite.source = incoming.source;
       favorite.url = incoming.url;
-      favorite.name = incoming.name;
+      favorite.name = incoming.name || (incoming.source === 'airbnb' ? 'Airbnb stay' : 'Booking.com stay');
       favorite.city = incoming.city;
       favorite.area = incoming.area;
       favorite.image = incoming.image;
@@ -355,6 +354,71 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       addAudit_(state, actor, 'deleteStayFavorite', favoriteId);
       saveState_(state);
       return output_({ok:true});
+    }
+
+    if (action === 'selectStayForTrip') {
+      const planId = cleanText_(payload.planId,80);
+      const ownerPlanId = cleanText_(payload.ownerPlanId,80);
+      const favoriteId = cleanText_(payload.favoriteId,80);
+      const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
+      const ownerIdx = state.plans.findIndex(function(x){ return x.id === ownerPlanId; });
+      if (planIdx < 0 || ownerIdx < 0) throw new Error('Trip or saved accommodation not found');
+      const plan = sanitizePlan_(state.plans[planIdx]);
+      const linkedTrip = plan.linkedTripId ? state.trips.find(function(t){ return t.id === plan.linkedTripId; }) : null;
+      if (linkedTrip && isTripLocked_(linkedTrip)) throw new Error('This trip is already confirmed by both of you');
+      const existingAccom = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses.accom);
+      if (existingAccom.total !== '' || existingAccom.accommodation.paymentType) {
+        throw new Error('This trip already has an accommodation expense');
+      }
+      const owner = sanitizePlan_(state.plans[ownerIdx]);
+      const favorite = owner.stayTracker.saved.find(function(item){ return item.id === favoriteId; });
+      if (!favorite) throw new Error('Saved accommodation not found');
+      const latest = (Array.isArray(favorite.history) ? favorite.history : [])
+        .slice().sort(function(a,b){ return String(a.checkedAt).localeCompare(String(b.checkedAt)); }).pop();
+      const total = cleanMoney_(latest && latest.price);
+      if (total === '') throw new Error('Update this accommodation price before selecting it');
+
+      state.sharedJar = sanitizeSharedJar_(state.sharedJar);
+      const shareEach = money2_(Number(total) / 2);
+      const current = sanitizeSharedExpense_(plan.sharedExpenses && plan.sharedExpenses.accom);
+      current.total = total;
+      current.totalUncertain = false;
+      current.totalKnownBy = actor;
+      current.totals.Principessa = total;
+      current.totals.Principe = total;
+      current.mode.Principessa = 'shared';
+      current.mode.Principe = 'shared';
+      current.paid.Principessa = shareEach;
+      current.paid.Principe = shareEach;
+      current.unknown.Principessa = false;
+      current.unknown.Principe = false;
+      current.accommodation = {
+        useJar:false,
+        jarContribution:0,
+        jarBalanceAfter:state.sharedJar.balance,
+        remaining:Number(total),
+        paymentType:'shared',
+        paidUpfront:false,
+        upfrontBy:'',
+        shareEach:shareEach,
+        repayment:{debtor:'',creditor:'',amount:'',status:'none',confirmedAt:''}
+      };
+      current.updatedAt = new Date().toISOString();
+      current.updatedBy = actor;
+      plan.sharedExpenses.accom = current;
+      plan.stayTracker.selected = {
+        ownerPlanId:ownerPlanId,
+        favoriteId:favoriteId,
+        selectedAt:current.updatedAt,
+        priceAtSelection:total
+      };
+      plan.updatedAt = current.updatedAt;
+      plan.updatedBy = actor;
+      syncSharedExpenseIntoPlanAndTrip_(state, plan, 'accom');
+      state.plans[planIdx] = plan;
+      addAudit_(state, actor, 'selectStayForTrip', plan.id);
+      saveState_(state);
+      return output_({ok:true,planId:plan.id,sharedExpense:plan.sharedExpenses.accom,selected:plan.stayTracker.selected});
     }
 
     if (action === 'saveStayTrackerSnapshot') {
@@ -2445,6 +2509,16 @@ function sanitizeStayFavorite_(item) {
   };
 }
 
+function sanitizeStaySelection_(item) {
+  const source=item&&typeof item==='object'?item:{};
+  return {
+    ownerPlanId:cleanText_(source.ownerPlanId,80),
+    favoriteId:cleanText_(source.favoriteId,80),
+    selectedAt:cleanText_(source.selectedAt,40),
+    priceAtSelection:cleanMoney_(source.priceAtSelection)
+  };
+}
+
 function sanitizeStayTrackerSnapshot_(item) {
   const source=item&&typeof item==='object'?item:{};
   return {
@@ -2463,6 +2537,7 @@ function sanitizeStayTracker_(value) {
     area:area,
     preferences:sanitizeStayPreferences_(source.preferences),
     saved:(Array.isArray(source.saved)?source.saved:[]).slice(0,120).map(sanitizeStayFavorite_).filter(function(item){return item.url&&item.name;}),
+    selected:sanitizeStaySelection_(source.selected),
     lastCheckedAt:cleanText_(source.lastCheckedAt,40),
     history:(Array.isArray(source.history)?source.history:[]).slice(-800).map(sanitizeStayTrackerSnapshot_).filter(function(item){return item.accommodationId&&item.price!==''&&item.checkedAt;})
   };
@@ -2585,7 +2660,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoritePrice', 'deleteStayFavorite', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoritePrice', 'deleteStayFavorite', 'selectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
