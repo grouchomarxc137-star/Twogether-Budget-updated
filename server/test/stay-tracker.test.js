@@ -348,3 +348,39 @@ test('unavailable is trip-specific and a later price check makes the stay availa
     assert.equal(selected.expense.amount, 590);
   } finally { context.cleanup(); }
 });
+
+
+test('stay prices stay isolated by trip even when two trips use the same dates', () => {
+  const context = setup();
+  try {
+    const first = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Lonato del Garda', start:'2099-10-17', end:'2099-10-20' }, budget:'',
+    });
+    const second = action(context.database, 'savePlan', {
+      meta:{ location:'Italy', city:'Peschiera del Garda', start:'2099-10-17', end:'2099-10-20' }, budget:'',
+    });
+    const saved = action(context.database, 'saveStayFavorite', {
+      planId:first.planId, price:700, checkedAt:'2099-07-10T10:00:00.000Z',
+      favorite:{source:'airbnb',url:'https://www.airbnb.com/rooms/515151',name:'Same Dates Stay',note:''},
+    });
+    assert.equal(saved.ok, true);
+
+    const secondPrice = action(context.database, 'updateStayFavoritePrice', {
+      favoriteId:saved.favorite.id, contextPlanId:second.planId,
+      price:520, checkedAt:'2099-07-11T10:00:00.000Z',
+    });
+    assert.equal(secondPrice.ok, true);
+
+    const firstSelected = action(context.database, 'selectStayForTrip', {
+      planId:first.planId, ownerPlanId:'', favoriteId:saved.favorite.id,
+    });
+    assert.equal(firstSelected.ok, true);
+    assert.equal(firstSelected.expense.amount, 700);
+
+    const secondSelected = action(context.database, 'selectStayForTrip', {
+      planId:second.planId, ownerPlanId:'', favoriteId:saved.favorite.id,
+    });
+    assert.equal(secondSelected.ok, true);
+    assert.equal(secondSelected.expense.amount, 520);
+  } finally { context.cleanup(); }
+});
