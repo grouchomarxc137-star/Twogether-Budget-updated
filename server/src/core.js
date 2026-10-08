@@ -1148,6 +1148,43 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,twosDelta:twosDelta,game:sanitizeGame_(state.game)});
     }
 
+    if (action === 'confirmFutureBill') {
+      const billId=cleanText_(payload.billId,80);
+      const dueDate=cleanFinanceDate_(payload.dueDate);
+      const paidDate=cleanFinanceDate_(payload.paidDate||payload.dueDate);
+      if(!billId||!dueDate||!paidDate||paidDate.slice(0,7)!==dueDate.slice(0,7))throw new Error('Choose a valid date in the bill month');
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);
+      state.finances=sanitizeFinances_(state.finances);
+      const profile=sanitizeFinanceProfile_(state.financeProfiles[actor],actor);
+      const bill=profile.futureBills.find(function(item){return item.id===billId;});
+      if(!bill)throw new Error('Future bill not found');
+      if(futureBillOccurrenceDate_(bill,Number(dueDate.slice(0,4)))!==dueDate)throw new Error('The bill is not scheduled for that date');
+      const month=dueDate.slice(0,7);
+      const list=state.finances[actor]||[];
+      const index=list.findIndex(function(item){return item.month===month;});
+      const existing=index>=0?sanitizeFinanceMonth_(list[index],actor):null;
+      if(existing&&existing.finalized)throw new Error('This month is final and locked');
+      const record=existing||sanitizeFinanceMonth_({month:month,partialOnly:true,incomes:[],expenses:[]},actor);
+      const duplicate=record.expenses.some(function(item){return item.futureBillId===billId&&item.futureBillDueDate===dueDate;});
+
+      if(duplicate)return output_({ok:true,alreadyPaid:true,monthData:record,financeProfile:profile});
+      const amount=payload.amount==null?bill.amount:cleanMoney_(payload.amount);
+      if(amount===''||!Number.isFinite(Number(amount))||Number(amount)<=0)throw new Error('Enter a valid bill amount');
+      record.expenses.push({id:Utilities.getUuid(),name:bill.name,amount:amount,date:paidDate,group:bill.group,paidFrom:'personal',futureBillId:billId,futureBillDueDate:dueDate});
+      const saved=sanitizeFinanceMonth_(record,actor);
+      saved.updatedAt=new Date().toISOString();
+      saved.updatedBy=actor;
+      if(index>=0)list[index]=saved;else list.push(saved);
+      list.sort(function(a,b){return a.month.localeCompare(b.month);});
+      state.finances[actor]=list;
+      profile.updatedAt=saved.updatedAt;
+      profile.updatedBy=actor;
+      state.financeProfiles[actor]=sanitizeFinanceProfile_(profile,actor);
+      addAudit_(state,actor,'confirmFutureBill',billId);
+      saveState_(state);
+      return output_({ok:true,monthData:saved,financeProfile:state.financeProfiles[actor]});
+    }
+
     if (action === 'saveFinanceMonth') {
       const monthData = sanitizeFinanceMonth_(payload.monthData || {}, actor);
       if (!/^\d{4}-\d{2}$/.test(monthData.month)) throw new Error('Choose a valid month');
@@ -1932,7 +1969,9 @@ function sanitizeFinanceExpense_(item) {
     name:cleanText_(item && item.name, 100),
     amount:cleanMoney_(item && item.amount),
     date:cleanFinanceDate_(item && item.date),
-    paidFrom:paidFrom
+    paidFrom:paidFrom,
+    futureBillId:cleanText_(item&&item.futureBillId,80),
+    futureBillDueDate:cleanFinanceDate_(item&&item.futureBillDueDate)
   };
 }
 
@@ -2221,6 +2260,30 @@ function sanitizeFinanceCustomCategory_(item) {
   };
 }
 
+function sanitizeFutureBill_(item) {
+  const s=item&&typeof item==='object'?item:{};
+  const amount=cleanMoney_(s.amount);
+  const date=cleanFinanceDate_(s.date);
+  return {
+    id:cleanText_(s.id,80)||Utilities.getUuid(),
+    name:cleanText_(s.name,100),
+    amount:amount,
+    date:date,
+    group:cleanFinanceGroup_(s.group),
+    repeat:s.repeat==='yearly'?'yearly':'none'
+  };
+}
+
+function futureBillOccurrenceDate_(bill,year) {
+  const initial=cleanFinanceDate_(bill.date);
+  if(!initial||!Number.isInteger(year))return '';
+  const firstYear=Number(initial.slice(0,4));
+  if(year<firstYear||(bill.repeat!=='yearly'&&year!==firstYear))return '';
+  const month=Number(initial.slice(5,7)),day=Number(initial.slice(8,10));
+  const lastDay=new Date(Date.UTC(year,month,0)).getUTCDate();
+  return year+'-'+initial.slice(5,7)+'-'+String(Math.min(day,lastDay)).padStart(2,'0');
+}
+
 function sanitizeFinanceProfile_(profile, actor) {
   const source = profile && typeof profile === 'object' ? profile : {};
   const cleanupDone=source.customCategoryCleanupV1===true;
@@ -2254,6 +2317,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     customCategories: customCategories,
     customCategoryCleanupV1: true,
     recurring: recurring,
+    futureBills:Array.isArray(source.futureBills)?source.futureBills.slice(0,120).map(sanitizeFutureBill_).filter(function(b){return b.name&&b.amount!==''&&Number(b.amount)>0&&b.date;}):[],
     financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && (x.kind==='investment-snapshot' || x.amount !== '') && x.month && x.date; }) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
     updatedBy: cleanActor_(source.updatedBy || actor)
@@ -2814,7 +2878,7 @@ export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
-  'saveFinanceProfile', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
+  'saveFinanceProfile', 'confirmFutureBill', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',
 ]);

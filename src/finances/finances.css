@@ -5856,3 +5856,15 @@ dialog.finance-log-host .tv2-backdrop {
     background:linear-gradient(90deg,rgba(237,246,232,.72),rgba(255,253,249,.18))!important;
   }
 }
+
+/* Future Bills uses the existing compact Finance manager and transaction styles. */
+.finance-log-tools{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.finance-future-bill-list{display:grid;gap:10px;margin:18px 0}
+.finance-future-bill-row{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--tv2-line,var(--line));border-radius:16px;background:var(--tv2-card,#fff);color:inherit;text-align:left;padding:14px 16px;cursor:pointer;font:inherit}
+.finance-future-bill-main{display:grid;gap:5px;flex:1;min-width:0}
+.finance-future-bill-main strong{font-weight:700}
+.finance-future-bill-main small,.finance-future-bill-end small{font-size:12px;color:var(--muted)}
+.finance-future-bill-end{display:grid;gap:5px;text-align:right}
+.finance-future-bill-end b{font-variant-numeric:tabular-nums}
+.finance-future-pending-amount{opacity:.7}
+@media(max-width:760px){.finance-log-tools{gap:5px}.finance-log-tools .finance-log-recurring-link{font-size:12px;padding:5px 2px}.finance-future-bill-row{padding:12px}}
