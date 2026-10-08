@@ -1411,9 +1411,8 @@ async function openSimplifiedChecklist(plan, initialPersonal = true) {
     sheet.classList.toggle('is-principessa',personal&&me==='Principessa');
     sheet.classList.toggle('is-principe',personal&&me==='Principe');
     sheet.innerHTML =
-      '<div class="tv2-sheet-head tv2-checklist-head"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>'+(personal?'My checklist':'During Trip')+'</h2>'+(personal?'<span class="tv2-check-personal-mode">'+esc(me)+'</span>':'<span class="tv2-check-shared-mode">Shared with both of you</span>')+'</div>'+
-        '<div class="tv2-check-head-actions"><button type="button" class="tv2-check-view-toggle" data-check-view-toggle>'+esc(personal?'During Trip':'My checklist')+' ↔</button>'+
-        (personal?'<button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button>':'')+'</div></div>'+
+      '<div class="tv2-sheet-head tv2-checklist-head" data-check-personal-toggle role="button" tabindex="0" aria-pressed="'+(personal?'true':'false')+'" aria-label="'+esc(personal?'Show During Trip checklist':'Show My checklist')+'"><div><small class="tv2-check-city">'+esc(plan.meta?.city || locationLabel(plan.meta))+'</small><h2>'+(personal?'My checklist':'During Trip')+'</h2>'+(personal?'<span class="tv2-check-personal-mode">'+esc(me)+'</span>':'<span class="tv2-check-shared-mode">Shared with both of you</span>')+'</div>'+
+        (personal?'<button type="button" class="tv2-check-recurrent" data-check-recurrent><strong>Recurrent Items</strong><b aria-hidden="true">›</b></button>':'')+'</div>'+
       activeSection('packing',personal?'Packing / things to take':'Groceries & things to do')+
       activeSection('reminders',personal?'Important reminders':'Shared reminders')+
       notesSection()+
@@ -2335,6 +2334,12 @@ async function openSimplifiedChecklist(plan, initialPersonal = true) {
     syncChecklistTextWidth(e.target);
   });
   sheet.addEventListener('keydown',(e)=>{
+    if(e.target.matches?.('[data-check-personal-toggle]')&&(e.key==='Enter'||e.key===' ')){
+      e.preventDefault();
+      state.packingMine=!state.packingMine;
+      render();
+      return;
+    }
     const input=e.target.closest('[data-check-new]'); if(!input||e.key!=='Enter')return;
     e.preventDefault(); addItem(input.dataset.checkNew);
   });
@@ -2343,8 +2348,13 @@ async function openSimplifiedChecklist(plan, initialPersonal = true) {
       e.preventDefault();
       return;
     }
+    const header=e.target.closest('[data-check-personal-toggle]');
+    if(header&&!e.target.closest('button,input,label,a,select,textarea')){
+      state.packingMine=!state.packingMine;
+      render();
+      return;
+    }
     const b=e.target.closest('button'); if(!b)return;
-    if(b.hasAttribute('data-check-view-toggle')){state.packingMine=!state.packingMine;render();return;}
     if(b.hasAttribute('data-close')){closeReminderNotificationEditor();closeSimplifiedSheet();return;}
     if(b.hasAttribute('data-check-recurrent')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan,state.packingMine);return;}
     if(b.hasAttribute('data-check-categories')){closeReminderNotificationEditor();openRecurrentChecklistItems(plan,state.packingMine,true);return;}
@@ -2376,8 +2386,15 @@ function openRecurrentChecklistItems(plan, initialPersonal = true, initialCatego
   document.body.appendChild(simplifiedLayer);
   document.body.classList.add('tv2-locked');
   const sheet = simplifiedLayer.querySelector('.tv2-checklist-sheet');
-
-  bindChecklistSwipeDown(simplifiedLayer, sheet);
+  const layer=simplifiedLayer;
+  const returnToChecklist=()=>{
+    if(simplifiedLayer!==layer)return;
+    closeSimplifiedSheet();
+    const latest=(remoteState?.plans||[]).find((item)=>item.id===plan.id)||plan;
+    openSimplifiedChecklist(latest,state.personal);
+  };
+  layer.__tv2SwipeBack=returnToChecklist;
+  bindChecklistSwipeDown(layer, sheet);
 
   const rowHtml = (kind,item) => {
     const viewItem=checklistViewItem(item,state.personal,actor());
@@ -3719,7 +3736,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = true, initialCatego
   sheet.addEventListener('click',(e)=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-close')){closeSimplifiedSheet();return;}
-    if(b.hasAttribute('data-check-back')){closeSimplifiedSheet();openSimplifiedChecklist(plan,state.personal);return;}
+    if(b.hasAttribute('data-check-back')){returnToChecklist();return;}
     if(b.hasAttribute('data-check-categories')){state.categoriesOpen=!state.categoriesOpen;render();return;}
     if(b.hasAttribute('data-check-category-add')){
       const input=sheet.querySelector('[data-check-category-new]');
@@ -3839,8 +3856,10 @@ function bindChecklistSwipeDown(layer, sheet) {
       backdrop.style.opacity = '0';
     }
     setTimeout(() => {
-      if (simplifiedLayer === layer) closeSimplifiedSheet();
-      else layer.remove();
+      if(simplifiedLayer===layer){
+        if(typeof layer.__tv2SwipeBack==='function')layer.__tv2SwipeBack();
+        else closeSimplifiedSheet();
+      }else layer.remove();
     }, 190);
   }, { passive:true });
 
