@@ -28,45 +28,46 @@ function setup() {
   return {action,createConfirmed};
 }
 
-test('only confirmed Test trip August 1–2 2026 and its test records may be deleted',()=>{
+test('confirmed Test trips from any date may be deleted without touching real trips',()=>{
   const ctx=setup();
-  const testPlan=ctx.createConfirmed('Test','2026-08-01','2026-08-02');
-  const realPlan=ctx.createConfirmed('Lonato','2026-08-01','2026-08-02');
-  const laterTest=ctx.createConfirmed('Test','2026-08-05','2026-08-06');
+  const oldTest=ctx.createConfirmed('Test','2026-08-01','2026-08-02');
+  const laterTest=ctx.createConfirmed(' tEsT ','2026-09-05','2026-09-06');
+  const real=ctx.createConfirmed('Lonato','2025-10-17','2025-10-20');
   const before=getState();
-  const target=before.plans.find(p=>p.id===testPlan);
-  const real=before.plans.find(p=>p.id===realPlan);
+  const old=before.plans.find(p=>p.id===oldTest);
   const later=before.plans.find(p=>p.id===laterTest);
-  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:real.linkedTripId}).ok,false);
-  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:later.linkedTripId}).ok,false);
+  const lonato=before.plans.find(p=>p.id===real);
+  const lonatoRecord=JSON.stringify(before.trips.find(t=>t.id===lonato.linkedTripId));
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:lonato.linkedTripId}).ok,false);
   assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:'nonexistent'}).ok,false);
-  const award='trip:Principessa:'+target.linkedTripId;
-  assert.equal(before.game.Principessa.awards.tripSettlements.includes(award),true);
-  const result=ctx.action('deleteConfirmedTestTrip',{tripId:target.linkedTripId});
-  assert.equal(result.ok,true,result.error);
-  assert.equal(result.deletedPlanId,testPlan);
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:old.linkedTripId}).ok,true);
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:later.linkedTripId},'Principe').ok,true);
   const after=getState();
-  assert.equal(after.trips.length,2);
-  assert.equal(after.plans.length,2);
-  assert.equal(after.trips.some(t=>t.id===target.linkedTripId),false);
-  assert.equal(after.plans.some(p=>p.id===testPlan),false);
-  assert.equal(after.trips.some(t=>t.id===real.linkedTripId),true);
-  assert.equal(after.trips.some(t=>t.id===later.linkedTripId),true);
-  assert.equal(after.game.Principessa.twos,before.game.Principessa.twos-100);
-  assert.equal(after.game.Principessa.awards.tripSettlements.includes(award),false);
+  assert.equal(after.trips.length,1);
+  assert.equal(after.plans.length,1);
+  assert.equal(after.trips[0].id,lonato.linkedTripId);
+  assert.equal(JSON.stringify(after.trips[0]),lonatoRecord);
+  assert.equal(after.plans[0].id,real);
+  assert.equal(after.game.Principessa.twos,before.game.Principessa.twos-200);
   assert.equal(after.game.Principe.twos,before.game.Principe.twos);
-  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:target.linkedTripId}).ok,false);
+  assert.equal(after.game.Principessa.awards.tripSettlements.includes('trip:Principessa:'+old.linkedTripId),false);
+  assert.equal(after.game.Principessa.awards.tripSettlements.includes('trip:Principessa:'+later.linkedTripId),false);
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:old.linkedTripId}).ok,false);
 });
 
-test('unconfirmed Test trip is protected; ordinary confirmed-trip deletion stays blocked',()=>{
+test('unconfirmed Test and real confirmed trips are protected, including old delete actions',()=>{
   const ctx=setup();
-  const pending=ctx.action('savePlan',{meta:{
-    location:'Italy',city:'Test',start:'2026-08-01',end:'2026-08-02'
+  const draft=ctx.action('savePlan',{meta:{
+    location:'Italy',city:'Test',start:'2025-08-01',end:'2025-08-02'
   },budget:100});
-  assert.equal(pending.ok,true);
-  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:pending.planId}).ok,false);
+  assert.equal(draft.ok,true);
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:draft.planId}).ok,false);
+  const real=ctx.createConfirmed('Lonato','2025-10-17','2025-10-20');
   const confirmed=ctx.createConfirmed('Test','2026-08-01','2026-08-02');
-  const tripId=getState().plans.find(p=>p.id===confirmed).linkedTripId;
+  const state=getState();
+  const tripId=state.plans.find(p=>p.id===confirmed).linkedTripId;
+  const lonatoTrip=state.plans.find(p=>p.id===real).linkedTripId;
   assert.equal(ctx.action('deleteCurrentTrip',{kind:'trip',id:tripId}).ok,false);
   assert.equal(ctx.action('deleteCurrentTrip',{kind:'plan',id:confirmed}).ok,false);
+  assert.equal(ctx.action('deleteConfirmedTestTrip',{tripId:lonatoTrip}).ok,false);
 });

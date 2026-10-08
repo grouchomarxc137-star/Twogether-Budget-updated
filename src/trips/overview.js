@@ -50,28 +50,28 @@ export function preloadTripGalleryImages() {
   return preloadTripImages(urls);
 }
 
-function hiddenTestCleanupHtml(state) {
-  const hidden=(Array.isArray(state?.trips)?state.trips:[]).filter((trip)=>isExcludedTestTrip(trip)&&isLocked(trip));
-  return hidden.map((trip)=>'<div class="trip-test-cleanup">'+
-    '<span>Hidden test trip · 1–2 August 2026</span>'+
-    '<button type="button" data-remove-confirmed-test="'+esc(trip.id)+'">Remove test trip</button>'+
-  '</div>').join('');
+// Only confirmed trips explicitly named Test can display the cleanup action.
+function isConfirmedTestTrip(trip) {
+  if(!trip||!isLocked(trip))return false;
+  const submissions=[trip.submissions?.Principessa,trip.submissions?.Principe].filter(Boolean);
+  return submissions.length===2 && submissions.every((item)=>String(item.city||'').trim().toLowerCase()==='test');
 }
-function confirmHiddenTestTripDeletion(id) {
+function confirmTestTripDeletion(id) {
   const trip=(getState()?.trips||[]).find((entry)=>entry.id===id);
-  if(!trip||!isExcludedTestTrip(trip)||!isLocked(trip))return;
+  if(!isConfirmedTestTrip(trip))return;
+  const meta=tripMeta(trip);
   document.querySelector('.trip-test-delete-confirm')?.remove();
   const layer=document.createElement('div');
   layer.className='tv2-confirm-layer trip-test-delete-confirm';
   layer.innerHTML=
     '<div class="tv2-confirm-backdrop" data-test-delete-cancel></div>'+
     '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="testDeleteHeading">'+
-      '<h2 id="testDeleteHeading">Remove the test trip?</h2>'+
-      '<p>Delete the confirmed <strong>Test</strong> trip from <strong>1–2 August 2026</strong> and its test entries?</p>'+
-      '<p class="tv2-confirm-note">Only this test trip will be deleted. Real trips stay untouched. This cannot be undone.</p>'+
+      '<h2 id="testDeleteHeading">Delete this Test trip?</h2>'+
+      '<p>Remove the confirmed <strong>Test</strong> trip ('+esc(fmtDate(meta.start))+'–'+esc(fmtDate(meta.end))+') and its linked test expenses?</p>'+
+      '<p class="tv2-confirm-note">This cannot be undone. Lonato and real trips stay untouched.</p>'+
       '<p class="tv2-confirm-error" aria-live="polite"></p>'+
       '<div class="tv2-confirm-actions"><button type="button" data-test-delete-cancel>Cancel</button>'+
-        '<button type="button" class="is-delete" data-test-delete-approve>Delete test trip</button></div>'+
+        '<button type="button" class="is-delete" data-test-delete-approve>Delete Test trip</button></div>'+
     '</div>';
   document.body.appendChild(layer);
   const cancel=()=>layer.remove();
@@ -83,33 +83,27 @@ function confirmHiddenTestTripDeletion(id) {
     const error=layer.querySelector('.tv2-confirm-error');
     try {
       const result=await postAction('deleteConfirmedTestTrip',{tripId:id},actor());
-      if(!result?.ok)throw new Error(result?.error||'Could not remove test trip');
+      if(!result?.ok)throw new Error(result?.error||'Could not remove Test trip');
       layer.remove();
+      if(openTripId===id)closeTripModal();
       await syncNow(true);
-      renderTripGallery();
-      renderMonthly();
-      toast('The confirmed test trip has been removed');
-    } catch(err) {
-      approve.disabled=false;approve.textContent='Delete test trip';
+      renderDataViews();
+      toast('Test trip removed');
+    }catch(err){
+      approve.disabled=false;approve.textContent='Delete Test trip';
       if(error)error.textContent=err?.message||'Could not delete the trip';
     }
   });
   approve.focus();
-}
-function bindHiddenTestCleanup(root){
-  root.querySelectorAll('[data-remove-confirmed-test]').forEach((button)=>
-    button.addEventListener('click',()=>confirmHiddenTestTripDeletion(button.dataset.removeConfirmedTest)));
 }
 
 export function renderTripGallery() {
   const root = $('#tripGallery');
   if (!root) return;
   const state = getState();
-  const trips = visibleTrips(state);
-  const cleanup=hiddenTestCleanupHtml(state);
+  const trips = Array.isArray(state?.trips)?state.trips:[];
   if (!trips.length) {
-    root.innerHTML = '<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>'+cleanup;
-    bindHiddenTestCleanup(root);
+    root.innerHTML = '<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>';
     return;
   }
 
@@ -129,9 +123,8 @@ export function renderTripGallery() {
       <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
-  }).join('')+cleanup;
+  }).join('');
   $$('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));
-  bindHiddenTestCleanup(root);
 }
 
 export function openTripModal(id) {
@@ -170,7 +163,7 @@ function renderTripModal(id) {
   const root = $('#tripModalBody');
   const state = getState();
   if (root) root.dataset.tripId = id;
-  const t = visibleTrips(state).find((x) => x.id === id);
+  const t = (Array.isArray(state?.trips)?state.trips:[]).find((x) => x.id === id);
   if (!root || !t) return;
   const e = effectiveTrip(t), m = tripMeta(t), diff = differences(t), budget = budgetInfo(t);
   const both = !!(t.submissions.Principessa && t.submissions.Principe);
@@ -202,6 +195,7 @@ function renderTripModal(id) {
       ${!locked && !own && t.submissions?.[otherActor()] ? '<button class="btn" type="button" data-add-own>Add my version</button>' : ''}
       ${canConfirm ? '<button class="btn primary" type="button" data-confirm-own>Confirm my version</button>' : ''}
       ${!isBackendV3() && both && !diff.length ? '<span class="backend-inline-note">Backend v3 is needed before confirmation can be saved.</span>' : ''}
+      ${isConfirmedTestTrip(t) ? '<button class="btn trip-test-delete-button" type="button" data-delete-confirmed-test>Delete Test trip</button>' : ''}
     </div>`;
 
   root.querySelectorAll('[data-trip-car-breakdown]').forEach((trigger)=>installCarLongPress(trigger,()=>{
@@ -216,6 +210,7 @@ function renderTripModal(id) {
     if(legacyOther>.005)details.push({kind:'older-car',label:'Tolls / Parking (older)',amount:legacyOther,items:[]});
     showCarBreakdown('Car · '+(m.city||'Trip'),details,total);
   }));
+  $('[data-delete-confirmed-test]', root)?.addEventListener('click',()=>confirmTestTripDeletion(id));
   $('[data-edit-own]', root)?.addEventListener('click', () => beginEdit(id));
   $('[data-add-own]', root)?.addEventListener('click', () => { closeTripModal(true); openSheet('log'); beginJoin(id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('[data-confirm-own]', root)?.addEventListener('click', async () => {

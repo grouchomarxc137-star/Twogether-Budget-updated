@@ -889,18 +889,15 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if(!tripId||idx<0)throw new Error('Test trip not found');
       const trip=sanitizeTripRecord_(state.trips[idx]);
       const filled=ACTORS.map(function(name){return trip.submissions[name];}).filter(Boolean);
-      // Exactly the hidden development-only trip; never allow this action for
-      // Lonato or any other real confirmed trip.
-      const matches=function(meta){return String(meta&&meta.city||'').trim().toLowerCase()==='test'
-        && String(meta&&meta.start||'')==='2026-08-01'
-        && String(meta&&meta.end||'')==='2026-08-02';};
-      if(!isTripLocked_(trip)||!filled.length||!filled.some(matches)
-          ||filled.some(function(meta){return !matches(meta);}))
-        throw new Error('Only the confirmed Test trip from 1–2 August 2026 can be removed');
-      const linked=state.plans.map(sanitizePlan_).filter(function(p){return p.linkedTripId===tripId;});
-      if(linked.length>1)throw new Error('This test trip has multiple linked plans; contact Principe before removal');
-      const plan=linked[0]||null;
-      if(plan&&(!matches(plan.meta)))throw new Error('Linked plan details differ; nothing was deleted');
+      // Only fully confirmed trips whose saved name is exactly "Test" are
+      // eligible, regardless of dates. Real trips like Lonato stay locked.
+      const isTestName=function(meta){return String(meta&&meta.city||'').trim().toLowerCase()==='test';};
+      if(!isTripLocked_(trip)||filled.length!==ACTORS.length||filled.some(function(meta){return !isTestName(meta);}))
+        throw new Error('Only confirmed trips named Test can be removed');
+      const linked=state.plans.filter(function(p){return p.linkedTripId===tripId;});
+      if(linked.length>1)throw new Error('This test trip has multiple linked plans; deletion blocked');
+      const plan=linked.length?sanitizePlan_(linked[0]):null;
+      if(plan&&!isTestName(plan.meta))throw new Error('Linked plan is not named Test; nothing was deleted');
 
       state.game=sanitizeGame_(state.game);
       ACTORS.forEach(function(name){
