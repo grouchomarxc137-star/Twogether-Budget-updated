@@ -1073,17 +1073,23 @@ function previousMonthKey(month) {
 function extraSpendsTotal(rec) { return (rec?.extraSpends || []).reduce((sum, x) => sum + n(x.amount), 0); }
 function extraSpendsOutflowTotal(rec) { return (rec?.extraSpends || []).filter(extraSpendCountsInOutflow).reduce((sum, x) => sum + n(x.amount), 0); }
 
+function extraCarryAmounts(over, base = 250) {
+  const baseCents = Math.round(base * 100);
+  const overCents = Math.max(0, Math.round(over * 100));
+  const deductedCents = Math.min(overCents, Math.max(0, baseCents - 5000));
+  return {
+    budget: (baseCents - deductedCents) / 100,
+    debt: (overCents - deductedCents) / 100,
+    deducted: deductedCents / 100,
+  };
+}
+
 function extraCarryInfo(month) {
   const rules = financeRules();
-  if (!rules.extraTracking) return { prevMonth: previousMonthKey(month), over: 0, budget: 0, debt: 0 };
+  if (!rules.extraTracking) return { prevMonth: previousMonthKey(month), over: 0, budget: 0, debt: 0, deducted: 0 };
   const prevMonth = previousMonthKey(month), prev = prevMonth ? recordFor(prevMonth) : null;
   const over = prev ? extraSpendsOutflowTotal(prev) : 0;
-  return {
-    prevMonth,
-    over,
-    budget: over > 0 ? Math.max(100, rules.extraBudget - Math.min(150, over)) : rules.extraBudget,
-    debt: Math.max(0, over - 150),
-  };
+  return { prevMonth, over, ...extraCarryAmounts(over, rules.extraBudget) };
 }
 
 function mainAccountLeftover() { return ownMonths().reduce((sum, rec) => sum + calc(rec).leftover, 0); }
@@ -3259,7 +3265,7 @@ function renderDetail(rec) {
     notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>Extra budget exceeded · '+money(totals.extraOver)+' over</span></div>');
   }
   if(rules.extraTracking&&carry.debt>0){
-    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>');
+    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+' could not be deducted from Extra · see Money owed to me after confirming that month</span></div>');
   }
   if(actor()==='Principe'){
     const budgetRows=recurringBudgetProgress(rec.month,rec);
@@ -3857,7 +3863,7 @@ function renderWizard() {
     const actionText = item.kind === 'income' ? 'added to your account' : 'removed from your account';
     const bounds = financeDateBounds(d.month);
     const help = isFixedExtra
-      ? (n(d.extraBudget) < 250 ? `Your normal €250 Extra is reduced this month because you used extra money in ${monthLabel(carry.prevMonth)}.${carry.debt > 0 ? ` You still owe yourself ${money(carry.debt)} from last month.` : ''}` : 'This is your normal monthly Extra allocation. You do not need to itemize what the budget itself is spent on.')
+      ? (n(d.extraBudget) < financeRules().extraBudget ? `Your normal ${money(financeRules().extraBudget)} Extra is reduced by ${money(carry.deducted)} because you spent extra in ${monthLabel(carry.prevMonth)}.${carry.debt > 0 ? ` The remaining ${money(carry.debt)} is tracked in Money owed to me when that month is confirmed.` : ''}` : 'This is your normal monthly Extra allocation. You do not need to itemize what the budget itself is spent on.')
       : usualDay !== ''
         ? `Was ${source.name} ${actionText} on ${scheduledLabel}?`
         : `No usual date is set for ${source.name}. Add the date for this month if you want, or leave it blank.`;
@@ -4116,7 +4122,7 @@ function renderWizard() {
     setProgress('EXTRA BUDGET', 70);
     body.innerHTML = wizardHtml('What is your Extra spending limit this month?', 'Default is €250. You can change it for a specific month. This is a limit, not an expense. Twogether will warn you when your actual Extra purchases go above it.', `<div class="finance-money"><span>€</span><input id="finMoney" inputmode="decimal" value="${esc(String(hasValue(d.extraBudget) ? d.extraBudget : 250))}" placeholder="250"></div><div class="finance-actions"><button class="btn ghost" data-fin-back>Back</button><button class="btn primary big" data-fin-next>Next</button></div>`);
     bindBack(() => { flow.stage = 'expenseGroup'; renderWizard(); });
-    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid Extra budget', 'warn'); d.extraBudget = 250; flow.stage = 'extraSpentAsk'; renderWizard(); }); return;
+    $('[data-fin-next]')?.addEventListener('click', () => { const v = $('#finMoney')?.value || ''; if (v === '' || !Number.isFinite(Number(v.replace(',', '.')))) return toast('Enter a valid Extra budget', 'warn'); d.extraBudget = extraCarryInfo(d.month).budget; flow.stage = 'extraSpentAsk'; renderWizard(); }); return;
   }
 
   if (flow.stage === 'investmentTotal') {
@@ -4143,10 +4149,11 @@ function renderReview() {
   const d = flow.data, c = calc(d), gl = rules.investmentTracking ? investmentGL(d) : null, carry = extraCarryInfo(d.month); setProgress('REVIEW', 100);
   const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}${financeDateMeta(x.date)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-edit-income="${i}">Edit</button> <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
   const expenseRows = groupedExpenseHtml(d.expenses, true, d.extraSpends || []) || '<div class="finance-empty">No expenses added.</div>';
-  const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget.</div>` : '';
+  const nextExtra = extraCarryAmounts(c.extraOver, rules.extraBudget || 250);
+  const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget. Next month's Extra will be ${money(nextExtra.budget)}.${nextExtra.debt > 0 ? ` ${money(nextExtra.debt)} will be added to Money owed to me when you confirm this month.` : ''}</div>` : '';
   const savedUpSpent = rules.savedUpExtraTracking ? (d.extraSpends || []).filter((x) => x.source === 'savings').reduce((sum, x) => sum + n(x.amount), 0) : 0;
   const savedUpLine = savedUpSpent > 0 ? `<div class="finance-carry-note">${money(savedUpSpent)} will be taken from Saved up when this month is saved.</div>` : '';
-  const debtLine = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">You still owe yourself ${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))}.</div>` : '';
+  const debtLine = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))} could not be deducted from Extra. Check Money owed to me after confirming that month.</div>` : '';
   const investmentLines = rules.investmentTracking ? (c.investmentTotal == null ? '<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>' : `<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div>${actor()==='Principessa'?`<div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div>`:''}<div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div>`) : '';
   const extraActions = rules.extraTracking
     ? (c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>')

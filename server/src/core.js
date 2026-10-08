@@ -1392,6 +1392,10 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const idx = list.findIndex(x => x.month === monthData.month);
       const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
       if (existing && existing.finalized) throw new Error('This month is final and locked');
+      if (actor === 'Principessa') {
+        const previous = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, -1));
+        if (previous) setFinanceExtraBudget_(monthData, financeExtraCarryFrom_(previous).budget);
+      }
       const now = new Date().toISOString();
       syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
@@ -1417,6 +1421,29 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (idx >= 0) list[idx] = monthData; else list.push(monthData);
       list.sort((a,b) => String(a.month).localeCompare(String(b.month)));
       state.finances[actor] = list;
+      if (actor === 'Principessa') {
+        const next = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, 1));
+        if (next && !next.finalized) {
+          setFinanceExtraBudget_(next, financeExtraCarryFrom_(monthData).budget);
+          next.updatedAt = now;
+          next.updatedBy = actor;
+        }
+        if (monthData.finalized) {
+          const overflowDebt = financeExtraCarryFrom_(monthData).debt;
+          const debtId = 'extra-overspend:' + monthData.month;
+          if (overflowDebt > 0 && !financeProfile.receivables.some(x => x.id === debtId)) {
+            if (financeProfile.receivables.length >= 60) throw new Error('Money owed to me is full. Please clear space before confirming.');
+            financeProfile.receivables.push({
+              id: debtId, person: 'Myself',
+              reason: 'Extra budget overspending · ' + monthData.month,
+              principal: overflowDebt, repayments: []
+            });
+            financeProfile.updatedAt = now;
+            financeProfile.updatedBy = actor;
+            state.financeProfiles[actor] = financeProfile;
+          }
+        }
+      }
       let twosDelta = 0;
       if (monthData.finalized) {
         state.game=sanitizeGame_(state.game);
@@ -2325,6 +2352,28 @@ function sanitizeFinancePlanningItem_(item){
   return {id:cleanText_(s.id,80)||Utilities.getUuid(),name:cleanText_(s.name,120),kind:kind,group:group,planner:planner,actual:actual,frequency:frequency,paymentTiming:paymentTiming,reserveMonthly:reserveMonthly,notes:cleanText_(s.notes,240),custom:s.custom===true};
 }
 function sanitizeFinancePlanning_(value){const s=value&&typeof value==='object'?value:{};return {items:(Array.isArray(s.items)?s.items:[]).slice(0,120).map(sanitizeFinancePlanningItem_).filter(function(x){return !!x.name;}),openingSavings:cleanMoney_(s.openingSavings),updatedAt:cleanText_(s.updatedAt,40)};}
+
+
+function adjacentFinanceMonth_(month, step) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return '';
+  const date = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + step, 1));
+  return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+}
+
+function financeExtraCarryFrom_(record) {
+  const overspentCents = Math.max(0, Math.round((Array.isArray(record?.extraSpends) ? record.extraSpends : [])
+    .filter(financeExtraSpendCountsAsOutflow_)
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0) * 100));
+  const deductedCents = Math.min(overspentCents, 20000);
+  return { budget: (25000 - deductedCents) / 100, debt: (overspentCents - deductedCents) / 100 };
+}
+
+function setFinanceExtraBudget_(monthData, amount) {
+  monthData.extraBudget = amount;
+  (monthData.expenses || []).forEach(function(item) {
+    if (item.group === 'extra' && String(item.name || '').trim().toLowerCase() === 'extra') item.amount = amount;
+  });
+}
 
 function sanitizeFinanceMonth_(record, actor) {
   const month = cleanText_(record && record.month, 10);
