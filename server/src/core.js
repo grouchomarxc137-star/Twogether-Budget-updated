@@ -1392,17 +1392,12 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const idx = list.findIndex(x => x.month === monthData.month);
       const existing = idx >= 0 ? sanitizeFinanceMonth_(list[idx], actor) : null;
       if (existing && existing.finalized) throw new Error('This month is final and locked');
-      if (actor === 'Principessa') {
-        const previous = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, -1));
-        if (previous) setFinanceExtraBudget_(monthData, financeExtraCarryFrom_(previous).budget);
-      } else if (actor === 'Principe') {
-        const previous = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, -1));
-        if (previous) setFinancePersonalBudget_(monthData, financePersonalCarryFrom_(previous).budget);
-      }
       const now = new Date().toISOString();
-      syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       state.financeProfiles = sanitizeFinanceProfiles_(state.financeProfiles);
       const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
+      financeReconcileCarryLoans_(list,financeProfile,actor,now);
+      financeSetCarryBudget_(monthData,actor,financeCarryPlan_(list,financeProfile,actor,monthData.month).budget);
+      syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       const savingsUsed = function(record) {
         return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
       };
@@ -1424,52 +1419,9 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (idx >= 0) list[idx] = monthData; else list.push(monthData);
       list.sort((a,b) => String(a.month).localeCompare(String(b.month)));
       state.finances[actor] = list;
-      if (actor === 'Principessa') {
-        const next = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, 1));
-        if (next && !next.finalized) {
-          setFinanceExtraBudget_(next, financeExtraCarryFrom_(monthData).budget);
-          next.updatedAt = now;
-          next.updatedBy = actor;
-        }
-        if (monthData.finalized) {
-          const overflowDebt = financeExtraCarryFrom_(monthData).debt;
-          const debtId = 'extra-overspend:' + monthData.month;
-          if (overflowDebt > 0 && !financeProfile.receivables.some(x => x.id === debtId)) {
-            if (financeProfile.receivables.length >= 60) throw new Error('Money owed to me is full. Please clear space before confirming.');
-            financeProfile.receivables.push({
-              id: debtId, person: 'Myself',
-              reason: 'Extra budget overspending · ' + monthData.month,
-              principal: overflowDebt, repayments: []
-            });
-            financeProfile.updatedAt = now;
-            financeProfile.updatedBy = actor;
-            state.financeProfiles[actor] = financeProfile;
-          }
-        }
-      }
-      if (actor === 'Principe') {
-        const next = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, 1));
-        if (next && !next.finalized) {
-          setFinancePersonalBudget_(next, financePersonalCarryFrom_(monthData).budget);
-          next.updatedAt = now;
-          next.updatedBy = actor;
-        }
-        if (monthData.finalized) {
-          const overflowDebt = financePersonalCarryFrom_(monthData).debt;
-          const debtId = 'personal-overspend:' + monthData.month;
-          if (overflowDebt > 0 && !financeProfile.receivables.some(x => x.id === debtId)) {
-            if (financeProfile.receivables.length >= 60) throw new Error('Money owed to me is full. Please clear space before confirming.');
-            financeProfile.receivables.push({
-              id: debtId, person: 'Myself',
-              reason: 'Personal budget overspending · ' + monthData.month,
-              principal: overflowDebt, repayments: []
-            });
-            financeProfile.updatedAt = now;
-            financeProfile.updatedBy = actor;
-            state.financeProfiles[actor] = financeProfile;
-          }
-        }
-      }
+      financeReconcileCarryLoans_(list,financeProfile,actor,now);
+      financeRefreshFutureCarry_(list,financeProfile,actor,monthData.month,now);
+      state.financeProfiles[actor]=financeProfile;
       let twosDelta = 0;
       if (monthData.finalized) {
         state.game=sanitizeGame_(state.game);
@@ -1569,6 +1521,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       });
       state.game[actor]=sanitizeGameProfile_(pstate);
       state.financeProfiles[actor] = profile;
+      financeRefreshFutureCarry_(state.finances[actor]||[],profile,actor,'',profile.updatedAt);
       saveState_(state);
       return output_(gameResponse_(state,{wishlistAwarded:wishlistAwarded}));
     }
@@ -2386,20 +2339,112 @@ function adjacentFinanceMonth_(month, step) {
   return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
 }
 
-function financeExtraCarryFrom_(record) {
-  const overspentCents = Math.max(0, Math.round((Array.isArray(record?.extraSpends) ? record.extraSpends : [])
-    .filter(financeExtraSpendCountsAsOutflow_)
-    .reduce((sum, item) => sum + Number(item.amount || 0), 0) * 100));
-  const deductedCents = Math.min(overspentCents, 20000);
-  return { budget: (25000 - deductedCents) / 100, debt: (overspentCents - deductedCents) / 100 };
-}
 
-function financePersonalCarryFrom_(record) {
-  const overspentCents = Math.max(0, Math.round((Array.isArray(record?.extraSpends) ? record.extraSpends : [])
+function financeCarrySettings_(actor) {
+  return actor === 'Principe'
+    ? {base:100,minimum:30,prefix:'personal-overspend:',label:'Personal'}
+    : {base:250,minimum:50,prefix:'extra-overspend:',label:'Extra'};
+}
+function financeOverspendCents_(record) {
+  return Math.max(0,Math.round((Array.isArray(record && record.extraSpends)?record.extraSpends:[])
     .filter(financeExtraSpendCountsAsOutflow_)
-    .reduce((sum, item) => sum + Number(item.amount || 0), 0) * 100));
-  const deductedCents = Math.min(overspentCents, 7000);
-  return { budget: (10000 - deductedCents) / 100, debt: (overspentCents - deductedCents) / 100 };
+    .reduce(function(sum,item){return sum+Number(item.amount||0);},0)*100));
+}
+function financeAutoLoan_(profile,actor,month) {
+  return (profile.receivables||[]).find(function(x){return x.id===financeCarrySettings_(actor).prefix+month;});
+}
+function financeCarryPlan_(list,profile,actor,month) {
+  const config=financeCarrySettings_(actor);
+  let owed=0;
+  (Array.isArray(list)?list:[]).forEach(function(record){
+    if(record.month>=month)return;
+    const over=financeOverspendCents_(record);
+    const loan=financeAutoLoan_(profile,actor,record.month);
+    if(!loan){owed+=over;return;}
+    const original=Math.max(over,Math.round(Number(loan.principal||0)*100));
+    const repaid=(loan.repayments||[]).filter(function(p){return p.month<month;})
+      .reduce(function(sum,p){return sum+Math.round(Number(p.amount||0)*100);},0);
+    owed+=Math.max(0,original-repaid);
+  });
+  const deductible=Math.min(owed,(config.base-config.minimum)*100);
+  return {budget:(config.base*100-deductible)/100,deducted:deductible/100,
+    owedBefore:owed/100,remaining:(owed-deductible)/100};
+}
+function financeSetCarryBudget_(record,actor,budget) {
+  if(actor==='Principe')setFinancePersonalBudget_(record,budget);
+  else setFinanceExtraBudget_(record,budget);
+}
+function financeCurrentCarryDeduction_(record,actor) {
+  const config=financeCarrySettings_(actor);
+  if(record.partialOnly)return 0;
+  let budget=config.base;
+  if(actor==='Principessa'){
+    if(!(record.expenses||[]).some(function(x){return x.group==='extra'&&String(x.name||'').trim().toLowerCase()==='extra';}))return 0;
+    budget=Number(record.extraBudget);
+  }else{
+    const personal=(record.expenses||[]).find(function(x){return x.group==='variable'&&String(x.name||'').trim().toLowerCase()==='personal'&&!x.id;});
+    if(!personal)return 0;
+    budget=Number(personal.amount);
+  }
+  return Math.min((config.base-config.minimum)*100,Math.max(0,Math.round((config.base-budget)*100)));
+}
+function financeReconcileCarryLoans_(list,profile,actor,now) {
+  const config=financeCarrySettings_(actor);
+  let changed=false;
+  // Preserve old automatic loans and any manual repayments, while upgrading
+  // the earlier one-month overflow format to the full overspend principal.
+  list.forEach(function(record){
+    if(!record.finalized)return;
+    const over=financeOverspendCents_(record);
+    if(!over)return;
+    let loan=financeAutoLoan_(profile,actor,record.month);
+    if(!loan){
+      if(profile.receivables.length>=60)throw new Error('Money owed to me is full. Please clear space before confirming.');
+      loan={id:config.prefix+record.month,person:'Myself',reason:config.label+' budget overspending · '+record.month,
+        principal:over/100,repayments:[]};
+      profile.receivables.push(loan);
+      changed=true;
+    }else if(Math.round(Number(loan.principal||0)*100)<over){
+      loan.principal=over/100;
+      changed=true;
+    }
+  });
+  // Only a confirmed month repays debt. Use one stable installment ID per
+  // source/debtor month to prevent double repayment on subsequent saves.
+  list.filter(function(record){return record.finalized;}).sort(function(a,b){return a.month.localeCompare(b.month);}).forEach(function(record){
+    const due=financeCurrentCarryDeduction_(record,actor);
+    if(!due)return;
+    const loans=(profile.receivables||[]).filter(function(x){
+      return String(x.id||'').startsWith(config.prefix)&&String(x.id).slice(config.prefix.length)<record.month;
+    }).sort(function(a,b){return a.id.localeCompare(b.id);});
+    const alreadyPaid=loans.reduce(function(sum,loan){
+      return sum+(loan.repayments||[]).filter(function(p){
+        return p.month===record.month&&String(p.id||'').startsWith('carry-deduction:');
+      }).reduce(function(s,p){return s+Math.round(Number(p.amount||0)*100);},0);
+    },0);
+    let toPay=Math.max(0,due-alreadyPaid);
+    loans.forEach(function(loan){
+      if(!toPay)return;
+      const repaid=(loan.repayments||[]).filter(function(p){return p.month<=record.month;})
+        .reduce(function(sum,p){return sum+Math.round(Number(p.amount||0)*100);},0);
+      const available=Math.max(0,Math.round(Number(loan.principal||0)*100)-repaid);
+      const amount=Math.min(toPay,available);
+      if(!amount)return;
+      loan.repayments.push({id:'carry-deduction:'+record.month+':'+loan.id.slice(config.prefix.length),
+        month:record.month,date:record.month+'-01',amount:amount/100,at:now});
+      toPay-=amount;
+      changed=true;
+    });
+  });
+  if(changed){profile.updatedAt=now;profile.updatedBy=actor;}
+}
+function financeRefreshFutureCarry_(list,profile,actor,changedMonth,now) {
+  list.filter(function(record){return !record.finalized&&record.month>changedMonth;})
+    .sort(function(a,b){return a.month.localeCompare(b.month);})
+    .forEach(function(record){
+      financeSetCarryBudget_(record,actor,financeCarryPlan_(list,profile,actor,record.month).budget);
+      record.updatedAt=now;record.updatedBy=actor;
+    });
 }
 
 function setFinancePersonalBudget_(monthData, amount) {

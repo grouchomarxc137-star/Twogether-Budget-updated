@@ -26,7 +26,7 @@ test('Extra overspending keeps 50 next month and records only excess as self deb
     assert.equal(november.expenses.find(x => x.group === 'extra').amount, 50);
     assert.deepEqual(state.financeProfiles.Principessa.receivables.map(x => ({
       id: x.id, person: x.person, principal: x.principal,
-    })), [{ id: 'extra-overspend:2026-10', person: 'Myself', principal: 40.25 }]);
+    })), [{ id: 'extra-overspend:2026-10', person: 'Myself', principal: 240.25 }]);
     assert.equal(action(record('2026-11', [], true)).ok, true);
     assert.equal(getState().financeProfiles.Principessa.receivables.length, 1);
   } finally {
@@ -73,7 +73,7 @@ test('Principe personal overspending reduces next month to at least 30 and creat
     assert.equal(november.expenses.find(x => x.name === 'Rent').amount, 575);
     assert.deepEqual(state.financeProfiles.Principe.receivables.map(x =>
       ({ id: x.id, person: x.person, principal: x.principal })),
-      [{ id: 'personal-overspend:2026-10', person: 'Myself', principal: 10 }]
+      [{ id: 'personal-overspend:2026-10', person: 'Myself', principal: 80 }]
     );
     assert.equal(save('2026-11', [], true).ok, true);
     assert.equal(getState().finances.Principe.find(x => x.month === '2026-11').expenses.find(x => x.name === 'Personal').amount, 30);
@@ -100,11 +100,11 @@ test('Principe personal overspending respects cents, month boundaries, and draft
     assert.equal(save('2027-01', []).monthData.expenses[0].amount, 30);
     assert.equal(getState().financeProfiles.Principe.receivables.length, 0);
     assert.equal(save('2026-12', [{ source: 'main', amount: 70.01 }], true).ok, true);
-    assert.equal(getState().financeProfiles.Principe.receivables[0].principal, 0.01);
-    assert.equal(save('2027-02', []).monthData.expenses[0].amount, 100);
+    assert.equal(getState().financeProfiles.Principe.receivables[0].principal, 70.01);
+    assert.equal(save('2027-02', []).monthData.expenses[0].amount, 30);
     assert.equal(save('2027-03', [{ source: 'savings', amount: 4.5 }]).ok, false);
     assert.equal(save('2027-03', [{ source: 'main', amount: 4.5 }]).ok, true);
-    assert.equal(save('2027-04', []).monthData.expenses[0].amount, 95.5);
+    assert.equal(save('2027-04', []).monthData.expenses[0].amount, 30);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -122,9 +122,93 @@ test('Principe partial-only months do not gain an unrequested Personal expense',
     assert.equal(november.ok,true);
     assert.deepEqual(november.monthData.expenses,[]);
     assert.equal(save({month:'2026-10',extraSpends:[{source:'main',amount:120}],expenses:[],partialOnly:true,finalized:true}).ok,true);
-    assert.equal(getState().financeProfiles.Principe.receivables[0].principal,50);
+    assert.equal(getState().financeProfiles.Principe.receivables[0].principal,120);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('Extra overspending is paid over future confirmed months without losing the minimum',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ongoing-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const save=(month,over=0,finalized=false)=>database.db.transaction(()=>runAction('saveFinanceMonth',{
+    monthData:{month,finalized,incomes:[],extraSpends:over?[{source:'main',amount:over}]:[],
+      expenses:[{group:'extra',name:'Extra',amount:250}]}
+  },'Principessa'))();
+  try{
+    assert.equal(save('2026-10',500,true).ok,true);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].principal,500);
+    assert.equal(save('2026-11',0,true).monthData.extraBudget,50);
+    assert.equal(save('2026-12',0,true).monthData.extraBudget,50);
+    assert.equal(save('2027-01',0,true).monthData.extraBudget,150);
+    assert.equal(save('2027-02').monthData.extraBudget,250);
+    const loan=getState().financeProfiles.Principessa.receivables[0];
+    assert.equal(loan.repayments.reduce((sum,p)=>sum+Number(p.amount),0),500);
+    assert.equal(loan.repayments.length,3);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('Principe overspending is combined with existing debt and repaid progressively',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ongoing-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const save=(month,over=0,finalized=false)=>database.db.transaction(()=>runAction('saveFinanceMonth',{
+    monthData:{month,finalized,incomes:[],extraSpends:over?[{source:'main',amount:over}]:[],
+      expenses:[{group:'variable',name:'Personal',amount:100}]}
+  },'Principe'))();
+  try{
+    assert.equal(save('2026-10',200,true).ok,true);
+    assert.equal(save('2026-11',50,true).monthData.expenses[0].amount,30);
+    assert.equal(save('2026-12',0,true).monthData.expenses[0].amount,30);
+    assert.equal(save('2027-01',0,true).monthData.expenses[0].amount,30);
+    assert.equal(save('2027-02',0,true).monthData.expenses[0].amount,60);
+    assert.equal(save('2027-03').monthData.expenses[0].amount,100);
+    const loans=getState().financeProfiles.Principe.receivables;
+    assert.equal(loans.reduce((total,x)=>total+Number(x.principal)-x.repayments.reduce((s,r)=>s+Number(r.amount),0),0),0);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('drafts do not repay debt, and confirmed installments are not duplicated',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ongoing-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const save=(month,over=0,finalized=false)=>database.db.transaction(()=>runAction('saveFinanceMonth',{
+    monthData:{month,finalized,incomes:[],extraSpends:over?[{source:'main',amount:over}]:[],
+      expenses:[{group:'extra',name:'Extra',amount:250}]}
+  },'Principessa'))();
+  try{
+    assert.equal(save('2026-10',500,true).ok,true);
+    assert.equal(save('2026-11').monthData.extraBudget,50);
+    assert.equal(save('2026-12').monthData.extraBudget,50);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments.length,0);
+    assert.equal(save('2026-11',0,true).ok,true);
+    assert.equal(getState().finances.Principessa.find(x=>x.month==='2026-12').extraBudget,50);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments.length,1);
+    assert.equal(save('2026-12',0,true).ok,true);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments.length,2);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('previous automatic self-loan values retain existing manual payments',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ongoing-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const save=(month,over=0,finalized=false)=>database.db.transaction(()=>runAction('saveFinanceMonth',{
+    monthData:{month,finalized,incomes:[],extraSpends:over?[{source:'main',amount:over}]:[],
+      expenses:[{group:'extra',name:'Extra',amount:250}]}
+  },'Principessa'))();
+  try{
+    assert.equal(save('2026-10',500,true).ok,true);
+    const profile=getState().financeProfiles.Principessa;
+    profile.receivables[0].principal=300;
+    profile.receivables[0].repayments=[{id:'manual',month:'2026-10',date:'2026-10-30',amount:20}];
+    assert.equal(database.db.transaction(()=>runAction('saveFinanceProfile',{profile},'Principessa'))().ok,true);
+    assert.equal(save('2026-11',0,true).ok,true);
+    const loan=getState().financeProfiles.Principessa.receivables[0];
+    assert.equal(loan.principal,500);
+    assert.equal(loan.repayments.find(x=>x.id==='manual').amount,20);
+    assert.equal(loan.repayments.find(x=>x.month==='2026-11').amount,200);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
 });
