@@ -130,7 +130,7 @@ export function renderTripGallery() {
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
   }).join('')+cleanup;
-  $('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));
+  $$('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));
   bindHiddenTestCleanup(root);
 }
 
