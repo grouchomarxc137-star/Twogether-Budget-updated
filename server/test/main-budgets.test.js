@@ -85,3 +85,24 @@ test('untracked categories, shared jar, legacy records and excluded expenses are
   assert.equal(budgetProgressForMonth([fuel],{expenses:[{name:'Fuel',amount:400}]},[],'2026-10')[0].remaining,-50);
   assert.equal(budgetProgressForMonth([fuel],null,[{id:'a',expenseEntries:[{category:'transport',transportType:'tolls',amount:50,paidBy:'Principe',date:'2026-10-03'}]}],'2026-10')[0].spent,0);
 });
+
+test('tracking is permitted only in Variable expenses and inactive elsewhere',()=>{
+  const ctx=setup();
+  try{
+    const expenses=[
+      {...fuel,id:'fuel-allowed'},
+      {...groceries,id:'groceries-allowed',group:'groceries'},
+      {...fuel,id:'fixed-rejected',name:'Rent',group:'fixed'},
+      {...fuel,id:'subscriptions-rejected',name:'Spotify',group:'subscriptions'},
+      {...fuel,id:'savings-rejected',name:'Savings',group:'savings'},
+      {...fuel,id:'other-rejected',name:'Other',group:'other'},
+    ];
+    assert.equal(action(ctx.database,'saveFinanceProfile',{profile:{recurring:{custom:true,expenses}}}).ok,true);
+    const actual=getState().financeProfiles.Principe.recurring.expenses;
+    assert.deepEqual(actual.map((item)=>item.isBudget),[true,true,false,false,false,false]);
+    assert.deepEqual(recurringBudgetItems({expenses:actual}).map((item)=>item.id),['fuel-allowed','groceries-allowed']);
+    assert.deepEqual(recurringBudgetItems({expenses:[{...fuel,group:'fixed'}]}),[]);
+    assert.equal(getState().finances.Principe.length,0);
+  }finally{ctx.cleanup();}
+});
+

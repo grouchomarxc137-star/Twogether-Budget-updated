@@ -5,7 +5,7 @@ const cents = (value) => Math.max(0, Math.round((Number(value) || 0) * 100));
 const label = (value) => String(value || '').trim().toLocaleLowerCase();
 export function recurringBudgetItems(recurring) {
   return (Array.isArray(recurring?.expenses) ? recurring.expenses : [])
-    .filter((item) => item?.isBudget === true && item?.id && label(item.name) && Number(item.amount) > 0)
+    .filter((item) => item?.isBudget === true && (item.group === 'variable' || item.group === 'groceries') && item?.id && label(item.name) && Number(item.amount) > 0)
     .map((item) => ({ id:String(item.id), name:String(item.name), amount:Number(item.amount) }));
 }
 export function budgetCategoryForTrip(entry) {

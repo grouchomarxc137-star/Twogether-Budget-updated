@@ -2210,13 +2210,14 @@ function sanitizeRecurringIncome_(item) {
 }
 
 function sanitizeRecurringExpense_(item) {
+  const group=cleanFinanceGroup_(item && item.group);
   return {
     id: cleanText_(item && item.id, 80) || Utilities.getUuid(),
-    group: cleanFinanceGroup_(item && item.group),
+    group: group,
     name: cleanText_(item && item.name, 100),
     amount: cleanMoney_(item && item.amount),
     day: cleanRecurringDay_(item && item.day),
-    isBudget:item&&item.isBudget===true
+    isBudget:item&&item.isBudget===true&&(group==='variable'||group==='groceries')
   };
 }
 

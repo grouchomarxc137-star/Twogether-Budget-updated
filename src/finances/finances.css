@@ -5900,3 +5900,6 @@ dialog.finance-log-host .tv2-backdrop {
 .finance-month-budget-list{display:grid;gap:8px}
 .finance-month-budget-list .finance-recurring-budget-status{margin:0}
 @media(max-width:760px){.finance-budget-log-preview,.finance-budget-trip-preview{margin:10px 0}}
+
+/* Hidden checkbox only for non-variable recurring categories. */
+.finance-recurring-budget-toggle[hidden]{display:none!important}

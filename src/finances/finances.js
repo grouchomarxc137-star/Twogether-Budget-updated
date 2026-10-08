@@ -347,7 +347,7 @@ function normalizeRecurringConfig(value) {
   return {
     custom: v.custom === true,
     incomes: Array.isArray(v.incomes) ? v.incomes.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day) })).filter((x) => x.name) : [],
-    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day), isBudget:x.isBudget===true })).filter((x) => x.name) : [],
+    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day), isBudget:x.isBudget===true&&['variable','groceries'].includes(normalizeGroup(x.group)) })).filter((x) => x.name) : [],
   };
 }
 function freshProfile() {
@@ -2105,7 +2105,7 @@ function openRecurringEditor(kind,index) {
   const referenceMonth=/^\d{4}-\d{2}$/.test(String(selectedMonth||''))?selectedMonth:'2026-09';
   const bounds=financeDateBounds(referenceMonth);
   const selectedDate=financeDateForDay(referenceMonth,item?.day);
-  const budgetChecked=item?.isBudget===true;
+  const budgetChecked=selectedGroup==='budgets'&&item?.isBudget===true;
   const groupField=isExpense
     ? '<label class="tv2-field"><span>Category</span><select id="finRecurringGroup" class="finance-recurring-select">'+groups.map((g)=>'<option value="'+g.key+'" '+(g.key===selectedGroup?'selected':'')+'>'+esc(g.label)+'</option>').join('')+'</select></label>'+
       '<label class="tv2-field finance-new-category-field" id="finRecurringNewCategoryField" '+(selectedGroup==='other'?'':'hidden')+'><span>New category <small>Optional</small></span><input id="finRecurringNewCategory" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts"></label>'
@@ -2119,8 +2119,8 @@ function openRecurringEditor(kind,index) {
         '<section class="tv2-budget-editor-card finance-recurring-editor-card">'+
           '<label class="tv2-field"><span>Name</span><input id="finRecurringName" value="'+esc(item?.name||'')+'" placeholder="'+(isExpense?'e.g. Spotify':'e.g. Salary')+'"></label>'+
           groupField+
-          '<label class="tv2-field"><span>'+(budgetChecked?'Monthly budget':'Usual amount')+'</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0"></div></label>'+
-          (isExpense&&actor()==='Principe'?'<label class="finance-recurring-budget-toggle"><input type="checkbox" id="finRecurringIsBudget" '+(budgetChecked?'checked':'')+'><span><strong>Track as a monthly budget</strong><small>Example: Fuel €350. Log actual purchases separately to see how much is left.</small></span></label>':'')+
+          '<label class="tv2-field"><span id="finRecurringAmountLabel">'+(budgetChecked?'Monthly budget':'Usual amount')+'</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0"></div></label>'+
+          (isExpense&&actor()==='Principe'?'<label class="finance-recurring-budget-toggle" '+(selectedGroup==='budgets'?'':'hidden')+'><input type="checkbox" id="finRecurringIsBudget" '+(budgetChecked?'checked':'')+'><span><strong>Track as a monthly budget</strong><small>Example: Fuel €350. Log actual purchases separately to see how much is left.</small></span></label>':'')+
           '<label class="tv2-field tv2-date-field" '+(budgetChecked?'hidden':'')+'><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
         '</section>'+
         '<div class="finance-recurring-editor-actions">'+
@@ -2138,11 +2138,25 @@ function openRecurringEditor(kind,index) {
   const syncRecurringNewCategoryField=()=>{
     if(recurringNewCategoryField) recurringNewCategoryField.hidden=recurringGroupSelect?.value!=='other';
   };
-  recurringGroupSelect?.addEventListener('change',syncRecurringNewCategoryField);
   const budgetToggle=$('#finRecurringIsBudget');
+  const budgetToggleField=budgetToggle?.closest('.finance-recurring-budget-toggle');
   const dateField=$('#finRecurringDate')?.closest('.tv2-field');
-  budgetToggle?.addEventListener('change',()=>{if(dateField)dateField.hidden=budgetToggle.checked;});
+  const amountLabel=$('#finRecurringAmountLabel');
+  const syncBudgetField=()=>{
+    const variableExpenses=isExpense&&actor()==='Principe'&&recurringGroupSelect?.value==='budgets';
+    if(budgetToggleField)budgetToggleField.hidden=!variableExpenses;
+    if(!variableExpenses&&budgetToggle)budgetToggle.checked=false;
+    const tracking=variableExpenses&&budgetToggle?.checked===true;
+    if(dateField)dateField.hidden=tracking;
+    if(amountLabel)amountLabel.textContent=tracking?'Monthly budget':'Usual amount';
+  };
+  recurringGroupSelect?.addEventListener('change',()=>{
+    syncRecurringNewCategoryField();
+    syncBudgetField();
+  });
+  budgetToggle?.addEventListener('change',syncBudgetField);
   syncRecurringNewCategoryField();
+  syncBudgetField();
   $('[data-fin-recurring-save]')?.addEventListener('click',async()=>{
     const name=String($('#finRecurringName')?.value||'').trim();
     const amount=$('#finRecurringAmount')?.value||'';
@@ -2164,7 +2178,7 @@ function openRecurringEditor(kind,index) {
         if(result.category) category=result.category.key;
       }
       row.group=recurringGroupForCategory(category,name,item);
-      row.isBudget=actor()==='Principe'&&budgetToggle?.checked===true;
+      row.isBudget=actor()==='Principe'&&category==='budgets'&&budgetToggle?.checked===true;
       if(row.isBudget)row.day='';
     }
     const target=isExpense?nextConfig.expenses:nextConfig.incomes;
@@ -2491,13 +2505,6 @@ function openFinanceTransactionSheet(rec, edit = null) {
       ? '<div class="finance-budget-log-preview"><b>'+esc(budgetBefore.name)+' · '+money(budgetBefore.remaining)+' left</b>'+
         '<small>'+money(budgetBefore.spent)+' spent of '+money(budgetBefore.amount)+(validAmount()?' · After this: '+money(budgetBefore.remaining-amount())+' left':'')+'</small></div>'
       : '';
-    const budgetOptions=isRegularExpense()&&trackedBudgets.length
-      ? '<label class="tv2-field finance-log-budget-assign"><span>Main Account budget</span><select id="financeLogBudgetCategory">'+
-        '<option value="" '+(!state.budgetCategoryId?'selected':'')+'>Match expense name</option>'+
-        trackedBudgets.map((budget)=>'<option value="'+esc(budget.id)+'" '+(state.budgetCategoryId===budget.id?'selected':'')+'>'+esc(budget.name)+'</option>').join('')+
-        '<option value="none" '+(state.budgetCategoryId==='none'?'selected':'')+'>Not part of a budget</option>'+
-        '</select></label>'
-      : '';
     const paymentSourceHtml=isRegularExpense()
       ? '<div class="finance-log-paid-from"><span>Paid from</span><div class="finance-log-paid-from-options">'+
           '<button type="button" data-fin-log-paid-from="personal" class="'+(state.paidFrom==='personal'?'is-active':'')+'">My money</button>'+
@@ -2517,7 +2524,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetOptions+budgetDisplay,
+      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetDisplay,
       defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
@@ -2538,10 +2545,6 @@ function openFinanceTransactionSheet(rec, edit = null) {
         event.preventDefault();
         if(canSave()) sheet.querySelector('[data-fin-log-save]')?.click();
       }
-    });
-    sheet.querySelector('#financeLogBudgetCategory')?.addEventListener('change',(event)=>{
-      state.budgetCategoryId=event.target.value;
-      render();
     });
     sheet.querySelector('#financeLogCategoryName')?.addEventListener('input',(event)=>{
       state.newCategoryName=event.target.value;
