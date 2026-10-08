@@ -2977,6 +2977,7 @@ function financeMonthTimeline(rec) {
       const allowance=row.kind==='allowance';
       const futureBill=row.kind==='future-bill';
       const tone=income?'income':row.tone;
+      const carryPayback=row.kind==='expense'&&String(item.id||'').startsWith('allowance-payback:');
       const meta=income
         ? 'Income'
         : extra
@@ -2986,7 +2987,6 @@ function financeMonthTimeline(rec) {
           : futureBill
             ? categoryLabel(tone)+' · Pending · Expected '+financeDateLabel(row.date)
             : carryPayback ? 'Self-debt repayment · Deducted from monthly funds' : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
-      const carryPayback=row.kind==='expense'&&String(item.id||'').startsWith('allowance-payback:');
       const protectedFixed=row.kind==='expense'&&(
         actor()==='Principessa'&&normalizeGroup(item.group)==='extra'&&String(item.name||'').trim().toLowerCase()==='extra'
         ||actor()==='Principe'&&normalizeGroup(item.group)==='variable'&&String(item.name||'').trim().toLowerCase()==='personal'&&!item.id);
