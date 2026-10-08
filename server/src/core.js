@@ -661,10 +661,28 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,sharedExpense:plan.sharedExpenses.accom,sharedJar:sanitizeSharedJar_(state.sharedJar)});
     }
 
+    if(action==='personalizeTripChecklists'){
+      if(!personalizeLegacyTripPrep_(state,actor))
+        return output_({ok:true,alreadyPersonal:true,tripPrepDefaults:state.tripPrepDefaults});
+      addAudit_(state,actor,'personalizeTripChecklists','personal-checklists');
+      saveState_(state);
+      return output_({ok:true,personalized:true,tripPrepDefaults:state.tripPrepDefaults});
+    }
+
     if (action === 'saveTripPrepDefaults') {
       const previous = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
       const incoming = payload.prep && typeof payload.prep === 'object' ? payload.prep : {};
       const source = Object.assign({}, incoming);
+      if(previous.personalRecurrentV1){
+        // Personal-mode saves may not modify the other person's recurring list.
+        source.personalRecurrentV1=true;
+        source.legacyRecurrentBackup=previous.legacyRecurrentBackup;
+        ['packing','reminders'].forEach(function(kind){
+          const own=(Array.isArray(incoming[kind])?incoming[kind]:previous[kind])
+            .map(prepItem_).filter(function(item){return item.personalFor===actor;});
+          source[kind]=previous[kind].filter(function(item){return item.personalFor!==actor;}).concat(own);
+        });
+      }
       if(!Object.prototype.hasOwnProperty.call(source,'notes'))source.notes=previous.notes;
       if(!Object.prototype.hasOwnProperty.call(source,'packingSections'))source.packingSections=previous.packingSections;
       const next = sanitizeTripPrepDefaults_(source);
@@ -760,7 +778,24 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const now = new Date().toISOString();
 
       plan.prep = sanitizeTripPrep_(promoted.prep);
+      if(state.tripPrepDefaults&&state.tripPrepDefaults.personalRecurrentV1===true){
+        const other=actor==='Principessa'?'Principe':'Principessa';
+        ['packing','reminders'].forEach(function(kind){
+          const priorById=new Map(storedPrep[kind].filter(function(item){return item.personalFor===other;})
+            .map(function(item){return [item.id,item];}));
+          const seen=new Set();
+          plan.prep[kind]=plan.prep[kind].map(function(item){
+            if(item.personalFor!==other)return item;
+            const prior=priorById.get(item.id);
+            if(prior){seen.add(item.id);return prior;}
+            // Never allow one partner to create or modify the other's private items.
+            return null;
+          }).filter(Boolean);
+          priorById.forEach(function(item,id){if(!seen.has(id))plan.prep[kind].push(item);});
+        });
+      }
       plan.prep.returnPackingResetEnd = storedPrep.returnPackingResetEnd;
+      plan.prep.legacyRecurrentBackup = storedPrep.legacyRecurrentBackup;
       plan.prep.updatedAt = now; plan.prep.updatedBy = actor;
       plan.updatedAt = now; plan.updatedBy = actor;
       state.plans[planIdx] = plan;
@@ -1778,7 +1813,17 @@ function defaultTripPrepDefaults_(){
     updatedBy:'Unknown'
   };
 }
-function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{};return {packing:(Array.isArray(s.packing)?s.packing:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),reminders:(Array.isArray(s.reminders)?s.reminders:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),returnPackingResetEnd:cleanFinanceDate_(s.returnPackingResetEnd),updatedAt:cleanText_(s.updatedAt,40),updatedBy:cleanActor_(s.updatedBy)};}
+function sanitizeTripPrep_(value){
+  const s=value&&typeof value==='object'?value:{};
+  const archived=s.legacyRecurrentBackup&&typeof s.legacyRecurrentBackup==='object'?s.legacyRecurrentBackup:{};
+  const read=(items,max)=>(Array.isArray(items)?items:[]).slice(0,max).map(prepItem_).filter(function(item){return !!item.text;});
+  return {
+    packing:read(s.packing,400),reminders:read(s.reminders,400),
+    legacyRecurrentBackup:{packing:read(archived.packing,120),reminders:read(archived.reminders,120)},
+    returnPackingResetEnd:cleanFinanceDate_(s.returnPackingResetEnd),
+    updatedAt:cleanText_(s.updatedAt,40),updatedBy:cleanActor_(s.updatedBy)
+  };
+}
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
@@ -1789,6 +1834,7 @@ function sanitizeTripPrepDefaults_(value){
   });
   out.reminders=out.reminders.map(function(item){return {id:item.id,text:item.text,done:false,addedBy:item.addedBy,personalFor:item.personalFor,personal:prepPersonal_(item.personal)};});
   out.notes=(Array.isArray(value.notes)?value.notes:[]).slice(0,120).map(prepNote_).filter(function(item){return !!item.text;});
+  out.personalRecurrentV1=value.personalRecurrentV1===true;
   return out;
 }
 function tripPrepForNewPlan_(value,actor,now){
@@ -1801,6 +1847,65 @@ function tripPrepForNewPlan_(value,actor,now){
   };
 }
 
+function personalTripPrepItem_(item,person,newId,recurrentId){
+  const original=prepItem_(item);
+  const own=(original.personal||{})[person]||{};
+  return Object.assign({},original,{
+    id:newId,
+    recurrentId:recurrentId===undefined?original.recurrentId:recurrentId,
+    personalFor:person,
+    text:Object.prototype.hasOwnProperty.call(own,'text')?own.text:original.text,
+    done:Object.prototype.hasOwnProperty.call(own,'done')?own.done:original.done,
+    section:own.section||original.section,
+    notifyAt:Object.prototype.hasOwnProperty.call(own,'notifyAt')?own.notifyAt:original.notifyAt,
+    personal:own.hidden?{[person]:{hidden:true}}:{}
+  });
+}
+function personalizeLegacyTripPrep_(state,actor){
+  const defaults=sanitizeTripPrepDefaults_(state.tripPrepDefaults);
+  if(defaults.personalRecurrentV1)return false;
+  const mapping={packing:{},reminders:{}};
+  const templateBackup={packing:[],reminders:[]};
+  ['packing','reminders'].forEach(function(kind){
+    defaults[kind]=defaults[kind].flatMap(function(item){
+      if(prepPersonalFor_(item.personalFor))return [item];
+      templateBackup[kind].push(prepItem_(item));
+      const first=personalTripPrepItem_(item,'Principessa',Utilities.getUuid(),'');
+      const second=personalTripPrepItem_(item,'Principe',Utilities.getUuid(),'');
+      first.done=false;second.done=false;
+      mapping[kind][item.id]={Principessa:first.id,Principe:second.id};
+      return [first,second];
+    });
+  });
+  state.plans=state.plans.map(function(raw){
+    const plan=sanitizePlan_(raw);
+    const linked=plan.linkedTripId?state.trips.find(function(t){return t.id===plan.linkedTripId;}):null;
+    if(linked&&isTripLocked_(linked))return plan;
+    let changed=false;
+    const planBackup={packing:[],reminders:[]};
+    ['packing','reminders'].forEach(function(kind){
+      plan.prep[kind]=plan.prep[kind].flatMap(function(item){
+        const ids=mapping[kind][item.recurrentId];
+        if(!ids||prepPersonalFor_(item.personalFor))return [item];
+        changed=true;
+        planBackup[kind].push(prepItem_(item));
+        return ACTORS.map(function(person){
+          const own=personalTripPrepItem_(item,person,Utilities.getUuid(),ids[person]);
+          return own;
+        });
+      });
+    });
+    if(changed){
+      plan.prep.legacyRecurrentBackup=planBackup;
+      plan.updatedAt=new Date().toISOString();plan.updatedBy=actor;
+    }
+    return plan;
+  });
+  defaults.legacyRecurrentBackup=templateBackup;
+  defaults.personalRecurrentV1=true;
+  state.tripPrepDefaults=defaults;
+  return true;
+}
 function normalizedPrepText_(value){return cleanText_(value,160).trim().toLowerCase();}
 function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor){
   const previous=sanitizeTripPrep_(previousPrep);
@@ -1829,6 +1934,7 @@ function promoteNewTripPrepItemsToDefaults_(previousPrep,nextPrep,defaults,actor
       if(prepAddedBy_(item.addedBy)!==actor)return;
       const personalFor=prepPersonalFor_(item.personalFor);
       if(personalFor&&personalFor!==actor)return;
+      if(nextDefaults.personalRecurrentV1&&personalFor!==actor)return;
       if(cleanText_(item.recurrentId,80))return;
       const textKey=normalizedPrepText_(item.text);
       if(!textKey)return;
@@ -1902,7 +2008,9 @@ function mergeRecurrentPrepKind_(existingItems,previousDefaults,nextDefaults){
     if(prior){
       const previousDefault=previousById[item.id]||{};
       recurrent.push({
-        id:prior.id,recurrentId:item.id,text:item.text,done:!!prior.done,section:prior.section||item.section,addedBy:item.addedBy,
+        id:prior.id,recurrentId:item.id,
+        text:normalizedPrepText_(prior.text)!==normalizedPrepText_(previousDefault.text)?prior.text:item.text,
+        done:!!prior.done,section:prior.section||item.section,addedBy:item.addedBy,
         personalFor:item.personalFor,notifyAt:prior.notifyAt||'',
         personal:mergePrepPersonalDefaults_(previousDefault.personal,item.personal,prior.personal)
       });
@@ -3065,7 +3173,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'resetReturnPacking', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'resetReturnPacking', 'personalizeTripChecklists', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
