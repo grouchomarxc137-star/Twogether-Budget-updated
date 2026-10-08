@@ -1148,6 +1148,29 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,twosDelta:twosDelta,game:sanitizeGame_(state.game)});
     }
 
+    if (action === 'dismissFutureBillOccurrence') {
+      const billId=cleanText_(payload.billId,80);
+      const dueDate=cleanFinanceDate_(payload.dueDate);
+      if(!billId||!dueDate)throw new Error('Choose a valid bill and date');
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);
+      const profile=sanitizeFinanceProfile_(state.financeProfiles[actor]||{},actor);
+      const bill=profile.futureBills.find(function(item){return item.id===billId;});
+      if(!bill)throw new Error('Future bill not found');
+      if(futureBillOccurrenceDate_(bill,Number(dueDate.slice(0,4)))!==dueDate)throw new Error('The bill is not scheduled for this date');
+      state.finances=sanitizeFinances_(state.finances);
+      const rec=(state.finances[actor]||[]).find(function(month){return month.month===dueDate.slice(0,7);});
+      if(rec&&rec.finalized)throw new Error('This month is final and locked');
+      if((rec&&rec.expenses||[]).some(function(item){return item.futureBillId===billId&&item.futureBillDueDate===dueDate;}))throw new Error('This bill has already been paid. Delete the expense instead.');
+      if(bill.skippedDates.includes(dueDate))return output_({ok:true,alreadyRemoved:true,financeProfile:profile});
+      bill.skippedDates=Array.from(new Set(bill.skippedDates.concat([dueDate]))).sort();
+      profile.updatedAt=new Date().toISOString();
+      profile.updatedBy=actor;
+      state.financeProfiles[actor]=sanitizeFinanceProfile_(profile,actor);
+      addAudit_(state,actor,'dismissFutureBillOccurrence',billId);
+      saveState_(state);
+      return output_({ok:true,financeProfile:state.financeProfiles[actor]});
+    }
+
     if (action === 'confirmFutureBill') {
       const billId=cleanText_(payload.billId,80);
       const dueDate=cleanFinanceDate_(payload.dueDate);
@@ -1166,7 +1189,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if(existing&&existing.finalized)throw new Error('This month is final and locked');
       const record=existing||sanitizeFinanceMonth_({month:month,partialOnly:true,incomes:[],expenses:[]},actor);
       const duplicate=record.expenses.some(function(item){return item.futureBillId===billId&&item.futureBillDueDate===dueDate;});
-
+      if(bill.skippedDates.includes(dueDate))throw new Error('This bill was removed from this month');
       if(duplicate)return output_({ok:true,alreadyPaid:true,monthData:record,financeProfile:profile});
       const amount=payload.amount==null?bill.amount:cleanMoney_(payload.amount);
       if(amount===''||!Number.isFinite(Number(amount))||Number(amount)<=0)throw new Error('Enter a valid bill amount');
@@ -2270,7 +2293,8 @@ function sanitizeFutureBill_(item) {
     amount:amount,
     date:date,
     group:cleanFinanceGroup_(s.group),
-    repeat:s.repeat==='yearly'?'yearly':'none'
+    repeat:s.repeat==='yearly'?'yearly':'none',
+    skippedDates:Array.from(new Set((Array.isArray(s.skippedDates)?s.skippedDates:[]).slice(0,120).map(cleanFinanceDate_).filter(Boolean))).sort()
   };
 }
 
@@ -2878,7 +2902,7 @@ export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
-  'saveFinanceProfile', 'confirmFutureBill', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
+  'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',
 ]);

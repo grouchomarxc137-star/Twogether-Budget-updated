@@ -5868,3 +5868,14 @@ dialog.finance-log-host .tv2-backdrop {
 .finance-future-bill-end b{font-variant-numeric:tabular-nums}
 .finance-future-pending-amount{opacity:.7}
 @media(max-width:760px){.finance-log-tools{gap:5px}.finance-log-tools .finance-log-recurring-link{font-size:12px;padding:5px 2px}.finance-future-bill-row{padding:12px}}
+
+/* Future Bills is one level inside recurring items. */
+.finance-recurring-future-link{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:rgba(255,253,249,.82);color:var(--tv2-ink);border:1px solid #dfd3c3;border-radius:16px;padding:13px 16px;margin:10px 0 22px;cursor:pointer;font:inherit}
+.finance-recurring-future-link span{display:grid;gap:4px}
+.finance-recurring-future-link strong{font-size:15px}
+.finance-recurring-future-link small{font-size:12px;color:var(--tv2-muted)}
+.finance-recurring-future-link b{font-size:22px;font-weight:400;color:var(--tv2-muted)}
+.finance-future-bill-list-row{display:flex;align-items:stretch;gap:6px;min-width:0}
+.finance-future-bill-list-row .finance-future-bill-row{flex:1;min-width:0}
+.finance-future-bill-remove{flex:0 0 42px;border:1px solid #e5c4c4;border-radius:14px;background:#fff5f3;color:#9f4747;cursor:pointer;font-size:24px;line-height:1}
+.finance-future-bill-remove:focus-visible,.finance-recurring-future-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}

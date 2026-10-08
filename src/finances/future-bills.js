@@ -11,6 +11,10 @@ export function billOccurrenceDate(bill, year) {
   return `${year}-${match[2]}-${String(Math.min(day, maxDay)).padStart(2, '0')}`;
 }
 
+export function isFutureBillSkipped(bill, date) {
+  return Array.isArray(bill?.skippedDates) && bill.skippedDates.includes(date);
+}
+
 export function isFutureBillPaid(bill, date, financeMonths = []) {
   const month = (financeMonths || []).find((item) => item.month === date.slice(0, 7));
   return (month?.expenses || []).some((expense) =>
@@ -22,7 +26,7 @@ export function pendingFutureBillsForMonth(bills, month, financeMonths = []) {
   const year = Number(month.slice(0, 4));
   return (bills || []).flatMap((bill) => {
     const date = billOccurrenceDate(bill, year);
-    return date && date.slice(0, 7) === month && !isFutureBillPaid(bill, date, financeMonths)
+    return date && date.slice(0, 7) === month && !isFutureBillSkipped(bill, date) && !isFutureBillPaid(bill, date, financeMonths)
       ? [{ bill, date }] : [];
   });
 }
@@ -37,7 +41,7 @@ export function dueFutureBills(bills, today, financeMonths = []) {
     const matches = [];
     for (let year = from; year <= to; year++) {
       const date = billOccurrenceDate(bill, year);
-      if (date && date <= today && !isFutureBillPaid(bill, date, financeMonths)) {
+      if (date && date <= today && !isFutureBillSkipped(bill, date) && !isFutureBillPaid(bill, date, financeMonths)) {
         matches.push({ bill, date });
       }
     }

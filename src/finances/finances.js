@@ -376,6 +376,7 @@ function normalizeProfile(profileData) {
       date:normalizeFinanceDate(bill?.date),
       group:normalizeGroup(bill?.group),
       repeat:bill?.repeat==='yearly'?'yearly':'none',
+      skippedDates:Array.isArray(bill?.skippedDates)?Array.from(new Set(bill.skippedDates.map((date)=>normalizeFinanceDate(date)).filter(Boolean))).sort():[],
     })).filter((bill)=>bill.id&&bill.name&&bill.date) : [],
     financeReminders: Array.isArray(p.financeReminders) ? p.financeReminders.map((item) => ({
       id: String(item?.id || ''),
@@ -1836,7 +1837,7 @@ function futureBillNextStatus(bill) {
   const firstYear=Number(bill.date.slice(0,4));
   const currentYear=Number(today.slice(0,4));
   if(bill.repeat!=='yearly'){
-    return {date:bill.date,status:isFutureBillPaid(bill,bill.date,ownMonths())?'Paid':bill.date<today?'Overdue':bill.date===today?'Pending':'Scheduled'};
+    return {date:bill.date,status:isFutureBillPaid(bill,bill.date,ownMonths())?'Paid':(bill.skippedDates||[]).includes(bill.date)?'Removed from log':bill.date<today?'Overdue':bill.date===today?'Pending':'Scheduled'};
   }
   const firstDueYear=Math.max(firstYear,currentYear);
   for(let year=firstYear;year<=firstDueYear+1;year++){
@@ -1851,16 +1852,17 @@ function openFutureBillsManager() {
   const bills=[...profile().futureBills].sort((a,b)=>a.date.localeCompare(b.date));
   const rows=bills.map((bill)=>{
     const next=futureBillNextStatus(bill);
-    return '<button type="button" class="finance-future-bill-row" data-fin-future-edit="'+esc(bill.id)+'">'+
+    return '<div class="finance-future-bill-list-row"><button type="button" class="finance-future-bill-row" data-fin-future-edit="'+esc(bill.id)+'">'+
       '<span class="finance-future-bill-main"><strong>'+esc(bill.name)+'</strong><small>'+esc(futureBillDisplayDate(next.date))+' · '+(bill.repeat==='yearly'?'Repeats yearly':'One-time')+'</small></span>'+
       '<span class="finance-future-bill-end"><b>'+money(bill.amount)+'</b><small>'+esc(next.status)+'</small></span>'+
       '<span aria-hidden="true">›</span>'+
-    '</button>';
+    '</button>'+
+    '<button type="button" class="finance-future-bill-remove" data-fin-future-remove="'+esc(bill.id)+'" aria-label="Delete schedule for '+esc(bill.name)+'" title="Delete bill schedule">×</button></div>';
   }).join('')||'<div class="finance-recurring-empty-card">No future bills yet. Add one to plan ahead.</div>';
   showMini(
     '<div class="tv2-root finance-recurring-tv2 finance-future-bills-view">'+
       '<div class="tv2-page">'+
-        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-future-close>‹ Finances</button><span></span></div><h1>Future Bills</h1><p>Plan bills ahead without counting them as spent.</p></header>'+
+        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-future-close>‹ Recurring items</button><span></span></div><h1>Future Bills</h1><p>Plan bills ahead without counting them as spent.</p></header>'+
         '<section class="finance-future-bill-list">'+rows+'</section>'+
         '<div class="finance-recurring-editor-actions"><button type="button" class="tv2-primary" data-fin-future-add>＋ Add Future Bill</button></div>'+
       '</div>'+
@@ -1868,9 +1870,10 @@ function openFutureBillsManager() {
     'recurring-manager'
   );
   const root=$('#financeMiniBody');
-  $('[data-fin-future-close]',root)?.addEventListener('click',closeMini);
+  $('[data-fin-future-close]',root)?.addEventListener('click',openRecurringManager);
   $('[data-fin-future-add]',root)?.addEventListener('click',()=>openFutureBillEditor(''));
-  $('[data-fin-future-edit]',root).forEach((row)=>row.addEventListener('click',()=>openFutureBillEditor(row.dataset.finFutureEdit)));
+  $$('[data-fin-future-edit]',root).forEach((row)=>row.addEventListener('click',()=>openFutureBillEditor(row.dataset.finFutureEdit)));
+  $$('[data-fin-future-remove]',root).forEach((button)=>button.addEventListener('click',()=>openFutureBillDelete(button.dataset.finFutureRemove)));
 }
 function openFutureBillEditor(id) {
   const item=profile().futureBills.find((bill)=>bill.id===id)||null;
@@ -1907,7 +1910,7 @@ function openFutureBillEditor(id) {
     try{
       const next=profile();
       const category=$('#finFutureGroup')?.value||'other';
-      const bill={id:item?.id||uid(),name,amount:Math.round(amount*100)/100,date,group:recurringGroupForCategory(category,name,item),repeat:$('#finFutureRepeat')?.value==='yearly'?'yearly':'none'};
+      const bill={id:item?.id||uid(),name,amount:Math.round(amount*100)/100,date,group:recurringGroupForCategory(category,name,item),repeat:$('#finFutureRepeat')?.value==='yearly'?'yearly':'none',skippedDates:item?.skippedDates||[]};
       if(item)next.futureBills=next.futureBills.map((x)=>x.id===item.id?bill:x);
       else next.futureBills.push(bill);
       await post('saveFinanceProfile',{profile:next});
@@ -2004,6 +2007,7 @@ function openRecurringManager() {
       '<div class="tv2-page">'+
         '<header class="tv2-trip-head finance-recurring-page-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-recurring-close>‹ Finances</button><span></span></div>'+
           '<h1>Manage recurring items</h1></header>'+
+        '<button class="finance-recurring-future-link" type="button" data-fin-open-future><span><strong>Future Bills</strong><small>Schedule upcoming expenses</small></span><b aria-hidden="true">›</b></button>'+
         '<section class="finance-recurring-list">'+
           '<div class="finance-recurring-section-block">'+
             '<div class="finance-recurring-tv2-head"><h2>Income</h2><button type="button" class="finance-recurring-add" data-fin-recurring-add="income"><span aria-hidden="true">＋</span> Add</button></div>'+
@@ -2021,6 +2025,7 @@ function openRecurringManager() {
 
   const modalBody=$('#financeMiniBody');
   $('[data-fin-recurring-close]',modalBody)?.addEventListener('click',closeMini);
+  $('[data-fin-open-future]',modalBody)?.addEventListener('click',openFutureBillsManager);
   if (modalBody) {
     bindRecurringItemSwipe(modalBody);
     modalBody.onclick=(e)=>{
@@ -2754,7 +2759,7 @@ function financeMonthTimeline(rec) {
             ? categoryLabel(tone)+' · Pending · Expected '+financeDateLabel(row.date)
             : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
       const editable=(row.kind==='income'||row.kind==='expense')&&!locked;
-      const deletable=(row.kind==='income'||row.kind==='expense'||row.kind==='extra')&&!locked;
+      const deletable=(row.kind==='income'||row.kind==='expense'||row.kind==='extra'||futureBill)&&!locked;
       const rowHtml=tripExpenseRowHtml({
         attr:futureBill?'data-fin-future-id="'+esc(item.id)+'" data-fin-future-due="'+esc(row.date)+'"':editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable&&!futureBill,
@@ -2766,7 +2771,7 @@ function financeMonthTimeline(rec) {
         amountClass:income?'finance-tv2-income-amt':extra?'finance-extra-used-amt':futureBill?'finance-future-pending-amount':'',
       });
       if(!deletable) return rowHtml;
-      return '<div class="finance-month-swipe-row" data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'">'+
+      return '<div class="finance-month-swipe-row" data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"'+(futureBill?' data-fin-future-id="'+esc(item.id)+'" data-fin-future-due="'+esc(row.date)+'"':'')+'>'+
         '<div class="finance-month-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
         rowHtml+
       '</div>';
@@ -2864,6 +2869,54 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
     }
   });
   setTimeout(()=>deleteButton.focus(),0);
+}
+
+function openFinanceFutureBillDismissConfirm(rec,billId,dueDate) {
+  if(!rec||rec.finalized||!billId||!dueDate)return;
+  const bill=profile().futureBills.find((item)=>item.id===billId);
+  if(!bill||!pendingFutureBillsForMonth(profile().futureBills,rec.month,ownMonths()).some((entry)=>entry.bill.id===billId&&entry.date===dueDate))return;
+  closeFinanceMonthDeleteConfirm();
+  financeMonthDeleteConfirmLayer=document.createElement('dialog');
+  financeMonthDeleteConfirmLayer.className='finance-month-delete-confirm-host';
+  financeMonthDeleteConfirmLayer.setAttribute('aria-label','Remove expected bill from month');
+  financeMonthDeleteConfirmLayer.innerHTML=
+    '<div class="tv2-confirm-layer">'+
+      '<div class="tv2-confirm-backdrop" data-fin-future-dismiss-cancel></div>'+
+      '<div class="tv2-confirm-card" role="document" aria-labelledby="finFutureDismissTitle">'+
+        '<h2 id="finFutureDismissTitle">Remove pending bill?</h2>'+
+        '<p>Remove <strong>'+esc(bill.name)+'</strong> · '+money(bill.amount)+' from '+esc(monthLabel(rec.month))+'?</p>'+
+        '<p class="tv2-confirm-note">Only this occurrence is removed. Your Future Bills schedule stays saved'+(bill.repeat==='yearly'?' for next year':'')+'.</p>'+
+        '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions"><button type="button" data-fin-future-dismiss-cancel>Cancel</button><button type="button" class="is-delete" data-fin-future-dismiss-save>Remove</button></div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(financeMonthDeleteConfirmLayer);
+  financeMonthDeleteConfirmLayer.showModal();
+  const cancel=()=>{closeFinanceMonthDeleteConfirm();closeFinanceMonthSwipeRows();};
+  financeMonthDeleteConfirmLayer.querySelectorAll('[data-fin-future-dismiss-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+  financeMonthDeleteConfirmLayer.addEventListener('cancel',(event)=>{event.preventDefault();cancel();});
+  const confirm=financeMonthDeleteConfirmLayer.querySelector('[data-fin-future-dismiss-save]');
+  confirm.addEventListener('click',async()=>{
+    confirm.disabled=true;
+    const error=financeMonthDeleteConfirmLayer.querySelector('.tv2-confirm-error');
+    error.textContent='';
+    try{
+      const result=await post('dismissFutureBillOccurrence',{billId,dueDate});
+      if(!result?.ok)throw new Error(result?.error||'Could not remove this occurrence');
+      financeState.financeProfiles[actor()]=normalizeProfile(result.financeProfile);
+      closeFinanceMonthDeleteConfirm();
+      closeFinanceMonthSwipeRows();
+      renderPage();
+      publishFinanceNotifications();
+      if(financeMonthDialog?.isConnected)renderDetail(recordFor(rec.month)||rec);
+      toast('Pending bill removed for '+monthLabel(rec.month));
+      setTimeout(loadState,700);
+    }catch(err){
+      confirm.disabled=false;
+      error.textContent=err?.message||'Could not remove this bill';
+    }
+  });
+  setTimeout(()=>confirm.focus(),0);
 }
 
 function bindFinanceMonthSwipe(rec) {
@@ -3042,11 +3095,13 @@ function bindFinanceMonthSwipe(rec) {
 
     financeMonthSwipeIgnoreUntil=Date.now()+550;
     const kind=row.dataset.finEntryKind,index=Number(row.dataset.finEntryIndex);
+    const futureId=row.dataset.finFutureId,dueDate=row.dataset.finFutureDue;
     finishDelete(row);
     resetRowState();
     setTimeout(()=>{
       resetFinanceMonthSwipeVisual(row,false);
-      openFinanceMonthDeleteConfirm(rec,kind,index);
+      if(kind==='future-bill')openFinanceFutureBillDismissConfirm(rec,futureId,dueDate);
+      else openFinanceMonthDeleteConfirm(rec,kind,index);
     },180);
   },{passive:true,signal});
 
@@ -3138,7 +3193,8 @@ function renderDetail(rec) {
   financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',()=>backFromFinanceMonth(rec));
   financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
   financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
-  financeMonthDialog.querySelectorAll('[data-fin-future-id]').forEach((button)=>button.addEventListener('click',()=>{
+  financeMonthDialog.querySelectorAll('button[data-fin-future-id]').forEach((button)=>button.addEventListener('click',()=>{
+    if(Date.now()<financeMonthSwipeIgnoreUntil)return;
     const bill=profile().futureBills.find((item)=>item.id===button.dataset.finFutureId);
     if(bill)openFutureBillConfirm(bill,button.dataset.finFutureDue);
   }));
@@ -4047,7 +4103,6 @@ function init() {
   ensureMiniModal();
   tab.addEventListener('click', () => { renderPage(); setTimeout(loadState, 50); });
   $('#financeManageRecurring')?.addEventListener('click', openRecurringManager);
-  $('#financeManageFutureBills')?.addEventListener('click', openFutureBillsManager);
   document.addEventListener('twogether:open-shared-jar', (e) => openSharedJarHistory(e.detail || {}));
   document.addEventListener('twogether:edit-shared-jar', (e) => openSharedJarModal(e.detail?.balance));
   document.addEventListener('twogether:saved', () => { loadState().catch(() => {}); });

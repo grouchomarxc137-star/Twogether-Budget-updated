@@ -83,3 +83,40 @@ test('yearly leap-day future bill rolls to February 28 on non-leap years',()=>{
   assert.equal(billOccurrenceDate(leap,2029),'2029-02-28');
   assert.equal(billOccurrenceDate({...leap,repeat:'none'},2029),'');
 });
+
+test('removing a pending occurrence only hides that date and survives profile edits',()=>{
+  const context=setup();
+  try {
+    assert.equal(action(context.database,'saveFinanceProfile',{profile:{futureBills:[insurance]}}).ok,true);
+    const removed=action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2027-10-15'});
+    assert.equal(removed.ok,true);
+    const after=getState();
+    assert.deepEqual(after.financeProfiles.Principessa.futureBills[0].skippedDates,['2027-10-15']);
+    assert.deepEqual(after.finances.Principessa,[]);
+    assert.equal(pendingFutureBillsForMonth(after.financeProfiles.Principessa.futureBills,'2027-10',after.finances.Principessa).length,0);
+    assert.equal(dueFutureBills(after.financeProfiles.Principessa.futureBills,'2027-10-31',after.finances.Principessa).length,0);
+    assert.equal(pendingFutureBillsForMonth(after.financeProfiles.Principessa.futureBills,'2028-10',after.finances.Principessa).length,1);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2027-10-15'}).alreadyRemoved,true);
+    assert.equal(action(context.database,'confirmFutureBill',{billId:insurance.id,dueDate:'2027-10-15'}).ok,false);
+    const future=action(context.database,'confirmFutureBill',{billId:insurance.id,dueDate:'2028-10-15'});
+    assert.equal(future.ok,true);
+    const edited={...getState().financeProfiles.Principessa.futureBills[0],name:'Updated insurance'};
+    assert.equal(action(context.database,'saveFinanceProfile',{profile:{...getState().financeProfiles.Principessa,futureBills:[edited]}}).ok,true);
+    assert.deepEqual(getState().financeProfiles.Principessa.futureBills[0].skippedDates,['2027-10-15']);
+  }finally{context.cleanup();}
+});
+
+test('dismissal rejects another actor, the wrong date and paid or locked months',()=>{
+  const context=setup();
+  try {
+    assert.equal(action(context.database,'saveFinanceProfile',{profile:{futureBills:[insurance]}}).ok,true);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2027-10-15'},'Principe').ok,false);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2026-10-15'}).ok,false);
+    const paid=action(context.database,'confirmFutureBill',{billId:insurance.id,dueDate:'2027-10-15'});
+    assert.equal(paid.ok,true);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2027-10-15'}).ok,false);
+    assert.equal(action(context.database,'saveFinanceMonth',{monthData:{...paid.monthData,finalized:true}}).ok,true);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2027-10-15'}).ok,false);
+    assert.equal(action(context.database,'dismissFutureBillOccurrence',{billId:insurance.id,dueDate:'2028-10-15'}).ok,true);
+  }finally{context.cleanup();}
+});
