@@ -1443,6 +1443,87 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
 
 
+
+    if (action === 'deleteFinanceMonth') {
+      const month=cleanText_(payload.month,10);
+      if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Choose a valid finance month');
+      state.finances=sanitizeFinances_(state.finances);
+      const list=state.finances[actor]||[];
+      const index=list.findIndex(function(record){return record.month===month;});
+      if(index<0||!list[index].finalized)throw new Error('Confirmed finance month not found');
+      if(list.some(function(record){return record.finalized&&record.month>month;}))
+        throw new Error('Delete newer confirmed finance months first to protect their linked repayment history');
+      const deleted=list[index];
+      const now=new Date().toISOString();
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);
+      const financeProfile=sanitizeFinanceProfile_(state.financeProfiles[actor]||{},actor);
+      const prefix=financeCarrySettings_(actor).prefix;
+      const originId=prefix+month;
+      const originLoan=financeProfile.receivables.find(function(x){return x.id===originId;});
+      if(originLoan&&(originLoan.repayments||[]).some(function(payment){
+        return !String(payment.id||'').startsWith('carry-deduction:')
+          && !String(payment.id||'').startsWith('allowance-payback:');
+      }))throw new Error('This month has manually recorded self-debt repayments. Clear those repayments before deleting it');
+
+      // Only remove the deleted month's own automatically logged self-debt
+      // and installments; independent manual loans and the other person stay safe.
+      financeProfile.receivables=financeProfile.receivables
+        .filter(function(loan){return loan.id!==originId;})
+        .map(function(loan){
+          if(!String(loan.id||'').startsWith(prefix))return loan;
+          loan.repayments=(loan.repayments||[]).filter(function(payment){
+            return !(payment.month===month
+              && (String(payment.id||'').startsWith('carry-deduction:')
+                ||String(payment.id||'').startsWith('allowance-payback:')));
+          });
+          return loan;
+        });
+      const savingsRefund=(deleted.extraSpends||[]).filter(function(item){return item.source==='savings';})
+        .reduce(function(sum,item){return sum+Number(item.amount||0);},0);
+      if(savingsRefund>.005)
+        financeProfile.savingsTotal=money2_(Number(financeProfile.savingsTotal||0)+savingsRefund);
+
+      const remaining=list.filter(function(record){return record.month!==month;});
+      // Draft months stay editable; recalculate only their allowances and their
+      // derived payback rows, never rewriting another locked month's history.
+      remaining.filter(function(record){return !record.finalized&&record.month>month;})
+        .sort(function(a,b){return a.month.localeCompare(b.month);})
+        .forEach(function(record){
+          financeSetCarryBudget_(record,actor,financeCarryPlan_(remaining,financeProfile,actor,record.month).budget);
+          financeSyncCarryRepaymentExpense_(record,financeProfile,actor);
+          financeCheckAllowanceCap_(record,actor);
+          record.updatedAt=now;
+          record.updatedBy=actor;
+        });
+      state.finances[actor]=remaining;
+      financeProfile.updatedAt=now;
+      financeProfile.updatedBy=actor;
+      state.financeProfiles[actor]=financeProfile;
+
+      state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+      state.sharedJar.transactions=state.sharedJar.transactions.filter(function(tx){
+        return !(tx.source==='finance'&&tx.actor===actor&&tx.month===month);
+      });
+      state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+
+      state.game=sanitizeGame_(state.game);
+      const gameProfile=state.game[actor],settle='month:'+actor+':'+month;
+      if(gameProfile.awards.financeSettlements.includes(settle)){
+        const income=(deleted.incomes||[]).reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+        const outflow=(deleted.expenses||[]).filter(financeExpenseCountsAsOutflow_)
+          .reduce(function(sum,x){return sum+Number(x.amount||0);},0)
+          +(deleted.extraSpends||[]).filter(financeExtraSpendCountsAsOutflow_)
+          .reduce(function(sum,x){return sum+Number(x.amount||0);},0);
+        gameProfile.twos=money2_(Number(gameProfile.twos)-money2_(income-outflow));
+        gameProfile.awards.financeSettlements=gameProfile.awards.financeSettlements.filter(function(key){return key!==settle;});
+      }
+      state.game[actor]=sanitizeGameProfile_(gameProfile);
+      addAudit_(state,actor,'deleteFinanceMonth',month);
+      saveState_(state);
+      return output_({ok:true,deletedMonth:month,financeProfile:sanitizeFinanceProfile_(financeProfile,actor),
+        sharedJar:sanitizeSharedJar_(state.sharedJar),game:sanitizeGame_(state.game)});
+    }
+
     if(action==='repayFinanceCarry') {
       const month=cleanText_(payload.month,10);
       if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Choose a valid finance month');
@@ -3375,7 +3456,7 @@ function reconciliationWarnings_(trip, plan) {
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'resetReturnPacking', 'personalizeTripChecklists', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
-  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'repayFinanceCarry', 'confirmFinanceCreditCard', 'saveFinancePlanning',
+  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'deleteFinanceMonth', 'repayFinanceCarry', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',

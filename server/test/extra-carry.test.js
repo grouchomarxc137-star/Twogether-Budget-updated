@@ -295,3 +295,97 @@ test('Principe Pay back is a Personal monthly outflow, not a second Personal all
     assert.equal(repaid.monthData.expenses.filter(x=>x.name==='Personal').length,1);
   }finally{database.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('delete confirmed finance month removes its debt and derived payback in later drafts',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-delete-finance-'));
+  const database=openDatabase(join(dir,'test.sqlite'));configureStateStore(database.store);
+  const action=(type,data,owner='Principessa')=>database.db.transaction(()=>runAction(type,data,owner))();
+  const month=(month,spent=0,finalized=false)=>({month,finalized,incomes:[{name:'Income',amount:1000}],
+    expenses:[{group:'extra',name:'Extra',amount:250}],
+    extraSpends:spent?[{source:'main',amount:spent}]:[]});
+  try{
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-10',500,true)}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-11')}).ok,true);
+    assert.equal(action('repayFinanceCarry',{month:'2026-11'}).paid,200);
+    assert.equal(action('deleteFinanceMonth',{month:'2026-10'}).ok,true);
+    const state=getState(),nov=state.finances.Principessa[0];
+    assert.equal(state.finances.Principessa.length,1);
+    assert.equal(nov.month,'2026-11');
+    assert.equal(nov.extraBudget,250);
+    assert.equal(nov.expenses.some(x=>String(x.id).startsWith('allowance-payback:')),false);
+    assert.equal(state.financeProfiles.Principessa.receivables.length,0);
+    assert.equal(state.game.Principessa.awards.financeSettlements.length,0);
+    assert.equal(state.game.Principessa.twos,0);
+    assert.equal(action('deleteFinanceMonth',{month:'2026-11'}).ok,false);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('delete confirmed months newest first to preserve later locked history',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-delete-finance-'));
+  const database=openDatabase(join(dir,'test.sqlite'));configureStateStore(database.store);
+  const action=(type,data)=>database.db.transaction(()=>runAction(type,data,'Principessa'))();
+  const month=(month,spent=0,finalized=false)=>({month,finalized,incomes:[],
+    expenses:[{group:'extra',name:'Extra',amount:250}],
+    extraSpends:spent?[{source:'main',amount:spent}]:[]});
+  try{
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-10',500,true)}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-11')}).ok,true);
+    assert.equal(action('repayFinanceCarry',{month:'2026-11'}).paid,200);
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-11',0,true)}).ok,true);
+    const blocked=action('deleteFinanceMonth',{month:'2026-10'});
+    assert.equal(blocked.ok,false);
+    assert.match(blocked.error,/newer confirmed/i);
+    assert.equal(action('deleteFinanceMonth',{month:'2026-11'}).ok,true);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments.length,0);
+    assert.equal(action('deleteFinanceMonth',{month:'2026-10'}).ok,true);
+    assert.deepEqual(getState().finances.Principessa,[]);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('deleting one person finance month restores Saved up and Shared Jar without touching partner',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-delete-finance-'));
+  const database=openDatabase(join(dir,'test.sqlite'));configureStateStore(database.store);
+  const action=(type,data,owner='Principessa')=>database.db.transaction(()=>runAction(type,data,owner))();
+  try{
+    assert.equal(action('saveFinanceProfile',{profile:{savingsTotal:100,receivables:[
+      {id:'family-loan',person:'Family',reason:'Unrelated',principal:75}
+    ]}}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:{month:'2026-10',finalized:true,
+      incomes:[],expenses:[
+        {group:'extra',name:'Extra',amount:250},
+        {id:'jar-1',group:'other',name:'Household',amount:25,paidFrom:'sharedJar'}
+      ],extraSpends:[{source:'savings',amount:40}]
+    }}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:{month:'2026-10',finalized:true,incomes:[],
+      expenses:[{group:'variable',name:'Personal',amount:100}],extraSpends:[]}},'Principe').ok,true);
+    assert.equal(getState().financeProfiles.Principessa.savingsTotal,60);
+    assert.equal(getState().sharedJar.balance,845);
+    assert.equal(action('deleteFinanceMonth',{month:'2026-10'}).ok,true);
+    const state=getState();
+    assert.equal(state.financeProfiles.Principessa.savingsTotal,100);
+    assert.equal(state.sharedJar.balance,870);
+    assert.equal(state.financeProfiles.Principessa.receivables.some(x=>x.id==='family-loan'),true);
+    assert.equal(state.finances.Principe.length,1);
+    assert.equal(state.game.Principe.awards.financeSettlements.length,1);
+    assert.equal(state.finances.Principessa.length,0);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('manual repayments from an older finance loan prevent destructive month deletion',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-delete-finance-'));
+  const database=openDatabase(join(dir,'test.sqlite'));configureStateStore(database.store);
+  const action=(type,data)=>database.db.transaction(()=>runAction(type,data,'Principessa'))();
+  try{
+    assert.equal(action('saveFinanceMonth',{monthData:{month:'2026-10',finalized:true,
+      incomes:[],expenses:[{group:'extra',name:'Extra',amount:250}],
+      extraSpends:[{source:'main',amount:500}]}}).ok,true);
+    const profile=getState().financeProfiles.Principessa;
+    profile.receivables[0].repayments=[{id:'manual-repay',month:'2026-11',date:'2026-11-10',amount:15}];
+    assert.equal(action('saveFinanceProfile',{profile}).ok,true);
+    const blocked=action('deleteFinanceMonth',{month:'2026-10'});
+    assert.equal(blocked.ok,false);
+    assert.match(blocked.error,/manually recorded/i);
+    assert.equal(getState().finances.Principessa[0].finalized,true);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments[0].amount,15);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});

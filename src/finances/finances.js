@@ -3039,6 +3039,61 @@ function closeFinanceMonthDeleteConfirm() {
   financeMonthDeleteConfirmLayer=null;
 }
 
+
+function openConfirmedFinanceMonthDelete(rec) {
+  if(!rec?.finalized)return;
+  closeFinanceMonthDeleteConfirm();
+  financeMonthDeleteConfirmLayer=document.createElement('dialog');
+  financeMonthDeleteConfirmLayer.className='finance-month-delete-confirm-host';
+  financeMonthDeleteConfirmLayer.setAttribute('aria-label','Delete confirmed finance month');
+  financeMonthDeleteConfirmLayer.innerHTML=
+    '<div class="tv2-confirm-layer">'+
+      '<div class="tv2-confirm-backdrop" data-fin-delete-locked-cancel></div>'+
+      '<div class="tv2-confirm-card" role="document" aria-labelledby="finDeleteLockedTitle">'+
+        '<h2 id="finDeleteLockedTitle">Delete '+esc(monthLabel(rec.month))+'?</h2>'+
+        '<p>Remove this confirmed finance month and undo its linked self-debt and repayments?</p>'+
+        '<p class="tv2-confirm-note">This cannot be undone. To keep later locked finances safe, delete newer confirmed months first.</p>'+
+        '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+        '<div class="tv2-confirm-actions">'+
+          '<button type="button" data-fin-delete-locked-cancel>Keep month</button>'+
+          '<button type="button" class="is-delete" data-fin-delete-locked-yes>Delete month</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(financeMonthDeleteConfirmLayer);
+  financeMonthDeleteConfirmLayer.showModal();
+  const close=()=>closeFinanceMonthDeleteConfirm();
+  financeMonthDeleteConfirmLayer.querySelectorAll('[data-fin-delete-locked-cancel]')
+    .forEach((button)=>button.addEventListener('click',close));
+  financeMonthDeleteConfirmLayer.addEventListener('cancel',(event)=>{event.preventDefault();close();});
+  const confirm=financeMonthDeleteConfirmLayer.querySelector('[data-fin-delete-locked-yes]');
+  confirm.addEventListener('click',async()=>{
+    confirm.disabled=true;
+    confirm.textContent='Deleting…';
+    const error=financeMonthDeleteConfirmLayer.querySelector('.tv2-confirm-error');
+    if(error)error.textContent='';
+    try{
+      const result=await post('deleteFinanceMonth',{month:rec.month});
+      if(result?.financeProfile)financeState.financeProfiles[actor()]=normalizeProfile(result.financeProfile);
+      if(result?.sharedJar)financeState.sharedJar=JSON.parse(JSON.stringify(result.sharedJar));
+      financeState.finances[actor()]=(financeState.finances[actor()]||[]).filter((record)=>record.month!==rec.month);
+      const months=ownMonths().slice().sort((a,b)=>a.month.localeCompare(b.month));
+      selectedMonth=months[months.length-1]?.month||rec.month;
+      financeOverviewMonth=selectedMonth;
+      close();
+      dismissCardView(financeMonthCardKey(rec.month));
+      closeFinanceMonthDialog();
+      renderPage();
+      toast(monthLabel(rec.month)+' deleted');
+      setTimeout(loadState,700);
+    }catch(err){
+      confirm.disabled=false;
+      confirm.textContent='Delete month';
+      if(error)error.textContent=err?.message||'Could not delete this month';
+    }
+  });
+}
+
 function openFinanceMonthDeleteConfirm(rec, kind, index) {
   if (!rec || rec.finalized === true) return;
   closeFinanceMonthDeleteConfirm();
@@ -3383,9 +3438,11 @@ function renderDetail(rec) {
   const stored=recordFor(rec.month);
   const status=rec.finalized?'Locked':stored?'Draft':'Not logged';
   const year=String(rec.month||'').slice(0,4)||String(financeViewYear);
-  const right=stored&&!rec.finalized
-    ? {attr:'data-fin-finalize-existing',label:'Confirm'}
-    : null;
+  const right=rec.finalized
+    ? {attr:'data-fin-delete-month',label:'Delete'}
+    : stored
+      ? {attr:'data-fin-finalize-existing',label:'Confirm'}
+      : null;
   const notes=[];
   if(rules.extraTracking&&totals.extraOver>0){
     notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>Extra budget exceeded · '+money(totals.extraOver)+' over</span></div>');
@@ -3437,6 +3494,7 @@ function renderDetail(rec) {
   financeMonthDialog.querySelector('[data-fin-month-close]')?.addEventListener('click',()=>backFromFinanceMonth(rec));
   financeMonthDialog.querySelector('[data-fin-add-transaction]')?.addEventListener('click',()=>openFinanceTransactionSheet(rec));
   financeMonthDialog.querySelector('[data-fin-finalize-existing]')?.addEventListener('click',()=>confirmExistingMonth(rec));
+  financeMonthDialog.querySelector('[data-fin-delete-month]')?.addEventListener('click',()=>openConfirmedFinanceMonthDelete(rec));
   financeMonthDialog.querySelectorAll('button[data-fin-future-id]').forEach((button)=>button.addEventListener('click',()=>{
     if(Date.now()<financeMonthSwipeIgnoreUntil)return;
     const bill=profile().futureBills.find((item)=>item.id===button.dataset.finFutureId);
