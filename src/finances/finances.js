@@ -980,6 +980,11 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     budgetCategoryId:String(x?.budgetCategoryId||''),
   })) : [];
   copy.partialOnly = copy.partialOnly === true;
+  copy.allowanceSpends=(Array.isArray(copy.allowanceSpends)?copy.allowanceSpends:[])
+    .map((x)=>({id:x.id||uid(),amount:n(x.amount),date:normalizeFinanceDate(x.date,copy.month)}))
+    .filter((x)=>x.amount>0);
+  // Legacy duplicate Extra transactions were created by the general finance logger.
+  if(owner==='Principessa')copy.expenses=copy.expenses.filter((x)=>!(normalizeGroup(x.group)==='variable'&&String(x.name||'').trim().toLowerCase()==='extra'));
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
   if (rules.extraTracking) {
     const storedBudget = hasValue(copy.extraBudget) ? n(copy.extraBudget) : (fixedExtras.length && hasValue(fixedExtras[0].amount) ? n(fixedExtras[0].amount) : rules.extraBudget);
@@ -1109,6 +1114,22 @@ function extraCarryInfo(month){return carryInfoForMonth(month,'Principessa');}
 function personalCarryInfo(month){return carryInfoForMonth(month,'Principe');}
 
 function mainAccountLeftover() { return ownMonths().reduce((sum, rec) => sum + calc(rec).leftover, 0); }
+
+
+function financeAllowanceInfo(rec) {
+  const personal=actor()==='Principe',name=personal?'Personal':'Extra';
+  const carry=personal?personalCarryInfo(rec.month):extraCarryInfo(rec.month);
+  const fixed=personal?(rec.expenses||[]).find((x)=>normalizeGroup(x.group)==='variable'&&String(x.name||'').trim().toLowerCase()==='personal'&&!x.id):null;
+  const limit=personal?(fixed?n(fixed.amount):carry.budget):n(rec.extraBudget??carry.budget);
+  const spent=(rec.allowanceSpends||[]).reduce((sum,x)=>sum+n(x.amount),0);
+  const prefix=personal?'personal-overspend:':'extra-overspend:';
+  const loans=(profile().receivables||[]).filter((x)=>String(x.id||'').startsWith(prefix)
+    &&String(x.id).slice(prefix.length)<rec.month);
+  const paidHere=loans.reduce((sum,x)=>sum+(x.repayments||[]).filter((p)=>p.month===rec.month).reduce((v,p)=>v+n(p.amount),0),0);
+  const debtLeft=loans.reduce((sum,x)=>sum+loanRemaining(x),0);
+  return {name,limit,spent,left:Math.max(0,limit-spent),carry,paidHere,debtLeft,
+    payable:Math.max(0,Math.min(carry.deducted-paidHere,debtLeft))};
+}
 
 function extraSpendSummary(rec) {
   const grouped = { creditcard: 0, savings: 0, main: 0 };
@@ -2263,6 +2284,13 @@ function financeRecurringItemsForCategory(category, month = selectedMonth) {
     tone:category,
     isBudget:item.isBudget===true,
   })).filter((item)=>item.name);
+  if(category==='budgets'){
+    const allowanceName=actor()==='Principe'?'Personal':'Extra';
+    if(!items.some((item)=>String(item.name||'').trim().toLowerCase()===allowanceName.toLowerCase())){
+      items.push({id:'monthly-allowance',name:allowanceName,amount:'',day:'',
+        group:actor()==='Principe'?'variable':'extra',tone:'budgets',isBudget:true});
+    }
+  }
   if(actor()==='Principe'&&category==='wealth'&&!items.some((item)=>normalizeGroup(item.group)==='investments')){
     items.push({id:'principe-investments',name:'Investments',amount:'',day:'',group:'investments',tone:'wealth'});
   }
@@ -2351,13 +2379,16 @@ function openFinanceTransactionSheet(rec, edit = null) {
   closeFinanceTransactionSheet();
 
   const categories=financeLogCategories(rec);
-  const editingKind=edit?.kind==='income'?'income':edit?.kind==='expense'?'expense':'';
+  const editingKind=['income','expense','allowance'].includes(edit?.kind)?edit.kind:'';
+  const focusedAllowance=edit?.kind==='allowance-start';
   const editingIndex=Number.isInteger(edit?.index)?edit.index:-1;
   const editingItem=editingKind==='income'
     ? (rec.incomes||[])[editingIndex]
     : editingKind==='expense'
       ? (rec.expenses||[])[editingIndex]
-      : null;
+      : editingKind==='allowance'
+        ? (rec.allowanceSpends||[])[editingIndex]
+        : null;
   const editingCategory=editingKind==='income'?'income':editingItem?groupTone(editingItem.group):'';
 
   const state={
@@ -2376,6 +2407,14 @@ function openFinanceTransactionSheet(rec, edit = null) {
     mounted:false,
   };
 
+  if(focusedAllowance||editingKind==='allowance'){
+    const name=actor()==='Principe'?'Personal':'Extra';
+    const item=financeRecurringItemsForCategory('budgets',rec.month)
+      .find((x)=>String(x.name||'').trim().toLowerCase()===name.toLowerCase());
+    state.category='budgets';state.selectedItemId=String(item?.id||'monthly-allowance');
+    state.name=name;state.group=actor()==='Principe'?'variable':'extra';
+    state.date=editingKind==='allowance'?normalizeFinanceDate(editingItem.date,rec.month):'';
+  }
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
   const selectedCategory=()=>categories.find((item)=>item.key===state.category)||null;
@@ -2385,10 +2424,14 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const isExtraUsed=()=>state.category==='extra-used';
   const selectedExtraSource=()=>isExtraUsed()?String(state.selectedItemId||''):'';
   const isCreditCardExtra=()=>selectedExtraSource()==='creditcard';
-  const isRegularExpense=()=>!!state.category&&state.category!=='income'&&!isExtraUsed();
+  const isAllowance=()=>state.category==='budgets'
+    &&String(state.name||'').trim().toLowerCase()===(actor()==='Principe'?'personal':'extra');
+  const isRegularExpense=()=>!!state.category&&state.category!=='income'&&!isExtraUsed()&&!isAllowance();
   const hasChosenItem=()=>!!state.selectedItemId || isOther() || isCustomCategory();
   const validExtraDate=()=>!isCreditCardExtra() || (!!normalizeFinanceDate(state.date) && state.date.slice(0,7) >= rec.month);
-  const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim()&&validExtraDate();
+  const allowanceAvailable=()=>financeAllowanceInfo(rec).left+(editingKind==='allowance'?n(editingItem?.amount):0);
+  const canSave=()=>validAmount()&&!!state.category&&hasChosenItem()&&!!state.name.trim()&&validExtraDate()
+    &&(!isAllowance()||amount()<=allowanceAvailable()+.005);
 
   const layer=document.createElement('dialog');
   layer.className='tv2-layer finance-log-layer finance-log-host';
@@ -2485,6 +2528,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     if (state.error) return state.error;
     if (state.amountText&&!validAmount()) return 'That amount doesn’t look right';
     if (!validAmount()) return 'Enter the amount';
+    if(isAllowance()&&amount()>allowanceAvailable()+.005)return 'Only '+money(allowanceAvailable())+' remains in this allowance';
     if (!state.category) return 'Pick a category';
     if (!hasChosenItem()) return 'Pick an item';
     if (!state.name.trim()) return 'Add a name';
@@ -2519,6 +2563,22 @@ function openFinanceTransactionSheet(rec, edit = null) {
         : isCustomCategory()
           ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
           : '';
+
+    const allowance=financeAllowanceInfo(rec);
+    const canPay=!rec.finalized&&!rec.partialOnly&&recordFor(rec.month)&&allowance.payable>.005;
+    const allowanceHtml=isAllowance()
+      ? '<section class="finance-allowance-tracker" aria-label="'+esc(allowance.name)+' balance">'+
+        '<div class="finance-allowance-head"><strong>'+esc(allowance.name)+' budget</strong><b>'+money(allowance.left)+' left</b></div>'+
+        '<div class="finance-allowance-track" role="progressbar" aria-valuemin="0" aria-valuemax="'+Math.max(1,allowance.limit)+'" aria-valuenow="'+Math.min(allowance.limit,allowance.spent)+'"><span style="width:'+Math.min(100,allowance.limit>0?100*allowance.spent/allowance.limit:100)+'%"></span></div>'+
+        '<small>'+money(allowance.spent)+' spent of '+money(allowance.limit)+' spendable · Minimum protected</small>'+
+        (allowance.carry.owedBefore>0?
+          '<div class="finance-allowance-repayment"><span>Money owed to yourself<strong>'+money(allowance.debtLeft)+'</strong></span>'+
+          '<button type="button" data-fin-allowance-payback '+(canPay?'':'disabled')+'>'+
+          (allowance.payable>.005?'Pay back '+money(allowance.payable):'Paid for this month')+'</button></div>'+
+          '<small class="finance-allowance-note">'+money(allowance.paidHere)+' repaid this month · Remaining debt carries forward</small>'
+        : '')+
+        '</section>'
+      : '';
     const jarBalance=n(financeState.sharedJar?.balance??0);
     const trackedBudgets=actor()==='Principe'?recurringBudgetItems(recurringConfig()):[];
     const activeBudget=trackedBudgets.find((item)=>state.budgetCategoryId?state.budgetCategoryId===item.id:item.name.toLowerCase()===state.name.trim().toLowerCase());
@@ -2546,13 +2606,13 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetDisplay,
+      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetDisplay+allowanceHtml,
       defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
       hintClass:state.error?'is-error':'',
       saveAttr:'data-fin-log-save',
-      saveLabel:state.busy?'Saving…':editingItem?'Save changes':'Save',
+      saveLabel:state.busy?'Saving…':editingItem?'Save changes':isAllowance()?'Log '+(actor()==='Principe'?'Personal':'Extra')+' spending':'Save',
       saveDisabled:!canSave()||state.busy,
     });
 
@@ -2626,6 +2686,22 @@ function openFinanceTransactionSheet(rec, edit = null) {
       return;
     }
 
+    if(button.hasAttribute('data-fin-allowance-payback')){
+      if(state.busy||!recordFor(rec.month))return;
+      state.busy=true;state.error='';
+      try{
+        const result=await post('repayFinanceCarry',{month:rec.month});
+        if(result.financeProfile)financeState.financeProfiles[actor()]=normalizeProfile(result.financeProfile);
+        closeFinanceTransactionSheet();
+        const saved=normalizeFinanceRecord(result.monthData,actor());
+        const list=financeState.finances[actor()]||[],idx=list.findIndex((x)=>x.month===saved.month);
+        if(idx>=0)list[idx]=saved;else list.push(saved);
+        renderPage();renderDetail(saved);
+        toast('Paid back '+money(result.paid)+' to yourself');
+        setTimeout(loadState,700);
+      }catch(error){state.busy=false;state.error=error?.message||'Could not record repayment';render();}
+      return;
+    }
     if(button.dataset.finLogPaidFrom){
       state.paidFrom=button.dataset.finLogPaidFrom==='sharedJar'?'sharedJar':'personal';
       state.error='';
@@ -2666,6 +2742,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       }
       state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
       if(!editingItem)state.amountText=item.isBudget===true?'':(hasValue(item.amount)?String(n(item.amount)):'');
+      if(state.category==='budgets'&&String(item.name||'').trim().toLowerCase()===(actor()==='Principe'?'personal':'extra')&&!editingItem)state.amountText='';
       state.date=isExtraUsed()?'':financeDateForDay(rec.month,item.day);
       state.more=false;
       state.error='';
@@ -2690,6 +2767,28 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.error='';
       refreshLive();
 
+      if(isAllowance()){
+        if(amount()>allowanceAvailable()+.005){state.busy=false;state.error='Only '+money(allowanceAvailable())+' remains';refreshLive();return;}
+        const target=cloneRecord(rec);
+        target.allowanceSpends=[...(target.allowanceSpends||[])];
+        const entry={id:editingKind==='allowance'&&editingItem?.id?editingItem.id:uid(),amount:Math.round(amount()*100)/100,date:state.date};
+        if(editingKind==='allowance'&&editingIndex>=0)target.allowanceSpends[editingIndex]=entry;
+        else target.allowanceSpends.push(entry);
+        if(!recordFor(rec.month))target.partialOnly=true;
+        try{closeFinanceTransactionSheet();await saveDirectMonthRecord(target,(actor()==='Principe'?'Personal':'Extra')+' spending logged');}
+        catch(error){
+          state.busy=false;state.error=error?.message||'Could not save spending';
+          if(!layer.isConnected)document.body.appendChild(layer);
+          if(!layer.open)layer.showModal();
+          document.documentElement.classList.add('finance-log-locked');
+          document.body.classList.add('finance-log-locked');
+          document.body.classList.add('tv2-locked');
+          document.body.classList.add('trip-expense-open');
+          financeMonthDialog?.classList.add('finance-log-background-locked');
+          render();
+        }
+        return;
+      }
       if(isExtraUsed()){
         const source=selectedExtraSource();
         const chargeDate=isCreditCardExtra()?normalizeFinanceDate(state.date):'';
@@ -2859,6 +2958,7 @@ function financeMonthTimeline(rec) {
       tone:'extra-used',
     });
   });
+  (rec.allowanceSpends||[]).forEach((item,index)=>rows.push({kind:'allowance',date:item.date||'',item,index,tone:'budgets'}));
   const pendingBills=pendingFutureBillsForMonth(profile().futureBills,rec.month,ownMonths());
   pendingBills.forEach(({bill,date})=>rows.push({kind:'future-bill',date,bill,item:bill,tone:groupTone(bill.group)}));
   rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || a.kind.localeCompare(b.kind));
@@ -2873,23 +2973,29 @@ function financeMonthTimeline(rec) {
       const item=row.item;
       const income=row.kind==='income';
       const extra=row.kind==='extra';
+      const allowance=row.kind==='allowance';
       const futureBill=row.kind==='future-bill';
       const tone=income?'income':row.tone;
       const meta=income
         ? 'Income'
         : extra
           ? 'Money used extra · '+extraSourceShortLabel(item.source)+(item.source==='creditcard'&&item.status==='pending'?' · Pending':'')
+          : allowance
+            ? 'Inside '+(actor()==='Principe'?'Personal':'Extra')+' allowance · Already included in budget'
           : futureBill
             ? categoryLabel(tone)+' · Pending · Expected '+financeDateLabel(row.date)
             : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
-      const editable=(row.kind==='income'||row.kind==='expense')&&!locked;
-      const deletable=(row.kind==='income'||row.kind==='expense'||row.kind==='extra'||futureBill)&&!locked;
+      const protectedFixed=row.kind==='expense'&&(
+        actor()==='Principessa'&&normalizeGroup(item.group)==='extra'&&String(item.name||'').trim().toLowerCase()==='extra'
+        ||actor()==='Principe'&&normalizeGroup(item.group)==='variable'&&String(item.name||'').trim().toLowerCase()==='personal'&&!item.id);
+      const editable=(row.kind==='income'||row.kind==='expense'||allowance)&&!locked;
+      const deletable=!protectedFixed&&(row.kind==='income'||row.kind==='expense'||row.kind==='extra'||allowance||futureBill)&&!locked;
       const rowHtml=tripExpenseRowHtml({
         attr:futureBill?'data-fin-future-id="'+esc(item.id)+'" data-fin-future-due="'+esc(row.date)+'"':editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable&&!futureBill,
         icon:futureBill?'📅':financeMonthToneIcon(tone,income?'income':'expense'),
         iconClass:'finance-tv2-tone-'+tone,
-        title:extra?extraSourceShortLabel(item.source):(item.name||(income?'Income':groupLabel(item.group))),
+        title:extra?extraSourceShortLabel(item.source):allowance?(actor()==='Principe'?'Personal spending':'Extra spending'):(item.name||(income?'Income':groupLabel(item.group))),
         meta,
         amount:money(item.amount),
         amountClass:income?'finance-tv2-income-amt':extra?'finance-extra-used-amt':futureBill?'finance-future-pending-amount':'',
@@ -2934,7 +3040,7 @@ function closeFinanceMonthDeleteConfirm() {
 function openFinanceMonthDeleteConfirm(rec, kind, index) {
   if (!rec || rec.finalized === true) return;
   closeFinanceMonthDeleteConfirm();
-  const list=kind==='income'?(rec.incomes||[]):kind==='extra'?(rec.extraSpends||[]):(rec.expenses||[]);
+  const list=kind==='income'?(rec.incomes||[]):kind==='extra'?(rec.extraSpends||[]):kind==='allowance'?(rec.allowanceSpends||[]):(rec.expenses||[]);
   const item=list[index];
   if(!item)return;
 
@@ -2946,7 +3052,7 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
       '<div class="tv2-confirm-backdrop" data-fin-month-confirm-cancel></div>'+
       '<div class="tv2-confirm-card" role="document" aria-labelledby="finMonthDeleteTitle">'+
         '<h2 id="finMonthDeleteTitle">Delete finance?</h2>'+
-        '<p>Are you sure you want to delete <strong>'+esc(kind==='extra'?extraSourceShortLabel(item.source):(item.name||(kind==='income'?'Income':groupLabel(item.group))))+'</strong> · '+money(item.amount)+'?</p>'+
+        '<p>Are you sure you want to delete <strong>'+esc(kind==='extra'?extraSourceShortLabel(item.source):kind==='allowance'?'allowance spending':(item.name||(kind==='income'?'Income':groupLabel(item.group))))+'</strong> · '+money(item.amount)+'?</p>'+
         '<p class="tv2-confirm-note">This removes it from '+esc(monthLabel(rec.month))+'.</p>'+
         '<p class="tv2-confirm-error" aria-live="polite"></p>'+
         '<div class="tv2-confirm-actions"><button type="button" data-fin-month-confirm-cancel>Cancel</button><button type="button" class="is-delete" data-fin-month-confirm-delete>Delete</button></div>'+
@@ -2971,7 +3077,8 @@ function openFinanceMonthDeleteConfirm(rec, kind, index) {
       next.incomes=[...(next.incomes||[])];
       next.expenses=[...(next.expenses||[])];
       next.extraSpends=[...(next.extraSpends||[])];
-      const target=kind==='income'?next.incomes:kind==='extra'?next.extraSpends:next.expenses;
+      next.allowanceSpends=[...(next.allowanceSpends||[])];
+      const target=kind==='income'?next.incomes:kind==='extra'?next.extraSpends:kind==='allowance'?next.allowanceSpends:next.expenses;
       if(!target[index]) throw new Error('This finance item no longer exists');
       const deletingInvestment=kind==='expense'&&normalizeGroup(target[index]?.group)==='investments';
       target.splice(index,1);
@@ -3338,6 +3445,12 @@ function renderDetail(rec) {
     button.addEventListener('click',(event)=>{
       if(Date.now()<financeMonthSwipeIgnoreUntil){event.preventDefault();return;}
       if(button.dataset.finEntryKind==='extra')return;
+      const kind=button.dataset.finEntryKind,index=Number(button.dataset.finEntryIndex);
+      const item=kind==='expense'?(rec.expenses||[])[index]:null;
+      const allowanceItem=item&&(
+        actor()==='Principessa'&&normalizeGroup(item.group)==='extra'&&String(item.name||'').trim().toLowerCase()==='extra'
+        ||actor()==='Principe'&&normalizeGroup(item.group)==='variable'&&String(item.name||'').trim().toLowerCase()==='personal'&&!item.id);
+      if(allowanceItem){openFinanceTransactionSheet(rec,{kind:'allowance-start'});return;}
       openFinanceTransactionSheet(rec,{
         kind:button.dataset.finEntryKind,
         index:Number(button.dataset.finEntryIndex),
@@ -3657,7 +3770,7 @@ function openLoanRepayment(index, backAction = closeMini) {
 
 function freshRecord(month) {
   const rules = financeRules();
-  return { month, incomes: [], expenses: [], extraBudget: rules.extraTracking ? rules.extraBudget : '', extraSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', partialOnly: false, finalized: false, finalizedAt: '' };
+  return { month, incomes: [], expenses: [], extraBudget: rules.extraTracking ? rules.extraBudget : '', extraSpends: [], allowanceSpends: [], extraOverspendSource: '', extraOverspendAmount: 0, investmentTotal: '', sisterInvestments: '', partialOnly: false, finalized: false, finalizedAt: '' };
 }
 function cloneRecord(rec) {
   const rules = financeRules();

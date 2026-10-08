@@ -1397,6 +1397,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const financeProfile = sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor);
       financeReconcileCarryLoans_(list,financeProfile,actor,now);
       financeSetCarryBudget_(monthData,actor,financeCarryPlan_(list,financeProfile,actor,monthData.month).budget);
+      financeCheckAllowanceCap_(monthData,actor);
       syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       const savingsUsed = function(record) {
         return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
@@ -1439,6 +1440,42 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,month:monthData.month,monthData:monthData,twosDelta:twosDelta,game:sanitizeGame_(state.game),financeProfile:sanitizeFinanceProfile_(state.financeProfiles[actor] || {}, actor),sharedJar:sanitizeSharedJar_(state.sharedJar)});
     }
 
+
+
+    if(action==='repayFinanceCarry') {
+      const month=cleanText_(payload.month,10);
+      if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Choose a valid finance month');
+      state.finances=sanitizeFinances_(state.finances);
+      const list=state.finances[actor]||[],record=list.find(function(x){return x.month===month;});
+      if(!record)throw new Error('Start this finance month before paying yourself back');
+      if(record.finalized)throw new Error('This month is final and locked');
+      if(record.partialOnly)throw new Error('Confirm your monthly allowance before paying yourself back');
+      const now=new Date().toISOString();
+      state.financeProfiles=sanitizeFinanceProfiles_(state.financeProfiles);
+      const profile=state.financeProfiles[actor];
+      financeReconcileCarryLoans_(list,profile,actor,now);
+      financeSetCarryBudget_(record,actor,financeCarryPlan_(list,profile,actor,month).budget);
+      const payable=financeCarryPayable_(list,profile,actor,month);
+      let remaining=Math.min(financeCurrentCarryDeduction_(record,actor),payable.amount);
+      if(remaining<=0)throw new Error('No repayment available this month');
+      const paid=remaining;
+      payable.loans.forEach(function(loan){
+        if(!remaining)return;
+        const previously=(loan.repayments||[]).reduce(function(sum,p){return sum+Math.round(Number(p.amount||0)*100);},0);
+        const available=Math.max(0,Math.round(Number(loan.principal||0)*100)-previously);
+        const amount=Math.min(available,remaining);
+        if(!amount)return;
+        loan.repayments.push({id:'carry-deduction:'+month+':'+loan.id.slice(financeCarrySettings_(actor).prefix.length),
+          month:month,date:month+'-01',amount:amount/100,at:now});
+        remaining-=amount;
+      });
+      if(remaining)throw new Error('Could not complete debt repayment');
+      profile.updatedAt=now;profile.updatedBy=actor;
+      financeRefreshFutureCarry_(list,profile,actor,month,now);
+      state.financeProfiles[actor]=profile;
+      saveState_(state);
+      return output_({ok:true,monthData:record,financeProfile:sanitizeFinanceProfile_(profile,actor),paid:paid/100});
+    }
 
     if (action === 'confirmFinanceCreditCard') {
       const month = cleanText_(payload.month, 10);
@@ -2409,33 +2446,7 @@ function financeReconcileCarryLoans_(list,profile,actor,now) {
       changed=true;
     }
   });
-  // Only a confirmed month repays debt. Use one stable installment ID per
-  // source/debtor month to prevent double repayment on subsequent saves.
-  list.filter(function(record){return record.finalized;}).sort(function(a,b){return a.month.localeCompare(b.month);}).forEach(function(record){
-    const due=financeCurrentCarryDeduction_(record,actor);
-    if(!due)return;
-    const loans=(profile.receivables||[]).filter(function(x){
-      return String(x.id||'').startsWith(config.prefix)&&String(x.id).slice(config.prefix.length)<record.month;
-    }).sort(function(a,b){return a.id.localeCompare(b.id);});
-    const alreadyPaid=loans.reduce(function(sum,loan){
-      return sum+(loan.repayments||[]).filter(function(p){
-        return p.month===record.month&&String(p.id||'').startsWith('carry-deduction:');
-      }).reduce(function(s,p){return s+Math.round(Number(p.amount||0)*100);},0);
-    },0);
-    let toPay=Math.max(0,due-alreadyPaid);
-    loans.forEach(function(loan){
-      if(!toPay)return;
-      const repaid=(loan.repayments||[]).filter(function(p){return p.month<=record.month;})
-        .reduce(function(sum,p){return sum+Math.round(Number(p.amount||0)*100);},0);
-      const available=Math.max(0,Math.round(Number(loan.principal||0)*100)-repaid);
-      const amount=Math.min(toPay,available);
-      if(!amount)return;
-      loan.repayments.push({id:'carry-deduction:'+record.month+':'+loan.id.slice(config.prefix.length),
-        month:record.month,date:record.month+'-01',amount:amount/100,at:now});
-      toPay-=amount;
-      changed=true;
-    });
-  });
+  // Previous repayments are preserved; new ones require an explicit Pay back tap.
   if(changed){profile.updatedAt=now;profile.updatedBy=actor;}
 }
 function financeRefreshFutureCarry_(list,profile,actor,changedMonth,now) {
@@ -2447,6 +2458,30 @@ function financeRefreshFutureCarry_(list,profile,actor,changedMonth,now) {
     });
 }
 
+
+function financeAllowanceBudgetCents_(record,actor) {
+  if(actor==='Principessa')return Math.round(Number(record.extraBudget||0)*100);
+  const item=(record.expenses||[]).find(function(x){return x.group==='variable'&&String(x.name||'').trim().toLowerCase()==='personal'&&!x.id;});
+  return item?Math.round(Number(item.amount||0)*100):10000;
+}
+function financeCheckAllowanceCap_(record,actor) {
+  const spent=(record.allowanceSpends||[]).reduce(function(sum,x){return sum+Math.round(Number(x.amount||0)*100);},0);
+  const cap=financeAllowanceBudgetCents_(record,actor);
+  if(spent>cap)throw new Error((actor==='Principe'?'Personal':'Extra')+' spending cannot exceed '+formatMoney_(cap/100)+' this month');
+}
+function financeCarryPayable_(list,profile,actor,month) {
+  const config=financeCarrySettings_(actor);
+  const loans=(profile.receivables||[]).filter(function(x){
+    return String(x.id||'').startsWith(config.prefix)&&String(x.id).slice(config.prefix.length)<month;
+  }).sort(function(a,b){return a.id.localeCompare(b.id);});
+  const already=loans.reduce(function(sum,x){return sum+(x.repayments||[]).filter(function(p){return p.month===month;}).reduce(function(t,p){return t+Math.round(Number(p.amount||0)*100);},0);},0);
+  const outstanding=loans.reduce(function(sum,x){
+    const paid=(x.repayments||[]).reduce(function(t,p){return t+Math.round(Number(p.amount||0)*100);},0);
+    return sum+Math.max(0,Math.round(Number(x.principal||0)*100)-paid);
+  },0);
+  const budgetDeduction=Math.round(financeCarryPlan_(list,profile,actor,month).deducted*100);
+  return {amount:Math.max(0,Math.min(budgetDeduction-already,outstanding)),loans};
+}
 function setFinancePersonalBudget_(monthData, amount) {
   (monthData.expenses || []).forEach(function(item) {
     if (item.group === 'variable' && String(item.name || '').trim().toLowerCase() === 'personal' && !item.id) {
@@ -2485,6 +2520,10 @@ function sanitizeFinanceMonth_(record, actor) {
     }
     return true;
   });
+  // Old versions could create a second variable-category Extra transaction.
+  if(actor==='Principessa')expenses=expenses.filter(function(x){
+    return !(x.group==='variable'&&String(x.name||'').trim().toLowerCase()==='extra');
+  });
   const partialOnly = !!(record && record.partialOnly === true);
   if (usesExtraBudget && !partialOnly && !foundFixedExtra) expenses.push({id:'',group:'extra',name:'Extra',amount:extraBudget,date:'',paidFrom:'personal'});
   if (partialOnly) expenses = expenses.filter(function(x){ return !(x.group === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra'); });
@@ -2508,6 +2547,9 @@ function sanitizeFinanceMonth_(record, actor) {
     expenses: expenses,
     extraBudget: extraBudget,
     extraSpends: extraSpends,
+    allowanceSpends:(Array.isArray(record&&record.allowanceSpends)?record.allowanceSpends:[]).slice(0,100).map(function(x){
+      return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),amount:cleanMoney_(x&&x.amount),date:cleanFinanceDate_(x&&x.date)};
+    }).filter(function(x){return x.amount!==''&&Number(x.amount)>0&&(!x.date||x.date.slice(0,7)===month);}),
     extraOverspendSource: extraSpends.length ? extraSpends[0].source : '',
     extraOverspendAmount: legacyTotal,
     investmentTotal: cleanMoney_(record && record.investmentTotal),
@@ -3310,7 +3352,7 @@ function reconciliationWarnings_(trip, plan) {
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'resetReturnPacking', 'personalizeTripChecklists', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
-  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
+  'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'repayFinanceCarry', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
   'shopSendSignal', 'shopMarkSignalsSeen',
