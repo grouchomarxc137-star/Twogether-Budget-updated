@@ -32,6 +32,7 @@ export function openPrep(id) {
   const prep = {
     packing: stored.packing?.length ? JSON.parse(JSON.stringify(stored.packing)) : defaults(PACKING_DEFAULTS),
     reminders: stored.reminders?.length ? JSON.parse(JSON.stringify(stored.reminders)) : defaults(REMINDER_DEFAULTS),
+    returnPackingResetEnd: String(stored.returnPackingResetEnd || ''),
   };
   $('#v33PrepModal')._prep = prep;
   renderPrep();
@@ -98,6 +99,12 @@ function bindPrep() {
       toast('Trip checklist saved'); closePrep();
       await freshState();
     } catch (e) {
+      if(String(e?.message||'').includes('Packing was reset for the journey home')){
+        await freshState();
+        closePrep();
+        toast('Packing was refreshed for the journey home. Reopen the checklist.','warn');
+        return;
+      }
       toast(e.message || 'Could not save checklist', 'warn'); btn.disabled = false;
     }
   });

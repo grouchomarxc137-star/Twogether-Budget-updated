@@ -42,6 +42,7 @@ let cardSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row
 let expenseSwipe = { tracking:false, active:false, startX:0, startY:0, lastX:0, row:null, ignoreClickUntil:0 };
 let deleteConfirmLayer = null;
 let tripNotificationTimer = null;
+let nextPackingBoundaryTimer = null;
 let tripFocusScrollY = 0;
 let startupReadySent = false;
 
@@ -58,6 +59,46 @@ function locationLabel(m) { return m?.location === 'Other' ? (m.otherLocation ||
 function localDate(value) { if (!value) return null; const d = new Date(value + 'T12:00:00'); return Number.isNaN(d.getTime()) ? null : d; }
 function localToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); }
 function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
+function localDateKey(date=new Date()) {
+  const pad=(value)=>String(value).padStart(2,'0');
+  return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
+}
+function returnPackingResetDue(plan, today=localDateKey()) {
+  const start=String(plan?.meta?.start||''), end=String(plan?.meta?.end||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end))return false;
+  if(plan?.prep?.returnPackingResetEnd===end||end<start)return false;
+  const endDay=localDate(end);
+  if(!endDay)return false;
+  const resetDay=localDateKey(new Date(endDay.getFullYear(),endDay.getMonth(),endDay.getDate()-1));
+  if(today<start||today<resetDay||today>end)return false;
+  const linked=plan?.linkedTripId&&(remoteState?.trips||[]).find((item)=>item.id===plan.linkedTripId);
+  return !linked||!isLocked(linked);
+}
+async function applyReturnPackingReset(plan) {
+  if(!actor()||!returnPackingResetDue(plan))return false;
+  const result=await window.TwogetherAPI.post('resetReturnPacking',{planId:plan.id,localDate:localDateKey()},actor());
+  if(!result?.ok)throw new Error(result?.error||'Could not refresh return packing');
+  if(result.prep)plan.prep=JSON.parse(JSON.stringify(result.prep));
+  return !!result.reset;
+}
+async function refreshReturnPackingResets() {
+  for(const plan of (remoteState?.plans||[])){
+    if(!returnPackingResetDue(plan))continue;
+    try{await applyReturnPackingReset(plan);}
+    catch(error){console.warn('Return packing reset could not be saved:',error);}
+  }
+}
+function schedulePackingBoundaryRefresh() {
+  if(nextPackingBoundaryTimer)clearTimeout(nextPackingBoundaryTimer);
+  const now=new Date();
+  const tomorrow=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,4);
+  nextPackingBoundaryTimer=setTimeout(()=>{
+    nextPackingBoundaryTimer=null;
+    refreshState(false);
+    schedulePackingBoundaryRefresh();
+  },Math.max(1000,tomorrow-now));
+}
+
 function tripTiming(meta) {
   const start = localDate(meta?.start), end = localDate(meta?.end), now = localToday();
   if (!start || !end) return '';
@@ -1222,8 +1263,12 @@ function publishTripNotifications() {
   scheduleNextTripReminderRefresh();
 }
 
-function openSimplifiedChecklist(plan, initialPersonal = false) {
+async function openSimplifiedChecklist(plan, initialPersonal = false) {
   if (!plan) return;
+  // Also check immediately when opening a checklist that was left on screen
+  // through midnight. The action is idempotent across both people's devices.
+  try{await applyReturnPackingReset(plan);}
+  catch(error){toast(error?.message||'Could not refresh return packing','warn');return;}
   closeSimplifiedSheet();
   const prep = JSON.parse(JSON.stringify(tripPrepSnapshot(plan)));
   prep.notes = JSON.parse(JSON.stringify(recurrentPrepSnapshot().notes || []));
@@ -1381,6 +1426,7 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   }
   function cleanPrep(source=prep) {
     return {
+      returnPackingResetEnd:String(plan?.prep?.returnPackingResetEnd||''),
       packing: source.packing.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,section:checklistSection(item.section),addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),personal:checklistPersonalPayload(item.personal)})),
       reminders: source.reminders.filter((item)=>String(item.text||'').trim()).map((item)=>({id:item.id,recurrentId:item.recurrentId||'',text:String(item.text||'').trim(),done:!!item.done,addedBy:checklistAddedBy(item.addedBy),personalFor:checklistPersonalFor(item.personalFor),notifyAt:String(item.notifyAt||''),personal:checklistPersonalPayload(item.personal)})),
     };
@@ -1412,6 +1458,12 @@ function openSimplifiedChecklist(plan, initialPersonal = false) {
   }
   function autoSaveChecklist() {
     return saveChecklistSnapshot(cleanPrep()).catch((err)=>{
+      if(String(err?.message||'').includes('Packing was reset for the journey home')){
+        closeSimplifiedSheet();
+        toast('Packing was refreshed for the journey home. Reopen your checklist.','warn');
+        refreshState(false);
+        return null;
+      }
       state.error=err?.message||'Could not update checklist';
       if(sheet?.isConnected)render();
       return null;
@@ -4388,6 +4440,7 @@ export async function refreshState(force = false) {
   if (refreshing || !window.TwogetherAPI) return; refreshing = true;
   try {
     remoteState = await window.TwogetherAPI.state();
+    await refreshReturnPackingResets();
     const imageUrls = allSimplifiedItems().map((item) => {
       const name = item.meta?.city || locationLabel(item.meta);
       return tripImage(name, locationLabel(item.meta), item.id);
@@ -4542,6 +4595,7 @@ function installEnhancers() {
 
 export function initCurrentTrips() {
   simplifyStaticCopy(); ensureCurrentTrips(); installEnhancers(); enhanceTripChoices(); enhancePartialPicker();
+  schedulePackingBoundaryRefresh();
   enhanceCardMedia(); decorateTripStories();
   document.addEventListener('twogether:v18-rendered', () => requestAnimationFrame(() => { enhanceCardMedia(); decorateTripStories(); }));
   setTimeout(() => refreshState(true), 180);

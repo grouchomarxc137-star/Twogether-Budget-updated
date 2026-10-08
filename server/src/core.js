@@ -693,10 +693,65 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,notes:current.notes,prep:current});
     }
 
+    if (action === 'resetReturnPacking') {
+      const planId=cleanText_(payload.planId,80);
+      const idx=state.plans.findIndex(function(plan){return plan.id===planId;});
+      if(idx<0)throw new Error('Trip not found');
+      const plan=sanitizePlan_(state.plans[idx]);
+      const start=cleanFinanceDate_(plan.meta&&plan.meta.start);
+      const end=cleanFinanceDate_(plan.meta&&plan.meta.end);
+      if(!start||!end||end<start)throw new Error('This trip has no valid dates');
+      const linked=plan.linkedTripId?state.trips.find(function(trip){return trip.id===plan.linkedTripId;}):null;
+      if(linked&&isTripLocked_(linked))return output_({ok:true,notDue:true,prep:plan.prep});
+
+      // The browser supplies its calendar date so midnight and timezone
+      // differences do not trigger a reset too early or a day too late.
+      const localDate=cleanFinanceDate_(payload.localDate);
+      const utcDate=new Date().toISOString().slice(0,10);
+      const localStamp=Date.parse(localDate+'T00:00:00Z');
+      const utcStamp=Date.parse(utcDate+'T00:00:00Z');
+      if(!localDate||Math.abs(localStamp-utcStamp)>86400000)
+        throw new Error('Refresh the app to use your current date');
+      const resetDay=new Date(Date.parse(end+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+      if(localDate<start||localDate<resetDay||localDate>end)
+        return output_({ok:true,notDue:true,prep:plan.prep});
+      if(plan.prep.returnPackingResetEnd===end)
+        return output_({ok:true,alreadyReset:true,prep:plan.prep});
+
+      plan.prep.packing.forEach(function(item){
+        item.done=false;
+        ACTORS.forEach(function(person){
+          if(item.personal&&item.personal[person]&&Object.prototype.hasOwnProperty.call(item.personal[person],'done'))
+            item.personal[person].done=false;
+        });
+      });
+      plan.prep.returnPackingResetEnd=end;
+      const now=new Date().toISOString();
+      plan.prep.updatedAt=now;plan.prep.updatedBy=actor;
+      plan.updatedAt=now;plan.updatedBy=actor;
+      state.plans[idx]=plan;
+
+      // Old Shop packing lists are independent and private per person.
+      state.game=sanitizeGame_(state.game);
+      ACTORS.forEach(function(person){
+        const saved=state.game[person].packing;
+        [plan.id,plan.linkedTripId].filter(Boolean).forEach(function(key){
+          if(Array.isArray(saved[key]))saved[key].forEach(function(item){item.done=false;});
+        });
+      });
+
+      addAudit_(state,actor,'resetReturnPacking',plan.id);
+      saveState_(state);
+      return output_({ok:true,reset:true,planId:plan.id,prep:plan.prep});
+    }
+
     if (action === 'saveTripPrep') {
       const planId = cleanText_(payload.planId, 80);
       const planIdx = state.plans.findIndex(function(x){ return x.id === planId; });
       if (planIdx < 0) throw new Error('Budget plan not found');
+      const storedPrep = sanitizeTripPrep_(state.plans[planIdx].prep);
+      if(storedPrep.returnPackingResetEnd&&storedPrep.returnPackingResetEnd!==cleanFinanceDate_(payload.prep&&payload.prep.returnPackingResetEnd))
+        throw new Error('Packing was reset for the journey home. Reopen your checklist to see the latest items.');
 
       const previousPlan = sanitizePlan_(state.plans[planIdx]);
       const previousDefaults = sanitizeTripPrepDefaults_(state.tripPrepDefaults);
@@ -705,6 +760,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       const now = new Date().toISOString();
 
       plan.prep = sanitizeTripPrep_(promoted.prep);
+      plan.prep.returnPackingResetEnd = storedPrep.returnPackingResetEnd;
       plan.prep.updatedAt = now; plan.prep.updatedBy = actor;
       plan.updatedAt = now; plan.updatedBy = actor;
       state.plans[planIdx] = plan;
@@ -1699,7 +1755,7 @@ function mergePrepPersonalDefaults_(previousDefault,nextDefault,tripValue){
 }
 function prepItem_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),recurrentId:cleanText_(x&&x.recurrentId,80),text:cleanText_(x&&x.text,160),done:!!(x&&x.done),section:prepSection_(x&&x.section),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),notifyAt:prepNotifyAt_(x&&x.notifyAt),personal:prepPersonal_(x&&x.personal)};}
 function prepNote_(x){return {id:cleanText_(x&&x.id,80)||Utilities.getUuid(),text:cleanText_(x&&x.text,160),addedBy:prepAddedBy_(x&&x.addedBy),personalFor:prepPersonalFor_(x&&x.personalFor),personal:prepPersonal_(x&&x.personal),createdAt:prepCreatedAt_(x&&x.createdAt)};}
-function defaultTripPrep_(){return {packing:[],reminders:[],updatedAt:'',updatedBy:'Unknown'};}
+function defaultTripPrep_(){return {packing:[],reminders:[],returnPackingResetEnd:'',updatedAt:'',updatedBy:'Unknown'};}
 function defaultTripPrepDefaults_(){
   return {
     packingSections:defaultPackingSections_(),
@@ -1722,7 +1778,7 @@ function defaultTripPrepDefaults_(){
     updatedBy:'Unknown'
   };
 }
-function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{};return {packing:(Array.isArray(s.packing)?s.packing:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),reminders:(Array.isArray(s.reminders)?s.reminders:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),updatedAt:cleanText_(s.updatedAt,40),updatedBy:cleanActor_(s.updatedBy)};}
+function sanitizeTripPrep_(value){const s=value&&typeof value==='object'?value:{};return {packing:(Array.isArray(s.packing)?s.packing:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),reminders:(Array.isArray(s.reminders)?s.reminders:[]).slice(0,120).map(prepItem_).filter(function(x){return !!x.text;}),returnPackingResetEnd:cleanFinanceDate_(s.returnPackingResetEnd),updatedAt:cleanText_(s.updatedAt,40),updatedBy:cleanActor_(s.updatedBy)};}
 function sanitizeTripPrepDefaults_(value){
   if(!value||typeof value!=='object')return defaultTripPrepDefaults_();
   const out=sanitizeTripPrep_(value);
@@ -3009,7 +3065,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'resetReturnPacking', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
