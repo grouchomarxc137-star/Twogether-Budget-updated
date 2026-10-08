@@ -4433,7 +4433,9 @@ function filterTripStories() {
 // decorates above. Ported from v28.js's decorateTripStories().
 function decorateTripStories() {
   const root = $('#tripGallery'); if (!root) return;
-  $$('.trip-story-card', root).forEach((card) => {
+  $('.trip-story-card', root).forEach((card) => {
+    // The compact card retains its original trip photo; do not reseed it.
+    if (card.classList.contains('is-stay-style')) return;
     const country = ($('.trip-country', card)?.textContent || '').trim(), city = ($('h3', card)?.textContent || '').trim().toLowerCase();
     const image = tripImage(city, country, card.dataset.openTrip || `${city}|${country}`);
     card.style.setProperty('--v28-story-bg', `url("${image}")`);

@@ -40,13 +40,18 @@ function visibleTrips(state = getState()) {
   return (Array.isArray(state?.trips) ? state.trips : []).filter((trip) => !isExcludedTestTrip(trip));
 }
 
+// Use the original plan's photo seed when a trip moves to confirmed stories.
+function tripStoryPhoto(state, trip) {
+  const plan = (Array.isArray(state?.plans) ? state.plans : [])
+    .find((item) => item.linkedTripId === trip.id);
+  const meta = plan?.meta || tripMeta(trip);
+  const city = meta.city || locationLabel(meta);
+  return tripImage(city, locationLabel(meta), plan?.id || trip.id);
+}
+
 export function preloadTripGalleryImages() {
   const state = getState();
-  const urls = visibleTrips(state).filter(isLocked).map((trip) => {
-    const meta = tripMeta(trip);
-    const city = meta.city || locationLabel(meta);
-    return tripImage(city, locationLabel(meta), trip.id);
-  });
+  const urls = visibleTrips(state).filter(isLocked).map((trip) => tripStoryPhoto(state,trip));
   return preloadTripImages(urls);
 }
 
@@ -115,13 +120,21 @@ export function renderTripGallery() {
     else if (t.submissions.Principessa && t.submissions.Principe && d.length) { status = 'Needs discussion'; statusClass = 'status-warn'; }
     else if (t.submissions.Principessa && t.submissions.Principe) { status = 'Awaiting confirmation'; statusClass = 'status-wait'; }
     else { status = `Waiting for ${t.submissions.Principessa ? 'Principe' : 'Principessa'}`; }
-    const city = m.city || locationLabel(m), country = locationLabel(m), image = tripImage(city, country, t.id);
-    return `<button class="trip-story-card" type="button" data-open-trip="${esc(t.id)}">
+    const city = m.city || locationLabel(m), country = locationLabel(m);
+    const image = tripStoryPhoto(state,t);
+    return `<button class="trip-story-card is-stay-style" type="button" data-open-trip="${esc(t.id)}" aria-label="Open confirmed trip to ${esc(city)}">
       <span class="trip-story-photo" aria-hidden="true" style="background-image:url(&quot;${esc(image)}&quot;)"></span>
-      <div class="trip-card-top"><span class="trip-country">${esc(country)}</span><span class="trip-status ${statusClass}">${esc(status)}</span></div>
-      <h3>${esc(city)}</h3><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
-      <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
-      ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
+      <span class="trip-story-copy">
+        <span class="trip-country">${esc(country)}</span>
+        <h3>${esc(city)}</h3>
+        <p>${fmtDate(m.start)}–${fmtDate(m.end)}</p>
+        <small class="trip-story-status">✓ ${esc(status)}</small>
+      </span>
+      <span class="trip-story-total">
+        <strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong>
+        <small>Spent</small>
+        <i aria-hidden="true">›</i>
+      </span>
     </button>`;
   }).join('');
   $$('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));

@@ -2295,3 +2295,135 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   padding:0 9px;background:#f0ebe4;color:#695746;border-radius:99px;
   font-size:11px;font-weight:650;
 }
+
+/* Confirmed trip stories reuse the small accommodation-card geometry.
+   A trip's photograph stays visible when it becomes past/confirmed. */
+#log #tripGallery.trip-gallery{gap:9px!important}
+#log #tripGallery .trip-story-card.is-stay-style{
+  display:grid!important;
+  box-sizing:border-box;
+  grid-template-columns:82px minmax(0,1fr) auto!important;
+  grid-template-rows:1fr!important;
+  align-items:center!important;
+  column-gap:12px!important;
+  row-gap:0!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:96px!important;
+  max-height:none!important;
+  padding:10px!important;
+  margin:0!important;
+  border:1px solid #ebe4da!important;
+  border-radius:18px!important;
+  background:#fffdf9!important;
+  background-image:none!important;
+  box-shadow:none!important;
+  text-align:left!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style:hover{
+  transform:translateY(-1px);
+  border-color:#ddd3c7!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-photo{
+  display:block!important;
+  grid-column:1!important;
+  grid-row:1!important;
+  width:82px!important;
+  height:74px!important;
+  min-height:74px!important;
+  max-height:74px!important;
+  border-radius:14px!important;
+  background-color:#eee8df;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  opacity:1!important;
+  filter:none!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-copy{
+  grid-column:2;
+  grid-row:1;
+  display:grid;
+  align-content:center;
+  gap:4px;
+  min-width:0;
+  color:#26221e;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-copy h3{
+  grid-column:auto;
+  grid-row:auto;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  margin:0!important;
+  min-width:0;
+  font-size:15.5px!important;
+  font-weight:650!important;
+  line-height:1.2!important;
+  letter-spacing:0!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-copy p{
+  grid-column:auto;
+  grid-row:auto;
+  align-self:auto;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  margin:0!important;
+  color:#7a736b!important;
+  font-size:12px!important;
+  line-height:1.2!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-status{
+  color:#4f6f4a!important;
+  font-size:10.5px!important;
+  font-weight:650!important;
+  line-height:1.2!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-total{
+  grid-column:3;
+  grid-row:1;
+  display:grid;
+  justify-items:end;
+  align-items:center;
+  gap:3px;
+  min-width:64px;
+  color:#26221e;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-total strong{
+  font-size:17px!important;
+  line-height:1.2!important;
+  font-weight:650!important;
+  font-variant-numeric:tabular-nums;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-total small{
+  color:#7a736b!important;
+  font-size:11px!important;
+  line-height:1.2!important;
+}
+#log #tripGallery .trip-story-card.is-stay-style .trip-story-total i{
+  color:#a39c93;
+  font-size:20px;
+  line-height:.8;
+  font-style:normal;
+}
+@media(max-width:620px){
+  #log #tripGallery .trip-story-card.is-stay-style{
+    grid-template-columns:72px minmax(0,1fr) auto!important;
+    column-gap:10px!important;
+    min-height:88px!important;
+    padding:10px!important;
+  }
+  #log #tripGallery .trip-story-card.is-stay-style .trip-story-photo{
+    width:72px!important;
+    height:68px!important;
+    min-height:68px!important;
+    max-height:68px!important;
+  }
+}
+/* The existing past-trip variant must not fade or hide photographs. */
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-photo,
+#twCurrentTrips.tv2-root:not(.tv2-trip-view) .tv2-card.is-past .tv2-card-photo img{
+  opacity:1!important;
+  filter:none!important;
+}
