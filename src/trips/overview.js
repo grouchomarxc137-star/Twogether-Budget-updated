@@ -50,13 +50,66 @@ export function preloadTripGalleryImages() {
   return preloadTripImages(urls);
 }
 
+function hiddenTestCleanupHtml(state) {
+  const hidden=(Array.isArray(state?.trips)?state.trips:[]).filter((trip)=>isExcludedTestTrip(trip)&&isLocked(trip));
+  return hidden.map((trip)=>'<div class="trip-test-cleanup">'+
+    '<span>Hidden test trip · 1–2 August 2026</span>'+
+    '<button type="button" data-remove-confirmed-test="'+esc(trip.id)+'">Remove test trip</button>'+
+  '</div>').join('');
+}
+function confirmHiddenTestTripDeletion(id) {
+  const trip=(getState()?.trips||[]).find((entry)=>entry.id===id);
+  if(!trip||!isExcludedTestTrip(trip)||!isLocked(trip))return;
+  document.querySelector('.trip-test-delete-confirm')?.remove();
+  const layer=document.createElement('div');
+  layer.className='tv2-confirm-layer trip-test-delete-confirm';
+  layer.innerHTML=
+    '<div class="tv2-confirm-backdrop" data-test-delete-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="testDeleteHeading">'+
+      '<h2 id="testDeleteHeading">Remove the test trip?</h2>'+
+      '<p>Delete the confirmed <strong>Test</strong> trip from <strong>1–2 August 2026</strong> and its test entries?</p>'+
+      '<p class="tv2-confirm-note">Only this test trip will be deleted. Real trips stay untouched. This cannot be undone.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-test-delete-cancel>Cancel</button>'+
+        '<button type="button" class="is-delete" data-test-delete-approve>Delete test trip</button></div>'+
+    '</div>';
+  document.body.appendChild(layer);
+  const cancel=()=>layer.remove();
+  layer.querySelectorAll('[data-test-delete-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+  layer.addEventListener('keydown',(e)=>{if(e.key==='Escape')cancel();});
+  const approve=layer.querySelector('[data-test-delete-approve]');
+  approve.addEventListener('click',async()=>{
+    approve.disabled=true;approve.textContent='Deleting…';
+    const error=layer.querySelector('.tv2-confirm-error');
+    try {
+      const result=await postAction('deleteConfirmedTestTrip',{tripId:id},actor());
+      if(!result?.ok)throw new Error(result?.error||'Could not remove test trip');
+      layer.remove();
+      await syncNow(true);
+      renderTripGallery();
+      renderMonthly();
+      toast('The confirmed test trip has been removed');
+    } catch(err) {
+      approve.disabled=false;approve.textContent='Delete test trip';
+      if(error)error.textContent=err?.message||'Could not delete the trip';
+    }
+  });
+  approve.focus();
+}
+function bindHiddenTestCleanup(root){
+  root.querySelectorAll('[data-remove-confirmed-test]').forEach((button)=>
+    button.addEventListener('click',()=>confirmHiddenTestTripDeletion(button.dataset.removeConfirmedTest)));
+}
+
 export function renderTripGallery() {
   const root = $('#tripGallery');
   if (!root) return;
   const state = getState();
   const trips = visibleTrips(state);
+  const cleanup=hiddenTestCleanupHtml(state);
   if (!trips.length) {
-    root.innerHTML = '<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>';
+    root.innerHTML = '<div class="empty-state gallery-empty"><strong>No trips yet</strong><span>Your shared trips will appear here.</span></div>'+cleanup;
+    bindHiddenTestCleanup(root);
     return;
   }
 
@@ -76,8 +129,9 @@ export function renderTripGallery() {
       <div class="trip-card-bottom"><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong><span>${budget.has ? esc(budget.label) : 'No budget set'}</span></div>
       ${!t.submissions?.[actor()] && !isLocked(t) ? '<div class="your-version-needed">Your version is still needed</div>' : ''}
     </button>`;
-  }).join('');
-  $$('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));
+  }).join('')+cleanup;
+  $('[data-open-trip]', root).forEach((btn) => btn.addEventListener('click', () => openTripModal(btn.dataset.openTrip)));
+  bindHiddenTestCleanup(root);
 }
 
 export function openTripModal(id) {

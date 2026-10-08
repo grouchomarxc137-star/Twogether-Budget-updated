@@ -883,6 +883,54 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true,planId:plan.id,repayment:repayment,settlement:nextSettlement});
     }
 
+    if (action === 'deleteConfirmedTestTrip') {
+      const tripId=cleanText_(payload.tripId,80);
+      const idx=state.trips.findIndex(function(t){return t.id===tripId;});
+      if(!tripId||idx<0)throw new Error('Test trip not found');
+      const trip=sanitizeTripRecord_(state.trips[idx]);
+      const filled=ACTORS.map(function(name){return trip.submissions[name];}).filter(Boolean);
+      // Exactly the hidden development-only trip; never allow this action for
+      // Lonato or any other real confirmed trip.
+      const matches=function(meta){return String(meta&&meta.city||'').trim().toLowerCase()==='test'
+        && String(meta&&meta.start||'')==='2026-08-01'
+        && String(meta&&meta.end||'')==='2026-08-02';};
+      if(!isTripLocked_(trip)||!filled.length||!filled.some(matches)
+          ||filled.some(function(meta){return !matches(meta);}))
+        throw new Error('Only the confirmed Test trip from 1–2 August 2026 can be removed');
+      const linked=state.plans.map(sanitizePlan_).filter(function(p){return p.linkedTripId===tripId;});
+      if(linked.length>1)throw new Error('This test trip has multiple linked plans; contact Principe before removal');
+      const plan=linked[0]||null;
+      if(plan&&(!matches(plan.meta)))throw new Error('Linked plan details differ; nothing was deleted');
+
+      state.game=sanitizeGame_(state.game);
+      ACTORS.forEach(function(name){
+        const profile=state.game[name];
+        const award='trip:'+name+':'+tripId;
+        if(profile.awards.tripSettlements.includes(award)){
+          const budgetRaw=plan&&plan.budgets[name]!==''?plan.budgets[name]:trip.budget;
+          const paid=trip.submissions[name]&&trip.submissions[name].paid;
+          if(budgetRaw!==''&&paid!==''&&Number.isFinite(Number(budgetRaw))&&Number.isFinite(Number(paid))){
+            const delta=money2_(Number(budgetRaw)-Number(paid));
+            profile.twos=money2_(Number(profile.twos)-delta);
+          }
+          profile.awards.tripSettlements=profile.awards.tripSettlements.filter(function(key){return key!==award;});
+        }
+        if(profile.packing){delete profile.packing[tripId];if(plan)delete profile.packing[plan.id];}
+        if(profile.planners){delete profile.planners[tripId];if(plan)delete profile.planners[plan.id];}
+        state.game[name]=sanitizeGameProfile_(profile);
+      });
+      state.trips.splice(idx,1);
+      if(plan){
+        state.plans=state.plans.filter(function(p){return p.id!==plan.id;});
+        state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+        state.sharedJar.transactions=state.sharedJar.transactions.filter(function(t){return t.planId!==plan.id;});
+        state.sharedJar=sanitizeSharedJar_(state.sharedJar);
+      }
+      addAudit_(state,actor,'deleteConfirmedTestTrip',tripId);
+      saveState_(state);
+      return output_({ok:true,deletedTripId:tripId,deletedPlanId:plan&&plan.id||'',sharedJar:state.sharedJar,game:state.game});
+    }
+
     if (action === 'deleteCurrentTrip') {
       const kind = String(payload.kind || '');
       const id = cleanText_(payload.id, 80);
@@ -2964,7 +3012,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',

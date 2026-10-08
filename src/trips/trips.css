@@ -5461,3 +5461,15 @@ body.tv2-locked{overflow:hidden}
 .trip-car-breakdown-entry b{white-space:nowrap;font-variant-numeric:tabular-nums}
 .trip-car-breakdown-empty{font-size:13px;color:#88786c;padding:20px 0}
 @media(max-width:600px){.trip-car-breakdown-dialog{padding:10px}.trip-car-breakdown-shell{padding:18px}}
+
+/* One-time cleanup for the historical confirmed Test trip, not real stories. */
+.trip-test-cleanup{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:12px 14px;margin:12px 0;border:1px dashed #decfbd;border-radius:13px;
+  background:#fffaf3;color:#77675a;font-size:12px;
+}
+.trip-test-cleanup button{
+  border:1px solid #e2c4bd;background:#fff8f5;color:#9b524a;border-radius:10px;
+  padding:9px 12px;min-height:36px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+}
+.trip-test-cleanup button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
