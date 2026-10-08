@@ -2414,6 +2414,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     state.category='budgets';state.selectedItemId=String(item?.id||'monthly-allowance');
     state.name=name;state.group=actor()==='Principe'?'variable':'extra';
     state.date=editingKind==='allowance'?normalizeFinanceDate(editingItem.date,rec.month):'';
+    if(focusedAllowance) state.amountText=String(financeAllowanceInfo(rec).left);
   }
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
@@ -2742,7 +2743,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       }
       state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
       if(!editingItem)state.amountText=item.isBudget===true?'':(hasValue(item.amount)?String(n(item.amount)):'');
-      if(state.category==='budgets'&&String(item.name||'').trim().toLowerCase()===(actor()==='Principe'?'personal':'extra')&&!editingItem)state.amountText='';
+      if(state.category==='budgets'&&String(item.name||'').trim().toLowerCase()===(actor()==='Principe'?'personal':'extra')&&!editingItem)state.amountText=String(financeAllowanceInfo(rec).left);
       state.date=isExtraUsed()?'':financeDateForDay(rec.month,item.day);
       state.more=false;
       state.error='';
