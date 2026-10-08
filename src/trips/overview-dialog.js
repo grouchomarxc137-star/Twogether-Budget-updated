@@ -5,13 +5,15 @@
 import { fmtDate, money as formatMoney } from '../lib/format.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
+import { isCarExpense, carExpenseLabel } from './car-expenses.js';
 
 const names = ['Principessa', 'Principe'];
 const legacyKeys = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
-const legacyLabels = { travel: 'Flights / Train', accom: 'Accommodation', fuel: 'Fuel', groceries: 'House groceries', eat: 'Food / eating out', tolls: 'Parking / Tolls', other: 'Other' };
+const legacyLabels = { travel: 'Transport', accom: 'Accommodation', fuel: 'Car · Fuel', groceries: 'House groceries', eat: 'Food / eating out', tolls: 'Car · Tolls / Parking', other: 'Other' };
 const rows = [
   { key: 'accommodation', label: 'Accommodation', category: 'accommodation', legacy: ['accom'] },
-  { key: 'transport', label: 'Transport', category: 'transport', legacy: ['travel', 'fuel', 'tolls'], subtypes: [['flights-trains', 'Flights / Trains'], ['fuel', 'Fuel'], ['parking-tolls', 'Parking / Tolls'], ['other', 'Other']] },
+  { key: 'transport', label: 'Transport', category: 'transport', legacy: ['travel'], subtypes: [['flights-trains', 'Flights / Trains'], ['other', 'Other']] },
+  { key: 'car', label: 'Car', category: 'transport', car: true, legacy: ['fuel', 'tolls'], subtypes: [['fuel', 'Fuel'], ['tolls', 'Tolls'], ['parking', 'Parking'], ['car-other', 'Other']] },
   { key: 'groceries', label: 'Groceries', category: 'food', legacy: ['groceries', 'eat'], subtypes: [['eating-out', 'Food / eating out'], ['groceries', 'House groceries'], ['other', 'Other']] },
   { key: 'activities', label: 'Activities', category: 'activities', legacy: [] },
   { key: 'other', label: 'Other', category: 'other', legacy: ['other'], customName: true },
@@ -34,7 +36,7 @@ function shortRange(start,end){const a=asDate(start),b=asDate(end);if(!a||!b)ret
 function displayMoney(value,_forceCents=false){return money(value);}
 function categoryInfo(entry){
   if(entry?.category==='accommodation')return['Stay','🛏'];
-  if(entry?.category==='transport')return[entry?.transportType==='fuel'?'Fuel':entry?.transportType==='tolls'?'Tolls':'Transport',entry?.transportType==='fuel'?'⛽':'✈️'];
+  if(entry?.category==='transport')return[isCarExpense(entry)?'Car · '+carExpenseLabel(entry):'Transport',isCarExpense(entry)?'⛽':'✈️'];
   if(entry?.category==='food')return[entry?.foodType==='groceries'?'Groceries':entry?.foodType==='eating-out'?'Eating out':'Food',entry?.foodType==='groceries'?'🛒':'🍝'];
   if(entry?.category==='activities')return['Activities','🎟'];
   return[entry?.name||entry?.note||'Other','•'];
@@ -200,7 +202,12 @@ let latest = null, dialog = null, opened = null, refreshing = false, lastRefresh
 function rowByKey(key) { return rows.find((row) => row.key === key) || null; }
 function records(plan, trip) { return names.map((name) => trip?.submissions?.[name] || plan?.partials?.[name] || {}); }
 function entries(plan) { return Array.isArray(plan?.expenseEntries) ? plan.expenseEntries : []; }
-function rowEntries(plan, row) { return entries(plan).filter((entry) => entry?.category === row.category); }
+function rowEntries(plan, row) {
+  return entries(plan).filter((entry) => entry?.category === row.category && (row.category !== 'transport' || isCarExpense(entry) === (row.car === true)));
+}
+function rowForExpense(entry) {
+  return rows.find((row)=>row.category===entry.category&&(row.category!=='transport'||isCarExpense(entry)===(row.car===true)))||rows[rows.length-1];
+}
 function sharedFor(plan, trip, key) { return plan?.sharedExpenses?.[key] || trip?.sharedExpenses?.[key] || null; }
 
 function legacyPaid(plan, trip, row, name) {
@@ -365,14 +372,14 @@ function draw(plan) {
   dialog.querySelector('[data-overview-edit]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
   dialog.querySelector('[data-overview-budget]').onclick=()=>window.TwogetherWorkflow?.budget(plan.id);
   dialog.querySelector('[data-overview-add]').onclick=()=>openExpenseSheet(plan);
-  dialog.querySelectorAll('[data-trip-entry]').forEach((button)=>button.onclick=()=>{const entry=entries(plan).find((item)=>item.id===button.dataset.tripEntry);if(!entry)return;const row=rows.find((item)=>item.category===entry.category)||rows[rows.length-1];drawCategory(plan,row.key,entry.id,true);});
+  dialog.querySelectorAll('[data-trip-entry]').forEach((button)=>button.onclick=()=>{const entry=entries(plan).find((item)=>item.id===button.dataset.tripEntry);if(!entry)return;const row=rowForExpense(entry);drawCategory(plan,row.key,entry.id,true);});
 }
 
 function subtypeLabel(row, entry) {
   if (!row?.subtypes?.length) return row?.label || 'Expense';
   const value = row.category === 'transport' ? entry?.transportType : entry?.foodType;
-  const normalized = value === 'tolls' ? 'parking-tolls' : value;
-  return row.subtypes.find(([key]) => key === normalized)?.[1] || row.label;
+  const normalized = value;
+  return normalized==='parking-tolls'?'Tolls / Parking':(row.subtypes.find(([key]) => key === normalized)?.[1] || row.label);
 }
 
 function entryTitle(row, entry) {
@@ -397,7 +404,7 @@ function categoryEntriesHtml(plan, row) {
 }
 
 function blankDraft(row, subtype = '') {
-  return { id: '', category: row.category, foodType: row.category === 'food' ? subtype : '', transportType: row.category === 'transport' ? subtype : '', name: '', amount: '', paidBy: document.body.dataset.actor || 'Principessa', split: 'shared', forActor: document.body.dataset.actor || 'Principessa', date: today(), note: '', uncertain: false, useJar: false, showMore: false };
+  return { id: '', category: row.category, foodType: row.category === 'food' ? subtype : '', transportType: row.category === 'transport' ? (row.car ? 'fuel' : (subtype||'flights-trains')) : '', name: '', amount: '', paidBy: document.body.dataset.actor || 'Principessa', split: 'shared', forActor: document.body.dataset.actor || 'Principessa', date: today(), note: '', uncertain: false, useJar: false, showMore: false };
 }
 
 function draftFromEntry(entry) {
@@ -405,7 +412,7 @@ function draftFromEntry(entry) {
     ...entry,
     name: entry?.name || '',
     foodType: entry?.foodType || '',
-    transportType: entry?.transportType === 'tolls' ? 'parking-tolls' : (entry?.transportType || ''),
+    transportType: entry?.transportType || '',
     amount: String(entry?.amount ?? ''),
     date: entry?.date || today(),
     note: entry?.note || '',
@@ -416,13 +423,13 @@ function draftFromEntry(entry) {
 function formSubtype(row, draft) {
   if (!row.subtypes?.length) return '';
   const current = row.category === 'transport' ? draft.transportType : draft.foodType;
-  return '<fieldset><legend>' + esc(row.label) + ' type</legend><div class="overview-form-chips">' + row.subtypes.map(([key, label]) => '<button type="button" class="' + (current === key || (current === 'tolls' && key === 'parking-tolls') ? 'active' : '') + '" data-form-subtype="' + key + '">' + esc(label) + '</button>').join('') + '</div></fieldset>';
+  return '<fieldset><legend>' + esc(row.label) + ' type</legend><div class="overview-form-chips">' + (row.car&&draft.transportType==='parking-tolls'?[...row.subtypes,['parking-tolls','Tolls / Parking (older)']]:row.subtypes).map(([key, label]) => '<button type="button" class="' + (current === key ? 'active' : '') + '" data-form-subtype="' + key + '">' + esc(label) + '</button>').join('') + '</div></fieldset>';
 }
 
 function categoryFormHtml(plan, row, draft, entry) {
   const available = n(latest?.sharedJar?.balance) + n(entry?.jarContribution);
   const jar = draft.useJar && row.category === 'accommodation' ? n(draft.amount) * .2 : 0;
-  const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
+  const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'car-other' || (draft.transportType === 'other' && !row.car);
   return '<div class="overview-expense-form">' +
     formSubtype(row, draft) +
     '<label data-form-name-wrap class="' + (needsName ? '' : 'hidden') + '">Expense name<input id="overviewExpenseName" value="' + esc(draft.name || '') + '" placeholder="Write your own"></label>' +
@@ -468,13 +475,13 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
     const syncChoices = () => {
       dialog.querySelectorAll('[data-form-subtype]').forEach((button) => {
         const current = row.category === 'transport' ? draft.transportType : draft.foodType;
-        button.classList.toggle('active', current === button.dataset.formSubtype || (current === 'tolls' && button.dataset.formSubtype === 'parking-tolls'));
+        button.classList.toggle('active', current === button.dataset.formSubtype);
       });
       dialog.querySelectorAll('[data-form-payer]').forEach((button) => button.classList.toggle('active', draft.paidBy === button.dataset.formPayer));
       dialog.querySelectorAll('[data-form-split]').forEach((button) => button.classList.toggle('active', draft.split === button.dataset.formSplit));
       dialog.querySelectorAll('[data-form-owner]').forEach((button) => button.classList.toggle('active', draft.forActor === button.dataset.formOwner));
 
-      const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'other';
+      const needsName = row.customName || draft.foodType === 'other' || draft.transportType === 'car-other' || (draft.transportType === 'other' && !row.car);
       dialog.querySelector('[data-form-name-wrap]')?.classList.toggle('hidden', !needsName);
       dialog.querySelector('[data-form-owner-wrap]')?.classList.toggle('hidden', draft.split !== 'personal');
 
@@ -504,7 +511,7 @@ function drawCategory(plan, key, editId = '', expandedHistory = false) {
       if (row.category === 'transport') draft.transportType = button.dataset.formSubtype;
       else draft.foodType = button.dataset.formSubtype;
       syncChoices();
-      if ((draft.foodType === 'other' || draft.transportType === 'other') && !draft.name) {
+      if ((draft.foodType === 'other' || draft.transportType === 'other' || draft.transportType==='car-other') && !draft.name) {
         requestAnimationFrame(() => dialog.querySelector('#overviewExpenseName')?.focus());
       }
     });
@@ -567,7 +574,7 @@ async function saveEntry(plan, row, draft) {
   const error = dialog?.querySelector('[data-overview-error]');
   const amount = Number(String(draft.amount || '').replace(',', '.'));
   const subtype = row.category === 'transport' ? draft.transportType : row.category === 'food' ? draft.foodType : '';
-  const needsName = row.customName || subtype === 'other';
+  const needsName = row.customName || subtype === 'other' || subtype === 'car-other';
   if (row.subtypes?.length && !subtype) { if (error) error.textContent = 'Choose a type first.'; return; }
   if (needsName && !String(draft.name || '').trim()) { if (error) error.textContent = 'Add the expense name first.'; return; }
   if (!Number.isFinite(amount) || amount <= 0) { if (error) error.textContent = 'Enter a valid amount.'; return; }

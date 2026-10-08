@@ -6,7 +6,7 @@ import { n, money, fmtDate } from '../lib/format.js';
 export const MONEY_FIELDS = ['accom', 'groceries', 'eat', 'travel', 'fuel', 'tolls', 'other'];
 export const MONEY_LABELS = {
   accom: 'Accommodation', groceries: 'Groceries', eat: 'Eating out',
-  travel: 'Flights / Train', fuel: 'Fuel', tolls: 'Tolls / Parking', other: 'Other',
+  travel: 'Transport', fuel: 'Car · Fuel', tolls: 'Car · Tolls / Parking', other: 'Other',
 };
 export const DEFAULT_COMPARE = {
   rent: 600, utilities: 120, condo: 0, stilltravel: 180, food: 250,

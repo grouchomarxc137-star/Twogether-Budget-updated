@@ -5432,3 +5432,32 @@ body.tv2-locked{overflow:hidden}
     max-width:150px;
   }
 }
+
+/* Car is one category in trip summaries, with four precisely logged subtypes. */
+.tv2-car-subtypes,.trip-car-expense-choices{border:0;padding:0;margin:12px 0}
+.tv2-car-subtypes legend,.trip-car-expense-choices legend{font-size:13px;font-weight:720;margin-bottom:9px;color:#605245}
+.trip-car-expense-choices>div{display:flex;flex-wrap:wrap;gap:7px}
+.trip-car-expense-choices button{border:1px solid #d9cbbb;border-radius:99px;padding:9px 14px;background:#faf7f1;color:#463c32;font:inherit;cursor:pointer}
+.trip-car-expense-choices button.active{background:#34302b;color:#fff;border-color:#34302b}
+.trip-car-breakdown-trigger{cursor:pointer;touch-action:pan-y;-webkit-touch-callout:none}
+#monthly .trip-monthly-category.trip-car-breakdown-trigger{width:100%;background:transparent;border:0;padding:0;text-align:left;color:inherit;font:inherit}
+#monthly .trip-car-breakdown-trigger:focus-visible{outline:2px solid #ab8c55;outline-offset:3px;border-radius:8px}
+.trip-car-ball{display:inline-block;width:9px;height:9px;margin-right:7px;border-radius:50%;background:#a88d57;vertical-align:middle}
+.submission-mini .trip-car-breakdown-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:transparent;color:inherit;border:0;padding:5px 0;font:inherit;text-align:left}
+.submission-mini .trip-car-breakdown-trigger b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.trip-car-breakdown-dialog{border:0;background:transparent;padding:16px;max-width:min(540px,100%);width:100%;max-height:calc(100dvh - 36px);overflow:auto;color:#322b25}
+.trip-car-breakdown-dialog::backdrop{background:rgba(20,15,10,.56);backdrop-filter:blur(3px)}
+.trip-car-breakdown-shell{padding:24px;border-radius:20px;background:#fffdf9;box-shadow:0 18px 48px #0002}
+.trip-car-breakdown-shell header{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.trip-car-breakdown-shell h2{font-size:25px;margin:5px 0 0;line-height:1.2}
+.trip-car-breakdown-close{font-size:25px;line-height:1;background:transparent;border:0;color:#67594b;padding:3px 8px;cursor:pointer}
+.trip-car-breakdown-total{display:flex;justify-content:space-between;gap:12px;margin:16px 0 8px;padding:13px 0;border-top:1px solid #ece2d6;border-bottom:1px solid #ece2d6;font-size:13px}
+.trip-car-breakdown-total strong{font-size:17px}
+.trip-car-breakdown-group{padding:10px 0;border-bottom:1px solid #eee5dc}
+.trip-car-breakdown-group-head{display:flex;justify-content:space-between;gap:15px;font-size:15px;padding-bottom:5px}
+.trip-car-breakdown-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#73685e;font-size:13px;padding:7px 0}
+.trip-car-breakdown-entry span{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.trip-car-breakdown-entry small{font-size:11px;color:#93867a}
+.trip-car-breakdown-entry b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.trip-car-breakdown-empty{font-size:13px;color:#88786c;padding:20px 0}
+@media(max-width:600px){.trip-car-breakdown-dialog{padding:10px}.trip-car-breakdown-shell{padding:18px}}

@@ -23,11 +23,12 @@ import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { tripImage, preloadTripImages } from './trip-images.js';
+import { isCarExpense, carExpenseLabel, CAR_TYPES, carExpenseSubtype } from './car-expenses.js';
 import { recurringBudgetItems, budgetProgressForMonth, budgetKeyForItem } from '../finances/main-budgets.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
-const LABELS = { travel: 'Flights / Train', accom: 'Accommodation', fuel: 'Fuel', groceries: 'Groceries', eat: 'Eating out', tolls: 'Tolls / Parking', other: 'Other' };
+const LABELS = { travel: 'Transport', accom: 'Accommodation', fuel: 'Car · Fuel', groceries: 'Groceries', eat: 'Eating out', tolls: 'Car · Tolls / Parking', other: 'Other' };
 
 let remoteState = null;
 let refreshing = false;
@@ -170,7 +171,7 @@ function settlementState(plan) {
 }
 function debtCategoryKey(entry) {
   if (entry?.category === 'accommodation') return 'stay';
-  if (entry?.category === 'transport') return entry.transportType === 'fuel' ? 'car' : 'transport';
+  if (entry?.category === 'transport') return isCarExpense(entry) ? 'car' : 'transport';
   if (entry?.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eating-out';
   if (entry?.category === 'activities') return 'activities';
   return 'other';
@@ -353,7 +354,7 @@ function relativePayer(name) { return name === actor() ? 'you' : name; }
 function categoryInfo(entry) {
   if (entry?.category === 'accommodation') return ['Stay', '🛏'];
   if (entry?.category === 'transport') {
-    if (entry?.transportType === 'fuel') return ['Car', '⛽'];
+    if(isCarExpense(entry))return ['Car · '+carExpenseLabel(entry),'⛽'];
     return ['Transport', '✈️'];
   }
   if (entry?.category === 'food') {
@@ -596,14 +597,14 @@ const EXPENSE_CATS = [
 function uiCategoryFromEntry(entry) {
   if (!entry) return '';
   if (entry.category === 'accommodation') return 'stay';
-  if (entry.category === 'transport') return entry.transportType === 'fuel' ? 'car' : 'transport';
+  if (entry.category === 'transport') return isCarExpense(entry) ? 'car' : 'transport';
   if (entry.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eating-out';
   return entry.category || 'other';
 }
-function mapUiCategory(key) {
+function mapUiCategory(key,carType='fuel') {
   if (key === 'stay') return {category:'accommodation',foodType:'',transportType:'',useJar:true};
   if (key === 'transport') return {category:'transport',foodType:'',transportType:'other',useJar:false};
-  if (key === 'car') return {category:'transport',foodType:'',transportType:'fuel',useJar:false};
+  if (key === 'car') return {category:'transport',foodType:'',transportType:carExpenseSubtype(carType),useJar:false};
   if (key === 'groceries') return {category:'food',foodType:'groceries',transportType:'',useJar:false};
   if (key === 'eating-out') return {category:'food',foodType:'eating-out',transportType:'',useJar:false};
   if (key === 'activities') return {category:'activities',foodType:'',transportType:'',useJar:false};
@@ -643,6 +644,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   const state = {
     amountText: existing ? String(existing.amount ?? '') : '',
     category: uiCategoryFromEntry(existing),
+    carType:isCarExpense(existing)?String(existing.transportType):'fuel',
     paidBy: existing?.paidBy || me,
     split: existing?.split || 'shared',
     forActor: existing?.forActor || (existing?.split === 'personal' && existing?.paidBy && existing.paidBy !== 'both' ? existing.paidBy : me),
@@ -661,7 +663,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   const jarAmount = () => state.category === 'stay' && state.useJar && validAmount() ? amount() * .2 : 0;
   const tripFuelBudget = () => {
     if(me!=='Principe')return null;
-    const kind=state.category==='car'?'fuel':state.category==='groceries'?'groceries':'';
+    const kind=state.category==='car'&&state.carType==='fuel'?'fuel':state.category==='groceries'?'groceries':'';
     if(!kind)return null;
     const month=String(state.date||'').slice(0,7);
     const budget=recurringBudgetItems(remoteState?.financeProfiles?.Principe?.recurring).find((item)=>budgetKeyForItem(item)===kind);
@@ -737,6 +739,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         const cls = state.category===k || selectedDebt ? 'on' : '';
         return '<button type="button" class="tv2-cat '+cls+(selectedDebt?' is-owed-target':'')+(hasOwedBalance?' has-owed-balance':'')+'" data-cat="'+k+'" aria-pressed="'+((state.category===k||selectedDebt)?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>';
       }).join('')+'</div>'+
+      (state.category==='car'?'<fieldset class="tv2-car-subtypes"><legend>Car expense</legend><div class="tv2-seg">'+(state.carType==='parking-tolls'?[{value:'parking-tolls',label:'Tolls / Parking (older)'},...CAR_TYPES]:CAR_TYPES).map((type)=>'<button type="button" data-car-type="'+type.value+'" class="'+(state.carType===type.value?'on':'')+'" aria-pressed="'+(state.carType===type.value?'true':'false')+'">'+type.label+'</button>').join('')+'</div></fieldset>':'')+
       owedPanel+normalOptions+
       (tripFuelBudget()?'<div class="finance-budget-trip-preview" aria-live="polite"></div>':'')+
       '<p class="tv2-hint" aria-live="polite"></p>'+
@@ -805,6 +808,10 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         mount();
         return;
       }
+      if(b.dataset.carType){
+        state.carType=carExpenseSubtype(b.dataset.carType);
+        mount();return;
+      }
       if (b.dataset.cat) {
         const key = b.dataset.cat;
         if (state.category === 'owed') {
@@ -869,7 +876,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
       } catch (err) { state.busy=false; state.error=err?.message||'Could not save repayment. Check your connection and try again.'; refreshLive(); }
       return;
     }
-    const mapped=mapUiCategory(state.category);
+    const mapped=mapUiCategory(state.category,state.carType);
     try {
       await window.TwogetherAPI.post('saveTripExpense',{planId:plan.id,expense:{
         id:existing?.id||'',category:mapped.category,foodType:mapped.foodType,transportType:mapped.transportType,name:'',

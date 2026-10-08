@@ -20,6 +20,8 @@ import { getState, isBackendV3, postAction, syncNow } from './state.js';
 import { beginEdit, beginJoin } from './wizard.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { tripImage, preloadTripImages } from './trip-images.js';
+import { isCarExpense, carExpenseBreakdown } from './car-expenses.js';
+import { installCarLongPress, showCarBreakdown } from './car-breakdown-ui.js';
 
 let openTripId = '';
 let selectedMonthlyKey = '';
@@ -148,6 +150,18 @@ function renderTripModal(id) {
       ${!isBackendV3() && both && !diff.length ? '<span class="backend-inline-note">Backend v3 is needed before confirmation can be saved.</span>' : ''}
     </div>`;
 
+  root.querySelectorAll('[data-trip-car-breakdown]').forEach((trigger)=>installCarLongPress(trigger,()=>{
+    const total=n(e.fuel)+n(e.tolls);
+    const plan=(Array.isArray(state.plans)?state.plans:[]).find((item)=>item.linkedTripId===t.id);
+    const details=carExpenseBreakdown(plan?.expenseEntries);
+    const recordedFuel=details.find((g)=>g.kind==='fuel')?.amount||0;
+    const recordedOther=details.filter((g)=>g.kind!=='fuel').reduce((sum,g)=>sum+g.amount,0);
+    const legacyFuel=Math.max(0,n(e.fuel)-recordedFuel);
+    const legacyOther=Math.max(0,n(e.tolls)-recordedOther);
+    if(legacyFuel>.005)details.push({kind:'older-fuel',label:'Fuel (older)',amount:legacyFuel,items:[]});
+    if(legacyOther>.005)details.push({kind:'older-car',label:'Tolls / Parking (older)',amount:legacyOther,items:[]});
+    showCarBreakdown('Car · '+(m.city||'Trip'),details,total);
+  }));
   $('[data-edit-own]', root)?.addEventListener('click', () => beginEdit(id));
   $('[data-add-own]', root)?.addEventListener('click', () => { closeTripModal(true); openSheet('log'); beginJoin(id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('[data-confirm-own]', root)?.addEventListener('click', async () => {
@@ -158,7 +172,15 @@ function renderTripModal(id) {
 
 function submissionCard(name, s) {
   if (!s) return `<div class="submission-card missing"><span>${esc(name)}</span><strong>Not logged yet</strong></div>`;
-  return `<div class="submission-card"><span>${esc(name)}</span><strong>${money(tripTotalSubmission(s))}</strong><small>Paid: ${money(s.paid)}</small><div class="submission-mini">${MONEY_FIELDS.map((k) => `<div><span>${esc(MONEY_LABELS[k])}</span><b>${s?.uncertain?.[k] ? '~ ' : ''}${money(s[k])}</b></div>`).join('')}</div></div>`;
+  const fields=[...MONEY_FIELDS.filter((key)=>key!=='fuel'&&key!=='tolls'),'car'];
+  const html=fields.map((key)=>{
+    const car=key==='car',amount=car?n(s.fuel)+n(s.tolls):n(s[key]);
+    const uncertain=car?!!(s?.uncertain?.fuel||s?.uncertain?.tolls):!!s?.uncertain?.[key];
+    const categoryLabel=car?'Car':key==='travel'?'Transport':MONEY_LABELS[key];
+    if(car)return '<button type="button" class="trip-car-breakdown-trigger" data-trip-car-breakdown aria-label="View Car expense breakdown"><span><i class="trip-car-ball" aria-hidden="true"></i>'+esc(categoryLabel)+'</span><b>'+(uncertain?'~ ':'')+money(amount)+'</b></button>';
+    return '<div><span>'+esc(categoryLabel)+'</span><b>'+(uncertain?'~ ':'')+money(amount)+'</b></div>';
+  }).join('');
+  return `<div class="submission-card"><span>${esc(name)}</span><strong>${money(tripTotalSubmission(s))}</strong><small>Paid: ${money(s.paid)}</small><div class="submission-mini">${html}</div></div>`;
 }
 
 const MONTHLY_CATEGORY_COLORS = {
@@ -166,6 +188,7 @@ const MONTHLY_CATEGORY_COLORS = {
   groceries: '#c89d56',
   eat: '#c77f68',
   travel: '#7188a1',
+  car: '#a88d57',
   fuel: '#a88d57',
   tolls: '#8d7b6d',
   other: '#b6aaa0',
@@ -178,13 +201,15 @@ function fullMonthLabel(key) {
   return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
+const MONTHLY_DISPLAY_FIELDS=['accom','groceries','eat','travel','car','other'];
+const monthlyDisplayAmount=(stat,key)=>key==='car'?Math.max(0,n(stat?.fuel)+n(stat?.tolls)):Math.max(0,n(stat?.[key]));
 function monthlyDonutGradient(stat) {
-  const values = MONEY_FIELDS.map((key) => Math.max(0, n(stat?.[key])));
+  const values = MONTHLY_DISPLAY_FIELDS.map((key)=>monthlyDisplayAmount(stat,key));
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total <= .005) return 'conic-gradient(#e8e2d9 0 100%)';
   let cursor = 0;
   const stops = [];
-  MONEY_FIELDS.forEach((key, index) => {
+  MONTHLY_DISPLAY_FIELDS.forEach((key, index) => {
     const value = values[index];
     if (value <= .005) return;
     const start = cursor;
@@ -199,7 +224,7 @@ function monthlyEntryKey(entry) {
   if (entry?.category === 'food') return entry.foodType === 'groceries' ? 'groceries' : 'eat';
   if (entry?.category === 'transport') {
     if (entry.transportType === 'fuel') return 'fuel';
-    if (entry.transportType === 'tolls' || entry.transportType === 'parking-tolls') return 'tolls';
+    if (isCarExpense(entry)) return 'tolls';
     return 'travel';
   }
   return 'other';
@@ -289,16 +314,19 @@ export function renderMonthly() {
   const me = actor();
   const personal = monthlyViewMode === 'personal';
   const selected = personal ? personalMonthlyStat(getState(), selectedCombined.key, me, selectedCombined.trips) : selectedCombined;
-  const categories = MONEY_FIELDS.map((key) => ({
+  const categories = MONTHLY_DISPLAY_FIELDS.map((key) => ({
     key,
-    label: MONEY_LABELS[key],
-    amount: Math.max(0, n(selected[key])),
+    label: key==='car'?'Car':key==='travel'?'Transport':MONEY_LABELS[key],
+    amount: monthlyDisplayAmount(selected,key),
     color: MONTHLY_CATEGORY_COLORS[key],
   })).filter((item) => item.amount > .005);
   const categoryHtml = categories.length
     ? categories.map((item) => {
         const percent = selected.total > .005 ? (item.amount / selected.total) * 100 : 0;
-        return `<div class="trip-monthly-category"><i style="--trip-monthly-color:${item.color}" aria-hidden="true"></i><span><strong>${esc(item.label)}</strong><small>${percent.toFixed(0)}% of ${personal ? 'your spending' : 'this month'}</small></span><b>${money(item.amount)}</b></div>`;
+        const content='<i style="--trip-monthly-color:'+item.color+'" aria-hidden="true"></i><span><strong>'+esc(item.label)+'</strong><small>'+percent.toFixed(0)+'% of '+(personal?'your spending':'this month')+'</small></span><b>'+money(item.amount)+'</b>';
+        return item.key==='car'
+          ?'<button class="trip-monthly-category trip-car-breakdown-trigger" data-trip-monthly-car type="button" aria-label="Show Car spending breakdown">'+content+'</button>'
+          :'<div class="trip-monthly-category">'+content+'</div>';
       }).join('')
     : `<div class="trip-monthly-empty">${personal && !selected.detailed ? 'No detailed personal payer data is available for this month.' : personal ? 'You have no personal Trip spending logged for this month.' : 'No trip spending logged for this month.'}</div>`;
 
@@ -351,6 +379,20 @@ export function renderMonthly() {
     renderMonthly();
   });
 
+  const carTrigger=body.querySelector('[data-trip-monthly-car]');
+  installCarLongPress(carTrigger,()=>{
+    const currentState=getState();
+    const matchingPlans=(Array.isArray(currentState.plans)?currentState.plans:[]).filter((plan)=>String(plan?.meta?.start||'').slice(0,7)===selectedCombined.key);
+    const details=carExpenseBreakdown(matchingPlans.flatMap((plan)=>Array.isArray(plan.expenseEntries)?plan.expenseEntries:[]),{payer:personal?me:''});
+    const shownAmount=monthlyDisplayAmount(selected,'car');
+    const recordedFuel=details.find((g)=>g.kind==='fuel')?.amount||0;
+    const recordedOther=details.filter((g)=>g.kind!=='fuel').reduce((sum,g)=>sum+g.amount,0);
+    const legacyFuel=Math.max(0,n(selected.fuel)-recordedFuel);
+    const legacyOther=Math.max(0,n(selected.tolls)-recordedOther);
+    if(legacyFuel>.005)details.push({kind:'older-fuel',label:'Fuel (older)',amount:legacyFuel,items:[]});
+    if(legacyOther>.005)details.push({kind:'older-car',label:'Tolls / Parking (older)',amount:legacyOther,items:[]});
+    showCarBreakdown('Car · '+fullMonthLabel(selectedCombined.key),details,shownAmount);
+  });
   const toggleMonthlyView = () => {
     monthlyViewMode = monthlyViewMode === 'personal' ? 'combined' : 'personal';
     renderMonthly();

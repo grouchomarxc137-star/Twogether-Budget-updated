@@ -11,7 +11,7 @@
 import { esc, money } from '../lib/format.js';
 import { actor, otherActor } from '../lib/session.js';
 
-const labels = { accom: 'Accommodation', travel: 'Flights / Train' };
+const labels = { accom: 'Accommodation', travel: 'Transport' };
 const amount = (v) => Number(String(v).replace(',', '.'));
 const valid = (v) => String(v ?? '').trim() !== '' && Number.isFinite(amount(v)) && amount(v) >= 0;
 
