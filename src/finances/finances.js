@@ -2985,12 +2985,13 @@ function financeMonthTimeline(rec) {
             ? 'Inside '+(actor()==='Principe'?'Personal':'Extra')+' allowance · Already included in budget'
           : futureBill
             ? categoryLabel(tone)+' · Pending · Expected '+financeDateLabel(row.date)
-            : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
+            : carryPayback ? 'Self-debt repayment · Deducted from monthly funds' : categoryLabel(tone)+(item.paidFrom==='sharedJar'?' · Shared Jar':'');
+      const carryPayback=row.kind==='expense'&&String(item.id||'').startsWith('allowance-payback:');
       const protectedFixed=row.kind==='expense'&&(
         actor()==='Principessa'&&normalizeGroup(item.group)==='extra'&&String(item.name||'').trim().toLowerCase()==='extra'
         ||actor()==='Principe'&&normalizeGroup(item.group)==='variable'&&String(item.name||'').trim().toLowerCase()==='personal'&&!item.id);
-      const editable=(row.kind==='income'||row.kind==='expense'||allowance)&&!locked;
-      const deletable=!protectedFixed&&(row.kind==='income'||row.kind==='expense'||row.kind==='extra'||allowance||futureBill)&&!locked;
+      const editable=(row.kind==='income'||row.kind==='expense'||allowance)&&!locked&&!carryPayback;
+      const deletable=!carryPayback&&!protectedFixed&&(row.kind==='income'||row.kind==='expense'||row.kind==='extra'||allowance||futureBill)&&!locked;
       const rowHtml=tripExpenseRowHtml({
         attr:futureBill?'data-fin-future-id="'+esc(item.id)+'" data-fin-future-due="'+esc(row.date)+'"':editable?'data-fin-entry-kind="'+row.kind+'" data-fin-entry-index="'+row.index+'"':'',
         disabled:!editable&&!futureBill,
@@ -3452,6 +3453,7 @@ function renderDetail(rec) {
         actor()==='Principessa'&&normalizeGroup(item.group)==='extra'&&String(item.name||'').trim().toLowerCase()==='extra'
         ||actor()==='Principe'&&normalizeGroup(item.group)==='variable'&&String(item.name||'').trim().toLowerCase()==='personal'&&!item.id);
       if(allowanceItem){openFinanceTransactionSheet(rec,{kind:'allowance-start'});return;}
+      if(item&&String(item.id||'').startsWith('allowance-payback:'))return;
       openFinanceTransactionSheet(rec,{
         kind:button.dataset.finEntryKind,
         index:Number(button.dataset.finEntryIndex),

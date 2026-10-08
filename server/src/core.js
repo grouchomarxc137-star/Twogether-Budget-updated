@@ -1398,6 +1398,7 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       financeReconcileCarryLoans_(list,financeProfile,actor,now);
       financeSetCarryBudget_(monthData,actor,financeCarryPlan_(list,financeProfile,actor,monthData.month).budget);
       financeCheckAllowanceCap_(monthData,actor);
+      financeSyncCarryRepaymentExpense_(monthData,financeProfile,actor);
       syncFinanceSharedJarTransactions_(state,actor,monthData,now);
       const savingsUsed = function(record) {
         return (record && Array.isArray(record.extraSpends) ? record.extraSpends : []).filter(function(x){ return x.source === 'savings'; }).reduce(function(sum,x){ return sum + Number(x.amount || 0); },0);
@@ -1465,11 +1466,13 @@ function handleAction_(actionValue, payloadValue, actorValue) {
         const available=Math.max(0,Math.round(Number(loan.principal||0)*100)-previously);
         const amount=Math.min(available,remaining);
         if(!amount)return;
-        loan.repayments.push({id:'carry-deduction:'+month+':'+loan.id.slice(financeCarrySettings_(actor).prefix.length),
+        loan.repayments.push({id:'allowance-payback:'+month+':'+loan.id.slice(financeCarrySettings_(actor).prefix.length),
           month:month,date:month+'-01',amount:amount/100,at:now});
         remaining-=amount;
       });
       if(remaining)throw new Error('Could not complete debt repayment');
+      financeSyncCarryRepaymentExpense_(record,profile,actor);
+      record.updatedAt=now;record.updatedBy=actor;
       profile.updatedAt=now;profile.updatedBy=actor;
       financeRefreshFutureCarry_(list,profile,actor,month,now);
       state.financeProfiles[actor]=profile;
@@ -2468,6 +2471,26 @@ function financeCheckAllowanceCap_(record,actor) {
   const spent=(record.allowanceSpends||[]).reduce(function(sum,x){return sum+Math.round(Number(x.amount||0)*100);},0);
   const cap=financeAllowanceBudgetCents_(record,actor);
   if(spent>cap)throw new Error((actor==='Principe'?'Personal':'Extra')+' spending cannot exceed '+formatMoney_(cap/100)+' this month');
+}
+
+function financeSyncCarryRepaymentExpense_(record,profile,actor) {
+  const id='allowance-payback:'+record.month;
+  // This expense is derived from completed Pay back actions, never from a
+  // user-supplied amount. It replaces, rather than adds to, an existing row.
+  const prior=(record.expenses||[]).find(function(x){return x.id===id;});
+  record.expenses=(record.expenses||[]).filter(function(x){return x.id!==id;});
+  const prefix=financeCarrySettings_(actor).prefix;
+  const repayments=(profile.receivables||[]).filter(function(loan){
+    return String(loan.id||'').startsWith(prefix)&&String(loan.id).slice(prefix.length)<record.month;
+  }).reduce(function(sum,loan){
+    return sum+(loan.repayments||[]).filter(function(p){
+      return p.month===record.month&&String(p.id||'').startsWith('allowance-payback:');
+    }).reduce(function(n,p){return n+Math.round(Number(p.amount||0)*100);},0);
+  },0);
+  if(repayments<=0)return;
+  record.expenses.push({id:id,group:'other',name:'Pay back '+financeCarrySettings_(actor).label,
+    amount:repayments/100,date:prior?.date||record.month+'-01',paidFrom:'personal',
+    budgetCategoryId:''});
 }
 function financeCarryPayable_(list,profile,actor,month) {
   const config=financeCarrySettings_(actor);

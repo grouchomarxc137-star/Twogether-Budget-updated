@@ -250,3 +250,48 @@ test('older self-debt and repayments stay safe after enabling manual Pay back',(
     assert.equal(loan.repayments.length,2);
   }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('Pay back creates exactly one ordinary outflow record, and later saves preserve it',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ledger-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const action=(name,payload)=>database.db.transaction(()=>runAction(name,payload,'Principessa'))();
+  const month=(name,extra=0,finalized=false)=>({month:name,finalized,incomes:[{name:'Salary',amount:1000}],
+    expenses:[{group:'extra',name:'Extra',amount:250}],
+    extraSpends:extra?[{source:'main',amount:extra}]:[]});
+  try{
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-10',500,true)}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-11')}).ok,true);
+    const first=action('repayFinanceCarry',{month:'2026-11'});
+    assert.equal(first.paid,200);
+    assert.equal(first.monthData.expenses.find(x=>x.id==='allowance-payback:2026-11').amount,200);
+    assert.equal(first.monthData.expenses.reduce((total,x)=>total+Number(x.amount),0),250);
+    assert.equal(action('repayFinanceCarry',{month:'2026-11'}).ok,false);
+    const stale=action('saveFinanceMonth',{monthData:month('2026-11')});
+    assert.equal(stale.ok,true);
+    assert.equal(stale.monthData.expenses.filter(x=>x.id==='allowance-payback:2026-11').length,1);
+    assert.equal(stale.monthData.expenses.reduce((total,x)=>total+Number(x.amount),0),250);
+    const confirmed=action('saveFinanceMonth',{monthData:month('2026-11',0,true)});
+    assert.equal(confirmed.twosDelta,750);
+    assert.equal(getState().financeProfiles.Principessa.receivables[0].repayments.length,1);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('Principe Pay back is a Personal monthly outflow, not a second Personal allocation',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'twogether-ledger-'));
+  const database=openDatabase(join(dir,'test.sqlite'));
+  configureStateStore(database.store);
+  const action=(name,payload)=>database.db.transaction(()=>runAction(name,payload,'Principe'))();
+  const month=(name,extra=0,finalized=false)=>({month:name,finalized,incomes:[],
+    expenses:[{group:'variable',name:'Personal',amount:100}],
+    extraSpends:extra?[{source:'main',amount:extra}]:[]});
+  try{
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-10',120,true)}).ok,true);
+    assert.equal(action('saveFinanceMonth',{monthData:month('2026-11')}).ok,true);
+    const repaid=action('repayFinanceCarry',{month:'2026-11'});
+    assert.equal(repaid.paid,70);
+    assert.equal(repaid.monthData.expenses.find(x=>x.id==='allowance-payback:2026-11').amount,70);
+    assert.equal(repaid.monthData.expenses.reduce((total,x)=>total+Number(x.amount),0),100);
+    assert.equal(repaid.monthData.expenses.filter(x=>x.name==='Personal').length,1);
+  }finally{database.close();rmSync(dir,{recursive:true,force:true});}
+});
