@@ -1722,7 +1722,7 @@ function openRecurringDeleteConfirm(kind,index) {
   });
   setTimeout(()=>deleteButton.focus(),0);
 }
-function bindRecurringItemSwipe(root) {
+function bindRecurringItemSwipe(root, { futureBills = false } = {}) {
   recurringSwipeAbort?.abort();
   const controller=new AbortController();
   recurringSwipeAbort=controller;
@@ -1810,11 +1810,15 @@ function bindRecurringItemSwipe(root) {
       return;
     }
     const kind=row.dataset.finRecurringKind,index=Number(row.dataset.finRecurringIndex);
+    const billId=futureBills?row.dataset.finFutureId:'';
     finish(row,direction);
     resetState();
     setTimeout(()=>{
       resetRecurringSwipeVisual(row,false);
-      if(direction==='edit') openRecurringEditor(kind,index);
+      if(futureBills){
+        if(direction==='edit')openFutureBillEditor(billId);
+        else openFutureBillDelete(billId);
+      } else if(direction==='edit') openRecurringEditor(kind,index);
       else openRecurringDeleteConfirm(kind,index);
     },180);
   },{passive:true,signal});
@@ -1852,12 +1856,14 @@ function openFutureBillsManager() {
   const bills=[...profile().futureBills].sort((a,b)=>a.date.localeCompare(b.date));
   const rows=bills.map((bill)=>{
     const next=futureBillNextStatus(bill);
-    return '<div class="finance-future-bill-list-row"><button type="button" class="finance-future-bill-row" data-fin-future-edit="'+esc(bill.id)+'">'+
+    return '<div class="finance-recurring-swipe-row finance-future-bill-list-row" data-fin-future-id="'+esc(bill.id)+'">'+
+      '<span class="finance-recurring-edit-reveal" aria-hidden="true"><b>Edit</b></span>'+
+      '<span class="finance-recurring-delete-reveal" aria-hidden="true"><b>Delete</b></span>'+
+      '<button type="button" class="finance-recurring-tv2-row finance-future-bill-row" data-fin-future-edit="'+esc(bill.id)+'">'+
       '<span class="finance-future-bill-main"><strong>'+esc(bill.name)+'</strong><small>'+esc(futureBillDisplayDate(next.date))+' · '+(bill.repeat==='yearly'?'Repeats yearly':'One-time')+'</small></span>'+
       '<span class="finance-future-bill-end"><b>'+money(bill.amount)+'</b><small>'+esc(next.status)+'</small></span>'+
       '<span aria-hidden="true">›</span>'+
-    '</button>'+
-    '<button type="button" class="finance-future-bill-remove" data-fin-future-remove="'+esc(bill.id)+'" aria-label="Delete schedule for '+esc(bill.name)+'" title="Delete bill schedule">×</button></div>';
+    '</button></div>';
   }).join('')||'<div class="finance-recurring-empty-card">No future bills yet. Add one to plan ahead.</div>';
   showMini(
     '<div class="tv2-root finance-recurring-tv2 finance-future-bills-view">'+
@@ -1870,10 +1876,14 @@ function openFutureBillsManager() {
     'recurring-manager'
   );
   const root=$('#financeMiniBody');
+  root.onclick=null; // Clear the recurring manager's delegated row-edit handler.
   $('[data-fin-future-close]',root)?.addEventListener('click',openRecurringManager);
   $('[data-fin-future-add]',root)?.addEventListener('click',()=>openFutureBillEditor(''));
-  $$('[data-fin-future-edit]',root).forEach((row)=>row.addEventListener('click',()=>openFutureBillEditor(row.dataset.finFutureEdit)));
-  $$('[data-fin-future-remove]',root).forEach((button)=>button.addEventListener('click',()=>openFutureBillDelete(button.dataset.finFutureRemove)));
+  $$('[data-fin-future-edit]',root).forEach((row)=>row.addEventListener('click',()=>{
+    if(Date.now()<recurringSwipeIgnoreUntil)return;
+    openFutureBillEditor(row.dataset.finFutureEdit);
+  }));
+  bindRecurringItemSwipe(root,{futureBills:true});
 }
 function openFutureBillEditor(id) {
   const item=profile().futureBills.find((bill)=>bill.id===id)||null;
@@ -1926,26 +1936,47 @@ function openFutureBillEditor(id) {
 function openFutureBillDelete(id) {
   const bill=profile().futureBills.find((item)=>item.id===id);
   if(!bill)return;
-  showMini(
-    '<div class="tv2-root finance-recurring-tv2 finance-future-bills-view"><div class="tv2-page">'+
-      '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-future-back>‹ Back</button></div><h1>Delete Future Bill?</h1><p>Remove '+esc(bill.name)+' from future reminders? Already logged expenses will stay unchanged.</p></header>'+
-      '<div class="finance-recurring-editor-actions"><button type="button" class="btn ghost" data-fin-future-cancel>Cancel</button><button type="button" class="tv2-primary" data-fin-future-confirm-delete>Delete bill</button></div>'+
-    '</div></div>',
-    'recurring-manager',{back:()=>openFutureBillEditor(id),keepSurfaceOnBack:true}
-  );
-  $('[data-fin-future-back]')?.addEventListener('click',()=>openFutureBillEditor(id));
-  $('[data-fin-future-cancel]')?.addEventListener('click',()=>openFutureBillEditor(id));
-  $('[data-fin-future-confirm-delete]')?.addEventListener('click',async()=>{
-    const button=$('[data-fin-future-confirm-delete]');button.disabled=true;
+  closeRecurringDeleteConfirm();
+  recurringDeleteConfirmLayer=document.createElement('div');
+  recurringDeleteConfirmLayer.className='tv2-confirm-layer';
+  recurringDeleteConfirmLayer.innerHTML=
+    '<div class="tv2-confirm-backdrop" data-fin-future-cancel></div>'+
+    '<div class="tv2-confirm-card" role="dialog" aria-modal="true" aria-labelledby="finFutureDeleteTitle">'+
+      '<h2 id="finFutureDeleteTitle">Delete bill?</h2>'+
+      '<p>Are you sure you want to delete <strong>'+esc(bill.name)+'</strong>?</p>'+
+      '<p class="tv2-confirm-note">This removes its future schedule. Already logged expenses stay unchanged.</p>'+
+      '<p class="tv2-confirm-error" aria-live="polite"></p>'+
+      '<div class="tv2-confirm-actions"><button type="button" data-fin-future-cancel>Cancel</button><button type="button" class="is-delete" data-fin-future-confirm-delete>Delete</button></div>'+
+    '</div>';
+  document.body.appendChild(recurringDeleteConfirmLayer);
+  const cancel=()=>{closeRecurringDeleteConfirm();closeRecurringSwipeRows();};
+  recurringDeleteConfirmLayer.querySelectorAll('[data-fin-future-cancel]').forEach((button)=>button.addEventListener('click',cancel));
+  recurringDeleteConfirmLayer.addEventListener('keydown',(event)=>{if(event.key==='Escape')cancel();});
+  const button=recurringDeleteConfirmLayer.querySelector('[data-fin-future-confirm-delete]');
+  button.addEventListener('click',async()=>{
+    button.disabled=true;
+    button.textContent='Deleting…';
+    const error=recurringDeleteConfirmLayer?.querySelector('.tv2-confirm-error');
+    if(error)error.textContent='';
     try{
-      const next=profile();next.futureBills=next.futureBills.filter((item)=>item.id!==id);
+      const next=profile();
+      if(!next.futureBills.some((item)=>item.id===id))throw new Error('This future bill no longer exists');
+      next.futureBills=next.futureBills.filter((item)=>item.id!==id);
       await post('saveFinanceProfile',{profile:next});
       financeState.financeProfiles[actor()]=normalizeProfile(next);
-      renderPage();publishFinanceNotifications();openFutureBillsManager();
+      closeRecurringDeleteConfirm();
+      renderPage();
+      publishFinanceNotifications();
+      openFutureBillsManager();
       toast('Future bill removed');
       setTimeout(loadState,600);
-    }catch(error){toast(error?.message||'Could not delete future bill','warn');button.disabled=false;}
+    }catch(err){
+      button.disabled=false;
+      button.textContent='Delete';
+      if(error)error.textContent=err?.message||'Could not delete future bill';
+    }
   });
+  setTimeout(()=>button.focus(),0);
 }
 function openFutureBillConfirm(bill,dueDate) {
   if(!bill||!dueDate)return;
