@@ -11,7 +11,9 @@
 import { $, $$ } from '../lib/dom.js';
 import { money, esc } from '../lib/format.js';
 import { actor } from '../lib/session.js';
-import { getState } from './state.js';
+import { getState, postAction } from './state.js';
+import { isCarExpense } from './car-expenses.js';
+import { confirmedPieCategories } from './confirmed-spend.js';
 
 const COLORS = ['#8d6e63', '#c8909c', '#7f927a', '#c09a5b', '#7f91a8', '#a98572', '#b7a390'];
 
@@ -123,6 +125,13 @@ function installStyles() {
     .confirmed-legend-chip{display:inline-flex;align-items:center;gap:6px;min-height:30px;max-width:100%;padding:0 9px;border:1px solid #e6ddd4;border-radius:999px;background:#fffdfa;color:#6f655c;font:inherit;font-size:10.5px;line-height:1;white-space:nowrap}
     .confirmed-legend-chip i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--confirmed-color)}
     .confirmed-legend-chip.is-selected{border-color:var(--confirmed-color);color:#332d28;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--confirmed-color) 35%,transparent)}
+    .confirmed-legend-chip[data-car-expandable]{touch-action:manipulation;-webkit-touch-callout:none}
+    .confirmed-spend-back{border:0;background:transparent;color:#826245;font-size:12px;font-weight:650;cursor:pointer;padding:8px 0;min-height:35px}
+    .confirmed-spend-back:focus-visible{outline:2px solid #af8d58}
+    .confirmed-spend-car-hint{font-size:10px;color:#91877e;white-space:nowrap}
+    .confirmed-lonato-correction{display:block;width:100%;border:1px solid #decab6;background:#fffaf0;border-radius:11px;color:#75563e;padding:10px 12px;margin:10px 0 0;font-size:12px;font-weight:650;cursor:pointer}
+    .confirmed-lonato-correction:disabled{opacity:.55;cursor:wait}
+    .confirmed-lonato-correction-error{font-size:11px;color:#aa4038;padding:4px}
     .confirmed-spend-empty{padding:18px 4px 8px;color:#91877e;font-size:12px;text-align:center}
     .submission-grid.confirmed-submissions-hidden{display:none!important}
     .budget-locked-note{font-size:11px;color:var(--muted);padding:8px 2px 0}
@@ -231,7 +240,7 @@ function decorateTripBudget() {
 }
 
 function categoryData(card) {
-  return [...(card?.querySelectorAll('.submission-mini > div') || [])].map((row) => ({
+  return [...(card?.querySelectorAll('.submission-mini > div, .submission-mini > button') || [])].map((row) => ({
     label: row.querySelector('span')?.textContent?.trim() || '',
     amount: parseMoney(row.querySelector('b')?.textContent || '') || 0,
   })).filter((x) => x.label && x.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -240,19 +249,15 @@ function categoryData(card) {
 function confirmedEntryCategory(entry) {
   if (entry?.category === 'accommodation') return 'Accommodation';
   if (entry?.category === 'food') return entry.foodType === 'groceries' ? 'Groceries' : 'Eating out';
-  if (entry?.category === 'transport') {
-    if (entry.transportType === 'fuel') return 'Fuel';
-    if (entry.transportType === 'tolls' || entry.transportType === 'parking-tolls') return 'Tolls / Parking';
-    return 'Flights / Train';
-  }
+  if (entry?.category === 'transport') return isCarExpense(entry) ? 'Car' : 'Transport';
   return 'Other';
 }
 
 function confirmedRepaymentCategory(repayment) {
   const map = {
     stay: 'Accommodation',
-    transport: 'Flights / Train',
-    car: 'Fuel',
+    transport: 'Transport',
+    car: 'Car',
     groceries: 'Groceries',
     'eating-out': 'Eating out',
     activities: 'Other',
@@ -303,6 +308,11 @@ function decorateConfirmedSpend() {
   const state = getState();
   const tripId = root.dataset.tripId || '';
   const plan = (state.plans || []).find((item) => item.linkedTripId === tripId) || null;
+  const trip = (state.trips || []).find((item)=>item.id===tripId) || null;
+  const combinedSnapshot = trip?.submissions?.Principessa || trip?.submissions?.Principe || null;
+  const canCorrectLonato=!!plan&&/lonato/i.test(String(plan?.meta?.city||''))&&String(plan?.meta?.start||'').slice(5,7)==='10'&&
+    ((plan.expenseEntries||[]).some((entry)=>entry.category==='transport'&&entry.transportType==='fuel')||
+      Number(combinedSnapshot?.fuel||0)>0);
   const me = actor();
   const other = me === 'Principessa' ? 'Principe' : 'Principessa';
   const totalCategories = categoryData(cards[0]);
@@ -326,6 +336,9 @@ function decorateConfirmedSpend() {
   let mode = 'total';
   let selectedIndex = -1;
   let longPressed = false;
+  let carDrilldown = false;
+  let displayedCategories = [];
+  let hasCarDrilldown = false;
   let longTimer = null;
   let startX = 0;
   let startY = 0;
@@ -334,10 +347,17 @@ function decorateConfirmedSpend() {
 
   const render = () => {
     const viewed = personForMode();
-    const categories = viewed ? personal[viewed] : totalCategories;
-    const viewedTotal = viewed ? (hasDetailed ? personalTotals[viewed] : fallbackPaid[viewed]) : total;
+    const pie = confirmedPieCategories(viewed ? personal[viewed] : totalCategories,plan,{person:viewed,snapshot:viewed?null:combinedSnapshot});
+    hasCarDrilldown = pie.hasCarBreakdown;
+    if(carDrilldown&&!hasCarDrilldown)carDrilldown=false;
+    const categories = carDrilldown
+      ? pie.carGroups.map((item)=>({label:item.label,amount:item.amount,car:false}))
+      : pie.categories;
+    displayedCategories=categories;
+    const ordinaryTotal = viewed ? (hasDetailed ? personalTotals[viewed] : fallbackPaid[viewed]) : total;
+    const viewedTotal = carDrilldown ? pie.categories.find((item)=>item.car)?.amount||0 : ordinaryTotal;
     const categoryTotal = categories.reduce((sum, item) => sum + item.amount, 0);
-    const chartTotal = Math.max(viewedTotal, categoryTotal, .01);
+    const chartTotal = Math.max(viewedTotal,categoryTotal,.01);
     if (selectedIndex >= categories.length) selectedIndex = -1;
 
     let offset = 0;
@@ -349,19 +369,19 @@ function decorateConfirmedSpend() {
       const muted = selectedIndex >= 0 && !selected;
       const dashOffset = -offset;
       offset += segmentPct;
-      return '<circle class="confirmed-donut-segment'+(selected?' is-selected':'')+(muted?' is-muted':'')+'" cx="60" cy="60" r="48" pathLength="100" transform="rotate(-90 60 60)" stroke="'+color+'" stroke-dasharray="'+segmentPct.toFixed(4)+' '+(100-segmentPct).toFixed(4)+'" stroke-dashoffset="'+dashOffset.toFixed(4)+'" data-confirmed-category="'+index+'" tabindex="0" role="button" aria-label="'+esc(item.label)+': '+esc(money(item.amount))+', '+pct.toFixed(0)+' percent"></circle>';
+      return '<circle class="confirmed-donut-segment'+(selected?' is-selected':'')+(muted?' is-muted':'')+'" cx="60" cy="60" r="48" pathLength="100" transform="rotate(-90 60 60)" stroke="'+color+'" stroke-dasharray="'+segmentPct.toFixed(4)+' '+(100-segmentPct).toFixed(4)+'" stroke-dashoffset="'+dashOffset.toFixed(4)+'" data-confirmed-category="'+index+'"'+(item.car&&hasCarDrilldown?' data-car-expandable="1"':'')+' tabindex="0" role="button" aria-label="'+esc(item.label)+': '+esc(money(item.amount))+', '+pct.toFixed(0)+' percent'+(item.car&&hasCarDrilldown?', hold to expand Car':'')+'"></circle>';
     }).join('');
 
     const selected = selectedIndex >= 0 ? categories[selectedIndex] : null;
     const selectedPct = selected && viewedTotal > .005 ? (selected.amount / viewedTotal) * 100 : 0;
     const centerHtml = selected
       ? '<span>'+esc(selected.label)+'</span><strong>'+money(selected.amount)+'</strong><small>'+selectedPct.toFixed(selectedPct < 10 ? 1 : 0)+'% of '+(viewed ? esc(viewed)+' spending' : 'this trip')+'</small>'
-      : '<span>'+(viewed ? 'Paid by '+esc(viewed) : 'Total spent')+'</span><strong>'+money(viewedTotal)+'</strong><small>'+(categories.length ? 'Tap a color' : 'No category data')+'</small>';
+      : '<span>'+(carDrilldown?'Car breakdown':viewed ? 'Paid by '+esc(viewed) : 'Total spent')+'</span><strong>'+money(viewedTotal)+'</strong><small>'+(categories.length ? 'Tap a color' : 'No category data')+'</small>';
 
     const legend = categories.length
       ? categories.map((item, index) => {
           const color = COLORS[index % COLORS.length];
-          return '<button type="button" class="confirmed-legend-chip'+(selectedIndex===index?' is-selected':'')+'" data-confirmed-category="'+index+'" style="--confirmed-color:'+color+'"><i aria-hidden="true"></i><span>'+esc(item.label)+'</span></button>';
+          return '<button type="button" class="confirmed-legend-chip'+(selectedIndex===index?' is-selected':'')+'" data-confirmed-category="'+index+'"'+(item.car&&hasCarDrilldown?' data-car-expandable="1"':'')+' style="--confirmed-color:'+color+'"><i aria-hidden="true"></i><span>'+esc(item.label)+'</span></button>';
         }).join('')
       : '<div class="confirmed-spend-empty">'+(viewed && !hasDetailed ? 'Personal category details are not available for this older trip.' : viewed ? esc(viewed)+' has no personal Trip spending logged.' : 'No spending entered yet.')+'</div>';
 
@@ -369,7 +389,7 @@ function decorateConfirmedSpend() {
     const cls = viewed ? ' is-' + viewed.toLowerCase() : '';
 
     analysis.innerHTML = '<section class="confirmed-spend-card'+cls+'" role="button" tabindex="0" aria-label="Confirmed trip spending view: '+esc(modeLabel)+'">'+
-      '<div class="confirmed-spend-title"><h3>Spending breakdown</h3><small>Tap a color</small></div>'+
+      '<div class="confirmed-spend-title"><h3>'+(carDrilldown?'Car breakdown':'Spending breakdown')+'</h3>'+(carDrilldown?'<button type="button" class="confirmed-spend-back" data-spend-back>← All spending</button>':'<small>'+(hasCarDrilldown?'Long-press Car · Tap a color':'Tap a color')+'</small>')+'</div>'+
       '<div class="confirmed-spend-visual">'+
         '<div class="confirmed-donut-shell">'+
           '<svg class="confirmed-donut-svg" viewBox="0 0 120 120" aria-label="Trip spending donut">'+
@@ -379,7 +399,8 @@ function decorateConfirmedSpend() {
         '</div>'+
         '<div class="confirmed-spend-side"><div class="confirmed-legend">'+legend+'</div></div>'+
       '</div>'+
-    '</section>';
+    '</section>'+
+    (canCorrectLonato?'<button type="button" class="confirmed-lonato-correction" data-correct-lonato>Correct Lonato Car expenses to Tolls</button><p class="confirmed-lonato-correction-error" aria-live="polite"></p>':'');
   };
 
   const clearLongPress = () => {
@@ -388,7 +409,21 @@ function decorateConfirmedSpend() {
   };
 
   analysis.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || !event.target.closest?.('.confirmed-spend-card') || event.target.closest?.('[data-confirmed-category]')) return;
+    if(event.button!==0)return;
+    const target=event.target.closest?.('[data-car-expandable]');
+    if(target&&!carDrilldown){
+      const index=Number(target.dataset.confirmedCategory);
+      if(!displayedCategories[index]?.car || !hasCarDrilldown)return;
+      startX=event.clientX;startY=event.clientY;longPressed=false;
+      clearLongPress();
+      longTimer=setTimeout(()=>{
+        longTimer=null;longPressed=true;carDrilldown=true;selectedIndex=-1;
+        try{navigator.vibrate?.(10);}catch{}
+        render();
+      },500);
+      return;
+    }
+    if (!event.target.closest?.('.confirmed-spend-card') || event.target.closest?.('button,[data-confirmed-category]')) return;
     longPressed = false;
     startX = event.clientX;
     startY = event.clientY;
@@ -396,6 +431,7 @@ function decorateConfirmedSpend() {
     longTimer = setTimeout(() => {
       longPressed = true;
       selectedIndex = -1;
+      carDrilldown=false;
       mode = 'other';
       try { if (typeof navigator.vibrate === 'function') navigator.vibrate(10); } catch {}
       render();
@@ -410,7 +446,26 @@ function decorateConfirmedSpend() {
     if (event.target.closest?.('.confirmed-spend-card')) event.preventDefault();
   });
 
-  analysis.addEventListener('click', (event) => {
+  analysis.addEventListener('click', async (event) => {
+    const correction=event.target.closest?.('[data-correct-lonato]');
+    if(correction){
+      event.preventDefault();event.stopPropagation();
+      if(!window.confirm('Correct all Fuel-labelled Car expenses in this confirmed Lonato trip to Tolls? Amounts, payers and trip totals will not change.'))return;
+      correction.disabled=true;
+      try{
+        const result=await postAction('correctLonatoCarTolls',{planId:plan.id},actor());
+        if(!result?.ok)throw new Error(result?.error||'Could not correct Lonato expenses');
+      }catch(err){
+        correction.disabled=false;
+        const error=analysis.querySelector('.confirmed-lonato-correction-error');
+        if(error)error.textContent=err?.message||'Could not correct the Car expenses';
+      }
+      return;
+    }
+    if(longPressed){longPressed=false;return;}
+    if(event.target.closest?.('[data-spend-back]')){
+      carDrilldown=false;selectedIndex=-1;render();return;
+    }
     const categoryTarget = event.target.closest?.('[data-confirmed-category]');
     if (categoryTarget) {
       const index = Number(categoryTarget.dataset.confirmedCategory);
@@ -420,11 +475,8 @@ function decorateConfirmedSpend() {
       return;
     }
     if (!event.target.closest?.('.confirmed-spend-card')) return;
-    if (longPressed) {
-      longPressed = false;
-      return;
-    }
     selectedIndex = -1;
+    carDrilldown=false;
     mode = mode === 'total' ? 'mine' : 'total';
     render();
   });
@@ -435,13 +487,19 @@ function decorateConfirmedSpend() {
       event.preventDefault();
       const index = Number(categoryTarget.dataset.confirmedCategory);
       if (!Number.isInteger(index)) return;
-      selectedIndex = selectedIndex === index ? -1 : index;
+      if(event.shiftKey&&displayedCategories[index]?.car&&hasCarDrilldown){
+        carDrilldown=true;selectedIndex=-1;
+      }else selectedIndex = selectedIndex === index ? -1 : index;
       render();
       return;
+    }
+    if(event.target.closest?.('[data-spend-back]')&&(event.key==='Enter'||event.key===' ')){
+      event.preventDefault();carDrilldown=false;selectedIndex=-1;render();return;
     }
     if (event.target.closest?.('.confirmed-spend-card') && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault();
       selectedIndex = -1;
+      carDrilldown=false;
       mode = mode === 'total' ? 'mine' : 'total';
       render();
     }

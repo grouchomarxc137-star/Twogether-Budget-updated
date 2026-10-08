@@ -785,6 +785,46 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       return output_({ok:true, planId:plan.id, sharedExpense:plan.sharedExpenses[key]});
     }
 
+    if (action === 'correctLonatoCarTolls') {
+      const planId=cleanText_(payload.planId,80);
+      const idx=state.plans.findIndex(function(plan){return plan.id===planId;});
+      if(idx<0)throw new Error('Lonato trip plan not found');
+      const plan=sanitizePlan_(state.plans[idx]);
+      const place=String(plan.meta&&plan.meta.city||'').trim().toLowerCase();
+      if(!place.includes('lonato')||String(plan.meta&&plan.meta.start||'').slice(5,7)!=='10')throw new Error('This correction is only available for the October Lonato trip');
+      const tripIdx=state.trips.findIndex(function(item){return item.id&&item.id===plan.linkedTripId;});
+      if(tripIdx<0||!isTripLocked_(state.trips[tripIdx]))throw new Error('This correction requires the confirmed Lonato trip');
+      const trip=sanitizeTripRecord_(state.trips[tripIdx]);
+      const now=new Date().toISOString();
+      let moved=0;
+      plan.expenseEntries.forEach(function(entry){
+        if(entry.category==='transport'&&entry.transportType==='fuel'){
+          entry.transportType='tolls';moved++;
+        }
+      });
+      const moveSnapshot=function(values){
+        if(!values)return false;
+        const fuel=Number(values.fuel||0);
+        if(fuel<=0)return false;
+        values.tolls=money2_(Number(values.tolls||0)+fuel);
+        values.fuel=0;
+        if(values.uncertain){
+          values.uncertain.tolls=!!(values.uncertain.tolls||values.uncertain.fuel);
+          values.uncertain.fuel=false;
+        }
+        return true;
+      };
+      const snapshotChanged=ACTORS.some(function(person){return Number(trip.submissions[person]&&trip.submissions[person].fuel||0)>0;});
+      if(!moved&&!snapshotChanged)return output_({ok:true,alreadyCorrected:true,planId:planId,tripId:trip.id});
+      ACTORS.forEach(function(person){moveSnapshot(trip.submissions[person]);moveSnapshot(plan.partials[person]);});
+      plan.updatedAt=now;plan.updatedBy=actor;
+      trip.updatedAt=now;trip.updatedBy=actor;
+      state.plans[idx]=plan;state.trips[tripIdx]=trip;
+      addAudit_(state,actor,'correctLonatoCarTolls',trip.id);
+      saveState_(state);
+      return output_({ok:true,planId:planId,tripId:trip.id,reclassified:moved});
+    }
+
     if (action === 'saveTripExpense') {
       const planId=cleanText_(payload.planId,80),idx=state.plans.findIndex(x=>x.id===planId);if(idx<0)throw new Error('Budget plan not found');const plan=sanitizePlan_(state.plans[idx]),linkedTrip=plan.linkedTripId?state.trips.find(x=>x.id===plan.linkedTripId):null;if(linkedTrip&&isTripLocked_(linkedTrip))throw new Error('This trip is already confirmed by both of you');const raw=payload.expense||{},id=cleanText_(raw.id,80),at=id?plan.expenseEntries.findIndex(x=>x.id===id):-1,prev=at>=0?plan.expenseEntries[at]:null,now=new Date().toISOString(),expense=sanitizeTripExpense_(Object.assign({},raw,{id:id||Utilities.getUuid(),loggedBy:prev&&prev.loggedBy||actor,createdAt:prev&&prev.createdAt||now,updatedAt:now}),actor);
       if(expense.amount===''||Number(expense.amount)<=0)throw new Error('Enter a valid expense amount');if(!expense.paidBy)throw new Error('Choose who paid');if(expense.split==='personal'&&expense.paidBy==='both')throw new Error('Choose one payer for a personal expense');if(expense.split==='personal'&&!expense.forActor)expense.forActor=actor;if(!expense.date)expense.date=now.slice(0,10);
@@ -2924,7 +2964,7 @@ function reconciliationWarnings_(trip, plan) {
 
 export const SUPPORTED_ACTIONS = new Set([
   'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
-  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
+  'saveTripPrep', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
   'shopAward', 'shopPurchase', 'shopSetTheme', 'shopSavePacking',
