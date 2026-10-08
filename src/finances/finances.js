@@ -11,6 +11,7 @@ import { toast } from '../lib/toast.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 import { openFinanceSubview, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { renderSharedJar } from './shared-jar.js';
+import { budgetItemsForMonth, budgetSnapshotForMonth, budgetProgressForMonth } from './main-budgets.js';
 import { billOccurrenceDate, isFutureBillPaid, pendingFutureBillsForMonth, dueFutureBills } from './future-bills.js';
 
 const MONTHS = [
@@ -97,6 +98,7 @@ let financeState = {
 let flow = null;
 let selectedMonth = '2026-09';
 let financeOverviewMonth = '';
+let financeBudgetViewMonth = '';
 let financeViewYear = Number(selectedMonth.slice(0,4));
 let loading = false;
 let recurringSwipeAbort = null;
@@ -350,7 +352,7 @@ function normalizeRecurringConfig(value) {
   };
 }
 function freshProfile() {
-  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, customCategories: [], customCategoryCleanupV1: true, recurring: normalizeRecurringConfig({}), futureBills: [], financeReminders: [], updatedAt: '', updatedBy: '' };
+  return { bankAccounts: [], savingsTotal: '', savingsReserved: [], receivables: [], scenarios: [], wishlist: [], compareLab: {}, customCategories: [], customCategoryCleanupV1: true, recurring: normalizeRecurringConfig({}), mainBudgets: [], futureBills: [], financeReminders: [], updatedAt: '', updatedBy: '' };
 }
 function normalizeProfile(profileData) {
   const p = profileData && typeof profileData === 'object' ? profileData : {};
@@ -369,6 +371,12 @@ function normalizeProfile(profileData) {
     customCategories: normalizeCustomCategories(p.customCategories),
     customCategoryCleanupV1: p.customCategoryCleanupV1 === true,
     recurring: normalizeRecurringConfig(p.recurring),
+    mainBudgets: Array.isArray(p.mainBudgets) ? p.mainBudgets.map((snapshot)=>({
+      month:String(snapshot?.month||''),
+      items:Array.isArray(snapshot?.items)?snapshot.items.map((item)=>({
+        id:String(item?.id||''),name:String(item?.name||''),amount:n(item?.amount),
+      })).filter((item)=>item.id&&item.name&&item.amount>0):[],
+    })).filter((snapshot)=>/^\d{4}-(0[1-9]|1[0-2])$/.test(snapshot.month)) : [],
     futureBills: Array.isArray(p.futureBills) ? p.futureBills.map((bill)=>({
       id:String(bill?.id||''),
       name:String(bill?.name||''),
@@ -970,6 +978,7 @@ function normalizeFinanceRecord(rec, owner = actor()) {
     group:normalizeGroup(x.group),
     date:normalizeFinanceDate(x.date, copy.month),
     paidFrom:x?.paidFrom==='sharedJar'?'sharedJar':'personal',
+    budgetCategoryId:String(x?.budgetCategoryId||''),
   })) : [];
   copy.partialOnly = copy.partialOnly === true;
   const fixedExtras = copy.expenses.filter((x) => normalizeGroup(x.group) === 'extra' && String(x.name || '').trim().toLowerCase() === 'extra');
@@ -1531,6 +1540,116 @@ function bindFinanceWalletCarousel(root) {
   requestAnimationFrame(()=>scrollCardIntoCenter(cards[financeWalletIndex],'auto'));
 }
 
+
+function mainBudgetCardsHtml(items, record) {
+  const progress=budgetProgressForMonth(items,record);
+  return progress.map((item)=>{
+    const remaining=item.remaining;
+    return '<div class="finance-main-budget-item'+(item.over?' is-over':'')+'">'+
+      '<div class="finance-main-budget-item-head"><strong>'+esc(item.name)+'</strong><span class="finance-main-budget-remaining">'+(item.over?money(-remaining)+' over':money(remaining)+' left')+'</span></div>'+
+      '<div class="finance-main-budget-track" role="progressbar" aria-label="'+esc(item.name)+' spent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+item.percentage.toFixed(1)+'"><span style="width:'+item.percentage.toFixed(1)+'%"></span></div>'+
+      '<div class="finance-main-budget-metrics"><span>'+money(item.spent)+' spent</span><span>'+money(item.amount)+' budget</span></div>'+
+    '</div>';
+  }).join('');
+}
+function renderMainBudgetPanel() {
+  const root=$('#financeMainBudgets');
+  if(!root||actor()!=='Principe')return;
+  const current=localFinanceToday().month;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(financeBudgetViewMonth))financeBudgetViewMonth=current;
+  const month=financeBudgetViewMonth;
+  const min='2026-01',max=(Number(current.slice(0,4))+2)+'-12';
+  const items=budgetItemsForMonth(profile().mainBudgets,month);
+  const monthRecord=recordFor(month);
+  const canEdit=month>=current;
+  root.innerHTML=
+    '<div class="finance-main-budget-heading"><div><span class="panel-kicker">MAIN ACCOUNT</span><h3>Category budgets</h3><p>See what is left to spend, by category.</p></div></div>'+
+    '<div class="finance-main-budget-controls">'+
+      '<div class="finance-main-budget-month"><button type="button" data-fin-main-budget-prev aria-label="Previous budget month" '+(month<=min?'disabled':'')+'>‹</button><strong>'+esc(monthLabel(month))+'</strong><button type="button" data-fin-main-budget-next aria-label="Next budget month" '+(month>=max?'disabled':'')+'>›</button></div>'+
+      (canEdit?'<button type="button" class="finance-main-budget-manage" data-fin-main-budget-manage>'+(items.length?'Edit budgets':'+ Set budgets')+'</button>':'<span class="finance-main-budget-history-tag">Past month</span>')+
+    '</div>'+
+    (items.length?'<div class="finance-main-budget-items">'+mainBudgetCardsHtml(items,monthRecord)+'</div>':
+      '<p class="finance-main-budget-empty">No category budgets set for this month yet.</p>')+
+    '<p class="finance-main-budget-note">Only Main Account expenses count. Monthly limits carry forward; past months keep their budgets.</p>';
+  root.querySelector('[data-fin-main-budget-prev]')?.addEventListener('click',()=>{
+    if(financeBudgetViewMonth>min){financeBudgetViewMonth=shiftFinanceMonthKey(month,-1);renderMainBudgetPanel();}
+  });
+  root.querySelector('[data-fin-main-budget-next]')?.addEventListener('click',()=>{
+    if(financeBudgetViewMonth<max){financeBudgetViewMonth=shiftFinanceMonthKey(month,1);renderMainBudgetPanel();}
+  });
+  root.querySelector('[data-fin-main-budget-manage]')?.addEventListener('click',openMainBudgetEditor);
+}
+function openMainBudgetEditor() {
+  if(actor()!=='Principe')return;
+  const month=financeBudgetViewMonth||localFinanceToday().month;
+  if(month<localFinanceToday().month)return toast('Past budgets are read-only','warn');
+  const items=budgetItemsForMonth(profile().mainBudgets,month);
+  const lines=items.map((item)=>({...item}));
+  function renderEditor() {
+    showMini(
+      '<div class="tv2-root finance-recurring-tv2 finance-main-budget-editor"><div class="tv2-page">'+
+        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-main-budget-back>‹ Wallet</button></div>'+
+          '<h1>Main Account budgets</h1><p>Monthly allowances from '+esc(monthLabel(month))+'. They will carry into following months.</p></header>'+
+        '<section class="finance-main-budget-editor-list">'+
+          lines.map((item,index)=>'<div class="finance-main-budget-edit-row" data-fin-main-budget-row="'+index+'">'+
+            '<label class="tv2-field"><span>Category</span><input type="text" maxlength="60" data-fin-main-budget-name value="'+esc(item.name)+'" placeholder="e.g. Fuel"></label>'+
+            '<label class="tv2-field"><span>Monthly limit (€)</span><input type="number" min="0.01" step="0.01" data-fin-main-budget-amount value="'+esc(String(item.amount))+'" inputmode="decimal" placeholder="350"></label>'+
+            '<button type="button" data-fin-main-budget-remove="'+index+'" aria-label="Remove '+esc(item.name||'category')+'">Remove</button>'+
+          '</div>').join('')+
+        '</section>'+
+        '<button type="button" class="finance-main-budget-add" data-fin-main-budget-add>＋ Add category</button>'+
+        '<div class="finance-main-budget-editor-actions"><button type="button" class="tv2-primary" data-fin-main-budget-save>Save budgets</button></div>'+
+      '</div></div>',
+      'recurring-manager',
+      {back:closeMini}
+    );
+    const body=$('#financeMiniBody');
+    body.onclick=null;
+    const sync=()=>{
+      $$('[data-fin-main-budget-row]',body).forEach((row)=>{
+        const index=Number(row.dataset.finMainBudgetRow);
+        lines[index].name=row.querySelector('[data-fin-main-budget-name]')?.value||'';
+        lines[index].amount=row.querySelector('[data-fin-main-budget-amount]')?.value||'';
+      });
+    };
+    $('[data-fin-main-budget-back]',body)?.addEventListener('click',closeMini);
+    $('[data-fin-main-budget-add]',body)?.addEventListener('click',()=>{
+      sync();
+      if(lines.length>=40)return toast('Up to 40 categories allowed','warn');
+      lines.push({id:uid(),name:'',amount:''});
+      renderEditor();
+    });
+    $$('[data-fin-main-budget-remove]',body).forEach((button)=>button.addEventListener('click',()=>{
+      sync();
+      lines.splice(Number(button.dataset.finMainBudgetRemove),1);
+      renderEditor();
+    }));
+    $('[data-fin-main-budget-save]',body)?.addEventListener('click',async()=>{
+      sync();
+      const cleaned=lines.map((item)=>({
+        id:String(item.id||uid()),
+        name:String(item.name||'').trim().replace(/\s+/g,' '),
+        amount:Number(String(item.amount||'').replace(',','.')),
+      }));
+      if(cleaned.some((item)=>!item.name||!Number.isFinite(item.amount)||item.amount<=0||item.amount>1000000))return toast('Enter a name and a valid positive limit for every category','warn');
+      const names=cleaned.map((item)=>item.name.toLocaleLowerCase());
+      if(new Set(names).size!==names.length)return toast('Each category needs a different name','warn');
+      const button=$('[data-fin-main-budget-save]',body);button.disabled=true;
+      try{
+        const next=profile();
+        next.mainBudgets=budgetSnapshotForMonth(next.mainBudgets,month,cleaned.map((item)=>({...item,amount:Math.round(item.amount*100)/100})));
+        await post('saveFinanceProfile',{profile:next});
+        financeState.financeProfiles[actor()]=normalizeProfile(next);
+        closeMini();renderPage();toast('Main Account budgets saved');
+        setTimeout(loadState,800);
+      }catch(error){
+        button.disabled=false;
+        toast(error?.message||'Could not save budgets','warn');
+      }
+    });
+  }
+  renderEditor();
+}
 function renderCurrentPanel() {
   const root = $('#financeCurrent'); if (!root) return;
   const { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth } = profileStats();
@@ -1559,7 +1678,8 @@ function renderCurrentPanel() {
       <button type="button" data-fin-wallet-jump="savings">${financeWalletIcon('savings')}<span>Saved up</span></button>
         <button type="button" data-fin-wallet-jump="investments">${financeWalletIcon('investments')}<span>Investments</span></button>
       </div>
-    </div>`;
+    </div>
+    ${actor()==='Principe'?'<section id="financeMainBudgets" class="finance-main-budgets" aria-label="Main Account category budgets"></section>':''}`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
   $$('[data-fin-edit-bank]', root).forEach((btn) => btn.addEventListener('click', () => openBankModal(Number(btn.dataset.finEditBank))));
   $('[data-fin-edit-savings]', root)?.addEventListener('click', openSavingsModal);
@@ -1577,6 +1697,7 @@ function renderCurrentPanel() {
     openOwedHistory();
   });
   renderSharedJar(financeState,p);
+  renderMainBudgetPanel();
   bindFinanceWalletCarousel(root);
 }
 
@@ -2171,7 +2292,7 @@ function financeLogCategories(rec) {
     { key:'extra-used', label:'Money used extra', tone:'extra-used', icon:financeMonthToneIcon('extra-used') },
   ];
 }
-function financeRecurringItemsForCategory(category) {
+function financeRecurringItemsForCategory(category, month = selectedMonth) {
   if (category === 'extra-used') return extraSourceOptions();
   const config = recurringConfig();
   if (category === 'income') {
@@ -2193,6 +2314,13 @@ function financeRecurringItemsForCategory(category) {
     group:/invest/i.test(String(item.name||''))?'investments':normalizeGroup(item.group),
     tone:category,
   })).filter((item)=>item.name);
+  if(actor()==='Principe'&&category==='budgets'){
+    budgetItemsForMonth(profile().mainBudgets,month).forEach((budget)=>{
+      if(!items.some((entry)=>String(entry.name).trim().toLowerCase()===String(budget.name).trim().toLowerCase())){
+        items.push({id:'main-budget-'+budget.id,name:budget.name,amount:'',day:'',group:'variable',tone:'budgets'});
+      }
+    });
+  }
   if(actor()==='Principe'&&category==='wealth'&&!items.some((item)=>normalizeGroup(item.group)==='investments')){
     items.push({id:'principe-investments',name:'Investments',amount:'',day:'',group:'investments',tone:'wealth'});
   }
@@ -2299,6 +2427,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     newCategoryName:'',
     date:editingItem?normalizeFinanceDate(editingItem.date,rec.month):'',
     paidFrom:editingKind==='expense'&&editingItem?.paidFrom==='sharedJar'?'sharedJar':'personal',
+    budgetCategoryId:editingKind==='expense'?String(editingItem?.budgetCategoryId||''):'',
     more:!!editingItem,
     busy:false,
     error:'',
@@ -2308,7 +2437,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
   const amount=()=>Number(String(state.amountText||'').replace(',','.'));
   const validAmount=()=>Number.isFinite(amount())&&amount()>0;
   const selectedCategory=()=>categories.find((item)=>item.key===state.category)||null;
-  const selectedItems=()=>financeRecurringItemsForCategory(state.category);
+  const selectedItems=()=>financeRecurringItemsForCategory(state.category,rec.month);
   const isOther=()=>state.category==='other';
   const isCustomCategory=()=>isCustomGroupKey(state.category);
   const isExtraUsed=()=>state.category==='extra-used';
@@ -2449,6 +2578,14 @@ function openFinanceTransactionSheet(rec, edit = null) {
           ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
           : '';
     const jarBalance=n(financeState.sharedJar?.balance??0);
+    const trackedBudgets=actor()==='Principe'?budgetItemsForMonth(profile().mainBudgets,rec.month):[];
+    const budgetOptions=isRegularExpense()&&trackedBudgets.length
+      ? '<label class="tv2-field finance-log-budget-assign"><span>Main Account budget</span><select id="financeLogBudgetCategory">'+
+        '<option value="" '+(!state.budgetCategoryId?'selected':'')+'>Match expense name</option>'+
+        trackedBudgets.map((budget)=>'<option value="'+esc(budget.id)+'" '+(state.budgetCategoryId===budget.id?'selected':'')+'>'+esc(budget.name)+'</option>').join('')+
+        '<option value="none" '+(state.budgetCategoryId==='none'?'selected':'')+'>Not part of a budget</option>'+
+        '</select></label>'
+      : '';
     const paymentSourceHtml=isRegularExpense()
       ? '<div class="finance-log-paid-from"><span>Paid from</span><div class="finance-log-paid-from-options">'+
           '<button type="button" data-fin-log-paid-from="personal" class="'+(state.paidFrom==='personal'?'is-active':'')+'">My money</button>'+
@@ -2468,7 +2605,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:categoryDetail+paymentSourceHtml,
+      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetOptions,
       defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
@@ -2489,6 +2626,9 @@ function openFinanceTransactionSheet(rec, edit = null) {
         event.preventDefault();
         if(canSave()) sheet.querySelector('[data-fin-log-save]')?.click();
       }
+    });
+    sheet.querySelector('#financeLogBudgetCategory')?.addEventListener('change',(event)=>{
+      state.budgetCategoryId=event.target.value;
     });
     sheet.querySelector('#financeLogCategoryName')?.addEventListener('input',(event)=>{
       state.newCategoryName=event.target.value;
@@ -2559,6 +2699,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.name='';
       state.newCategoryName='';
       state.group=clicked==='other'||isCustomGroupKey(clicked)?clicked:'';
+      if(!editingItem)state.budgetCategoryId='';
       if(clicked==='income'||clicked==='extra-used')state.paidFrom='personal';
       state.date='';
       state.more=false;
@@ -2573,6 +2714,10 @@ function openFinanceTransactionSheet(rec, edit = null) {
       if(!item) return;
       state.selectedItemId=String(item.id);
       state.name=item.name;
+      if(!editingItem){
+        const matched=budgetItemsForMonth(profile().mainBudgets,rec.month).find((budget)=>budget.name.toLowerCase()===item.name.toLowerCase());
+        state.budgetCategoryId=matched?.id||'';
+      }
       state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
       if(!isExtraUsed()||hasValue(item.amount)) state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
       state.date=isExtraUsed()?'':financeDateForDay(rec.month,item.day);
@@ -2688,12 +2833,14 @@ function openFinanceTransactionSheet(rec, edit = null) {
         }
       } else {
         const row={
+          ...(editingKind==='expense'&&editingItem?editingItem:{}),
           id:editingKind==='expense'&&editingItem?.id?String(editingItem.id):uid(),
           group:state.group||financeGroupForTone(categoryForSave,state.name),
           name:state.name.trim(),
           amount:amount(),
           date:state.date,
           paidFrom:state.paidFrom==='sharedJar'?'sharedJar':'personal',
+          budgetCategoryId:actor()==='Principe'?state.budgetCategoryId:'',
         };
         investmentLogged=normalizeGroup(row.group)==='investments'&&row.paidFrom!=='sharedJar';
         if(editingKind==='expense'&&editingIndex>=0) next.expenses[editingIndex]=row;
@@ -3189,6 +3336,12 @@ function renderDetail(rec) {
   }
   if(rules.extraTracking&&carry.debt>0){
     notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>');
+  }
+  if(actor()==='Principe'){
+    const budgetItems=budgetItemsForMonth(profile().mainBudgets,rec.month);
+    if(budgetItems.length){
+      notes.push('<section class="finance-month-main-budgets" aria-label="Main Account budgets"><h3>Main Account budgets</h3><div class="finance-main-budget-items">'+mainBudgetCardsHtml(budgetItems,rec)+'</div></section>');
+    }
   }
 
   financeMonthDialog=document.createElement('dialog');

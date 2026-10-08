@@ -1994,7 +1994,8 @@ function sanitizeFinanceExpense_(item) {
     date:cleanFinanceDate_(item && item.date),
     paidFrom:paidFrom,
     futureBillId:cleanText_(item&&item.futureBillId,80),
-    futureBillDueDate:cleanFinanceDate_(item&&item.futureBillDueDate)
+    futureBillDueDate:cleanFinanceDate_(item&&item.futureBillDueDate),
+    budgetCategoryId:cleanText_(item&&item.budgetCategoryId,80)
   };
 }
 
@@ -2308,6 +2309,26 @@ function futureBillOccurrenceDate_(bill,year) {
   return year+'-'+initial.slice(5,7)+'-'+String(Math.min(day,lastDay)).padStart(2,'0');
 }
 
+
+function sanitizeMainAccountBudgets_(value) {
+  const source=Array.isArray(value)?value:[];
+  const byMonth={};
+  source.slice(-120).forEach(function(snapshot){
+    const month=cleanText_(snapshot&&snapshot.month,7);
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
+    const seen=new Set();
+    const items=(Array.isArray(snapshot&&snapshot.items)?snapshot.items:[]).slice(0,40).map(function(item){
+      const name=cleanText_(item&&item.name,60);
+      const amount=cleanMoney_(item&&item.amount);
+      const id=cleanText_(item&&item.id,80);
+      if(!id||!name||amount===''||Number(amount)<=0||seen.has(id))return null;
+      seen.add(id);
+      return {id:id,name:name,amount:amount};
+    }).filter(Boolean);
+    byMonth[month]={month:month,items:items};
+  });
+  return Object.keys(byMonth).sort().map(function(month){return byMonth[month];});
+}
 function sanitizeFinanceProfile_(profile, actor) {
   const source = profile && typeof profile === 'object' ? profile : {};
   const cleanupDone=source.customCategoryCleanupV1===true;
@@ -2341,6 +2362,7 @@ function sanitizeFinanceProfile_(profile, actor) {
     customCategories: customCategories,
     customCategoryCleanupV1: true,
     recurring: recurring,
+    mainBudgets:actor==='Principe'?sanitizeMainAccountBudgets_(source.mainBudgets):[],
     futureBills:Array.isArray(source.futureBills)?source.futureBills.slice(0,120).map(sanitizeFutureBill_).filter(function(b){return b.name&&b.amount!==''&&Number(b.amount)>0&&b.date;}):[],
     financeReminders: Array.isArray(source.financeReminders) ? source.financeReminders.slice(0,160).map(sanitizeFinanceReminder_).filter(function(x){ return x.name && (x.kind==='investment-snapshot' || x.amount !== '') && x.month && x.date; }) : [],
     updatedAt: cleanText_(source.updatedAt, 40),
