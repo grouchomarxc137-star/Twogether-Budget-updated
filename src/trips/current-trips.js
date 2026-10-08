@@ -2394,6 +2394,7 @@ function openRecurrentChecklistItems(plan, initialPersonal = true, initialCatego
     openSimplifiedChecklist(latest,state.personal);
   };
   layer.__tv2SwipeBack=returnToChecklist;
+  layer._twogetherBack=returnToChecklist;
   bindChecklistSwipeDown(layer, sheet);
 
   const rowHtml = (kind,item) => {

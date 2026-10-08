@@ -801,8 +801,15 @@ function installSurfaceNavigation() {
     event.preventDefault();
     event.stopImmediatePropagation();
     finishSurfaceVisual(visual,mode,() => {
-      // Both swipe directions dismiss only the top layer.
-      goSurfaceHome(surface);
+      // Recurrent Items is nested inside My Checklist. An edge-swipe back
+      // must return to that checklist, not dismiss the whole Trips surface.
+      if (mode === 'right' && surface?.matches?.('.tv2-layer') &&
+          surface.querySelector?.('.tv2-recurrent-sheet') &&
+          typeof surface._twogetherBack === 'function') {
+        goSurfaceBack(surface);
+      } else {
+        goSurfaceHome(surface);
+      }
     });
   }, { passive:false, capture:true });
 
