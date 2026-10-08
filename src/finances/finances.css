@@ -5879,53 +5879,24 @@ dialog.finance-log-host .tv2-backdrop {
 .finance-future-bill-list-row>.finance-future-bill-row{display:flex;width:100%;min-width:0;border-radius:16px;background:var(--tv2-card,#fff)}
 .finance-recurring-future-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 
-/* Principe's Main Account category budgets: separate from Wallet carousel. */
-.finance-main-budgets{
-  margin:22px 0 12px;
-  padding:20px;
-  border:1px solid #e2d6c6;
-  border-radius:19px;
-  background:rgba(255,253,249,.84);
-  box-shadow:0 7px 20px rgba(62,45,31,.035);
-}
-.finance-main-budget-heading h3{font-size:21px;line-height:1.24;margin:5px 0 3px;color:var(--tv2-ink)}
-.finance-main-budget-heading p{font-size:13px;color:var(--tv2-muted);margin:0}
-.finance-main-budget-controls{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:16px 0}
-.finance-main-budget-month{display:flex;gap:5px;align-items:center}
-.finance-main-budget-month strong{min-width:88px;text-align:center;font-size:14px}
-.finance-main-budget-month button{border:1px solid #dfd3c3;background:#fffdf9;color:var(--tv2-ink);border-radius:10px;min-width:34px;min-height:34px;font:inherit;font-size:22px;cursor:pointer}
-.finance-main-budget-month button:disabled{opacity:.32;cursor:default}
-.finance-main-budget-manage{border:1px solid #d6c5aa;background:#f8efdf;color:var(--tv2-ink);font:inherit;font-size:13px;font-weight:700;padding:10px 13px;border-radius:12px;cursor:pointer}
-.finance-main-budget-history-tag{color:var(--tv2-muted);font-size:12px}
-.finance-main-budget-items{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr));gap:12px}
-.finance-main-budget-item{border:1px solid #eadfce;background:var(--tv2-card,#fff);border-radius:14px;padding:14px}
-.finance-main-budget-item-head{display:flex;align-items:start;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:12px}
-.finance-main-budget-item-head strong{overflow-wrap:anywhere}
-.finance-main-budget-remaining{color:#327d60;text-align:right;white-space:nowrap;font-size:13px;font-weight:750}
-.finance-main-budget-item.is-over .finance-main-budget-remaining{color:#b44f45}
-.finance-main-budget-track{width:100%;height:8px;background:#eee9df;border-radius:999px;overflow:hidden}
-.finance-main-budget-track>span{display:block;height:100%;background:#579a7c;border-radius:999px;transition:width .2s ease}
-.finance-main-budget-item.is-over .finance-main-budget-track>span{background:#b96055}
-.finance-main-budget-metrics{display:flex;justify-content:space-between;gap:8px;color:var(--tv2-muted);font-size:12px;margin-top:10px}
-.finance-main-budget-empty{font-size:13px;color:var(--tv2-muted);padding:16px;border:1px dashed #d9cab6;border-radius:13px;margin:0}
-.finance-main-budget-note{font-size:11px;color:var(--tv2-muted);margin:13px 0 0}
-.finance-main-budget-editor-list{display:grid;gap:12px;margin:20px 0}
-.finance-main-budget-edit-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto;align-items:end;gap:10px;padding:13px;border:1px solid var(--tv2-line,#e3d8c8);border-radius:14px;background:var(--tv2-card,#fff)}
-.finance-main-budget-edit-row .tv2-field{min-width:0;margin:0}
-.finance-main-budget-edit-row input,.finance-log-budget-assign select{width:100%;max-width:100%;box-sizing:border-box;min-height:42px;background:var(--tv2-card,#fff);color:var(--tv2-ink);border:1px solid var(--tv2-line,#ddd);border-radius:10px;padding:8px;font:inherit;font-size:16px}
-.finance-main-budget-edit-row button,.finance-main-budget-add{border:1px solid #e4c9c4;background:#fff9f7;color:#9b4a43;border-radius:10px;min-height:40px;padding:8px 10px;cursor:pointer;font:inherit;font-size:13px}
-.finance-main-budget-add{background:#f8efdf;color:var(--tv2-ink);border-color:#dfd3c3;width:100%}
-.finance-main-budget-editor-actions{display:flex;justify-content:end;margin:18px 0 24px}
-.finance-main-budget-editor-actions .tv2-primary{min-width:160px}
-.finance-log-budget-assign{margin-top:12px}
-@media(max-width:760px){
-  .finance-main-budgets{margin:18px 0 12px;padding:16px;border-radius:17px}
-  .finance-main-budget-items{grid-template-columns:1fr}
-  .finance-main-budget-edit-row{grid-template-columns:minmax(0,1fr) minmax(92px,.65fr);gap:8px}
-  .finance-main-budget-edit-row button{grid-column:1/-1;justify-self:end;min-height:32px}
-}
 
-.finance-month-main-budgets{margin:12px 0 16px;padding:14px 12px;border:1px solid #e3d7c6;border-radius:15px;background:rgba(255,253,249,.86)}
+/* Monthly limits configured in Recurring Items, shown only while logging and in month history. */
+.finance-recurring-budget-toggle{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid #e5d8c7;border-radius:12px;background:#fffcf7;cursor:pointer;margin:6px 0}
+.finance-recurring-budget-toggle input{width:20px;height:20px;flex:none;accent-color:#609378;margin-top:1px}
+.finance-recurring-budget-toggle span{display:grid;gap:5px}
+.finance-recurring-budget-toggle strong{font-size:14px}
+.finance-recurring-budget-toggle small{color:var(--tv2-muted);font-size:12px;line-height:1.4}
+.finance-recurring-budget-status,.finance-budget-log-preview,.finance-budget-trip-preview{padding:12px 14px;border:1px solid #d9e4d7;border-radius:13px;background:#f3f8f1;margin:12px 0;color:#36634b}
+.finance-recurring-budget-status>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.finance-recurring-budget-status strong,.finance-budget-log-preview b,.finance-budget-trip-preview strong{font-size:14px}
+.finance-recurring-budget-status span,.finance-budget-log-preview small,.finance-budget-trip-preview small{display:block;color:#5d7869;font-size:12px;margin-top:4px}
+.finance-recurring-budget-track{height:7px;background:#e5ece4;border-radius:99px;overflow:hidden;margin-top:10px}
+.finance-recurring-budget-track span{display:block;height:100%;border-radius:99px;background:#66a183}
+.finance-recurring-budget-status.is-over .finance-recurring-budget-track span{background:#bd6157}
+.finance-recurring-budget-status.is-over{border-color:#e9cbc5;background:#fff4f2;color:#a14d43}
+.finance-budget-trip-preview[hidden]{display:none!important}
+.finance-month-main-budgets{margin:12px 0 16px;padding:13px;border:1px solid #e2d6c6;border-radius:15px;background:rgba(255,253,249,.87)}
 .finance-month-main-budgets h3{font-size:15px;margin:0 0 12px;color:var(--tv2-ink)}
-.finance-month-main-budgets .finance-main-budget-items{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
-.finance-month-main-budgets .finance-main-budget-item{padding:11px}
+.finance-month-budget-list{display:grid;gap:8px}
+.finance-month-budget-list .finance-recurring-budget-status{margin:0}
+@media(max-width:760px){.finance-budget-log-preview,.finance-budget-trip-preview{margin:10px 0}}

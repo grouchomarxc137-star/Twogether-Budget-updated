@@ -2215,7 +2215,8 @@ function sanitizeRecurringExpense_(item) {
     group: cleanFinanceGroup_(item && item.group),
     name: cleanText_(item && item.name, 100),
     amount: cleanMoney_(item && item.amount),
-    day: cleanRecurringDay_(item && item.day)
+    day: cleanRecurringDay_(item && item.day),
+    isBudget:item&&item.isBudget===true
   };
 }
 

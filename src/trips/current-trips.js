@@ -23,6 +23,7 @@ import { actor } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { tripImage, preloadTripImages } from './trip-images.js';
+import { recurringBudgetItems, budgetProgressForMonth, budgetKeyForItem } from '../finances/main-budgets.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
 const PARTIAL_ORDER = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -658,6 +659,18 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
   const amount = () => Number(String(state.amountText||'').replace(',','.'));
   const validAmount = () => Number.isFinite(amount()) && amount() > 0;
   const jarAmount = () => state.category === 'stay' && state.useJar && validAmount() ? amount() * .2 : 0;
+  const tripFuelBudget = () => {
+    if(me!=='Principe')return null;
+    const kind=state.category==='car'?'fuel':state.category==='groceries'?'groceries':'';
+    if(!kind)return null;
+    const month=String(state.date||'').slice(0,7);
+    const budget=recurringBudgetItems(remoteState?.financeProfiles?.Principe?.recurring).find((item)=>budgetKeyForItem(item)===kind);
+    if(!budget||!/^\d{4}-\d{2}$/.test(month))return null;
+    const record=(remoteState?.finances?.Principe||[]).find((row)=>row.month===month);
+    const summary=budgetProgressForMonth([budget],record,remoteState?.plans||[],month,'Principe',{tripExpenseId:existing?.id,tripPlanId:plan.id})[0];
+    const effect=state.paidBy==='Principe'?(validAmount()?amount():0):state.paidBy==='both'?(validAmount()?amount()/2:0):0;
+    return { ...summary, after:summary.remaining-effect };
+  };
   const canSave = () => {
     if (state.category === 'owed') return !!state.owedCategory && maxCategoryRepayment() > .005 && validAmount() && amount() <= maxCategoryRepayment() + .005;
     return validAmount() && !!state.category && (state.category !== 'stay' || !state.useJar || jarAmount() <= availableJar()+.005);
@@ -725,6 +738,7 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
         return '<button type="button" class="tv2-cat '+cls+(selectedDebt?' is-owed-target':'')+(hasOwedBalance?' has-owed-balance':'')+'" data-cat="'+k+'" aria-pressed="'+((state.category===k||selectedDebt)?'true':'false')+'"><span aria-hidden="true">'+i+'</span>'+esc(l)+'</button>';
       }).join('')+'</div>'+
       owedPanel+normalOptions+
+      (tripFuelBudget()?'<div class="finance-budget-trip-preview" aria-live="polite"></div>':'')+
       '<p class="tv2-hint" aria-live="polite"></p>'+
       '<button type="button" class="tv2-primary tv2-save" data-save>'+(owedMode?'Log repayment':existing?'Save changes':'Save')+'</button>'+
       (existing?'<button type="button" class="tv2-danger-link" data-delete>Delete expense</button>':'');
@@ -747,6 +761,12 @@ function openSimplifiedExpenseSheet(plan, existing = null) {
     }
     const summaryEl = sheet.querySelector('[data-more] .tv2-summary');
     if (summaryEl) summaryEl.textContent = summary();
+    const budgetEl=sheet.querySelector('.finance-budget-trip-preview');
+    if(budgetEl){
+      const budget=tripFuelBudget();
+      if(budget)budgetEl.innerHTML='<strong>'+esc(budget.name)+' · '+displayMoney(budget.remaining,true)+' left</strong>'+
+        '<small>'+displayMoney(budget.spent,true)+' spent of '+displayMoney(budget.amount,true)+(validAmount()?' · After this: '+displayMoney(budget.after,true)+' left':'')+'</small>';
+    }
     const hint = sheet.querySelector('.tv2-hint'), save = sheet.querySelector('[data-save]');
     save.disabled = !canSave() || state.busy;
     save.textContent = state.busy ? 'Saving…' : state.category === 'owed' ? 'Log repayment' : existing ? 'Save changes' : 'Save';

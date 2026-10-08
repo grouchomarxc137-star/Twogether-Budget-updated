@@ -11,7 +11,7 @@ import { toast } from '../lib/toast.js';
 import { tripDetailMoneyHtml, tripDetailShellHtml, tripTimelineHtml, tripExpenseRowHtml, tripSheetHtml } from '../lib/trips-ui.js';
 import { openFinanceSubview, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { renderSharedJar } from './shared-jar.js';
-import { budgetItemsForMonth, budgetSnapshotForMonth, budgetProgressForMonth } from './main-budgets.js';
+import { recurringBudgetItems, budgetProgressForMonth } from './main-budgets.js';
 import { billOccurrenceDate, isFutureBillPaid, pendingFutureBillsForMonth, dueFutureBills } from './future-bills.js';
 
 const MONTHS = [
@@ -98,7 +98,6 @@ let financeState = {
 let flow = null;
 let selectedMonth = '2026-09';
 let financeOverviewMonth = '';
-let financeBudgetViewMonth = '';
 let financeViewYear = Number(selectedMonth.slice(0,4));
 let loading = false;
 let recurringSwipeAbort = null;
@@ -348,7 +347,7 @@ function normalizeRecurringConfig(value) {
   return {
     custom: v.custom === true,
     incomes: Array.isArray(v.incomes) ? v.incomes.map((x) => ({ id: x.id || uid(), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day) })).filter((x) => x.name) : [],
-    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day) })).filter((x) => x.name) : [],
+    expenses: Array.isArray(v.expenses) ? v.expenses.map((x) => ({ id: x.id || uid(), group: normalizeGroup(x.group), name: String(x.name || ''), amount: x.amount ?? '', day: normalizeRecurringDay(x.day), isBudget:x.isBudget===true })).filter((x) => x.name) : [],
   };
 }
 function freshProfile() {
@@ -638,7 +637,7 @@ function dueFinanceReminderSnapshots() {
   const config=recurringConfig();
   const rows=[
     ...config.incomes.map((item)=>({kind:'income',item})),
-    ...config.expenses.map((item)=>({kind:'expense',item})),
+    ...config.expenses.filter((item)=>item.isBudget!==true).map((item)=>({kind:'expense',item})),
   ];
   return rows.map(({kind,item})=>{
     const day=normalizeRecurringDay(item.day);
@@ -1541,115 +1540,22 @@ function bindFinanceWalletCarousel(root) {
 }
 
 
-function mainBudgetCardsHtml(items, record) {
-  const progress=budgetProgressForMonth(items,record);
-  return progress.map((item)=>{
-    const remaining=item.remaining;
-    return '<div class="finance-main-budget-item'+(item.over?' is-over':'')+'">'+
-      '<div class="finance-main-budget-item-head"><strong>'+esc(item.name)+'</strong><span class="finance-main-budget-remaining">'+(item.over?money(-remaining)+' over':money(remaining)+' left')+'</span></div>'+
-      '<div class="finance-main-budget-track" role="progressbar" aria-label="'+esc(item.name)+' spent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+item.percentage.toFixed(1)+'"><span style="width:'+item.percentage.toFixed(1)+'%"></span></div>'+
-      '<div class="finance-main-budget-metrics"><span>'+money(item.spent)+' spent</span><span>'+money(item.amount)+' budget</span></div>'+
-    '</div>';
-  }).join('');
+function recurringBudgetProgress(month, record = recordFor(month)) {
+  return budgetProgressForMonth(recurringBudgetItems(recurringConfig()),record,financeState.plans,month,'Principe');
 }
-function renderMainBudgetPanel() {
-  const root=$('#financeMainBudgets');
-  if(!root||actor()!=='Principe')return;
-  const current=localFinanceToday().month;
-  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(financeBudgetViewMonth))financeBudgetViewMonth=current;
-  const month=financeBudgetViewMonth;
-  const min='2026-01',max=(Number(current.slice(0,4))+2)+'-12';
-  const items=budgetItemsForMonth(profile().mainBudgets,month);
-  const monthRecord=recordFor(month);
-  const canEdit=month>=current;
-  root.innerHTML=
-    '<div class="finance-main-budget-heading"><div><span class="panel-kicker">MAIN ACCOUNT</span><h3>Category budgets</h3><p>See what is left to spend, by category.</p></div></div>'+
-    '<div class="finance-main-budget-controls">'+
-      '<div class="finance-main-budget-month"><button type="button" data-fin-main-budget-prev aria-label="Previous budget month" '+(month<=min?'disabled':'')+'>‹</button><strong>'+esc(monthLabel(month))+'</strong><button type="button" data-fin-main-budget-next aria-label="Next budget month" '+(month>=max?'disabled':'')+'>›</button></div>'+
-      (canEdit?'<button type="button" class="finance-main-budget-manage" data-fin-main-budget-manage>'+(items.length?'Edit budgets':'+ Set budgets')+'</button>':'<span class="finance-main-budget-history-tag">Past month</span>')+
-    '</div>'+
-    (items.length?'<div class="finance-main-budget-items">'+mainBudgetCardsHtml(items,monthRecord)+'</div>':
-      '<p class="finance-main-budget-empty">No category budgets set for this month yet.</p>')+
-    '<p class="finance-main-budget-note">Only Main Account expenses count. Monthly limits carry forward; past months keep their budgets.</p>';
-  root.querySelector('[data-fin-main-budget-prev]')?.addEventListener('click',()=>{
-    if(financeBudgetViewMonth>min){financeBudgetViewMonth=shiftFinanceMonthKey(month,-1);renderMainBudgetPanel();}
-  });
-  root.querySelector('[data-fin-main-budget-next]')?.addEventListener('click',()=>{
-    if(financeBudgetViewMonth<max){financeBudgetViewMonth=shiftFinanceMonthKey(month,1);renderMainBudgetPanel();}
-  });
-  root.querySelector('[data-fin-main-budget-manage]')?.addEventListener('click',openMainBudgetEditor);
+function budgetProgressLine(row) {
+  return '<div class="finance-recurring-budget-status'+(row.over?' is-over':'')+'">'+
+    '<div><strong>'+esc(row.name)+' · '+(row.over?money(-row.remaining)+' over':money(row.remaining)+' left')+'</strong>'+
+    '<span>'+money(row.spent)+' spent of '+money(row.amount)+'</span></div>'+
+    '<div class="finance-recurring-budget-track"><span style="width:'+row.percentage.toFixed(1)+'%"></span></div>'+
+  '</div>';
 }
-function openMainBudgetEditor() {
-  if(actor()!=='Principe')return;
-  const month=financeBudgetViewMonth||localFinanceToday().month;
-  if(month<localFinanceToday().month)return toast('Past budgets are read-only','warn');
-  const items=budgetItemsForMonth(profile().mainBudgets,month);
-  const lines=items.map((item)=>({...item}));
-  function renderEditor() {
-    showMini(
-      '<div class="tv2-root finance-recurring-tv2 finance-main-budget-editor"><div class="tv2-page">'+
-        '<header class="tv2-trip-head"><div class="tv2-nav"><button type="button" class="tv2-link" data-fin-main-budget-back>‹ Wallet</button></div>'+
-          '<h1>Main Account budgets</h1><p>Monthly allowances from '+esc(monthLabel(month))+'. They will carry into following months.</p></header>'+
-        '<section class="finance-main-budget-editor-list">'+
-          lines.map((item,index)=>'<div class="finance-main-budget-edit-row" data-fin-main-budget-row="'+index+'">'+
-            '<label class="tv2-field"><span>Category</span><input type="text" maxlength="60" data-fin-main-budget-name value="'+esc(item.name)+'" placeholder="e.g. Fuel"></label>'+
-            '<label class="tv2-field"><span>Monthly limit (€)</span><input type="number" min="0.01" step="0.01" data-fin-main-budget-amount value="'+esc(String(item.amount))+'" inputmode="decimal" placeholder="350"></label>'+
-            '<button type="button" data-fin-main-budget-remove="'+index+'" aria-label="Remove '+esc(item.name||'category')+'">Remove</button>'+
-          '</div>').join('')+
-        '</section>'+
-        '<button type="button" class="finance-main-budget-add" data-fin-main-budget-add>＋ Add category</button>'+
-        '<div class="finance-main-budget-editor-actions"><button type="button" class="tv2-primary" data-fin-main-budget-save>Save budgets</button></div>'+
-      '</div></div>',
-      'recurring-manager',
-      {back:closeMini}
-    );
-    const body=$('#financeMiniBody');
-    body.onclick=null;
-    const sync=()=>{
-      $$('[data-fin-main-budget-row]',body).forEach((row)=>{
-        const index=Number(row.dataset.finMainBudgetRow);
-        lines[index].name=row.querySelector('[data-fin-main-budget-name]')?.value||'';
-        lines[index].amount=row.querySelector('[data-fin-main-budget-amount]')?.value||'';
-      });
-    };
-    $('[data-fin-main-budget-back]',body)?.addEventListener('click',closeMini);
-    $('[data-fin-main-budget-add]',body)?.addEventListener('click',()=>{
-      sync();
-      if(lines.length>=40)return toast('Up to 40 categories allowed','warn');
-      lines.push({id:uid(),name:'',amount:''});
-      renderEditor();
-    });
-    $$('[data-fin-main-budget-remove]',body).forEach((button)=>button.addEventListener('click',()=>{
-      sync();
-      lines.splice(Number(button.dataset.finMainBudgetRemove),1);
-      renderEditor();
-    }));
-    $('[data-fin-main-budget-save]',body)?.addEventListener('click',async()=>{
-      sync();
-      const cleaned=lines.map((item)=>({
-        id:String(item.id||uid()),
-        name:String(item.name||'').trim().replace(/\s+/g,' '),
-        amount:Number(String(item.amount||'').replace(',','.')),
-      }));
-      if(cleaned.some((item)=>!item.name||!Number.isFinite(item.amount)||item.amount<=0||item.amount>1000000))return toast('Enter a name and a valid positive limit for every category','warn');
-      const names=cleaned.map((item)=>item.name.toLocaleLowerCase());
-      if(new Set(names).size!==names.length)return toast('Each category needs a different name','warn');
-      const button=$('[data-fin-main-budget-save]',body);button.disabled=true;
-      try{
-        const next=profile();
-        next.mainBudgets=budgetSnapshotForMonth(next.mainBudgets,month,cleaned.map((item)=>({...item,amount:Math.round(item.amount*100)/100})));
-        await post('saveFinanceProfile',{profile:next});
-        financeState.financeProfiles[actor()]=normalizeProfile(next);
-        closeMini();renderPage();toast('Main Account budgets saved');
-        setTimeout(loadState,800);
-      }catch(error){
-        button.disabled=false;
-        toast(error?.message||'Could not save budgets','warn');
-      }
-    });
-  }
-  renderEditor();
+function budgetStatusForName(month,name,categoryId='') {
+  if(actor()!=='Principe')return null;
+  const rows=recurringBudgetProgress(month);
+  return rows.find((row)=>categoryId?row.id===categoryId:row.name.trim().toLowerCase()===String(name||'').trim().toLowerCase())||null;
 }
+
 function renderCurrentPanel() {
   const root = $('#financeCurrent'); if (!root) return;
   const { p, bankTotal, savingsTotal, heldTotal, availableSavings, owedTotal, latestInvestment, inv, gl, netWorth } = profileStats();
@@ -1679,7 +1585,7 @@ function renderCurrentPanel() {
         <button type="button" data-fin-wallet-jump="investments">${financeWalletIcon('investments')}<span>Investments</span></button>
       </div>
     </div>
-    ${actor()==='Principe'?'<section id="financeMainBudgets" class="finance-main-budgets" aria-label="Main Account category budgets"></section>':''}`;
+`;
   $('[data-fin-add-bank]', root)?.addEventListener('click', () => openBankModal(-1));
   $$('[data-fin-edit-bank]', root).forEach((btn) => btn.addEventListener('click', () => openBankModal(Number(btn.dataset.finEditBank))));
   $('[data-fin-edit-savings]', root)?.addEventListener('click', openSavingsModal);
@@ -1697,7 +1603,6 @@ function renderCurrentPanel() {
     openOwedHistory();
   });
   renderSharedJar(financeState,p);
-  renderMainBudgetPanel();
   bindFinanceWalletCarousel(root);
 }
 
@@ -1734,14 +1639,14 @@ function recurringRow(kind, item, index) {
     '<div class="finance-recurring-edit-reveal" aria-hidden="true"><b>Edit</b></div>'+
     '<div class="finance-recurring-delete-reveal" aria-hidden="true"><b>Delete</b></div>'+
     '<button class="finance-recurring-tv2-row" type="button" data-fin-recurring-open>'+
-      '<span class="finance-recurring-item-main"><strong>'+esc(item.name)+'</strong>'+(timing?'<small>'+esc(timing)+'</small>':'')+'</span>'+
+      '<span class="finance-recurring-item-main"><strong>'+esc(item.name)+'</strong>'+(item.isBudget===true&&actor()==='Principe'?'<small>Monthly budget · '+(budgetStatusForName(localFinanceToday().month,item.name,item.id)?(money(budgetStatusForName(localFinanceToday().month,item.name,item.id).remaining)+' left'):'Tracking')+'</small>':timing?'<small>'+esc(timing)+'</small>':'')+'</span>'+
       '<span class="finance-recurring-item-amount">'+money(item.amount)+'</span>'+
     '</button>'+
   '</div>';
 }
 
 function recurringCategoryCard(kind, tone, label, items) {
-  const total = items.reduce((sum, x) => sum + n(x.item.amount), 0);
+  const total = items.reduce((sum, x) => sum + (x.item.isBudget===true&&actor()==='Principe'?0:n(x.item.amount)), 0);
   const rows = items.map((x) => recurringRow(kind, x.item, x.index)).join('');
   return '<div class="finance-recurring-card finance-recurring-card-'+tone+'">'+
     '<div class="finance-recurring-card-head">'+
@@ -1749,7 +1654,7 @@ function recurringCategoryCard(kind, tone, label, items) {
         '<span class="finance-recurring-card-icon finance-tv2-tone-'+tone+'" aria-hidden="true">'+financeMonthToneIcon(tone, kind)+'</span>'+
         '<h3>'+esc(label)+'</h3>'+
       '</div>'+
-      '<span class="finance-recurring-card-total"><span>Total</span><strong>'+money(total)+'</strong></span>'+
+      '<span class="finance-recurring-card-total"><span>'+((actor()==='Principe'&&kind==='expense'&&items.some((x)=>x.item.isBudget===true))?'Planned outflow':'Total')+'</span><strong>'+money(total)+'</strong></span>'+
     '</div>'+
     '<div class="finance-recurring-card-body">'+rows+'</div>'+
   '</div>';
@@ -2200,6 +2105,7 @@ function openRecurringEditor(kind,index) {
   const referenceMonth=/^\d{4}-\d{2}$/.test(String(selectedMonth||''))?selectedMonth:'2026-09';
   const bounds=financeDateBounds(referenceMonth);
   const selectedDate=financeDateForDay(referenceMonth,item?.day);
+  const budgetChecked=item?.isBudget===true;
   const groupField=isExpense
     ? '<label class="tv2-field"><span>Category</span><select id="finRecurringGroup" class="finance-recurring-select">'+groups.map((g)=>'<option value="'+g.key+'" '+(g.key===selectedGroup?'selected':'')+'>'+esc(g.label)+'</option>').join('')+'</select></label>'+
       '<label class="tv2-field finance-new-category-field" id="finRecurringNewCategoryField" '+(selectedGroup==='other'?'':'hidden')+'><span>New category <small>Optional</small></span><input id="finRecurringNewCategory" maxlength="50" placeholder="e.g. Pets, Beauty, Gifts"></label>'
@@ -2213,8 +2119,9 @@ function openRecurringEditor(kind,index) {
         '<section class="tv2-budget-editor-card finance-recurring-editor-card">'+
           '<label class="tv2-field"><span>Name</span><input id="finRecurringName" value="'+esc(item?.name||'')+'" placeholder="'+(isExpense?'e.g. Spotify':'e.g. Salary')+'"></label>'+
           groupField+
-          '<label class="tv2-field"><span>Usual amount</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0"></div></label>'+
-          '<label class="tv2-field tv2-date-field"><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
+          '<label class="tv2-field"><span>'+(budgetChecked?'Monthly budget':'Usual amount')+'</span><div class="finance-recurring-amount"><b>€</b><input id="finRecurringAmount" inputmode="decimal" value="'+esc(String(item?.amount??''))+'" placeholder="0"></div></label>'+
+          (isExpense&&actor()==='Principe'?'<label class="finance-recurring-budget-toggle"><input type="checkbox" id="finRecurringIsBudget" '+(budgetChecked?'checked':'')+'><span><strong>Track as a monthly budget</strong><small>Example: Fuel €350. Log actual purchases separately to see how much is left.</small></span></label>':'')+
+          '<label class="tv2-field tv2-date-field" '+(budgetChecked?'hidden':'')+'><span>Usual date</span><span class="tv2-date-box"><input id="finRecurringDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(selectedDate)+'"></span></label>'+
         '</section>'+
         '<div class="finance-recurring-editor-actions">'+
           '<button type="button" class="tv2-primary" data-fin-recurring-save>Save</button>'+
@@ -2232,6 +2139,9 @@ function openRecurringEditor(kind,index) {
     if(recurringNewCategoryField) recurringNewCategoryField.hidden=recurringGroupSelect?.value!=='other';
   };
   recurringGroupSelect?.addEventListener('change',syncRecurringNewCategoryField);
+  const budgetToggle=$('#finRecurringIsBudget');
+  const dateField=$('#finRecurringDate')?.closest('.tv2-field');
+  budgetToggle?.addEventListener('change',()=>{if(dateField)dateField.hidden=budgetToggle.checked;});
   syncRecurringNewCategoryField();
   $('[data-fin-recurring-save]')?.addEventListener('click',async()=>{
     const name=String($('#finRecurringName')?.value||'').trim();
@@ -2254,6 +2164,8 @@ function openRecurringEditor(kind,index) {
         if(result.category) category=result.category.key;
       }
       row.group=recurringGroupForCategory(category,name,item);
+      row.isBudget=actor()==='Principe'&&budgetToggle?.checked===true;
+      if(row.isBudget)row.day='';
     }
     const target=isExpense?nextConfig.expenses:nextConfig.incomes;
     if(index>=0) target[index]=row; else target.push(row);
@@ -2309,18 +2221,12 @@ function financeRecurringItemsForCategory(category, month = selectedMonth) {
   const items=(config.expenses || []).filter((item)=>groupTone(item.group)===category).map((item)=>({
     id:item.id || item.name,
     name:String(item.name || ''),
-    amount:item.amount,
+    amount:item.isBudget===true?'':item.amount,
     day:normalizeRecurringDay(item.day),
     group:/invest/i.test(String(item.name||''))?'investments':normalizeGroup(item.group),
     tone:category,
+    isBudget:item.isBudget===true,
   })).filter((item)=>item.name);
-  if(actor()==='Principe'&&category==='budgets'){
-    budgetItemsForMonth(profile().mainBudgets,month).forEach((budget)=>{
-      if(!items.some((entry)=>String(entry.name).trim().toLowerCase()===String(budget.name).trim().toLowerCase())){
-        items.push({id:'main-budget-'+budget.id,name:budget.name,amount:'',day:'',group:'variable',tone:'budgets'});
-      }
-    });
-  }
   if(actor()==='Principe'&&category==='wealth'&&!items.some((item)=>normalizeGroup(item.group)==='investments')){
     items.push({id:'principe-investments',name:'Investments',amount:'',day:'',group:'investments',tone:'wealth'});
   }
@@ -2578,7 +2484,13 @@ function openFinanceTransactionSheet(rec, edit = null) {
           ? '<label class="tv2-field finance-log-name"><span>Expense name</span><input id="financeLogName" maxlength="100" placeholder="What was this expense?" value="'+esc(state.name)+'"></label>'
           : '';
     const jarBalance=n(financeState.sharedJar?.balance??0);
-    const trackedBudgets=actor()==='Principe'?budgetItemsForMonth(profile().mainBudgets,rec.month):[];
+    const trackedBudgets=actor()==='Principe'?recurringBudgetItems(recurringConfig()):[];
+    const activeBudget=trackedBudgets.find((item)=>state.budgetCategoryId?state.budgetCategoryId===item.id:item.name.toLowerCase()===state.name.trim().toLowerCase());
+    const budgetBefore=activeBudget?budgetProgressForMonth([activeBudget],rec,financeState.plans,rec.month,'Principe',{financeExpenseId:editingItem?.id})[0]:null;
+    const budgetDisplay=budgetBefore&&state.paidFrom!=='sharedJar'
+      ? '<div class="finance-budget-log-preview"><b>'+esc(budgetBefore.name)+' · '+money(budgetBefore.remaining)+' left</b>'+
+        '<small>'+money(budgetBefore.spent)+' spent of '+money(budgetBefore.amount)+(validAmount()?' · After this: '+money(budgetBefore.remaining-amount())+' left':'')+'</small></div>'
+      : '';
     const budgetOptions=isRegularExpense()&&trackedBudgets.length
       ? '<label class="tv2-field finance-log-budget-assign"><span>Main Account budget</span><select id="financeLogBudgetCategory">'+
         '<option value="" '+(!state.budgetCategoryId?'selected':'')+'>Match expense name</option>'+
@@ -2605,7 +2517,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
       categoriesHtml:tiles,
       categoriesClass:'finance-log-categories '+(drillDown?'is-drilled':''),
       categoriesLabel:drillDown?'Items':'Category',
-      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetOptions,
+      afterCategoriesHtml:categoryDetail+paymentSourceHtml+budgetOptions+budgetDisplay,
       defaultsHtml:isExtraUsed()?'':'<button type="button" class="tv2-defaults" data-fin-log-more aria-expanded="'+(state.more?'true':'false')+'"><span class="tv2-summary">'+esc(dateSummary())+'</span><span class="tv2-chev" aria-hidden="true">'+(state.more?'⌃':'⌄')+'</span></button>',
       moreHtml:isExtraUsed()?'':'<div class="tv2-more" '+(state.more?'':'hidden')+'><label class="tv2-field"><span>Date</span><input id="financeLogDate" type="date" min="'+bounds.min+'" max="'+bounds.max+'" value="'+esc(state.date)+'"></label></div>',
       hintAttr:'data-fin-log-hint',
@@ -2629,6 +2541,7 @@ function openFinanceTransactionSheet(rec, edit = null) {
     });
     sheet.querySelector('#financeLogBudgetCategory')?.addEventListener('change',(event)=>{
       state.budgetCategoryId=event.target.value;
+      render();
     });
     sheet.querySelector('#financeLogCategoryName')?.addEventListener('input',(event)=>{
       state.newCategoryName=event.target.value;
@@ -2669,6 +2582,14 @@ function openFinanceTransactionSheet(rec, edit = null) {
     }
     const summary=sheet.querySelector('.tv2-summary');
     if(summary) summary.textContent=dateSummary();
+    const budget=sheet.querySelector('.finance-budget-log-preview small');
+    if(budget){
+      const item=recurringBudgetItems(recurringConfig()).find((entry)=>state.budgetCategoryId?entry.id===state.budgetCategoryId:entry.name.toLowerCase()===state.name.toLowerCase());
+      if(item){
+        const progress=budgetProgressForMonth([item],rec,financeState.plans,rec.month,'Principe',{financeExpenseId:editingItem?.id})[0];
+        budget.textContent=money(progress.spent)+' spent of '+money(progress.amount)+(validAmount()?' · After this: '+money(progress.remaining-amount())+' left':'');
+      }
+    }
   }
 
   layer.addEventListener('click',async(event)=>{
@@ -2715,11 +2636,11 @@ function openFinanceTransactionSheet(rec, edit = null) {
       state.selectedItemId=String(item.id);
       state.name=item.name;
       if(!editingItem){
-        const matched=budgetItemsForMonth(profile().mainBudgets,rec.month).find((budget)=>budget.name.toLowerCase()===item.name.toLowerCase());
+        const matched=recurringBudgetItems(recurringConfig()).find((budget)=>budget.name.toLowerCase()===item.name.toLowerCase());
         state.budgetCategoryId=matched?.id||'';
       }
       state.group=state.category==='income'?'':(item.group||financeGroupForTone(state.category,item.name));
-      if(!isExtraUsed()||hasValue(item.amount)) state.amountText=hasValue(item.amount)?String(n(item.amount)):'';
+      if(!editingItem)state.amountText=item.isBudget===true?'':(hasValue(item.amount)?String(n(item.amount)):'');
       state.date=isExtraUsed()?'':financeDateForDay(rec.month,item.day);
       state.more=false;
       state.error='';
@@ -3338,10 +3259,8 @@ function renderDetail(rec) {
     notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' extra carried from '+esc(monthLabel(carry.prevMonth))+'</span></div>');
   }
   if(actor()==='Principe'){
-    const budgetItems=budgetItemsForMonth(profile().mainBudgets,rec.month);
-    if(budgetItems.length){
-      notes.push('<section class="finance-month-main-budgets" aria-label="Main Account budgets"><h3>Main Account budgets</h3><div class="finance-main-budget-items">'+mainBudgetCardsHtml(budgetItems,rec)+'</div></section>');
-    }
+    const budgetRows=recurringBudgetProgress(rec.month,rec);
+    if(budgetRows.length)notes.push('<section class="finance-month-main-budgets" aria-label="Monthly budgets"><h3>Monthly budgets</h3><div class="finance-month-budget-list">'+budgetRows.map(budgetProgressLine).join('')+'</div></section>');
   }
 
   financeMonthDialog=document.createElement('dialog');
@@ -3775,7 +3694,7 @@ function seededRecord(month) {
     const usualDay = normalizeRecurringDay(x.day);
     return { name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'income', x.name, x.amount), usualDay, date: financeDateForDay(month, usualDay) };
   });
-  d.expenses = setup.expenses.map((x) => {
+  d.expenses = setup.expenses.filter((x)=>x.isBudget!==true).map((x) => {
     const usualDay = normalizeRecurringDay(x.day);
     return { group: x.group, name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount), usualDay, date: financeDateForDay(month, usualDay) };
   });
