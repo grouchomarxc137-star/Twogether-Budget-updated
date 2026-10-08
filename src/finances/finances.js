@@ -1073,10 +1073,10 @@ function previousMonthKey(month) {
 function extraSpendsTotal(rec) { return (rec?.extraSpends || []).reduce((sum, x) => sum + n(x.amount), 0); }
 function extraSpendsOutflowTotal(rec) { return (rec?.extraSpends || []).filter(extraSpendCountsInOutflow).reduce((sum, x) => sum + n(x.amount), 0); }
 
-function extraCarryAmounts(over, base = 250) {
+function extraCarryAmounts(over, base = 250, minimum = 50) {
   const baseCents = Math.round(base * 100);
   const overCents = Math.max(0, Math.round(over * 100));
-  const deductedCents = Math.min(overCents, Math.max(0, baseCents - 5000));
+  const deductedCents = Math.min(overCents, Math.max(0, baseCents - Math.round(minimum * 100)));
   return {
     budget: (baseCents - deductedCents) / 100,
     debt: (overCents - deductedCents) / 100,
@@ -1090,6 +1090,12 @@ function extraCarryInfo(month) {
   const prevMonth = previousMonthKey(month), prev = prevMonth ? recordFor(prevMonth) : null;
   const over = prev ? extraSpendsOutflowTotal(prev) : 0;
   return { prevMonth, over, ...extraCarryAmounts(over, rules.extraBudget) };
+}
+
+function personalCarryInfo(month) {
+  const prevMonth = previousMonthKey(month), prev = prevMonth ? recordFor(prevMonth) : null;
+  const over = prev ? extraSpendsOutflowTotal(prev) : 0;
+  return { prevMonth, over, ...extraCarryAmounts(over, 100, 30) };
 }
 
 function mainAccountLeftover() { return ownMonths().reduce((sum, rec) => sum + calc(rec).leftover, 0); }
@@ -3252,6 +3258,7 @@ function renderDetail(rec) {
 
   const rules=financeRules();
   const totals=calc(rec), carry=extraCarryInfo(rec.month);
+  const personalCarry=actor()==='Principe'?personalCarryInfo(rec.month):null;
   const over=totals.leftover<0;
   const progress=totals.income>0?Math.min(100,Math.max(0,(totals.outflow/totals.income)*100)):null;
   const stored=recordFor(rec.month);
@@ -3266,6 +3273,13 @@ function renderDetail(rec) {
   }
   if(rules.extraTracking&&carry.debt>0){
     notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(carry.debt)+' from '+esc(monthLabel(carry.prevMonth))+' could not be deducted from Extra · see Money owed to me after confirming that month</span></div>');
+  }
+  if(personalCarry&&totals.extraOver>0){
+    const next=extraCarryAmounts(totals.extraOver,100,30);
+    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>Personal overspending · '+money(totals.extraOver)+' extra used. Next month '+money(next.budget)+' Personal'+(next.debt>0?' · '+money(next.debt)+' owed to yourself after confirmation':'')+'</span></div>');
+  }
+  if(personalCarry&&personalCarry.debt>0){
+    notes.push('<div class="overview-trip-balance is-debtor finance-month-note"><span>'+money(personalCarry.debt)+' from '+esc(monthLabel(personalCarry.prevMonth))+' could not be deducted from Personal · see Money owed to me after confirming that month</span></div>');
   }
   if(actor()==='Principe'){
     const budgetRows=recurringBudgetProgress(rec.month,rec);
@@ -3691,7 +3705,7 @@ function recurringValue(previous, kind, name, fallback) {
   return match && hasValue(match.amount) ? n(match.amount) : fallback;
 }
 function seededRecord(month) {
-  const rules = financeRules(), previous = latestPriorMonth(month), d = freshRecord(month), carry = extraCarryInfo(month);
+  const rules = financeRules(), previous = latestPriorMonth(month), d = freshRecord(month), carry = extraCarryInfo(month), personalCarry = actor()==='Principe'?personalCarryInfo(month):null;
   const savedRecurring = profile().recurring;
   const custom = savedRecurring?.custom === true;
   const setup = custom ? normalizeRecurringConfig(savedRecurring) : {
@@ -3705,7 +3719,8 @@ function seededRecord(month) {
   });
   d.expenses = setup.expenses.filter((x)=>x.isBudget!==true).map((x) => {
     const usualDay = normalizeRecurringDay(x.day);
-    return { group: x.group, name: x.name, amount: custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount), usualDay, date: financeDateForDay(month, usualDay) };
+    const personalBudget = personalCarry && normalizeGroup(x.group)==='variable' && String(x.name||'').trim().toLowerCase()==='personal';
+    return { group: x.group, name: x.name, amount: personalBudget ? personalCarry.budget : (custom ? n(x.amount) : recurringValue(previous, 'expense', x.name, x.amount)), usualDay, date: financeDateForDay(month, usualDay) };
   });
   if (rules.extraTracking) d.expenses.push({ group: 'extra', name: 'Extra', amount: carry.budget, usualDay: '', date: '' });
   d.extraSpends = [];
@@ -3853,6 +3868,7 @@ function renderWizard() {
     const item = queue[idx], source = recurringSource(item, d);
     if (!source) { flow.recurringIndex = idx + 1; renderWizard(); return; }
     const isFixedExtra = item.kind === 'expense' && normalizeGroup(source.group) === 'extra' && String(source.name || '').trim().toLowerCase() === 'extra';
+    const isPersonalAllowance = actor()==='Principe' && item.kind==='expense' && normalizeGroup(source.group)==='variable' && String(source.name||'').trim().toLowerCase()==='personal';
     const meta = item.kind === 'income' ? { label: 'Income', tone: 'other' } : { label: categoryLabel(groupTone(source.group)), tone: groupTone(source.group) };
     const pct = 12 + Math.round(((idx + 1) / Math.max(1, queue.length)) * 48);
     setProgress(`CHECKING ${idx + 1} OF ${queue.length}`, pct);
@@ -3864,7 +3880,9 @@ function renderWizard() {
     const bounds = financeDateBounds(d.month);
     const help = isFixedExtra
       ? (n(d.extraBudget) < financeRules().extraBudget ? `Your normal ${money(financeRules().extraBudget)} Extra is reduced by ${money(carry.deducted)} because you spent extra in ${monthLabel(carry.prevMonth)}.${carry.debt > 0 ? ` The remaining ${money(carry.debt)} is tracked in Money owed to me when that month is confirmed.` : ''}` : 'This is your normal monthly Extra allocation. You do not need to itemize what the budget itself is spent on.')
-      : usualDay !== ''
+      : isPersonalAllowance && personalCarryInfo(d.month).deducted>0
+        ? `Your normal €100 Personal allowance is reduced by ${money(personalCarryInfo(d.month).deducted)} after extra spending in ${monthLabel(carry.prevMonth)}. At least €30 remains.${personalCarryInfo(d.month).debt>0 ? ` The remaining ${money(personalCarryInfo(d.month).debt)} becomes money you owe yourself when that month is confirmed.` : ''}`
+        : usualDay !== ''
         ? `Was ${source.name} ${actionText} on ${scheduledLabel}?`
         : `No usual date is set for ${source.name}. Add the date for this month if you want, or leave it blank.`;
     const dateField = !isFixedExtra && usualDay === '' ? `<label class="finance-date-field"><span>Actual date <small>Optional</small></span><input class="finance-input" id="finRecurringDate" type="date" min="${bounds.min}" max="${bounds.max}" value="${esc(normalizeFinanceDate(source.date, d.month))}"></label>` : '';
@@ -4150,10 +4168,13 @@ function renderReview() {
   const incomeRows = d.incomes.map((x, i) => `<div class="finance-list-row"><span>${esc(x.name)}${financeDateMeta(x.date)}</span><strong>${money(x.amount)} <button class="text-btn" data-fin-edit-income="${i}">Edit</button> <button class="text-btn" data-fin-remove-income="${i}">×</button></strong></div>`).join('') || '<div class="finance-empty">No income added.</div>';
   const expenseRows = groupedExpenseHtml(d.expenses, true, d.extraSpends || []) || '<div class="finance-empty">No expenses added.</div>';
   const nextExtra = extraCarryAmounts(c.extraOver, rules.extraBudget || 250);
+  const nextPersonal = extraCarryAmounts(c.extraOver, 100, 30);
   const extraLine = rules.extraTracking && c.extraOver > 0 ? `<div class="finance-alert bad">⚠ ${money(c.extraOver)} spent beyond this month’s Extra budget. Next month's Extra will be ${money(nextExtra.budget)}.${nextExtra.debt > 0 ? ` ${money(nextExtra.debt)} will be added to Money owed to me when you confirm this month.` : ''}</div>` : '';
+  const personalLine = actor()==='Principe' && c.extraOver>0 ? `<div class="finance-carry-note">${money(c.extraOver)} extra used this month. Next month's Personal allowance: ${money(nextPersonal.budget)}.${nextPersonal.debt>0 ? ` ${money(nextPersonal.debt)} will be recorded in Money owed to me when you confirm.` : ''}</div>` : '';
   const savedUpSpent = rules.savedUpExtraTracking ? (d.extraSpends || []).filter((x) => x.source === 'savings').reduce((sum, x) => sum + n(x.amount), 0) : 0;
   const savedUpLine = savedUpSpent > 0 ? `<div class="finance-carry-note">${money(savedUpSpent)} will be taken from Saved up when this month is saved.</div>` : '';
-  const debtLine = rules.extraTracking && carry.debt > 0 ? `<div class="finance-carry-note">${money(carry.debt)} from ${esc(monthLabel(carry.prevMonth))} could not be deducted from Extra. Check Money owed to me after confirming that month.</div>` : '';
+  const previousCarry = actor()==='Principe' ? personalCarryInfo(d.month) : carry;
+  const debtLine = previousCarry.debt>0 ? `<div class="finance-carry-note">${money(previousCarry.debt)} from ${esc(monthLabel(previousCarry.prevMonth))} could not be deducted from ${actor()==='Principe'?'Personal':'Extra'}. Check Money owed to me after confirming that month.</div>` : '';
   const investmentLines = rules.investmentTracking ? (c.investmentTotal == null ? '<div class="finance-breakdown-row"><span>Investment snapshot</span><strong>Skipped</strong></div>' : `<div class="finance-breakdown-row finance-tone-wealth"><span>Total investments</span><strong>${money(c.investmentTotal)}</strong></div>${actor()==='Principessa'?`<div class="finance-breakdown-row finance-tone-wealth"><span>Sis</span><strong>${money(c.sisterInvestments)}</strong></div>`:''}<div class="finance-breakdown-row finance-tone-wealth"><span>Your investments</span><strong>${money(c.ownInvestments)}</strong></div><div class="finance-breakdown-row ${gl?.value < 0 ? 'finance-negative' : 'finance-positive'}"><span>G/L p/m${gl ? ` vs ${monthLabel(gl.previousMonth)}` : ''}</span><strong>${gl ? signedMoney(gl.value) : '—'}</strong></div>`) : '';
   const extraActions = rules.extraTracking
     ? (c.extraOver > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit extra money used</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log extra money used</button>')
@@ -4161,7 +4182,7 @@ function renderReview() {
       ? (savedUpSpent > 0 ? '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Edit Saved up spending</button>' : '<button class="btn ghost" type="button" data-fin-edit-extra-spend>Log Saved up spending</button>')
       : '';
   const investmentSection = rules.investmentTracking ? `<div class="finance-review-section"><h3>Investment tracking</h3>${investmentLines}<button class="btn ghost" data-fin-edit-investments>Edit investment snapshot</button></div>` : '';
-  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${savedUpLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
+  body.innerHTML = wizardHtml(`Ready to save ${monthLabel(d.month)}?`, 'Review your personal monthly picture before saving.', `<div class="finance-summary-line"><div class="finance-summary-mini"><span>Income</span><strong>${money(c.income)}</strong></div><div class="finance-summary-mini"><span>Outflow</span><strong>${money(c.outflow)}</strong></div><div class="finance-summary-mini"><span>${c.leftover < 0 ? 'Overspent' : 'Leftover'}</span><strong>${money(Math.abs(c.leftover))}</strong></div></div>${extraLine}${personalLine}${savedUpLine}${debtLine}<div class="finance-review-section"><h3>Income</h3>${incomeRows}<button class="btn ghost" data-fin-add-income>Add income</button></div><div class="finance-review-section"><h3>Outflow</h3>${expenseRows}<button class="btn ghost" data-fin-add-expense>Add expense</button>${extraActions}</div>${investmentSection}<div class="finance-actions finance-save-actions"><button class="btn ghost" data-fin-cancel>Cancel</button><div><button class="btn ghost" data-fin-save-draft>Save draft</button><button class="btn primary big" data-fin-finalize>Confirm month</button></div></div>`);
   $$('[data-fin-edit-income]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editIncomeIndex: Number(btn.dataset.finEditIncome) }; flow.stage = 'editExistingIncome'; renderWizard(); }));
   $$('[data-fin-remove-income]').forEach((btn) => btn.addEventListener('click', () => { d.incomes.splice(Number(btn.dataset.finRemoveIncome), 1); renderReview(); }));
   $$('[data-fin-edit-expense]').forEach((btn) => btn.addEventListener('click', () => { flow.temp = { editExpenseIndex: Number(btn.dataset.finEditExpense) }; flow.stage = 'editExistingExpense'; renderWizard(); }));

@@ -50,3 +50,81 @@ test('pending credit card charges do not reduce next month Extra', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Principe personal overspending reduces next month to at least 30 and creates a self debt', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'twogether-personal-'));
+  const database = openDatabase(join(dir, 'test.sqlite'));
+  configureStateStore(database.store);
+  const save = (month, spends = [], finalized = false) =>
+    database.db.transaction(() => runAction('saveFinanceMonth', {
+      monthData: { month, incomes: [], extraSpends: spends, finalized,
+        expenses: [{ group: 'variable', name: 'Personal', amount: 100 },
+          { id: 'rent-row', group: 'fixed', name: 'Rent', amount: 575 }]
+      }
+    }, 'Principe'))();
+  try {
+    assert.equal(save('2026-10', [{ source: 'main', amount: 20 }]).ok, true);
+    assert.equal(save('2026-11').monthData.expenses.find(x => x.name === 'Personal').amount, 80);
+    assert.equal(getState().financeProfiles.Principe.receivables.length, 0);
+    assert.equal(save('2026-10', [{ source: 'main', amount: 80 }], true).ok, true);
+    const state = getState();
+    const november = state.finances.Principe.find(x => x.month === '2026-11');
+    assert.equal(november.expenses.find(x => x.name === 'Personal').amount, 30);
+    assert.equal(november.expenses.find(x => x.name === 'Rent').amount, 575);
+    assert.deepEqual(state.financeProfiles.Principe.receivables.map(x =>
+      ({ id: x.id, person: x.person, principal: x.principal })),
+      [{ id: 'personal-overspend:2026-10', person: 'Myself', principal: 10 }]
+    );
+    assert.equal(save('2026-11', [], true).ok, true);
+    assert.equal(getState().finances.Principe.find(x => x.month === '2026-11').expenses.find(x => x.name === 'Personal').amount, 30);
+    assert.equal(getState().financeProfiles.Principe.receivables.length, 1);
+    assert.equal(getState().financeProfiles.Principessa.receivables.length, 0);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Principe personal overspending respects cents, month boundaries, and draft vs final debts', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'twogether-personal-'));
+  const database = openDatabase(join(dir, 'test.sqlite'));
+  configureStateStore(database.store);
+  const save = (month, extraSpends, finalized = false, expenses) =>
+    database.db.transaction(() => runAction('saveFinanceMonth', {
+      monthData: { month, incomes: [], extraSpends, finalized,
+        expenses: expenses ?? [{ group: 'variable', name: 'Personal', amount: 100 }],
+      }
+    }, 'Principe'))();
+  try {
+    assert.equal(save('2026-12', [{ source: 'main', amount: 70.01 }]).ok, true);
+    assert.equal(save('2027-01', []).monthData.expenses[0].amount, 30);
+    assert.equal(getState().financeProfiles.Principe.receivables.length, 0);
+    assert.equal(save('2026-12', [{ source: 'main', amount: 70.01 }], true).ok, true);
+    assert.equal(getState().financeProfiles.Principe.receivables[0].principal, 0.01);
+    assert.equal(save('2027-02', []).monthData.expenses[0].amount, 100);
+    assert.equal(save('2027-03', [{ source: 'savings', amount: 4.5 }]).ok, false);
+    assert.equal(save('2027-03', [{ source: 'main', amount: 4.5 }]).ok, true);
+    assert.equal(save('2027-04', []).monthData.expenses[0].amount, 95.5);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Principe partial-only months do not gain an unrequested Personal expense', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'twogether-personal-'));
+  const database = openDatabase(join(dir, 'test.sqlite'));
+  configureStateStore(database.store);
+  const save = data => database.db.transaction(() => runAction('saveFinanceMonth', { monthData: data }, 'Principe'))();
+  try {
+    assert.equal(save({month:'2026-10',extraSpends:[{source:'main',amount:120}],expenses:[],partialOnly:true}).ok,true);
+    const november=save({month:'2026-11',extraSpends:[],expenses:[],partialOnly:true});
+    assert.equal(november.ok,true);
+    assert.deepEqual(november.monthData.expenses,[]);
+    assert.equal(save({month:'2026-10',extraSpends:[{source:'main',amount:120}],expenses:[],partialOnly:true,finalized:true}).ok,true);
+    assert.equal(getState().financeProfiles.Principe.receivables[0].principal,50);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

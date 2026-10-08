@@ -1395,6 +1395,9 @@ function handleAction_(actionValue, payloadValue, actorValue) {
       if (actor === 'Principessa') {
         const previous = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, -1));
         if (previous) setFinanceExtraBudget_(monthData, financeExtraCarryFrom_(previous).budget);
+      } else if (actor === 'Principe') {
+        const previous = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, -1));
+        if (previous) setFinancePersonalBudget_(monthData, financePersonalCarryFrom_(previous).budget);
       }
       const now = new Date().toISOString();
       syncFinanceSharedJarTransactions_(state,actor,monthData,now);
@@ -1436,6 +1439,29 @@ function handleAction_(actionValue, payloadValue, actorValue) {
             financeProfile.receivables.push({
               id: debtId, person: 'Myself',
               reason: 'Extra budget overspending · ' + monthData.month,
+              principal: overflowDebt, repayments: []
+            });
+            financeProfile.updatedAt = now;
+            financeProfile.updatedBy = actor;
+            state.financeProfiles[actor] = financeProfile;
+          }
+        }
+      }
+      if (actor === 'Principe') {
+        const next = list.find(x => x.month === adjacentFinanceMonth_(monthData.month, 1));
+        if (next && !next.finalized) {
+          setFinancePersonalBudget_(next, financePersonalCarryFrom_(monthData).budget);
+          next.updatedAt = now;
+          next.updatedBy = actor;
+        }
+        if (monthData.finalized) {
+          const overflowDebt = financePersonalCarryFrom_(monthData).debt;
+          const debtId = 'personal-overspend:' + monthData.month;
+          if (overflowDebt > 0 && !financeProfile.receivables.some(x => x.id === debtId)) {
+            if (financeProfile.receivables.length >= 60) throw new Error('Money owed to me is full. Please clear space before confirming.');
+            financeProfile.receivables.push({
+              id: debtId, person: 'Myself',
+              reason: 'Personal budget overspending · ' + monthData.month,
               principal: overflowDebt, repayments: []
             });
             financeProfile.updatedAt = now;
@@ -2366,6 +2392,22 @@ function financeExtraCarryFrom_(record) {
     .reduce((sum, item) => sum + Number(item.amount || 0), 0) * 100));
   const deductedCents = Math.min(overspentCents, 20000);
   return { budget: (25000 - deductedCents) / 100, debt: (overspentCents - deductedCents) / 100 };
+}
+
+function financePersonalCarryFrom_(record) {
+  const overspentCents = Math.max(0, Math.round((Array.isArray(record?.extraSpends) ? record.extraSpends : [])
+    .filter(financeExtraSpendCountsAsOutflow_)
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0) * 100));
+  const deductedCents = Math.min(overspentCents, 7000);
+  return { budget: (10000 - deductedCents) / 100, debt: (overspentCents - deductedCents) / 100 };
+}
+
+function setFinancePersonalBudget_(monthData, amount) {
+  (monthData.expenses || []).forEach(function(item) {
+    if (item.group === 'variable' && String(item.name || '').trim().toLowerCase() === 'personal' && !item.id) {
+      item.amount = amount;
+    }
+  });
 }
 
 function setFinanceExtraBudget_(monthData, amount) {
