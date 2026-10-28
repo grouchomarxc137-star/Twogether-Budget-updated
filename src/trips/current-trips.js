@@ -24,7 +24,6 @@ import { toast } from '../lib/toast.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { tripImage, preloadTripImages } from './trip-images.js';
 import { isCarExpense, carExpenseLabel, CAR_TYPES, carExpenseSubtype } from './car-expenses.js';
-import { loggedTripFuel, readDistanceInput, renderTripDistance } from './trip-distance.js';
 import { recurringBudgetItems, budgetProgressForMonth, budgetKeyForItem } from '../finances/main-budgets.js';
 
 const MONEY_KEYS = ['travel', 'accom', 'fuel', 'groceries', 'eat', 'tolls', 'other'];
@@ -560,7 +559,6 @@ function simplifiedTrip(plan, trip) {
     '</section>'+
     (()=>{const balanceLine=settlementLine(plan),balanceClass=balanceLine==='You’re even'?'is-even':balanceLine.startsWith('You owe ')?'is-debtor':'';return '<button class="tv2-balance '+balanceClass+'" data-act="balance"><span>'+esc(balanceLine)+'</span><span aria-hidden="true">›</span></button>';})()+
     confirmHtml+
-    (past?renderTripDistance(plan,trip,loggedTripFuel(plan),'current'):'')+
     '<section class="tv2-list" aria-label="Expenses">'+expenseTimeline(plan,!isLocked(trip))+'</section>'+
     '<div class="tv2-dock"><button class="tv2-primary" data-act="add-expense">＋ Add expense</button></div>'+
   '</div>';
@@ -4374,25 +4372,6 @@ async function handleSimplifiedClick(e) {
       b.disabled = false;
       b.textContent = editing ? 'Update my budget' : 'Save my budget';
       if (error) error.textContent = err?.message || 'Could not save your budget.';
-    }
-    return;
-  }
-  if (b.dataset.act === 'save-trip-distance') {
-    const input=b.closest('.trip-distance-panel')?.querySelector('[data-trip-distance-input]');
-    const distanceKm=readDistanceInput(input?.value);
-    if (distanceKm == null) { toast('Enter a valid distance in kilometres (for example, 375).','warn'); return; }
-    if (b.disabled) return;
-    b.disabled=true;
-    b.textContent='Saving…';
-    try {
-      const result=await window.TwogetherAPI.post('saveTripDistance',{planId:plan.id,distanceKm},actor());
-      if (!result?.ok) throw new Error(result?.error || 'Could not save kilometres');
-      await refreshState(true);
-      simplifiedSnack('Trip kilometres saved');
-    } catch (err) {
-      b.disabled=false;
-      b.textContent=plan.distanceKm?'Update km':'Save km';
-      toast(err?.message||'Could not save kilometres','warn');
     }
     return;
   }

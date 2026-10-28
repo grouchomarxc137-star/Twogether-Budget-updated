@@ -132,16 +132,6 @@ function gameCatalog_(){return {
 };}
 function gameResponse_(state, extra){return Object.assign({ok:true,game:sanitizeGame_(state.game)},extra||{});}
 
-// A shared distance can be entered once the trip has ended. Keep it
-// separate from spending, repayments and the confirmation lock.
-function cleanTripDistance_(value) {
-  if (value === '' || value == null) return '';
-  const text = String(value).trim().replace(',', '.');
-  if (!/^\d{1,7}(?:\.\d)?$/.test(text)) return '';
-  const km = Number(text);
-  return Number.isFinite(km) && km > 0 && km <= 1000000 ? km : '';
-}
-
 function migrateTrip_(trip) {
   if (trip && trip.submissions) return sanitizeTripRecord_(trip);
 
@@ -169,7 +159,6 @@ function migrateTrip_(trip) {
   const out = {
     id: cleanText_(trip && trip.id, 80) || Utilities.getUuid(),
     budget: cleanMoney_(trip && trip.budget),
-    distanceKm: cleanTripDistance_(trip && trip.distanceKm),
     submissions: {Principessa:null, Principe:null},
     sharedExpenses: sanitizeSharedExpenses_(trip && trip.sharedExpenses),
     confirmed: {Principessa:false, Principe:false},
@@ -209,43 +198,6 @@ function handleAction_(actionValue, payloadValue, actorValue) {
 
   try {
     const state = readState_();
-
-    if (action === 'saveTripDistance') {
-      const planId=cleanText_(payload.planId,80), tripId=cleanText_(payload.tripId,80);
-      if (!planId && !tripId) throw new Error('Choose a trip first');
-      const planIdx=planId
-        ? state.plans.findIndex(function(item){return item.id===planId;})
-        : state.plans.findIndex(function(item){return item.linkedTripId===tripId;});
-      const tripIdx=tripId
-        ? state.trips.findIndex(function(item){return item.id===tripId;})
-        : planIdx>=0&&state.plans[planIdx].linkedTripId
-          ? state.trips.findIndex(function(item){return item.id===state.plans[planIdx].linkedTripId;})
-          : -1;
-      if ((planId && planIdx<0) || (tripId && tripIdx<0) || (planIdx<0&&tripIdx<0))
-        throw new Error('Trip not found');
-      const plan=planIdx>=0?state.plans[planIdx]:null;
-      const trip=tripIdx>=0?state.trips[tripIdx]:null;
-      const meta=plan?.meta || trip?.submissions?.[trip.createdBy] || trip?.submissions?.Principessa || trip?.submissions?.Principe || {};
-      const today=new Date().toISOString().slice(0,10);
-      if (!meta.end || meta.end>today) throw new Error('You can enter kilometres once the trip has ended');
-      const distanceKm=cleanTripDistance_(payload.distanceKm);
-      if (distanceKm === '') throw new Error('Enter a valid distance between 0 and 1,000,000 km');
-      const now=new Date().toISOString();
-      if (plan) {
-        plan.distanceKm=distanceKm;
-        plan.updatedAt=now;
-        plan.updatedBy=actor;
-        state.plans[planIdx]=plan;
-      } else {
-        trip.distanceKm=distanceKm;
-        trip.updatedAt=now;
-        trip.updatedBy=actor;
-        state.trips[tripIdx]=trip;
-      }
-      addAudit_(state,actor,'saveTripDistance',plan?.id||trip.id);
-      saveState_(state);
-      return output_({ok:true,distanceKm:distanceKm});
-    }
 
     if (action === 'savePlan') {
       const id = cleanText_(payload.id, 80);
@@ -3390,7 +3342,6 @@ function sanitizePlan_(plan) {
   const partials = plan && plan.partials || {};
   return {
     id: cleanText_(plan && plan.id, 80) || Utilities.getUuid(),
-    distanceKm: cleanTripDistance_(plan && plan.distanceKm),
     meta: sanitizePlanMeta_(plan && plan.meta || {}),
     budgets: {
       Principessa: cleanMoney_(budgets.Principessa),
@@ -3438,7 +3389,6 @@ function sanitizeSubmission_(s, actor) {
 function sanitizeTripRecord_(t) {
   const out = {
     id: cleanText_(t && t.id, 80) || Utilities.getUuid(),
-    distanceKm: cleanTripDistance_(t && t.distanceKm),
     budget: cleanMoney_(t && t.budget),
     submissions: {Principessa:null, Principe:null},
     sharedExpenses: sanitizeSharedExpenses_(t && t.sharedExpenses),
@@ -3504,7 +3454,7 @@ function reconciliationWarnings_(trip, plan) {
 }
 
 export const SUPPORTED_ACTIONS = new Set([
-  'saveTripDistance', 'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
+  'savePlan', 'saveStaySearchPreferences', 'saveStayFavorite', 'updateStayFavoriteDetails', 'updateStayFavoritePrice', 'markStayFavoriteUnavailable', 'deleteStayFavorite', 'selectStayForTrip', 'unselectStayForTrip', 'saveStayTrackerSnapshot', 'saveAccommodationExpense', 'updateSharedJarBalance', 'confirmAccommodationRepayment',
   'saveTripPrep', 'resetReturnPacking', 'personalizeTripChecklists', 'saveTripPrepDefaults', 'saveTripNotes', 'saveSharedExpense', 'saveTripExpense', 'deleteTripExpense', 'deleteConfirmedTestTrip', 'correctLonatoCarTolls', 'saveTripRepayment', 'deleteCurrentTrip', 'savePlanPartial', 'savePlanSubmission',
   'saveSubmission', 'confirmTrip', 'confirmPlanTrip', 'saveFinanceMonth', 'deleteFinanceMonth', 'repayFinanceCarry', 'confirmFinanceCreditCard', 'saveFinancePlanning',
   'saveFinanceProfile', 'confirmFutureBill', 'dismissFutureBillOccurrence', 'wishlistCheckout', 'saveCompareLab', 'updateCompare',
