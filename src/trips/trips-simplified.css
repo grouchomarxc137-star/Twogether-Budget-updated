@@ -2427,3 +2427,94 @@ html body #twCurrentTripsSection.tv2-current-host.tv2-focus-open{
   opacity:1!important;
   filter:none!important;
 }
+
+/* Trip distance stays with its trip, both before and after confirmation. */
+.trip-distance-panel{
+  display:grid;
+  gap:12px;
+  margin:12px 0;
+  padding:15px;
+  border:1px solid #e6ded3;
+  border-radius:18px;
+  background:#fffdf9;
+  color:#302922;
+}
+.trip-distance-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:8px;
+}
+.trip-distance-head strong{font-size:16px;font-weight:650}
+.trip-distance-head small{font-size:11px;color:#898077}
+.trip-distance-stats{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+.trip-distance-stats>div{
+  display:grid;
+  align-content:center;
+  gap:5px;
+  min-width:0;
+  padding:10px 7px;
+  background:#f7f4ef;
+  border-radius:11px;
+}
+.trip-distance-stats small{color:#857c72;font-size:11px}
+.trip-distance-stats strong{
+  overflow-wrap:anywhere;
+  font-size:15px;
+  line-height:1.2;
+  font-weight:650;
+  font-variant-numeric:tabular-nums;
+}
+.trip-distance-edit{
+  display:flex;
+  align-items:end;
+  gap:9px;
+}
+.trip-distance-edit label{
+  display:grid;
+  flex:1;
+  gap:5px;
+  min-width:0;
+  font-size:12px;
+  font-weight:600;
+  color:#70665c;
+}
+.trip-distance-edit input{
+  box-sizing:border-box;
+  width:100%;
+  min-height:42px;
+  padding:9px 11px;
+  border:1px solid #e1d7cb;
+  border-radius:11px;
+  background:#fff;
+  color:#302922;
+  font-size:16px!important;
+  font-variant-numeric:tabular-nums;
+}
+.trip-distance-edit input:focus{outline:2px solid #ad9881;outline-offset:1px}
+.trip-distance-edit button{
+  flex:0 0 auto;
+  min-height:42px;
+  padding:0 15px!important;
+  border:0;
+  border-radius:11px;
+  background:#322a24!important;
+  color:#fffdf9!important;
+  font-size:13px!important;
+  font-weight:650!important;
+  cursor:pointer;
+}
+.trip-distance-edit button:disabled{opacity:.5;cursor:wait}
+.trip-distance-note{color:#857b70;font-size:11px;line-height:1.35}
+@media(max-width:410px){
+  .trip-distance-panel{padding:12px}
+  .trip-distance-stats{gap:5px}
+  .trip-distance-stats>div{padding:8px 6px}
+  .trip-distance-stats strong{font-size:13px}
+  .trip-distance-edit{gap:6px}
+  .trip-distance-edit button{padding:0 10px!important}
+}

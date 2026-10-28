@@ -21,6 +21,7 @@ import { beginEdit, beginJoin } from './wizard.js';
 import { openSheet, rememberCardView, backFromCardView, dismissCardView } from '../app/navigation.js';
 import { tripImage, preloadTripImages } from './trip-images.js';
 import { isCarExpense, carExpenseBreakdown } from './car-expenses.js';
+import { readDistanceInput, renderTripDistance } from './trip-distance.js';
 import { installCarLongPress, showCarBreakdown } from './car-breakdown-ui.js';
 
 let openTripId = '';
@@ -183,6 +184,8 @@ function renderTripModal(id) {
   const locked = isLocked(t);
   const own = !!t.submissions?.[actor()];
   const canConfirm = isBackendV3() && both && !diff.length && !locked && !t.confirmed?.[actor()];
+  const planForDistance = (Array.isArray(state.plans)?state.plans:[]).find((item)=>item.linkedTripId===t.id);
+  const canLogDistance = !!m.end && m.end<=new Date().toISOString().slice(0,10);
 
   let statusHtml = '';
   if (locked) {
@@ -200,6 +203,7 @@ function renderTripModal(id) {
     <div class="trip-modal-heading"><span class="eyebrow">${esc(locationLabel(m))}</span><h2>${esc(m.city || locationLabel(m))}</h2><p>${fmtDate(m.start)}–${fmtDate(m.end)}</p></div>
     <div class="trip-modal-total"><span>Current trip total</span><strong>${e.estimated ? '~ ' : ''}${money(e.total)}</strong></div>
     ${statusHtml}
+    ${canLogDistance?renderTripDistance(planForDistance,t,n(e.fuel),'confirmed'):''}
     <div class="budget-check ${budget.tone}"><div><span>Planned budget</span><strong>${e.budget ? money(e.budget) : 'Not set'}</strong></div><div><span>Actual / current total</span><strong>${money(e.total)}</strong></div><div class="budget-result"><span>Budget check</span><strong>${esc(budget.label)}</strong></div></div>
     ${diff.length ? `<div class="difference-list"><h3>What differs</h3>${diff.map((x) => `<div class="difference-row"><strong>${esc(x.label)}</strong><span>Principessa: ${esc(x.a)}</span><span>Principe: ${esc(x.b)}</span></div>`).join('')}</div>` : ''}
     <div class="submission-grid">${submissionCard('Principessa', t.submissions.Principessa)}${submissionCard('Principe', t.submissions.Principe)}</div>
@@ -223,6 +227,25 @@ function renderTripModal(id) {
     if(legacyOther>.005)details.push({kind:'older-car',label:'Tolls / Parking (older)',amount:legacyOther,items:[]});
     showCarBreakdown('Car · '+(m.city||'Trip'),details,total);
   }));
+  $('[data-trip-distance-save]',root)?.addEventListener('click',async(event)=>{
+    const button=event.currentTarget;
+    const input=root.querySelector('[data-trip-distance-input]');
+    const distanceKm=readDistanceInput(input?.value);
+    if (distanceKm == null) { toast('Enter a valid distance in kilometres (for example, 375).','warn'); return; }
+    if (button.disabled) return;
+    button.disabled=true;
+    button.textContent='Saving…';
+    try {
+      const result=await postAction('saveTripDistance',{tripId:id,distanceKm},actor());
+      if(!result?.ok)throw new Error(result?.error||'Could not save kilometres');
+      renderTripModal(id);
+      toast('Trip kilometres saved');
+    }catch(err){
+      button.disabled=false;
+      button.textContent='Save km';
+      toast(err?.message||'Could not save kilometres','warn');
+    }
+  });
   $('[data-delete-confirmed-test]', root)?.addEventListener('click',()=>confirmTestTripDeletion(id));
   $('[data-edit-own]', root)?.addEventListener('click', () => beginEdit(id));
   $('[data-add-own]', root)?.addEventListener('click', () => { closeTripModal(true); openSheet('log'); beginJoin(id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
