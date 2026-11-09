@@ -2,6 +2,10 @@ import { createPrivateKey, generateKeyPairSync, sign } from 'node:crypto';
 
 const ACTORS = new Set(['Principessa', 'Principe']);
 const FALLBACK_TIMEZONE = 'Europe/Amsterdam';
+const MAX_CACHED_TIME_ZONES = 8;
+const timeZoneFormatters = new Map();
+const shortDateFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const monthLabelFormatter = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 const CHECKLIST_DEFAULTS = {
   packing: ['Toothbrushes', 'Slippers', 'Hair brush', 'Shampoo', 'Conditioner', 'Shower gel', 'Dishwasher detergent'],
   reminders: ["Don't forget to put fuel", "Don't forget to ask mom to make work sandwich", "Don't forget to take pictures of the Airbnb when you arrive"],
@@ -14,20 +18,33 @@ const amount = (value) => {
 };
 const base64urlJson = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-function validTimeZone(value) {
-  const zone = cleanText(value, 80) || FALLBACK_TIMEZONE;
+function getTimeZoneFormatters(value) {
+  const timeZone = cleanText(value, 80) || FALLBACK_TIMEZONE;
+  const cached = timeZoneFormatters.get(timeZone);
+  if (cached) return cached;
+
+  const dateOptions = { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' };
+  let date;
   try {
-    new Intl.DateTimeFormat('en-GB', { timeZone: zone }).format(new Date());
-    return zone;
-  } catch {
-    return FALLBACK_TIMEZONE;
+    date = new Intl.DateTimeFormat('en-CA', dateOptions);
+  } catch (error) {
+    if (!(error instanceof RangeError) || timeZone === FALLBACK_TIMEZONE) throw error;
+    return getTimeZoneFormatters(FALLBACK_TIMEZONE);
   }
+
+  const wallClock = new Intl.DateTimeFormat('en-CA', {
+    ...dateOptions, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  const formatters = { timeZone, date, wallClock };
+  if (timeZoneFormatters.size === MAX_CACHED_TIME_ZONES) {
+    timeZoneFormatters.delete(timeZoneFormatters.keys().next().value);
+  }
+  timeZoneFormatters.set(timeZone, formatters);
+  return formatters;
 }
 
-function localIsoDate(timeZone, now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: validTimeZone(timeZone), year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now);
+function localIsoDate(formatter, now) {
+  const parts = formatter.formatToParts(now);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
@@ -39,13 +56,8 @@ function dayDiff(left, right) {
   return Math.round((b - a) / 86400000);
 }
 
-function localWallClock(timeZone, now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: validTimeZone(timeZone),
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now);
+function localWallClock(formatter, now) {
+  const parts = formatter.formatToParts(now);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return {
     year: Number(values.year), month: Number(values.month), day: Number(values.day),
@@ -53,10 +65,10 @@ function localWallClock(timeZone, now = new Date()) {
   };
 }
 
-function hoursUntilTripStart(value, timeZone, now = new Date()) {
+function hoursUntilTripStart(value, wallClockFormatter, now) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
   if (!match) return null;
-  const current = localWallClock(timeZone, now);
+  const current = localWallClock(wallClockFormatter, now);
   const start = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0);
   const localNow = Date.UTC(current.year, current.month - 1, current.day, current.hour, current.minute, current.second);
   if (!Number.isFinite(start) || !Number.isFinite(localNow)) return null;
@@ -125,14 +137,14 @@ function shortDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
   if (!match) return '';
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date);
+  return shortDateFormatter.format(date);
 }
 
 function monthLabel(value) {
   const match = /^(\d{4})-(\d{2})$/.exec(String(value || ''));
   if (!match) return String(value || '');
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
-  return new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date);
+  return monthLabelFormatter.format(date);
 }
 
 function buildFinancePushItems(state, actor, today) {
@@ -254,14 +266,14 @@ function prepItemsForActor(items,actor) {
   });
 }
 
-function buildTripPushItems(state, actor, today, timeZone, now) {
+function buildTripPushItems(state, actor, today, wallClockFormatter, now) {
   const items = [];
   const plans = Array.isArray(state?.plans) ? state.plans : [];
   const trips = Array.isArray(state?.trips) ? state.trips : [];
   for (const plan of plans) {
     const meta = plan?.meta || {};
     const start = cleanText(meta.start, 10);
-    const hoursUntilStart = hoursUntilTripStart(start, timeZone, now);
+    const hoursUntilStart = hoursUntilTripStart(start, wallClockFormatter, now);
     const reminderStage = hoursUntilStart != null && hoursUntilStart > 0 && hoursUntilStart <= 12
       ? 'important'
       : hoursUntilStart != null && hoursUntilStart > 12 && hoursUntilStart <= 48
@@ -338,8 +350,9 @@ function buildTripPushItems(state, actor, today, timeZone, now) {
 }
 
 export function buildPushItems(state, actor, timeZone, now = new Date()) {
-  const today = localIsoDate(timeZone, now);
-  return [...buildTripPushItems(state, actor, today, timeZone, now), ...buildFinancePushItems(state, actor, today)];
+  const { date, wallClock } = getTimeZoneFormatters(timeZone);
+  const today = localIsoDate(date, now);
+  return [...buildTripPushItems(state, actor, today, wallClock, now), ...buildFinancePushItems(state, actor, today)];
 }
 
 function nextScheduledTripReminderAt(state, nowMs = Date.now()) {
@@ -509,7 +522,8 @@ export function createPushService({ db, readState }) {
     if (!endpoint.startsWith('https://') || !p256dh || !auth) throw new Error('Invalid push subscription');
     const previous = subscriptionByEndpoint.get(endpoint);
     const now = new Date().toISOString();
-    upsertSubscription.run({ actor, endpoint, p256dh, auth, timezone: validTimeZone(timeZoneValue), now });
+    const { timeZone } = getTimeZoneFormatters(timeZoneValue);
+    upsertSubscription.run({ actor, endpoint, p256dh, auth, timezone: timeZone, now });
     const saved = subscriptionByEndpoint.get(endpoint);
     if (previous && saved && previous.actor !== actor) clearPendingMessages.run(saved.id);
     evaluateSoon();
